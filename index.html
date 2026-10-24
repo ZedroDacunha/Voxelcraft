@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voxel Sandbox - Texturas 32x32</title>
+<style>
+    body { margin: 0; overflow: hidden; background-color: #87CEEB; font-family: sans-serif; }
+    #crosshair { position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; margin-top: -10px; margin-left: -10px; pointer-events: none; }
+    #crosshair::before, #crosshair::after { content: ''; position: absolute; background-color: white; box-shadow: 0 0 2px black; }
+    #crosshair::before { top: 9px; left: 0; width: 20px; height: 2px; }
+    #crosshair::after { top: 0; left: 9px; width: 2px; height: 20px; }
+    #menu { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.6); display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; z-index: 10; }
+    #menu h1 { margin: 0 0 10px 0; }
+    #menu p { margin: 0 0 20px 0; }
+    .btn { padding: 10px 20px; font-size: 16px; background: #55aa55; border: none; color: white; cursor: pointer; border-radius: 4px; }
+    .btn:hover { background: #66cc66; }
+    
+    #hotbar {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 4px;
+        background-color: rgba(0, 0, 0, 0.5);
+        padding: 6px;
+        border-radius: 4px;
+        z-index: 5;
+    }
+    .slot {
+        width: 44px;
+        height: 44px;
+        background-color: rgba(255, 255, 255, 0.2);
+        border: 2px solid #555;
+        border-radius: 4px;
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transition: transform 0.1s;
+    }
+    .slot.active {
+        border: 3px solid white;
+        transform: scale(1.1);
+        z-index: 6;
+        background-color: rgba(255, 255, 255, 0.4);
+    }
+    .slot-number {
+        position: absolute;
+        top: 2px;
+        left: 4px;
+        color: white;
+        font-size: 10px;
+        font-weight: bold;
+        text-shadow: 1px 1px 0 #000;
+    }
+    .icon-grass { width: 24px; height: 24px; background: #55aa55; border-bottom: 6px solid #8b4513; }
+    .icon-stone { width: 24px; height: 24px; background: #888; }
+    .icon-wood { width: 24px; height: 24px; background: #a0522d; border-left: 4px solid #6b3e1b; }
+    .icon-dirt { width: 24px; height: 24px; background: #8b4513; }
+    
+    #survival-hud {
+        position: absolute;
+        bottom: 70px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        justify-content: space-between;
+        width: 320px;
+        z-index: 5;
+        pointer-events: none;
+    }
+    .stat-bar { display: flex; gap: 4px; }
+    .heart { width: 14px; height: 14px; background: #ff3333; border-radius: 50%; box-shadow: 0 0 2px #000; border: 1px solid #800000; }
+    .food { width: 14px; height: 14px; background: #ffaa00; border-radius: 3px; box-shadow: 0 0 2px #000; border: 1px solid #8b4500; }
+    .empty-stat { background: rgba(0,0,0,0.5); border: 1px solid #111; box-shadow: none; }
+</style>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+</script>
+</head>
+<body>
+<div id="crosshair"></div>
+<div id="menu">
+    <h1>Voxel Sandbox</h1>
+    <p>Texturas 32x32 e Terreno Procedural</p>
+    <button class="btn" id="btn-play">Clique para Jogar</button>
+    <p style="font-size: 14px; opacity: 0.8; margin-top: 15px;">Controles: [WASD] Mover | [Espaço] Pular | [Shift] Correr | [Ctrl / C] Agachar</p>
+</div>
+
+<!-- Interface da Barra Rápida -->
+<div id="hotbar">
+    <div class="slot active" id="slot-0"><span class="slot-number">1</span><div class="icon-grass"></div></div>
+    <div class="slot" id="slot-1"><span class="slot-number">2</span><div class="icon-stone"></div></div>
+    <div class="slot" id="slot-2"><span class="slot-number">3</span><div class="icon-wood"></div></div>
+    <div class="slot" id="slot-3"><span class="slot-number">4</span><div class="icon-dirt"></div></div>
+    <div class="slot" id="slot-4"><span class="slot-number">5</span></div>
+    <div class="slot" id="slot-5"><span class="slot-number">6</span></div>
+    <div class="slot" id="slot-6"><span class="slot-number">7</span></div>
+    <div class="slot" id="slot-7"><span class="slot-number">8</span></div>
+    <div class="slot" id="slot-8"><span class="slot-number">9</span></div>
+</div>
+
+<!-- HUD de Sobrevivência -->
+<div id="survival-hud">
+    <div class="stat-bar" id="health-bar"></div>
+    <div class="stat-bar" id="hunger-bar"></div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+let camera, scene, renderer, controls, world;
+
+// --- Variáveis de Interação ---
+const raycaster = new THREE.Raycaster();
+let targetMesh; // O contorno preto
+let currentTarget = null; // Coordenada do bloco sendo olhado
+let currentNormal = null; // Face do bloco sendo olhada
+
+const velocity = new THREE.Vector3();
+const direction = new THREE.Vector3();
+let moveForward = false; let moveBackward = false; let moveLeft = false; let moveRight = false;
+let isOnGround = false;
+
+// Controles
+let isSprinting = false;
+let wantToCrouch = false;
+let isCrouching = false;
+
+// --- Variáveis do Braço e View Bobbing ---
+let bobTimer = 0;
+let playerArm;
+
+// --- Sistema de Hotbar e Inventário ---
+let selectedSlot = 0;
+const hotbarItems = [1, 2, 3, 4, 0, 0, 0, 0, 0]; // 1:Grama, 2:Pedra, 3:Madeira, 4:Terra, 0:Vazio
+
+// --- Sistema de Sobrevivência (Vida e Fome) ---
+let health = 20;
+let hunger = 20;
+let exhaustion = 0;
+let healthTick = 0;
+
+function updateSurvivalUI() {
+    const healthBar = document.getElementById('health-bar');
+    const hungerBar = document.getElementById('hunger-bar');
+    if (!healthBar || !hungerBar) return;
+    
+    healthBar.innerHTML = '';
+    hungerBar.innerHTML = '';
+    
+    // Cada ícone vale 2 pontos (Total de 10 ícones = 20 pontos)
+    for(let i = 0; i < 10; i++) {
+        const heart = document.createElement('div');
+        heart.className = 'heart ' + (health > i * 2 ? '' : 'empty-stat');
+        healthBar.appendChild(heart);
+
+        const food = document.createElement('div');
+        food.className = 'food ' + (hunger > i * 2 ? '' : 'empty-stat');
+        hungerBar.appendChild(food);
+    }
+}
+
+function takeDamage(amount) {
+    health -= amount;
+    if (health <= 0) {
+        // Morte e Respawn
+        health = 20;
+        hunger = 20;
+        camera.position.set(0, 15, 0); // Nasce no céu novamente
+        velocity.set(0, 0, 0);
+    }
+    updateSurvivalUI();
+}
+
+function updateHotbarUI() {
+    for (let i = 0; i < 9; i++) {
+        const slot = document.getElementById(`slot-${i}`);
+        if (i === selectedSlot) {
+            slot.classList.add('active');
+        } else {
+            slot.classList.remove('active');
+        }
+    }
+}
+
+let prevTime = performance.now();
+const gravity = 30.0;
+const jumpForce = 10.0;
+
+// Velocidades
+const baseSpeed = 40.0;
+const sprintSpeed = 70.0;
+const crouchSpeed = 15.0;
+
+// Hitbox
+const playerRadius = 0.3;
+const normalHeight = 1.6;
+const crouchHeight = 0.8;
+let playerHeight = normalHeight;
+
+// --- Sistema Procedural de Texturas em Pixel Art (Agora 32x32) ---
+const blockMaterials = {};
+
+// Função que "desenha" texturas pixel art puras matematicamente
+function createVoxelTexture(type) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 32; canvas.height = 32;
+    const ctx = canvas.getContext('2d');
+
+    for (let x = 0; x < 32; x++) {
+        for (let y = 0; y < 32; y++) {
+            let color = [0, 0, 0];
+            
+            if (type === 'grass_top') {
+                color = [85 + (Math.random()*20-10), 170 + (Math.random()*20-10), 85 + (Math.random()*20-10)];
+            } else if (type === 'dirt') {
+                color = [139 + (Math.random()*20-10), 69 + (Math.random()*20-10), 19 + (Math.random()*10-5)];
+            } else if (type === 'grass_side') {
+                // Metade de cima verde (grama), metade de baixo marrom (terra) com transição irregular
+                // Escalonado para 32x32: antes era y < 6, agora y < 12
+                if (y < 12 + Math.random() * 6) {
+                    color = [85 + (Math.random()*20-10), 170 + (Math.random()*20-10), 85 + (Math.random()*20-10)];
+                } else {
+                    color = [139 + (Math.random()*20-10), 69 + (Math.random()*20-10), 19 + (Math.random()*10-5)];
+                }
+            } else if (type === 'stone') {
+                const c = 120 + (Math.random() * 30 - 15);
+                color = [c, c, c];
+            } else if (type === 'wood') {
+                // Fibras de madeira vertical, escalonado para 32x32
+                const line = (x % 8 < 2) ? -20 : 0;
+                color = [160 + line + (Math.random()*10-5), 82 + line + (Math.random()*10-5), 45 + line + (Math.random()*10-5)];
+            }
+
+            ctx.fillStyle = `rgb(${Math.floor(color[0])}, ${Math.floor(color[1])}, ${Math.floor(color[2])})`;
+            ctx.fillRect(x, y, 1, 1);
+        }
+    }
+    
+    const tex = new THREE.CanvasTexture(canvas);
+    // NearestFilter é vital para garantir o visual pixelado/nítido, sem embaçar!
+    tex.magFilter = THREE.NearestFilter; 
+    tex.minFilter = THREE.NearestFilter;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+}
+
+function initMaterials() {
+    const texGrassTop = createVoxelTexture('grass_top');
+    const texDirt = createVoxelTexture('dirt');
+    const texGrassSide = createVoxelTexture('grass_side');
+    const texStone = createVoxelTexture('stone');
+    const texWood = createVoxelTexture('wood');
+
+    // Tipo 1: Bloco de Grama (Array de 6 texturas: [Dir, Esq, Cima, Baixo, Frente, Trás])
+    blockMaterials[1] = [
+        new THREE.MeshLambertMaterial({ map: texGrassSide }), // Direita
+        new THREE.MeshLambertMaterial({ map: texGrassSide }), // Esquerda
+        new THREE.MeshLambertMaterial({ map: texGrassTop }),  // Cima
+        new THREE.MeshLambertMaterial({ map: texDirt }),      // Baixo
+        new THREE.MeshLambertMaterial({ map: texGrassSide }), // Frente
+        new THREE.MeshLambertMaterial({ map: texGrassSide })  // Trás
+    ];
+
+    // Tipo 2: Pedra
+    blockMaterials[2] = new THREE.MeshLambertMaterial({ map: texStone });
+    
+    // Tipo 3: Madeira
+    blockMaterials[3] = new THREE.MeshLambertMaterial({ map: texWood });
+    
+    // Tipo 4: Terra (Miolo das montanhas)
+    blockMaterials[4] = new THREE.MeshLambertMaterial({ map: texDirt });
+}
+
+// --- Classe Chunk (Lida com múltiplas malhas para permitir texturas diferentes) ---
+class Chunk {
+    constructor(cx, cz, scene, geometry) {
+        this.cx = cx;
+        this.cz = cz;
+        this.scene = scene;
+        this.geometry = geometry;
+        this.blocks = new Map();
+        this.meshes = {}; // InstancedMesh separados por Tipo de Bloco
+        this.isDirty = false;
+    }
+    
+    setBlock(x, y, z, type) {
+        this.blocks.set(`${x},${y},${z}`, type);
+        this.isDirty = true;
+    }
+
+    getBlock(x, y, z) {
+        return this.blocks.has(`${x},${y},${z}`) ? this.blocks.get(`${x},${y},${z}`) : 0;
+    }
+
+    removeBlock(x, y, z) {
+        if (this.blocks.has(`${x},${y},${z}`)) {
+            this.blocks.delete(`${x},${y},${z}`);
+            this.isDirty = true;
+        }
+    }
+
+    updateMesh() {
+        if (!this.isDirty) return;
+        
+        // Limpa as malhas antigas deste chunk
+        for (const key in this.meshes) {
+            this.scene.remove(this.meshes[key]);
+            this.meshes[key].dispose();
+        }
+        this.meshes = {};
+
+        const totalBlocks = this.blocks.size;
+        if (totalBlocks === 0) {
+            this.isDirty = false;
+            return;
+        }
+
+        // Conta quantos blocos existem de cada tipo para otimizar a criação
+        const counts = {};
+        for (const type of this.blocks.values()) {
+            counts[type] = (counts[type] || 0) + 1;
+        }
+
+        // Prepara malhas e matrizes individuais
+        const matrices = {};
+        const indices = {};
+        for (const type in counts) {
+            this.meshes[type] = new THREE.InstancedMesh(this.geometry, blockMaterials[type], counts[type]);
+            matrices[type] = new THREE.Matrix4();
+            indices[type] = 0;
+        }
+
+        // Posiciona cada bloco no InstancedMesh correto
+        for (const [key, type] of this.blocks.entries()) {
+            const [x, y, z] = key.split(',').map(Number);
+            matrices[type].setPosition(x, y, z);
+            this.meshes[type].setMatrixAt(indices[type], matrices[type]);
+            indices[type]++;
+        }
+
+        // Adiciona à cena
+        for (const type in this.meshes) {
+            this.scene.add(this.meshes[type]);
+        }
+        this.isDirty = false;
+    }
+    
+    dispose() {
+        for (const key in this.meshes) {
+            this.scene.remove(this.meshes[key]);
+            this.meshes[key].dispose();
+        }
+    }
+}
+
+// --- Gerenciador do Mundo (Camadas Reais de Terreno) ---
+class World {
+    constructor(scene) {
+        this.scene = scene;
+        this.chunks = new Map();
+        this.geometry = new THREE.BoxGeometry(1, 1, 1);
+        
+        this.chunkSize = 16; 
+        this.renderDistance = 3; 
+    }
+
+    getChunkCoords(x, z) {
+        return { cx: Math.floor(x / this.chunkSize), cz: Math.floor(z / this.chunkSize) };
+    }
+
+    getChunk(cx, cz) {
+        return this.chunks.get(`${cx},${cz}`);
+    }
+
+    getBlock(x, y, z) {
+        const { cx, cz } = this.getChunkCoords(x, z);
+        const chunk = this.getChunk(cx, cz);
+        if (!chunk) return 0;
+        return chunk.getBlock(x, y, z);
+    }
+
+    setBlock(x, y, z, type) {
+        const { cx, cz } = this.getChunkCoords(x, z);
+        let chunk = this.getChunk(cx, cz);
+        if (!chunk) return;
+        chunk.setBlock(x, y, z, type);
+        chunk.updateMesh();
+    }
+
+    addBlock(x, y, z, type) { this.setBlock(x, y, z, type); }
+    
+    removeBlock(x, y, z) {
+        const { cx, cz } = this.getChunkCoords(x, z);
+        const chunk = this.getChunk(cx, cz);
+        if (chunk) {
+            chunk.removeBlock(x, y, z);
+            chunk.updateMesh();
+        }
+    }
+
+    generateChunk(cx, cz) {
+        const chunk = new Chunk(cx, cz, this.scene, this.geometry);
+        const startX = cx * this.chunkSize;
+        const startZ = cz * this.chunkSize;
+
+        for (let x = 0; x < this.chunkSize; x++) {
+            for (let z = 0; z < this.chunkSize; z++) {
+                const worldX = startX + x;
+                const worldZ = startZ + z;
+                
+                const h = Math.floor(Math.sin(worldX * 0.1) * 3 + Math.cos(worldZ * 0.1) * 3);
+                
+                // Camadas Reais: Grama por cima, Terra no meio, Pedra no fundo
+                for (let y = -5; y <= h; y++) {
+                    if (y === h) {
+                        chunk.setBlock(worldX, y, worldZ, 1); // 1 = Grama
+                    } else if (y > h - 3) {
+                        chunk.setBlock(worldX, y, worldZ, 4); // 4 = Terra
+                    } else {
+                        chunk.setBlock(worldX, y, worldZ, 2); // 2 = Pedra
+                    }
+                }
+            }
+        }
+        chunk.updateMesh();
+        this.chunks.set(`${cx},${cz}`, chunk);
+    }
+
+    update(playerPos) {
+        const { cx: pCx, cz: pCz } = this.getChunkCoords(playerPos.x, playerPos.z);
+
+        for (let x = -this.renderDistance; x <= this.renderDistance; x++) {
+            for (let z = -this.renderDistance; z <= this.renderDistance; z++) {
+                const cx = pCx + x;
+                const cz = pCz + z;
+                if (!this.chunks.has(`${cx},${cz}`)) {
+                    this.generateChunk(cx, cz);
+                }
+            }
+        }
+
+        for (const [key, chunk] of this.chunks.entries()) {
+            if (Math.abs(chunk.cx - pCx) > this.renderDistance + 1 || 
+                Math.abs(chunk.cz - pCz) > this.renderDistance + 1) {
+                chunk.dispose();
+                this.chunks.delete(key);
+            }
+        }
+    }
+    
+    // Retorna todas as malhas ativas para o Raycaster
+    getMeshes() {
+        let allMeshes = [];
+        for (const chunk of this.chunks.values()) {
+            for (const key in chunk.meshes) {
+                allMeshes.push(chunk.meshes[key]);
+            }
+        }
+        return allMeshes;
+    }
+}
+
+init();
+animate();
+
+function init() {
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87CEEB);
+    scene.fog = new THREE.Fog(0x87CEEB, 10, 30);
+
+    const light = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8);
+    light.position.set(0, 20, 0);
+    scene.add(light);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+    dirLight.position.set(10, 20, 10);
+    scene.add(dirLight);
+
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+    // Fazer o jogador nascer no céu para cair no terreno gerado proceduralmente
+    camera.position.set(0, 15, 0); 
+
+    // Criar o Braço em Primeira Pessoa
+    const armGeometry = new THREE.BoxGeometry(0.2, 0.6, 0.2);
+    const armMaterial = new THREE.MeshLambertMaterial({ color: 0xd2a679 }); // Cor de pele (Skin tone voxel)
+    playerArm = new THREE.Mesh(armGeometry, armMaterial);
+    playerArm.position.set(0.3, -0.3, -0.4); // Canto inferior direito
+    playerArm.rotation.set(-0.1, -0.1, 0); // Leve inclinação natural
+    
+    // Para que o braço siga a câmera perfeitamente e receba a luz global do mundo:
+    camera.add(playerArm);
+    scene.add(camera);
+
+    // Criar a caixa de Seleção (Wireframe Preto)
+    const targetGeo = new THREE.BoxGeometry(1.01, 1.01, 1.01);
+    const targetMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+    const targetEdges = new THREE.EdgesGeometry(targetGeo);
+    targetMesh = new THREE.LineSegments(targetEdges, targetMat);
+    targetMesh.visible = false;
+    scene.add(targetMesh);
+
+    controls = new PointerLockControls(camera, document.body);
+    const menu = document.getElementById('menu');
+    const btnPlay = document.getElementById('btn-play');
+    
+    btnPlay.addEventListener('click', () => {
+        const promise = document.body.requestPointerLock();
+        if (promise !== undefined) {
+            promise.catch(error => console.warn('Aguardando cooldown do navegador...', error));
+        }
+    });
+
+    controls.addEventListener('lock', () => {
+        menu.style.display = 'none';
+    });
+
+    controls.addEventListener('unlock', () => {
+        menu.style.display = 'flex';
+        
+        btnPlay.disabled = true;
+        const originalText = btnPlay.innerText;
+        btnPlay.innerText = "Aguarde...";
+        btnPlay.style.background = "#888888";
+        btnPlay.style.cursor = "not-allowed";
+        
+        setTimeout(() => {
+            btnPlay.disabled = false;
+            btnPlay.innerText = originalText;
+            btnPlay.style.background = ""; 
+            btnPlay.style.cursor = "pointer";
+        }, 1300);
+    });
+
+    document.addEventListener('keydown', (event) => {
+        switch (event.code) {
+            case 'KeyW': moveForward = true; break;
+            case 'KeyA': moveLeft = true; break;
+            case 'KeyS': moveBackward = true; break;
+            case 'KeyD': moveRight = true; break;
+            case 'Space': 
+                if (isOnGround && !isCrouching) {
+                    velocity.y = jumpForce; 
+                    exhaustion += 0.2; // Pular gasta energia
+                }
+                break;
+            case 'ShiftLeft':
+            case 'ShiftRight':
+                isSprinting = true; break;
+            case 'ControlLeft':
+            case 'ControlRight':
+            case 'KeyC':
+                wantToCrouch = true; break;
+        }
+        
+        // Seleção da Hotbar pelas teclas numéricas (1 a 9)
+        if (event.code.startsWith('Digit')) {
+            const num = parseInt(event.key);
+            if (num >= 1 && num <= 9) {
+                selectedSlot = num - 1;
+                updateHotbarUI();
+            }
+        }
+    });
+
+    document.addEventListener('keyup', (event) => {
+        switch (event.code) {
+            case 'KeyW': moveForward = false; break;
+            case 'KeyA': moveLeft = false; break;
+            case 'KeyS': moveBackward = false; break;
+            case 'KeyD': moveRight = false; break;
+            case 'ShiftLeft':
+            case 'ShiftRight':
+                isSprinting = false; break;
+            case 'ControlLeft':
+            case 'ControlRight':
+            case 'KeyC':
+                wantToCrouch = false; break;
+        }
+    });
+
+    // Mudança da Hotbar com a Roda do Mouse (Scroll)
+    document.addEventListener('wheel', (event) => {
+        if (!controls.isLocked) return;
+        if (event.deltaY > 0) {
+            selectedSlot = (selectedSlot + 1) % 9;
+        } else {
+            selectedSlot = (selectedSlot - 1 + 9) % 9; // +9 para evitar mod de número negativo
+        }
+        updateHotbarUI();
+    });
+
+    // Inicializa as texturas geradas antes de carregar o mundo
+    initMaterials(); 
+
+    // Interação com o Mouse (Quebrar e Colocar)
+    document.addEventListener('mousedown', (event) => {
+        if (!controls.isLocked) return;
+        
+        if (event.button === 0 && targetMesh.visible && currentTarget) {
+            // Botão Esquerdo: Quebrar Bloco
+            world.removeBlock(currentTarget.x, currentTarget.y, currentTarget.z);
+            
+            // Simula um "tranco" no braço ao minerar
+            playerArm.rotation.x = -0.6;
+            
+        } else if (event.button === 2 && targetMesh.visible && currentTarget && currentNormal) {
+            // Botão Direito: Colocar Bloco (posição + normal da face)
+            const placeX = currentTarget.x + currentNormal.x;
+            const placeY = currentTarget.y + currentNormal.y;
+            const placeZ = currentTarget.z + currentNormal.z;
+            
+            const blockToPlace = hotbarItems[selectedSlot];
+            
+            // Previne colocar o bloco dentro do próprio jogador, e verifica se tem um bloco selecionado (diferente de 0)
+            if (blockToPlace !== 0 && !isPlayerInBlock(placeX, placeY, placeZ)) {
+                world.addBlock(placeX, placeY, placeZ, blockToPlace); 
+                
+                // Simula tranco no braço
+                playerArm.rotation.x = -0.6;
+            }
+        }
+    });
+
+    world = new World(scene);
+    world.update(camera.position);
+
+    renderer = new THREE.WebGLRenderer({ antialias: false });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+    
+    updateSurvivalUI(); // Inicializa HUD
+}
+
+function checkCollision(pos) {
+    const offsets = [
+        [-playerRadius, 0, -playerRadius],
+        [playerRadius, 0, -playerRadius],
+        [-playerRadius, 0, playerRadius],
+        [playerRadius, 0, playerRadius],
+        [-playerRadius, -playerHeight, -playerRadius],
+        [playerRadius, -playerHeight, -playerRadius],
+        [-playerRadius, -playerHeight, playerRadius],
+        [playerRadius, -playerHeight, playerRadius]
+    ];
+    for (let offset of offsets) {
+        const blockX = Math.floor(pos.x + offset[0] + 0.5);
+        const blockY = Math.floor(pos.y + offset[1] + 0.5);
+        const blockZ = Math.floor(pos.z + offset[2] + 0.5);
+        if (world.getBlock(blockX, blockY, blockZ)) return true;
+    }
+    return false;
+}
+
+// Função para checar se o jogador está dentro de um bloco específico (usado na hora de construir)
+function isPlayerInBlock(bx, by, bz) {
+    const minX = camera.position.x - playerRadius;
+    const maxX = camera.position.x + playerRadius;
+    const minY = camera.position.y - playerHeight;
+    const maxY = camera.position.y;
+    const minZ = camera.position.z - playerRadius;
+    const maxZ = camera.position.z + playerRadius;
+
+    const bMinX = bx - 0.5, bMaxX = bx + 0.5;
+    const bMinY = by - 0.5, bMaxY = by + 0.5;
+    const bMinZ = bz - 0.5, bMaxZ = bz + 0.5;
+
+    return (minX < bMaxX && maxX > bMinX) &&
+           (minY < bMaxY && maxY > bMinY) &&
+           (minZ < bMaxZ && maxZ > bMinZ);
+}
+
+function updatePhysics(delta) {
+    // Lógica de Agachamento (Crouch)
+    if (wantToCrouch && !isCrouching) {
+        isCrouching = true;
+        playerHeight = crouchHeight;
+        camera.position.y -= (normalHeight - crouchHeight); 
+    } else if (!wantToCrouch && isCrouching) {
+        const testPos = camera.position.clone();
+        testPos.y += (normalHeight - crouchHeight);
+        
+        playerHeight = normalHeight;
+        
+        if (!checkCollision(testPos)) {
+            isCrouching = false;
+            camera.position.y = testPos.y;
+        } else {
+            playerHeight = crouchHeight; 
+        }
+    }
+
+    let targetSpeed = isCrouching ? crouchSpeed : (isSprinting ? sprintSpeed : baseSpeed);
+
+    // Controle no Ar (aplica força de aceleração condizente com o atrito)
+    let currentAccel = isOnGround ? targetSpeed : targetSpeed * 0.15;
+
+    if (isOnGround) {
+        velocity.x -= velocity.x * 10.0 * delta;
+        velocity.z -= velocity.z * 10.0 * delta;
+    } else {
+        velocity.x -= velocity.x * 1.5 * delta;
+        velocity.z -= velocity.z * 1.5 * delta;
+    }
+
+    direction.z = Number(moveForward) - Number(moveBackward);
+    direction.x = Number(moveRight) - Number(moveLeft);
+    direction.normalize();
+
+    if (moveForward || moveBackward) velocity.z -= direction.z * currentAccel * delta;
+    if (moveLeft || moveRight) velocity.x += direction.x * currentAccel * delta; // Ajustado para Sliding lateral perfeito
+
+    velocity.y -= gravity * delta;
+
+    // Animação do FOV
+    const targetFOV = (isSprinting && moveForward && !isCrouching) ? 85 : 75;
+    if (Math.abs(camera.fov - targetFOV) > 0.1) {
+        camera.fov += (targetFOV - camera.fov) * 10 * delta;
+        camera.updateProjectionMatrix();
+    }
+
+    const camQuat = camera.quaternion.clone();
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camQuat);
+    forward.y = 0; forward.normalize();
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camQuat);
+    right.y = 0; right.normalize();
+
+    const moveX = forward.x * (-velocity.z * delta) + right.x * (velocity.x * delta);
+    const moveZ = forward.z * (-velocity.z * delta) + right.z * (velocity.x * delta);
+    const moveY = velocity.y * delta;
+
+    // View Bobbing (Balanço do Braço) - Declarado ANTES de ser usado nos cálculos de exaustão
+    const hzSpeed = Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
+
+    // Calcula exaustão pelo movimento
+    if (isOnGround && hzSpeed > 0.1) {
+        exhaustion += hzSpeed * delta * (isSprinting ? 0.015 : 0.005);
+    }
+
+    // Sistema de Fome e Regeneração
+    if (exhaustion >= 4.0) {
+        exhaustion = 0;
+        hunger = Math.max(0, hunger - 1);
+        updateSurvivalUI();
+    }
+
+    healthTick += delta;
+    if (healthTick >= 2.0) { // A cada 2 segundos
+        healthTick = 0;
+        if (hunger <= 0) {
+            takeDamage(1); // Dano de fome
+        } else if (hunger >= 18 && health < 20) {
+            health += 1; // Regeneração natural
+            updateSurvivalUI();
+        }
+    }
+
+    const pos = camera.position;
+
+    pos.x += moveX;
+    if (checkCollision(pos)) pos.x -= moveX;
+
+    let previousVelocityY = velocity.y;
+    pos.y += moveY;
+    isOnGround = false;
+    if (checkCollision(pos)) {
+        pos.y -= moveY;
+        if (velocity.y < 0) {
+            isOnGround = true;
+            // Dano de Queda
+            if (previousVelocityY < -12.0) {
+                let fallDamage = Math.floor(Math.abs(previousVelocityY) - 12.0);
+                if (fallDamage > 0) takeDamage(fallDamage);
+            }
+        }
+        velocity.y = 0;
+    }
+
+    pos.z += moveZ;
+    if (checkCollision(pos)) pos.z -= moveZ;
+
+    // View Bobbing Atualização Visual do Braço
+    if (isOnGround && hzSpeed > 2.0) {
+        bobTimer += delta * (hzSpeed * 0.35);
+    } else {
+        bobTimer += (0 - bobTimer) * 5 * delta;
+    }
+
+    playerArm.position.y = -0.3 + Math.sin(bobTimer * 2.0) * 0.04; 
+    playerArm.position.x = 0.3 + Math.cos(bobTimer) * 0.04;
+    playerArm.rotation.x += (-0.1 + Math.sin(bobTimer * 2.0) * 0.05 - playerArm.rotation.x) * 10 * delta;
+
+    // Lógica do Raycaster (Mira e Contorno)
+    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    const meshes = world.getMeshes();
+    
+    if (meshes.length > 0) {
+        const intersects = raycaster.intersectObjects(meshes);
+        
+        if (intersects.length > 0 && intersects[0].distance <= 5.0) { 
+            const intersect = intersects[0];
+            const pt = intersect.point;
+            const norm = intersect.face.normal;
+            
+            const bx = Math.floor(pt.x - norm.x * 0.1 + 0.5);
+            const by = Math.floor(pt.y - norm.y * 0.1 + 0.5);
+            const bz = Math.floor(pt.z - norm.z * 0.1 + 0.5);
+            
+            currentTarget = new THREE.Vector3(bx, by, bz);
+            currentNormal = norm;
+
+            targetMesh.position.set(bx, by, bz);
+            targetMesh.visible = true;
+        } else {
+            targetMesh.visible = false;
+            currentTarget = null;
+            currentNormal = null;
+        }
+    }
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    const time = performance.now();
+    if (controls.isLocked) {
+        const delta = Math.min((time - prevTime) / 1000, 0.1); 
+        updatePhysics(delta);
+        
+        world.update(camera.position);
+    }
+    prevTime = time;
+    renderer.render(scene, camera);
+}
+</script>
+</body>
+</html>
