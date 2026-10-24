@@ -501,6 +501,7 @@ let camera, scene, renderer, controls, world;
 let targetMesh;
 let currentHit = null;
 const tmpDir = new THREE.Vector3();
+const yawEuler = new THREE.Euler(0, 0, 0, 'YXZ');
 
 let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
 let jumpHeld = false, isSprinting = false, wantToCrouch = false, isCrouching = false;
@@ -684,7 +685,10 @@ function updatePhysics(dt) {
     const speed = isCrouching ? CROUCH_SPEED : (isSprinting ? SPRINT_SPEED : WALK_SPEED);
 
     // Direção desejada a partir do yaw da câmera
-    const yaw = camera.rotation.y;
+    // Yaw lido na ordem YXZ (a mesma do PointerLockControls). Usar camera.rotation.y
+    // (ordem XYZ) inverte o movimento ao olhar para trás ou muito para cima/baixo.
+    yawEuler.setFromQuaternion(camera.quaternion, 'YXZ');
+    const yaw = yawEuler.y;
     const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
     const rx = Math.cos(yaw),  rz = -Math.sin(yaw);
     let ix = Number(moveRight) - Number(moveLeft);
