@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Voxel Sandbox - Parte 2: Mineração e Inventário</title>
+<title>Voxel Sandbox - Parte 3: Inventário</title>
 <style>
     body { margin: 0; overflow: hidden; background-color: #87CEEB; font-family: sans-serif; }
     #crosshair { position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; margin-top: -10px; margin-left: -10px; pointer-events: none; }
@@ -44,6 +44,18 @@
     .food { width: 14px; height: 14px; background: #ffaa00; border-radius: 3px; box-shadow: 0 0 2px #000; border: 1px solid #8b4500; }
     .empty-stat { background: rgba(0,0,0,0.5); border: 1px solid #111; box-shadow: none; }
 
+    #inventory { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.55); z-index: 9; user-select: none; }
+    #inv-panel { background: #2b2b2b; border: 3px solid #111; outline: 3px solid #555; border-radius: 4px; padding: 14px 16px 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.6); color: #eee; }
+    .inv-title { font: bold 14px monospace; margin-bottom: 8px; color: #ddd; }
+    .inv-grid { display: grid; grid-template-columns: repeat(9, 44px); gap: 4px; }
+    .inv-sep { height: 12px; }
+    .islot { width: 44px; height: 44px; box-sizing: border-box; background: rgba(255,255,255,0.12); border: 2px solid #555; border-radius: 3px; position: relative; display: flex; align-items: center; justify-content: center; }
+    .islot:hover { background: rgba(255,255,255,0.3); border-color: #bbb; }
+    .islot.sel { border-color: #fff; }
+    .inv-help { font: 11px/1.6 monospace; opacity: 0.65; margin-top: 10px; max-width: 420px; }
+    #inv-cursor { position: fixed; width: 30px; height: 30px; pointer-events: none; z-index: 12; display: none; }
+    #inv-tooltip { position: fixed; pointer-events: none; z-index: 13; display: none; background: rgba(20,0,30,0.92); border: 2px solid #3a1a5c; color: #fff; font: 12px monospace; padding: 3px 6px; }
+
     #debug {
         position: absolute; top: 8px; left: 8px; z-index: 5; display: none; pointer-events: none;
         color: #fff; font: 12px/1.4 monospace; background: rgba(0,0,0,0.55); padding: 6px 8px; white-space: pre; border-radius: 4px;
@@ -61,11 +73,22 @@
 <body>
 <div id="crosshair"></div>
 <div id="debug"></div>
+<div id="inventory">
+    <div id="inv-panel">
+        <div class="inv-title">Inventário</div>
+        <div id="inv-main" class="inv-grid"></div>
+        <div class="inv-sep"></div>
+        <div id="inv-hotbar" class="inv-grid"></div>
+        <div class="inv-help">Esq: pegar/colocar · Dir: metade / 1 item · Shift+clique: mover rápido · Duplo clique: juntar pilhas · 1-9: trocar com a barra · Q: soltar 1 · Clique fora: jogar no mundo · E: fechar</div>
+    </div>
+    <div id="inv-cursor"></div>
+    <div id="inv-tooltip"></div>
+</div>
 <div id="menu">
     <h1>Voxel Sandbox</h1>
-    <p>Parte 2 — Mineração, drops e inventário</p>
+    <p>Parte 3 — Tela de inventário</p>
     <button class="btn" id="btn-play">Clique para Jogar</button>
-    <p style="font-size: 14px; opacity: 0.8; margin-top: 15px;">[WASD] Mover | [Espaço] Pular | [Shift] Correr | [Ctrl / C] Agachar | [F3] Debug | Botão esq (segure): minerar | Botão dir: colocar | [Q] Soltar item</p>
+    <p style="font-size: 14px; opacity: 0.8; margin-top: 15px;">[WASD] Mover | [Espaço] Pular | [Shift] Correr | [Ctrl / C] Agachar | [F3] Debug | Botão esq (segure): minerar | Botão dir: colocar | [E] Inventário | [Q] Soltar item</p>
     <p style="font-size: 12px; opacity: 0.6; margin-top: 0;">Dica: abra com ?seed=123 no final do endereço para gerar outro mundo.</p>
 </div>
 
@@ -519,16 +542,16 @@ class Inventory {
     constructor(size) { this.slots = Array.from({ length: size }, () => null); } // slots 0-8 = hotbar
 
     // Guarda o item; devolve a quantidade que NÃO coube
-    add(id, count) {
+    add(id, count, from = 0, to = this.slots.length) {
         const max = ITEMS[id].maxStack;
-        for (const s of this.slots) {                       // 1) completa pilhas existentes
-            if (count <= 0) break;
+        for (let i = from; i < to && count > 0; i++) {      // 1) completa pilhas existentes
+            const s = this.slots[i];
             if (s && s.id === id && s.count < max) {
                 const n = Math.min(max - s.count, count);
                 s.count += n; count -= n;
             }
         }
-        for (let i = 0; i < this.slots.length && count > 0; i++) {   // 2) ocupa slots vazios
+        for (let i = from; i < to && count > 0; i++) {   // 2) ocupa slots vazios
             if (!this.slots[i]) {
                 const n = Math.min(max, count);
                 this.slots[i] = { id, count: n };
@@ -851,7 +874,251 @@ function initGameplayAssets() {
     initItemIcons();
     computeBlockColors();
     createCrackAssets();
+    buildInventoryUI();
     updateHotbarUI();
+}
+
+// =====================================================================
+// 5C. TELA DE INVENTÁRIO (tecla E)
+// =====================================================================
+
+// --- Operações puras sobre os slots. Só MOVEM itens entre slots e cursor:
+//     nunca criam nem destroem, o que impede duplicação/perda. ---
+const cursorHeld = { stack: null };   // pilha presa ao cursor
+
+function invLeftClick(inv, i, cur) {
+    const s = inv.slots[i], c = cur.stack;
+    if (!c) { if (s) { cur.stack = s; inv.slots[i] = null; } return; }       // pega tudo
+    if (!s) { inv.slots[i] = c; cur.stack = null; return; }                  // coloca tudo
+    if (s.id === c.id) {                                                     // junta
+        const n = Math.min(ITEMS[s.id].maxStack - s.count, c.count);
+        s.count += n; c.count -= n;
+        if (c.count <= 0) cur.stack = null;
+        return;
+    }
+    inv.slots[i] = c; cur.stack = s;                                         // troca
+}
+
+function invRightClick(inv, i, cur) {
+    const s = inv.slots[i], c = cur.stack;
+    if (!c) {                                                                // pega metade
+        if (s) {
+            const take = Math.ceil(s.count / 2);
+            cur.stack = { id: s.id, count: take };
+            s.count -= take;
+            if (s.count <= 0) inv.slots[i] = null;
+        }
+        return;
+    }
+    if (!s) {                                                                // coloca 1
+        inv.slots[i] = { id: c.id, count: 1 };
+        c.count--;
+        if (c.count <= 0) cur.stack = null;
+        return;
+    }
+    if (s.id === c.id) {                                                     // soma 1
+        if (s.count < ITEMS[s.id].maxStack) {
+            s.count++; c.count--;
+            if (c.count <= 0) cur.stack = null;
+        }
+        return;
+    }
+    inv.slots[i] = c; cur.stack = s;                                         // troca
+}
+
+// Shift+clique: barra -> mochila e mochila -> barra
+function invQuickMove(inv, i) {
+    const s = inv.slots[i];
+    if (!s) return;
+    const [from, to] = i < 9 ? [9, 36] : [0, 9];
+    const left = inv.add(s.id, s.count, from, to);
+    if (left === 0) inv.slots[i] = null; else s.count = left;
+}
+
+// Duplo clique: puxa para o cursor todos os itens iguais
+function invCollectSame(inv, cur) {
+    const c = cur.stack;
+    if (!c) return;
+    const max = ITEMS[c.id].maxStack;
+    for (let i = 0; i < inv.slots.length && c.count < max; i++) {
+        const s = inv.slots[i];
+        if (s && s.id === c.id) {
+            const n = Math.min(max - c.count, s.count);
+            c.count += n; s.count -= n;
+            if (s.count <= 0) inv.slots[i] = null;
+        }
+    }
+}
+
+function invSwapHotbar(inv, i, h) {
+    if (i === h) return;
+    [inv.slots[i], inv.slots[h]] = [inv.slots[h], inv.slots[i]];
+}
+
+// --- Interface ---
+let inventoryOpen = false;
+let invHover = -1;
+let invLastClick = { time: 0, index: -1 };
+const invMouse = { x: 0, y: 0, seen: false };
+let invSlotEls = [];
+
+function stackHtml(s) {
+    if (!s) return '';
+    let html = `<div class="slot-icon" style="background-image:url('${ITEM_ICONS[s.id]}')"></div>`;
+    if (s.count > 1) html += `<span class="slot-count">${s.count}</span>`;
+    return html;
+}
+
+function throwStack(id, count) {
+    camera.getWorldDirection(tmpDir);
+    const pos = camera.position.clone().addScaledVector(tmpDir, 0.6);
+    pos.y -= 0.2;
+    const vel = tmpDir.clone().multiplyScalar(5);
+    vel.y += 2;
+    spawnItemEntity(id, count, pos, vel, 1.5);
+}
+
+function buildInventoryUI() {
+    const main = document.getElementById('inv-main');
+    const bar = document.getElementById('inv-hotbar');
+    invSlotEls = new Array(36);
+    const make = (i, parent) => {
+        const el = document.createElement('div');
+        el.className = 'islot';
+        el.dataset.index = i;
+        parent.appendChild(el);
+        invSlotEls[i] = el;
+    };
+    for (let i = 9; i < 36; i++) make(i, main);
+    for (let i = 0; i < 9; i++) make(i, bar);
+
+    const overlay = document.getElementById('inventory');
+    overlay.addEventListener('mousedown', onInventoryMouseDown);
+    overlay.addEventListener('mousemove', onInventoryMouseMove);
+}
+
+function updateInventoryFloaters() {
+    const cursorEl = document.getElementById('inv-cursor');
+    const tip = document.getElementById('inv-tooltip');
+    if (cursorHeld.stack && invMouse.seen) {
+        cursorEl.innerHTML = stackHtml(cursorHeld.stack);
+        cursorEl.style.left = (invMouse.x - 15) + 'px';
+        cursorEl.style.top = (invMouse.y - 15) + 'px';
+        cursorEl.style.display = 'block';
+    } else {
+        cursorEl.style.display = 'none';
+    }
+    const hovered = invHover >= 0 ? inventory.slots[invHover] : null;
+    if (hovered && !cursorHeld.stack && invMouse.seen) {
+        tip.textContent = ITEMS[hovered.id].name + (hovered.count > 1 ? ` (x${hovered.count})` : '');
+        tip.style.left = (invMouse.x + 14) + 'px';
+        tip.style.top = (invMouse.y + 14) + 'px';
+        tip.style.display = 'block';
+    } else {
+        tip.style.display = 'none';
+    }
+}
+
+function renderInventory() {
+    for (let i = 0; i < 36; i++) {
+        const el = invSlotEls[i];
+        el.innerHTML = stackHtml(inventory.slots[i]);
+        el.classList.toggle('sel', i === selectedSlot);
+    }
+    updateInventoryFloaters();
+    updateHotbarUI();
+}
+
+function onInventoryMouseMove(e) {
+    invMouse.x = e.clientX; invMouse.y = e.clientY; invMouse.seen = true;
+    const el = e.target.closest('.islot');
+    invHover = el ? Number(el.dataset.index) : -1;
+    updateInventoryFloaters();
+}
+
+function onInventoryMouseDown(e) {
+    e.preventDefault();
+    invMouse.x = e.clientX; invMouse.y = e.clientY; invMouse.seen = true;
+    const el = e.target.closest('.islot');
+
+    if (!el) {
+        // Clique fora do painel: joga a pilha do cursor no mundo
+        if (e.target.closest('#inv-panel')) return;
+        const c = cursorHeld.stack;
+        if (c) {
+            if (e.button === 0) { throwStack(c.id, c.count); cursorHeld.stack = null; }
+            else if (e.button === 2) { throwStack(c.id, 1); c.count--; if (c.count <= 0) cursorHeld.stack = null; }
+            renderInventory();
+        }
+        return;
+    }
+
+    const i = Number(el.dataset.index);
+    invHover = i;
+    if (e.button === 0) {
+        const now = performance.now();
+        if (e.shiftKey && !cursorHeld.stack) invQuickMove(inventory, i);
+        else if (cursorHeld.stack && invLastClick.index === i && now - invLastClick.time < 350) invCollectSame(inventory, cursorHeld);
+        else invLeftClick(inventory, i, cursorHeld);
+        invLastClick = { time: now, index: i };
+    } else if (e.button === 2) {
+        invRightClick(inventory, i, cursorHeld);
+    }
+    renderInventory();
+}
+
+function openInventory() {
+    if (!controls.isLocked || inventoryOpen) return;
+    inventoryOpen = true;               // antes do unlock, para o menu de pausa não aparecer
+    invHover = -1;
+    invMouse.seen = false;
+    invLastClick = { time: 0, index: -1 };
+    document.getElementById('inventory').style.display = 'flex';
+    renderInventory();
+    controls.unlock();
+}
+
+function closeInventory(relock) {
+    if (!inventoryOpen) return;
+    inventoryOpen = false;
+
+    // O que estiver no cursor volta para o inventário; se não couber, vai para o mundo
+    const c = cursorHeld.stack;
+    if (c) {
+        const left = inventory.add(c.id, c.count);
+        if (left > 0) throwStack(c.id, left);
+        cursorHeld.stack = null;
+    }
+    document.getElementById('inventory').style.display = 'none';
+    document.getElementById('inv-cursor').style.display = 'none';
+    document.getElementById('inv-tooltip').style.display = 'none';
+    updateHotbarUI();
+
+    const menu = document.getElementById('menu');
+    if (relock) {
+        const pr = document.body.requestPointerLock();
+        if (pr !== undefined) pr.catch(() => {});
+        setTimeout(() => { if (!controls.isLocked) menu.style.display = 'flex'; }, 400);
+    } else {
+        menu.style.display = 'flex';    // Esc: abre o menu de pausa
+    }
+}
+
+function handleInventoryKey(event) {
+    if (event.code === 'KeyE') { event.preventDefault(); if (!event.repeat) closeInventory(true); return; }
+    if (event.code === 'Escape') { closeInventory(false); return; }
+    if (invHover < 0 || cursorHeld.stack) return;
+    if (event.code.startsWith('Digit')) {
+        const n = parseInt(event.key);
+        if (n >= 1 && n <= 9) { invSwapHotbar(inventory, invHover, n - 1); renderInventory(); }
+    } else if (event.code === 'KeyQ') {
+        const s = inventory.slots[invHover];
+        if (s) {
+            throwStack(s.id, 1);
+            inventory.removeOne(invHover);
+            renderInventory();
+        }
+    }
 }
 
 // =====================================================================
@@ -950,7 +1217,7 @@ function updateDebug(rawDt) {
         ? `${BLOCKS[currentHit.type].name} (${currentHit.x}, ${currentHit.y}, ${currentHit.z})`
         : '—';
     debugEl.textContent =
-`Voxel Sandbox — Parte 2
+`Voxel Sandbox — Parte 3
 FPS: ${fps}
 Seed: ${SEED}
 XYZ: ${p.x.toFixed(2)} ${p.y.toFixed(2)} ${p.z.toFixed(2)}
@@ -1205,7 +1472,7 @@ function init() {
     });
     controls.addEventListener('lock', () => { menu.style.display = 'none'; });
     controls.addEventListener('unlock', () => {
-        menu.style.display = 'flex';
+        if (!inventoryOpen) menu.style.display = 'flex';   // com o inventário aberto não mostra a pausa
         // Evita ações presas ao abrir o menu
         moveForward = moveBackward = moveLeft = moveRight = jumpHeld = isSprinting = wantToCrouch = false;
         leftHeld = false;
@@ -1224,6 +1491,7 @@ function init() {
     });
 
     document.addEventListener('keydown', (event) => {
+        if (inventoryOpen) { handleInventoryKey(event); return; }
         switch (event.code) {
             case 'KeyW': moveForward = true; break;
             case 'KeyA': moveLeft = true; break;
@@ -1231,6 +1499,7 @@ function init() {
             case 'KeyD': moveRight = true; break;
             case 'Space': jumpHeld = true; break;
             case 'KeyQ': dropSelectedItem(); break;
+            case 'KeyE': if (!event.repeat) openInventory(); break;
             case 'ShiftLeft': case 'ShiftRight': isSprinting = true; break;
             case 'ControlLeft': case 'ControlRight': case 'KeyC': wantToCrouch = true; break;
             case 'F3':
