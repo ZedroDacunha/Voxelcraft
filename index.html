@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Voxel Sandbox - Parte 3: Inventário</title>
+<title>Voxel Sandbox - Parte 4: Ferramentas e Crafting</title>
 <style>
     body { margin: 0; overflow: hidden; background-color: #87CEEB; font-family: sans-serif; }
     #crosshair { position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; margin-top: -10px; margin-left: -10px; pointer-events: none; }
@@ -28,12 +28,10 @@
     }
     .slot.active { border: 3px solid white; transform: scale(1.1); z-index: 6; background-color: rgba(255, 255, 255, 0.4); }
     .slot-number { position: absolute; top: 2px; left: 4px; color: white; font-size: 10px; font-weight: bold; text-shadow: 1px 1px 0 #000; }
-    .icon-grass { width: 24px; height: 24px; background: #55aa55; border-bottom: 6px solid #8b4513; }
-    .icon-stone { width: 24px; height: 24px; background: #888; }
-    .icon-wood { width: 24px; height: 24px; background: #a0522d; border-left: 4px solid #6b3e1b; }
-    .icon-dirt { width: 24px; height: 24px; background: #8b4513; }
     .slot-icon { width: 30px; height: 30px; background-size: 100% 100%; image-rendering: pixelated; }
     .slot-count { position: absolute; right: 3px; bottom: 1px; color: #fff; font: bold 12px monospace; text-shadow: 1px 1px 0 #000; }
+    .dur { position: absolute; left: 5px; right: 5px; bottom: 3px; height: 3px; background: #000; pointer-events: none; }
+    .dur div { height: 100%; }
 
     #survival-hud {
         position: absolute; bottom: 70px; left: 50%; transform: translateX(-50%);
@@ -44,17 +42,25 @@
     .food { width: 14px; height: 14px; background: #ffaa00; border-radius: 3px; box-shadow: 0 0 2px #000; border: 1px solid #8b4500; }
     .empty-stat { background: rgba(0,0,0,0.5); border: 1px solid #111; box-shadow: none; }
 
+    #toast { position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%); z-index: 6; pointer-events: none;
+        color: #fff; font: bold 14px monospace; text-shadow: 1px 1px 0 #000; background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 4px; display: none; }
+
     #inventory { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.55); z-index: 9; user-select: none; }
-    #inv-panel { background: #2b2b2b; border: 3px solid #111; outline: 3px solid #555; border-radius: 4px; padding: 14px 16px 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.6); color: #eee; }
+    #inv-panel { background: #2b2b2b; border: 3px solid #111; outline: 3px solid #555; border-radius: 4px; padding: 14px 16px 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.6); color: #eee; max-height: 96vh; overflow-y: auto; }
     .inv-title { font: bold 14px monospace; margin-bottom: 8px; color: #ddd; }
     .inv-grid { display: grid; grid-template-columns: repeat(9, 44px); gap: 4px; }
+    .craft-row { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+    .craft-grid { grid-template-columns: repeat(2, 44px); }
+    .craft-arrow { font: bold 22px monospace; color: #aaa; }
     .inv-sep { height: 12px; }
     .islot { width: 44px; height: 44px; box-sizing: border-box; background: rgba(255,255,255,0.12); border: 2px solid #555; border-radius: 3px; position: relative; display: flex; align-items: center; justify-content: center; }
     .islot:hover { background: rgba(255,255,255,0.3); border-color: #bbb; }
     .islot.sel { border-color: #fff; }
+    .islot.out { width: 52px; height: 52px; border-color: #997733; }
     .inv-help { font: 11px/1.6 monospace; opacity: 0.65; margin-top: 10px; max-width: 420px; }
+    #inv-recipes { font: 10px/1.5 monospace; opacity: 0.8; margin-top: 8px; max-width: 420px; border-top: 1px solid #555; padding-top: 6px; }
     #inv-cursor { position: fixed; width: 30px; height: 30px; pointer-events: none; z-index: 12; display: none; }
-    #inv-tooltip { position: fixed; pointer-events: none; z-index: 13; display: none; background: rgba(20,0,30,0.92); border: 2px solid #3a1a5c; color: #fff; font: 12px monospace; padding: 3px 6px; }
+    #inv-tooltip { position: fixed; pointer-events: none; z-index: 13; display: none; background: rgba(20,0,30,0.92); border: 2px solid #3a1a5c; color: #fff; font: 12px monospace; padding: 3px 6px; white-space: pre; }
 
     #debug {
         position: absolute; top: 8px; left: 8px; z-index: 5; display: none; pointer-events: none;
@@ -73,35 +79,42 @@
 <body>
 <div id="crosshair"></div>
 <div id="debug"></div>
+<div id="toast"></div>
 <div id="inventory">
     <div id="inv-panel">
         <div class="inv-title">Inventário</div>
+        <div class="craft-row">
+            <div id="inv-craft" class="inv-grid craft-grid"></div>
+            <div class="craft-arrow">➜</div>
+            <div id="inv-out"></div>
+        </div>
         <div id="inv-main" class="inv-grid"></div>
         <div class="inv-sep"></div>
         <div id="inv-hotbar" class="inv-grid"></div>
-        <div class="inv-help">Esq: pegar/colocar · Dir: metade / 1 item · Shift+clique: mover rápido · Duplo clique: juntar pilhas · 1-9: trocar com a barra · Q: soltar 1 · Clique fora: jogar no mundo · E: fechar</div>
+        <div class="inv-help">Esq: pegar/colocar · Dir: metade / 1 item · Shift+clique: mover rápido (ou criar tudo) · Duplo clique: juntar pilhas · 1-9: trocar com a barra · Q: soltar 1 · Clique fora: jogar no mundo · E: fechar</div>
+        <div id="inv-recipes"></div>
     </div>
     <div id="inv-cursor"></div>
     <div id="inv-tooltip"></div>
 </div>
 <div id="menu">
     <h1>Voxel Sandbox</h1>
-    <p>Parte 3 — Tela de inventário</p>
+    <p>Parte 4 — Ferramentas, crafting 2×2 e mão em primeira pessoa</p>
     <button class="btn" id="btn-play">Clique para Jogar</button>
-    <p style="font-size: 14px; opacity: 0.8; margin-top: 15px;">[WASD] Mover | [Espaço] Pular | [Shift] Correr | [Ctrl / C] Agachar | [F3] Debug | Botão esq (segure): minerar | Botão dir: colocar | [E] Inventário | [Q] Soltar item</p>
-    <p style="font-size: 12px; opacity: 0.6; margin-top: 0;">Dica: abra com ?seed=123 no final do endereço para gerar outro mundo.</p>
+    <p style="font-size: 14px; opacity: 0.8; margin-top: 15px;">[WASD] Mover | [Espaço] Pular | [Shift] Correr | [Ctrl / C] Agachar | [F3] Debug | Botão esq (segure): minerar | Botão dir: colocar | [E] Inventário / crafting | [Q] Soltar item</p>
+    <p style="font-size: 12px; opacity: 0.6; margin-top: 0;">Dica: abra com ?seed=123 no final do endereço para gerar outro mundo. Comece quebrando uma árvore!</p>
 </div>
 
 <div id="hotbar">
-    <div class="slot active" id="slot-0"><span class="slot-number">1</span><div class="icon-grass"></div></div>
-    <div class="slot" id="slot-1"><span class="slot-number">2</span><div class="icon-stone"></div></div>
-    <div class="slot" id="slot-2"><span class="slot-number">3</span><div class="icon-wood"></div></div>
-    <div class="slot" id="slot-3"><span class="slot-number">4</span><div class="icon-dirt"></div></div>
-    <div class="slot" id="slot-4"><span class="slot-number">5</span></div>
-    <div class="slot" id="slot-5"><span class="slot-number">6</span></div>
-    <div class="slot" id="slot-6"><span class="slot-number">7</span></div>
-    <div class="slot" id="slot-7"><span class="slot-number">8</span></div>
-    <div class="slot" id="slot-8"><span class="slot-number">9</span></div>
+    <div class="slot active" id="slot-0"></div>
+    <div class="slot" id="slot-1"></div>
+    <div class="slot" id="slot-2"></div>
+    <div class="slot" id="slot-3"></div>
+    <div class="slot" id="slot-4"></div>
+    <div class="slot" id="slot-5"></div>
+    <div class="slot" id="slot-6"></div>
+    <div class="slot" id="slot-7"></div>
+    <div class="slot" id="slot-8"></div>
 </div>
 
 <div id="survival-hud">
@@ -135,29 +148,97 @@ const PLAYER_RADIUS = 0.3;
 const H_STAND = 1.8, H_CROUCH = 1.5;
 const EYE_STAND = 1.62, EYE_CROUCH = 1.27;
 
+// Mão em primeira pessoa (ajuste fino de pose aqui)
+const HAND_BASE = { x: 0.42, y: -0.50, z: -0.25 };
+const HELD_TOOL_ROT = [0.3, -0.55, 0.0];
+const HELD_BLOCK_ROT = [0.25, 0.7, 0.0];
+const HELD_BLOCK_POS = [0.03, 0.07, -0.04];
+
 // =====================================================================
-// 2. REGISTRO CENTRAL DE BLOCOS
+// 2. REGISTRO CENTRAL DE BLOCOS E ITENS
 // =====================================================================
-const TILE = { GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, STONE: 3, WOOD: 4, COBBLE: 5 };
-const ATLAS_COLUMNS = 8;
+const TILE = { GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, STONE: 3, WOOD: 4, COBBLE: 5, LEAVES: 6, PLANKS: 7 };
+const ATLAS_COLUMNS = 16;
 const TILE_PX = 32;
 
 const allFaces = (t) => ({ top: t, side: t, bottom: t });
 
+// IDs fixos (bloco = item de mesmo id; itens que não são blocos começam em 20)
+const ID = { GRASS: 1, STONE: 2, LOG: 3, DIRT: 4, COBBLE: 5, PLANKS: 6, LEAVES: 7, STICK: 20 };
+
 // Para adicionar um bloco novo: crie o tile no atlas e uma entrada aqui.
+//  drop: id do item solto (null = nada) | tool: ferramenta ideal
+//  requiresTool + minTier: sem a ferramenta certa o bloco demora mais e NÃO solta nada
 const BLOCKS = {
-    // drop = id do item que o bloco solta ao ser quebrado
-    1: { name: 'Grama',      hardness: 0.6, drop: 4, tiles: { top: TILE.GRASS_TOP, side: TILE.GRASS_SIDE, bottom: TILE.DIRT } },
-    2: { name: 'Pedra',      hardness: 1.5, drop: 5, tiles: allFaces(TILE.STONE) },
-    3: { name: 'Madeira',    hardness: 2.0, drop: 3, tiles: allFaces(TILE.WOOD) },
-    4: { name: 'Terra',      hardness: 0.5, drop: 4, tiles: allFaces(TILE.DIRT) },
-    5: { name: 'Pedregulho', hardness: 2.0, drop: 5, tiles: allFaces(TILE.COBBLE) },
+    1: { name: 'Grama',      hardness: 0.6, drop: ID.DIRT,   tool: 'shovel', tiles: { top: TILE.GRASS_TOP, side: TILE.GRASS_SIDE, bottom: TILE.DIRT } },
+    2: { name: 'Pedra',      hardness: 1.5, drop: ID.COBBLE, tool: 'pickaxe', requiresTool: true, minTier: 1, tiles: allFaces(TILE.STONE) },
+    3: { name: 'Madeira',    hardness: 2.0, drop: ID.LOG,    tool: 'axe',    tiles: allFaces(TILE.WOOD) },
+    4: { name: 'Terra',      hardness: 0.5, drop: ID.DIRT,   tool: 'shovel', tiles: allFaces(TILE.DIRT) },
+    5: { name: 'Pedregulho', hardness: 2.0, drop: ID.COBBLE, tool: 'pickaxe', requiresTool: true, minTier: 1, tiles: allFaces(TILE.COBBLE) },
+    6: { name: 'Tábuas',     hardness: 2.0, drop: ID.PLANKS, tool: 'axe',    tiles: allFaces(TILE.PLANKS) },
+    7: { name: 'Folhas',     hardness: 0.2, drop: null,      tool: null,     tiles: allFaces(TILE.LEAVES) },
 };
 
-// Itens: por enquanto todo bloco vira um item de mesmo id (ferramentas e comida entram nas próximas partes)
 const ITEMS = {};
 for (const [id, b] of Object.entries(BLOCKS)) {
     ITEMS[id] = { name: b.name, maxStack: 64, block: Number(id), iconTile: b.tiles.top };
+}
+
+// Itens com sprite pixelado (ganham um tile no atlas, depois dos tiles de bloco)
+let nextTile = 8;
+ITEMS[ID.STICK] = { name: 'Graveto', maxStack: 64, sprite: { kind: 'stick', mat: 'wood' }, iconTile: nextTile++ };
+
+const TOOL_MATS = {
+    wood:  { label: 'de Madeira', tier: 1, speed: 2, durability: 59,  base: 21, ingredient: ID.PLANKS },
+    stone: { label: 'de Pedra',   tier: 2, speed: 4, durability: 131, base: 24, ingredient: ID.COBBLE },
+};
+const TOOL_KINDS = [['pickaxe', 'Picareta'], ['axe', 'Machado'], ['shovel', 'Pá']];
+for (const [matKey, m] of Object.entries(TOOL_MATS)) {
+    TOOL_KINDS.forEach(([kind, label], k) => {
+        const id = m.base + k;
+        ITEMS[id] = {
+            name: `${label} ${m.label}`, maxStack: 1, maxDurability: m.durability,
+            tool: { type: kind, tier: m.tier, speed: m.speed },
+            sprite: { kind, mat: matKey }, iconTile: nextTile++,
+        };
+        m['id_' + kind] = id;
+    });
+}
+
+// ---- Receitas (dados puros). Formato: grade de linhas; null = vazio ----
+const RECIPES = [];
+function trimShape(rows) {
+    let r0 = rows.length, r1 = -1, c0 = Infinity, c1 = -1;
+    rows.forEach((row, r) => row.forEach((v, c) => {
+        if (v) { r0 = Math.min(r0, r); r1 = Math.max(r1, r); c0 = Math.min(c0, c); c1 = Math.max(c1, c); }
+    }));
+    if (r1 < 0) return null;
+    return rows.slice(r0, r1 + 1).map(row => row.slice(c0, c1 + 1));
+}
+function defRecipe(shape, result, count = 1) { RECIPES.push({ shape: trimShape(shape), result, count }); }
+
+defRecipe([[ID.LOG]], ID.PLANKS, 4);
+defRecipe([[ID.PLANKS], [ID.PLANKS]], ID.STICK, 4);
+for (const m of Object.values(TOOL_MATS)) {
+    const M = m.ingredient, S = ID.STICK;
+    defRecipe([[M, M], [null, S]], m.id_pickaxe);
+    defRecipe([[M, M], [M, S]],    m.id_axe);
+    defRecipe([[M], [S]],          m.id_shovel);
+}
+
+function shapesEqual(a, b) {
+    if (a.length !== b.length || a[0].length !== b[0].length) return false;
+    return a.every((row, r) => row.every((v, c) => v === b[r][c]));
+}
+function matchRecipe(craftInv) {
+    const s = craftInv.slots;
+    const grid = trimShape([[s[0]?.id ?? null, s[1]?.id ?? null], [s[2]?.id ?? null, s[3]?.id ?? null]]);
+    if (!grid) return null;
+    const mirrored = grid.map(row => row.slice().reverse());
+    for (const r of RECIPES) {
+        if (shapesEqual(r.shape, grid) || shapesEqual(r.shape, mirrored)) return { id: r.result, count: r.count };
+    }
+    return null;
 }
 
 // =====================================================================
@@ -170,6 +251,58 @@ function mulberry32(a) {
         t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
         return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
+}
+
+function hash2(x, z, s) {
+    let h = Math.imul(x | 0, 374761393) ^ Math.imul(z | 0, 668265263) ^ Math.imul(s | 0, 1274126177);
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    h ^= h >>> 16;
+    return (h >>> 0) / 4294967296;
+}
+
+// --- Sprites 16x16 de ferramentas (usados no atlas, no braço e nos drops) ---
+const HANDLE_L = [156, 106, 52], HANDLE_D = [112, 74, 34];
+const HEAD_COLORS = {
+    wood:  { l: [176, 128, 70],  d: [130, 90, 45] },
+    stone: { l: [150, 150, 152], d: [106, 106, 110] },
+};
+const spriteCache = {};
+function spritePixels(kind, mat) {
+    const key = kind + ':' + mat;
+    if (spriteCache[key]) return spriteCache[key];
+    const g = Array.from({ length: 16 }, () => Array(16).fill(null));
+    const put = (x, y, c) => { if (x >= 0 && x < 16 && y >= 0 && y < 16) g[y][x] = c; };
+    const hLen = kind === 'stick' ? 13 : kind === 'shovel' ? 10 : 10;
+    for (let x = 3; x <= hLen; x++) { put(x, 16 - x, HANDLE_L); put(x + 1, 16 - x, HANDLE_D); }
+
+    const head = new Set();
+    const add = (x, y) => head.add(x + ',' + y);
+    if (kind === 'pickaxe') {
+        for (let t = -4; t <= 4; t++) {
+            const k = Math.abs(t) >= 3 ? 1 : 0;           // pontas curvadas para trás
+            add(10 + t - k, 6 + t + k);
+            if (Math.abs(t) <= 3) add(11 + t, 5 + t);
+        }
+    } else if (kind === 'axe') {
+        for (let x = 9; x <= 12; x++) add(x, 2);
+        for (let x = 8; x <= 13; x++) add(x, 3);
+        for (let x = 8; x <= 12; x++) add(x, 4);
+        for (let x = 9; x <= 11; x++) add(x, 5);
+    } else if (kind === 'shovel') {
+        for (let x = 10; x <= 12; x++) add(x, 2);
+        for (let x = 9; x <= 13; x++) { add(x, 3); add(x, 4); }
+        for (let x = 10; x <= 12; x++) add(x, 5);
+    }
+    if (head.size) {
+        const hc = HEAD_COLORS[mat];
+        for (const k of head) {
+            const [x, y] = k.split(',').map(Number);
+            const dark = !head.has((x + 1) + ',' + y) || !head.has(x + ',' + (y + 1));
+            put(x, y, dark ? hc.d : hc.l);
+        }
+    }
+    spriteCache[key] = g;
+    return g;
 }
 
 function createAtlasTexture() {
@@ -202,6 +335,17 @@ function createAtlasTexture() {
                 const line = (x % 8 < 2) ? -20 : 0;
                 return [160 + line + j(5), 82 + line + j(5), 45 + line + j(5)];
             }
+            case TILE.LEAVES: {
+                const n = ((x * 7 + y * 13) % 5 === 0) ? -35 : 0;
+                return [40 + n + j(12), 130 + n + j(18), 45 + n + j(10)];
+            }
+            case TILE.PLANKS: {
+                const board = Math.floor(y / 8);
+                const seam = (y % 8 === 0);
+                const vseam = ((x + board * 11) % 16 === 0) && !seam;
+                const shade = seam ? 65 : vseam ? 35 : (board % 2) * 8;
+                return [178 - shade + j(5), 133 - shade + j(5), 78 - shade + j(4)];
+            }
         }
         return [255, 0, 255]; // tile desconhecido = magenta
     };
@@ -216,12 +360,44 @@ function createAtlasTexture() {
         }
     }
 
+    // Tiles de itens com sprite: cada pixel 16x16 vira 2x2 (fundo transparente)
+    for (const item of Object.values(ITEMS)) {
+        if (!item.sprite) continue;
+        const pix = spritePixels(item.sprite.kind, item.sprite.mat);
+        for (let y = 0; y < 16; y++) {
+            for (let x = 0; x < 16; x++) {
+                const c = pix[y][x];
+                if (!c) continue;
+                ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+                ctx.fillRect(item.iconTile * TILE_PX + x * 2, y * 2, 2, 2);
+            }
+        }
+    }
+
     const tex = new THREE.CanvasTexture(canvas);
     tex.magFilter = THREE.NearestFilter;
     tex.minFilter = THREE.NearestFilter;
     tex.generateMipmaps = false;
     tex.colorSpace = THREE.SRGBColorSpace;
     return tex;
+}
+
+function createNoiseTexture(rgb, seed, jitter = 12) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 8;
+    const ctx = c.getContext('2d');
+    const rnd = mulberry32(seed);
+    for (let x = 0; x < 8; x++) for (let y = 0; y < 8; y++) {
+        const d = (rnd() * 2 - 1) * jitter;
+        ctx.fillStyle = `rgb(${Math.round(rgb[0] + d)},${Math.round(rgb[1] + d)},${Math.round(rgb[2] + d)})`;
+        ctx.fillRect(x, y, 1, 1);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.magFilter = THREE.NearestFilter;
+    t.minFilter = THREE.NearestFilter;
+    t.generateMipmaps = false;
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
 }
 
 // =====================================================================
@@ -277,6 +453,7 @@ const floorDiv = (a, b) => Math.floor(a / b);
 
 class TerrainGenerator {
     constructor(seed) {
+        this.seed = seed;
         this.continents = new Noise2D(seed);
         this.hills = new Noise2D(seed + 1013);
     }
@@ -288,9 +465,11 @@ class TerrainGenerator {
     }
     fill(chunk) {
         const ox = chunk.cx * CHUNK_SIZE, oz = chunk.cz * CHUNK_SIZE;
+        const heights = new Int16Array(CHUNK_SIZE * CHUNK_SIZE);
         for (let lx = 0; lx < CHUNK_SIZE; lx++) {
             for (let lz = 0; lz < CHUNK_SIZE; lz++) {
                 const h = this.heightAt(ox + lx, oz + lz);
+                heights[lx + lz * CHUNK_SIZE] = h;
                 if (h > chunk.maxY) chunk.maxY = h;
                 for (let y = 0; y <= h; y++) {
                     let type;
@@ -299,6 +478,36 @@ class TerrainGenerator {
                     else if (y >= h - 3) type = 4;    // terra
                     else type = 2;                    // pedra
                     chunk.data[idx(lx, y, lz)] = type;
+                }
+            }
+        }
+        this.plantTrees(chunk, heights, ox, oz);
+    }
+    // Árvores simples: só em colunas 2..13 do chunk, assim a copa nunca cruza a borda do chunk
+    plantTrees(chunk, heights, ox, oz) {
+        const set = (lx, y, lz, t) => {
+            if (y < 0 || y >= WORLD_HEIGHT) return;
+            const i = idx(lx, y, lz);
+            if (chunk.data[i] === 0) { chunk.data[i] = t; if (y > chunk.maxY) chunk.maxY = y; }
+        };
+        for (let lx = 2; lx <= 13; lx++) {
+            for (let lz = 2; lz <= 13; lz++) {
+                const wx = ox + lx, wz = oz + lz;
+                if (Math.abs(wx) < 4 && Math.abs(wz) < 4) continue;        // mantém o spawn livre
+                if (hash2(wx, wz, this.seed) > 0.012) continue;
+                const h = heights[lx + lz * CHUNK_SIZE];
+                const th = 4 + Math.floor(hash2(wx, wz, this.seed + 7) * 3);  // tronco 4..6
+                if (h + th + 2 >= WORLD_HEIGHT) continue;
+                for (let k = 1; k <= th; k++) set(lx, h + k, lz, ID.LOG);
+                for (let dy = th - 2; dy <= th + 1; dy++) {
+                    const r = dy >= th ? 1 : 2;
+                    for (let dx = -r; dx <= r; dx++) {
+                        for (let dz = -r; dz <= r; dz++) {
+                            if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;      // sem cantos
+                            if (dy === th + 1 && Math.abs(dx) + Math.abs(dz) > 1) continue; // topo em cruz
+                            set(lx + dx, h + dy, lz + dz, ID.LEAVES);
+                        }
+                    }
                 }
             }
         }
@@ -536,13 +745,14 @@ class World {
 }
 
 // =====================================================================
-// 5B. INVENTÁRIO, DROPS, PARTÍCULAS E MINERAÇÃO
+// 5B. INVENTÁRIO, DROPS, PARTÍCULAS, FERRAMENTAS E MINERAÇÃO
 // =====================================================================
+// Pilha: { id, count, damage? }  (damage = durabilidade já gasta; só ferramentas)
 class Inventory {
     constructor(size) { this.slots = Array.from({ length: size }, () => null); } // slots 0-8 = hotbar
 
     // Guarda o item; devolve a quantidade que NÃO coube
-    add(id, count, from = 0, to = this.slots.length) {
+    add(id, count, from = 0, to = this.slots.length, damage = 0) {
         const max = ITEMS[id].maxStack;
         for (let i = from; i < to && count > 0; i++) {      // 1) completa pilhas existentes
             const s = this.slots[i];
@@ -554,7 +764,9 @@ class Inventory {
         for (let i = from; i < to && count > 0; i++) {   // 2) ocupa slots vazios
             if (!this.slots[i]) {
                 const n = Math.min(max, count);
-                this.slots[i] = { id, count: n };
+                const st = { id, count: n };
+                if (damage > 0) st.damage = damage;
+                this.slots[i] = st;
                 count -= n;
             }
         }
@@ -564,6 +776,17 @@ class Inventory {
     canAdd(id) {
         const max = ITEMS[id].maxStack;
         return this.slots.some(s => !s || (s.id === id && s.count < max));
+    }
+
+    // Quantos itens desse tipo ainda cabem
+    spaceFor(id) {
+        const max = ITEMS[id].maxStack;
+        let space = 0;
+        for (const s of this.slots) {
+            if (!s) space += max;
+            else if (s.id === id) space += max - s.count;
+        }
+        return space;
     }
 
     removeOne(slotIndex) {
@@ -600,6 +823,50 @@ function computeBlockColors() {
     }
 }
 
+// --- Regras de ferramenta (tudo vem dos dados de BLOCKS e ITEMS) ---
+function toolInfo(stack) {
+    const it = stack && ITEMS[stack.id];
+    return it && it.tool ? it.tool : null;
+}
+
+function canHarvest(type, stack) {
+    const b = BLOCKS[type];
+    if (!b.requiresTool) return true;
+    const t = toolInfo(stack);
+    return !!t && t.type === b.tool && t.tier >= (b.minTier || 0);
+}
+
+// Tempo (s) para quebrar com o item da mão
+function getBreakTime(type, stack) {
+    const b = BLOCKS[type];
+    const base = b.hardness * 1.5;
+    if (!canHarvest(type, stack)) return b.hardness * 5;     // sem a ferramenta certa: bem mais lento
+    const t = toolInfo(stack);
+    const speed = (t && t.type === b.tool) ? t.speed : 1;
+    return base / speed;
+}
+
+function damageTool(slotIndex, amount = 1) {
+    const s = inventory.slots[slotIndex];
+    const it = s && ITEMS[s.id];
+    if (!it || !it.maxDurability) return;
+    s.damage = (s.damage || 0) + amount;
+    if (s.damage >= it.maxDurability) {
+        inventory.slots[slotIndex] = null;
+        showToast(`${it.name} quebrou!`);
+    }
+    updateHotbarUI();
+}
+
+let toastTimer = 0;
+function showToast(text) {
+    const el = document.getElementById('toast');
+    el.textContent = text;
+    el.style.display = 'block';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.style.display = 'none'; }, 2000);
+}
+
 // --- Partículas de quebra ---
 const particles = [];
 const particleGeo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
@@ -629,22 +896,15 @@ function updateParticles(dt) {
     }
 }
 
-// --- Itens soltos no mundo (drops) ---
-const ITEM_SIZE = 0.28;
-const itemEntities = [];
-const itemGeometryCache = {};
-const _pickupCenter = new THREE.Vector3();
-
-function getItemGeometry(itemId) {
-    if (itemGeometryCache[itemId]) return itemGeometryCache[itemId];
-    const tiles = BLOCKS[ITEMS[itemId].block].tiles;
+// --- Geometrias de itens: cubo (blocos) ou sprite extrudado em voxels (ferramentas) ---
+function buildCubeGeo(tiles, size) {
     const positions = [], normals = [], uvs = [], indices = [];
     const uWidth = 1 / ATLAS_COLUMNS - 2 * UV_PAD;
     for (const f of FACES) {
         const u0 = tiles[f.kind] / ATLAS_COLUMNS + UV_PAD;
         const ndx = positions.length / 3;
         for (const c of f.corners) {
-            positions.push((c.pos[0] - 0.5) * ITEM_SIZE, (c.pos[1] - 0.5) * ITEM_SIZE, (c.pos[2] - 0.5) * ITEM_SIZE);
+            positions.push((c.pos[0] - 0.5) * size, (c.pos[1] - 0.5) * size, (c.pos[2] - 0.5) * size);
             normals.push(f.dir[0], f.dir[1], f.dir[2]);
             uvs.push(u0 + c.uv[0] * uWidth, UV_PAD + c.uv[1] * (1 - 2 * UV_PAD));
         }
@@ -655,22 +915,72 @@ function getItemGeometry(itemId) {
     geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
     geo.setIndex(indices);
+    return geo;
+}
+
+function buildSpriteGeo(pix, px, depth) {
+    const pos = [], nor = [], col = [], ind = [];
+    const filled = (cx, cy) => cx >= 0 && cx < 16 && cy >= 0 && cy < 16 && pix[cy][cx];
+    const tmp = new THREE.Color();
+    for (let cy = 0; cy < 16; cy++) {
+        for (let cx = 0; cx < 16; cx++) {
+            const c = pix[cy][cx];
+            if (!c) continue;
+            tmp.setRGB(c[0] / 255, c[1] / 255, c[2] / 255, THREE.SRGBColorSpace);
+            const gy = 15 - cy;
+            for (const f of FACES) {
+                if (f.dir[2] === 0 && filled(cx + f.dir[0], cy - f.dir[1])) continue; // face interna
+                const base = pos.length / 3;
+                for (const k of f.corners) {
+                    pos.push((cx - 8 + k.pos[0]) * px, (gy - 8 + k.pos[1]) * px, (k.pos[2] - 0.5) * depth);
+                    nor.push(f.dir[0], f.dir[1], f.dir[2]);
+                    col.push(tmp.r, tmp.g, tmp.b);
+                }
+                ind.push(base, base + 1, base + 2, base + 2, base + 1, base + 3);
+            }
+        }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    geo.setIndex(ind);
+    return geo;
+}
+
+const spriteMaterial = new THREE.MeshLambertMaterial({ vertexColors: true });
+
+// --- Itens soltos no mundo (drops) ---
+const ITEM_SIZE = 0.28;
+const itemEntities = [];
+const itemGeometryCache = {};
+const _pickupCenter = new THREE.Vector3();
+
+function getItemGeometry(itemId) {
+    if (itemGeometryCache[itemId]) return itemGeometryCache[itemId];
+    const item = ITEMS[itemId];
+    const geo = item.sprite
+        ? buildSpriteGeo(spritePixels(item.sprite.kind, item.sprite.mat), ITEM_SIZE * 1.6 / 16, ITEM_SIZE * 0.25)
+        : buildCubeGeo(BLOCKS[item.block].tiles, ITEM_SIZE);
     itemGeometryCache[itemId] = geo;
     return geo;
 }
 
-function spawnItemEntity(id, count, pos, vel, delay = 0.5) {
-    // Junta com um drop do mesmo tipo que já esteja por perto
-    for (const e of itemEntities) {
-        if (e.id === id && e.pos.distanceToSquared(pos) < 1.0 && e.count + count <= ITEMS[id].maxStack) {
-            e.count += count;
-            return;
+function spawnItemEntity(id, count, pos, vel, delay = 0.5, damage = 0) {
+    // Junta com um drop do mesmo tipo que já esteja por perto (nunca ferramentas)
+    if (ITEMS[id].maxStack > 1) {
+        for (const e of itemEntities) {
+            if (e.id === id && e.pos.distanceToSquared(pos) < 1.0 && e.count + count <= ITEMS[id].maxStack) {
+                e.count += count;
+                return;
+            }
         }
     }
-    const mesh = new THREE.Mesh(getItemGeometry(id), world.material);
+    const mat = ITEMS[id].sprite ? spriteMaterial : world.material;
+    const mesh = new THREE.Mesh(getItemGeometry(id), mat);
     mesh.position.copy(pos);
     scene.add(mesh);
-    itemEntities.push({ id, count, pos: pos.clone(), vel: vel.clone(), mesh, age: 0, delay, onGround: false, phase: Math.random() * 6.28 });
+    itemEntities.push({ id, count, damage, pos: pos.clone(), vel: vel.clone(), mesh, age: 0, delay, onGround: false, phase: Math.random() * 6.28 });
 }
 
 function removeItemEntity(i) {
@@ -715,7 +1025,7 @@ function updateItemEntities(dt) {
             const dx = _pickupCenter.x - e.pos.x, dy = _pickupCenter.y - e.pos.y, dz = _pickupCenter.z - e.pos.z;
             const d2 = dx * dx + dy * dy + dz * dz;
             if (d2 < 0.36) {
-                const left = inventory.add(e.id, e.count);
+                const left = inventory.add(e.id, e.count, 0, inventory.slots.length, e.damage);
                 updateHotbarUI();
                 if (left === 0) { removeItemEntity(i); continue; }
                 e.count = left;
@@ -735,14 +1045,14 @@ function dropSelectedItem() {
     if (!controls.isLocked) return;
     const s = inventory.slots[selectedSlot];
     if (!s) return;
-    const id = s.id;
+    const id = s.id, damage = s.damage || 0;
     inventory.removeOne(selectedSlot);
     camera.getWorldDirection(tmpDir);
     const pos = camera.position.clone().addScaledVector(tmpDir, 0.5);
     pos.y -= 0.2;
     const vel = tmpDir.clone().multiplyScalar(5);
     vel.y += 2;
-    spawnItemEntity(id, 1, pos, vel, 1.5);
+    spawnItemEntity(id, 1, pos, vel, 1.5, damage);
     updateHotbarUI();
 }
 
@@ -805,39 +1115,34 @@ function createCrackAssets() {
 
 // --- Mineração ---
 const mining = { active: false, x: 0, y: 0, z: 0, progress: 0, cooldown: 0 };
-let swingTime = 0;
-
-// Tempo (s) para quebrar. Ferramentas (Parte 3) vão alterar toolMultiplier.
-function getBreakTime(type) {
-    const toolMultiplier = 1;
-    return (BLOCKS[type].hardness * 1.5) / toolMultiplier;
-}
 
 function resetMining() {
     mining.active = false;
     mining.progress = 0;
     if (crackMesh) crackMesh.visible = false;
-    armSwing = 0;
 }
 
 function breakBlock(x, y, z) {
     const type = world.getBlock(x, y, z);
     if (!type) return;
+    const held = inventory.slots[selectedSlot];
+    const harvest = canHarvest(type, held);
+    const drop = BLOCKS[type].drop;
     world.setBlock(x, y, z, 0);
     spawnBreakParticles(x, y, z, type);
-    spawnItemEntity(
-        BLOCKS[type].drop, 1,
-        new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5),
-        new THREE.Vector3((Math.random() - 0.5) * 2, 3, (Math.random() - 0.5) * 2)
-    );
+    if (harvest && drop) {
+        spawnItemEntity(
+            drop, 1,
+            new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5),
+            new THREE.Vector3((Math.random() - 0.5) * 2, 3, (Math.random() - 0.5) * 2)
+        );
+    }
+    damageTool(selectedSlot, 1);      // gasta 1 de durabilidade por bloco quebrado
 }
 
 function updateMining(dt) {
     mining.cooldown = Math.max(0, mining.cooldown - dt);
     if (!leftHeld || !currentHit) { resetMining(); return; }
-
-    swingTime += dt;
-    armSwing = -Math.abs(Math.sin(swingTime * 9)) * 0.7;
 
     if (currentHit.y === 0) {          // fundo do mundo: indestrutível
         mining.progress = 0;
@@ -852,7 +1157,7 @@ function updateMining(dt) {
         mining.progress = 0;           // mudou de alvo: perde o progresso
     }
 
-    mining.progress += dt / getBreakTime(currentHit.type);
+    mining.progress += dt / getBreakTime(currentHit.type, inventory.slots[selectedSlot]);
 
     if (mining.progress >= 1) {
         breakBlock(mining.x, mining.y, mining.z);
@@ -867,7 +1172,18 @@ function updateMining(dt) {
 
 function selectedItemText() {
     const s = inventory.slots[selectedSlot];
-    return s ? `${ITEMS[s.id].name} x${s.count}` : 'mão vazia';
+    if (!s) return 'mão vazia';
+    const it = ITEMS[s.id];
+    let t = `${it.name} x${s.count}`;
+    if (it.maxDurability) t += ` (durabilidade ${it.maxDurability - (s.damage || 0)}/${it.maxDurability})`;
+    return t;
+}
+
+function selectSlot(n) {
+    if (n === selectedSlot) return;
+    selectedSlot = n;
+    resetMining();
+    updateHotbarUI();
 }
 
 function initGameplayAssets() {
@@ -875,22 +1191,105 @@ function initGameplayAssets() {
     computeBlockColors();
     createCrackAssets();
     buildInventoryUI();
+    buildRecipeList();
     updateHotbarUI();
 }
 
 // =====================================================================
-// 5C. TELA DE INVENTÁRIO (tecla E)
+// 5C. MÃO EM PRIMEIRA PESSOA (cena própria, renderizada por cima do mundo)
+// =====================================================================
+let handScene, handCamera, handPivot, heldAnchor;
+let heldMesh = null, heldId = -1;
+const handAnim = { mining: 0, phase: 0, punch: 0, sw: 1 };
+const heldGeoCache = {};
+
+function createHand() {
+    handScene = new THREE.Scene();
+    handCamera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 5);
+    handScene.add(new THREE.AmbientLight(0xffffff, 0.75));
+    const dl = new THREE.DirectionalLight(0xffffff, 0.5);
+    dl.position.set(0.5, 1, 0.8);
+    handScene.add(dl);
+
+    handPivot = new THREE.Group();                       // origem = ombro; o braço aponta para -Z
+    const sleeve = new THREE.Mesh(
+        new THREE.BoxGeometry(0.16, 0.16, 0.40),
+        new THREE.MeshLambertMaterial({ map: createNoiseTexture([70, 110, 190], 11) }));
+    sleeve.position.z = -0.20;
+    const hand = new THREE.Mesh(
+        new THREE.BoxGeometry(0.13, 0.13, 0.20),
+        new THREE.MeshLambertMaterial({ map: createNoiseTexture([214, 166, 125], 12, 8) }));
+    hand.position.z = -0.50;
+    heldAnchor = new THREE.Group();                      // ponto de empunhadura, na ponta da mão
+    heldAnchor.position.set(0, 0.03, -0.62);
+    handPivot.add(sleeve, hand, heldAnchor);
+    handScene.add(handPivot);
+}
+
+function refreshHeldItem() {
+    const s = inventory.slots[selectedSlot];
+    const id = s ? s.id : 0;
+    if (id === heldId) return;
+    heldId = id;
+    handAnim.sw = 0;                                     // animação de troca
+    if (heldMesh) { heldAnchor.remove(heldMesh); heldMesh = null; }
+    heldAnchor.rotation.set(0, 0, 0);
+    if (!id) return;
+    const item = ITEMS[id];
+    if (item.sprite) {
+        const px = 0.034;
+        const key = 'spr' + id;
+        if (!heldGeoCache[key]) heldGeoCache[key] = buildSpriteGeo(spritePixels(item.sprite.kind, item.sprite.mat), px, px);
+        heldMesh = new THREE.Mesh(heldGeoCache[key], spriteMaterial);
+        heldMesh.position.set(3.5 * px, 4.5 * px, 0);     // pixel (4,12) do sprite = ponto de empunhadura
+        heldAnchor.rotation.set(...HELD_TOOL_ROT);
+    } else {
+        const key = 'blk' + id;
+        if (!heldGeoCache[key]) heldGeoCache[key] = buildCubeGeo(BLOCKS[item.block].tiles, 0.3);
+        heldMesh = new THREE.Mesh(heldGeoCache[key], world.material);
+        heldMesh.position.set(...HELD_BLOCK_POS);
+        heldAnchor.rotation.set(...HELD_BLOCK_ROT);
+    }
+    heldAnchor.add(heldMesh);
+}
+
+// A pose é recalculada do zero a cada quadro (nada acumula, sem tremores)
+function updateHand(dt) {
+    refreshHeldItem();
+    const miningNow = (leftHeld && currentHit && currentHit.y !== 0) ? 1 : 0;
+    handAnim.mining += (miningNow - handAnim.mining) * Math.min(1, 12 * dt);
+    if (miningNow) handAnim.phase += dt * 9;
+    handAnim.punch = Math.max(0, handAnim.punch - dt / 0.28);
+    handAnim.sw = Math.min(1, handAnim.sw + dt / 0.25);
+
+    const m = handAnim.mining * Math.abs(Math.sin(handAnim.phase));
+    const p = Math.sin((1 - handAnim.punch) * Math.PI);
+    const swing = Math.max(m, p);
+    const dip = (1 - handAnim.sw) * (1 - handAnim.sw) * 0.5;
+
+    handPivot.position.set(
+        HAND_BASE.x + Math.cos(bobTimer) * 0.012,
+        HAND_BASE.y + Math.sin(bobTimer * 2) * 0.010 - dip - 0.05 * swing,
+        HAND_BASE.z - 0.12 * swing);
+    handPivot.rotation.set(0.35 - 0.9 * swing, 0.25, 0);
+}
+
+// =====================================================================
+// 5D. TELA DE INVENTÁRIO + CRAFTING 2x2 (tecla E)
 // =====================================================================
 
 // --- Operações puras sobre os slots. Só MOVEM itens entre slots e cursor:
 //     nunca criam nem destroem, o que impede duplicação/perda. ---
 const cursorHeld = { stack: null };   // pilha presa ao cursor
+const craftInv = new Inventory(4);    // grade 2x2 (slots 0,1 / 2,3)
+
+const stackable = (id) => ITEMS[id].maxStack > 1;
 
 function invLeftClick(inv, i, cur) {
     const s = inv.slots[i], c = cur.stack;
     if (!c) { if (s) { cur.stack = s; inv.slots[i] = null; } return; }       // pega tudo
     if (!s) { inv.slots[i] = c; cur.stack = null; return; }                  // coloca tudo
-    if (s.id === c.id) {                                                     // junta
+    if (s.id === c.id && stackable(s.id)) {                                  // junta
         const n = Math.min(ITEMS[s.id].maxStack - s.count, c.count);
         s.count += n; c.count -= n;
         if (c.count <= 0) cur.stack = null;
@@ -905,18 +1304,21 @@ function invRightClick(inv, i, cur) {
         if (s) {
             const take = Math.ceil(s.count / 2);
             cur.stack = { id: s.id, count: take };
+            if (s.damage) cur.stack.damage = s.damage;
             s.count -= take;
             if (s.count <= 0) inv.slots[i] = null;
         }
         return;
     }
     if (!s) {                                                                // coloca 1
-        inv.slots[i] = { id: c.id, count: 1 };
+        const one = { id: c.id, count: 1 };
+        if (c.damage) one.damage = c.damage;
+        inv.slots[i] = one;
         c.count--;
         if (c.count <= 0) cur.stack = null;
         return;
     }
-    if (s.id === c.id) {                                                     // soma 1
+    if (s.id === c.id && stackable(s.id)) {                                  // soma 1
         if (s.count < ITEMS[s.id].maxStack) {
             s.count++; c.count--;
             if (c.count <= 0) cur.stack = null;
@@ -926,19 +1328,18 @@ function invRightClick(inv, i, cur) {
     inv.slots[i] = c; cur.stack = s;                                         // troca
 }
 
-// Shift+clique: barra -> mochila e mochila -> barra
-function invQuickMove(inv, i) {
-    const s = inv.slots[i];
+// Shift+clique: move o slot de uma região para outra
+function invQuickMove(src, i, dst, from, to) {
+    const s = src.slots[i];
     if (!s) return;
-    const [from, to] = i < 9 ? [9, 36] : [0, 9];
-    const left = inv.add(s.id, s.count, from, to);
-    if (left === 0) inv.slots[i] = null; else s.count = left;
+    const left = dst.add(s.id, s.count, from, to, s.damage || 0);
+    if (left === 0) src.slots[i] = null; else s.count = left;
 }
 
 // Duplo clique: puxa para o cursor todos os itens iguais
 function invCollectSame(inv, cur) {
     const c = cur.stack;
-    if (!c) return;
+    if (!c || !stackable(c.id)) return;
     const max = ITEMS[c.id].maxStack;
     for (let i = 0; i < inv.slots.length && c.count < max; i++) {
         const s = inv.slots[i];
@@ -955,46 +1356,102 @@ function invSwapHotbar(inv, i, h) {
     [inv.slots[i], inv.slots[h]] = [inv.slots[h], inv.slots[i]];
 }
 
+// --- Crafting ---
+function craftConsume() {
+    for (let i = 0; i < 4; i++) if (craftInv.slots[i]) craftInv.removeOne(i);
+}
+
+function handleOutputClick(e) {
+    const r = matchRecipe(craftInv);
+    if (!r) return;
+    const c = cursorHeld.stack;
+    if (e.shiftKey && !c) {                                   // cria o máximo possível direto no inventário
+        for (let guard = 0; guard < 64; guard++) {
+            const rr = matchRecipe(craftInv);
+            if (!rr || inventory.spaceFor(rr.id) < rr.count) break;
+            craftConsume();
+            inventory.add(rr.id, rr.count);
+        }
+        return;
+    }
+    if (!c) {
+        craftConsume();
+        cursorHeld.stack = { id: r.id, count: r.count };
+    } else if (c.id === r.id && stackable(c.id) && c.count + r.count <= ITEMS[c.id].maxStack) {
+        craftConsume();
+        c.count += r.count;
+    }
+    // qualquer outro caso: não faz nada (nada é consumido nem perdido)
+}
+
 // --- Interface ---
 let inventoryOpen = false;
-let invHover = -1;
-let invLastClick = { time: 0, index: -1 };
+let invHover = null;                 // { inv: 'main' | 'craft' | 'out', i }
+let invLastClick = { time: 0, key: '' };
 const invMouse = { x: 0, y: 0, seen: false };
-let invSlotEls = [];
+let invSlotEls = [], craftSlotEls = [], outSlotEl = null;
+let craftResult = null;
 
 function stackHtml(s) {
     if (!s) return '';
     let html = `<div class="slot-icon" style="background-image:url('${ITEM_ICONS[s.id]}')"></div>`;
     if (s.count > 1) html += `<span class="slot-count">${s.count}</span>`;
+    const it = ITEMS[s.id];
+    if (it.maxDurability && s.damage > 0) {
+        const f = Math.max(0, 1 - s.damage / it.maxDurability);
+        html += `<div class="dur"><div style="width:${(f * 100).toFixed(0)}%;background:hsl(${(f * 120).toFixed(0)},80%,45%)"></div></div>`;
+    }
     return html;
 }
 
-function throwStack(id, count) {
+function throwStack(id, count, damage = 0) {
     camera.getWorldDirection(tmpDir);
     const pos = camera.position.clone().addScaledVector(tmpDir, 0.6);
     pos.y -= 0.2;
     const vel = tmpDir.clone().multiplyScalar(5);
     vel.y += 2;
-    spawnItemEntity(id, count, pos, vel, 1.5);
+    spawnItemEntity(id, count, pos, vel, 1.5, damage);
 }
 
 function buildInventoryUI() {
     const main = document.getElementById('inv-main');
     const bar = document.getElementById('inv-hotbar');
+    const craft = document.getElementById('inv-craft');
+    const out = document.getElementById('inv-out');
     invSlotEls = new Array(36);
-    const make = (i, parent) => {
+    craftSlotEls = new Array(4);
+    const make = (name, i, parent) => {
         const el = document.createElement('div');
         el.className = 'islot';
+        el.dataset.inv = name;
         el.dataset.index = i;
         parent.appendChild(el);
-        invSlotEls[i] = el;
+        return el;
     };
-    for (let i = 9; i < 36; i++) make(i, main);
-    for (let i = 0; i < 9; i++) make(i, bar);
+    for (let i = 9; i < 36; i++) invSlotEls[i] = make('main', i, main);
+    for (let i = 0; i < 9; i++) invSlotEls[i] = make('main', i, bar);
+    for (let i = 0; i < 4; i++) craftSlotEls[i] = make('craft', i, craft);
+    outSlotEl = make('out', 0, out);
+    outSlotEl.classList.add('out');
 
     const overlay = document.getElementById('inventory');
     overlay.addEventListener('mousedown', onInventoryMouseDown);
     overlay.addEventListener('mousemove', onInventoryMouseMove);
+}
+
+function buildRecipeList() {
+    const nm = (id) => id ? ITEMS[id].name : '·';
+    const lines = RECIPES.map(r =>
+        r.shape.map(row => row.map(nm).join(' + ')).join(' / ') + ` → ${r.count}× ${ITEMS[r.result].name}`);
+    document.getElementById('inv-recipes').innerHTML =
+        '<b>Receitas (grade 2×2, vale espelhado):</b><br>' + lines.join('<br>');
+}
+
+function hoveredStack() {
+    if (!invHover) return null;
+    if (invHover.inv === 'main') return inventory.slots[invHover.i];
+    if (invHover.inv === 'craft') return craftInv.slots[invHover.i];
+    return craftResult;
 }
 
 function updateInventoryFloaters() {
@@ -1008,9 +1465,12 @@ function updateInventoryFloaters() {
     } else {
         cursorEl.style.display = 'none';
     }
-    const hovered = invHover >= 0 ? inventory.slots[invHover] : null;
+    const hovered = hoveredStack();
     if (hovered && !cursorHeld.stack && invMouse.seen) {
-        tip.textContent = ITEMS[hovered.id].name + (hovered.count > 1 ? ` (x${hovered.count})` : '');
+        const it = ITEMS[hovered.id];
+        let text = it.name + (hovered.count > 1 ? ` (x${hovered.count})` : '');
+        if (it.maxDurability) text += `\nDurabilidade: ${it.maxDurability - (hovered.damage || 0)}/${it.maxDurability}`;
+        tip.textContent = text;
         tip.style.left = (invMouse.x + 14) + 'px';
         tip.style.top = (invMouse.y + 14) + 'px';
         tip.style.display = 'block';
@@ -1025,6 +1485,9 @@ function renderInventory() {
         el.innerHTML = stackHtml(inventory.slots[i]);
         el.classList.toggle('sel', i === selectedSlot);
     }
+    for (let i = 0; i < 4; i++) craftSlotEls[i].innerHTML = stackHtml(craftInv.slots[i]);
+    craftResult = matchRecipe(craftInv);
+    outSlotEl.innerHTML = craftResult ? stackHtml(craftResult) : '';
     updateInventoryFloaters();
     updateHotbarUI();
 }
@@ -1032,7 +1495,7 @@ function renderInventory() {
 function onInventoryMouseMove(e) {
     invMouse.x = e.clientX; invMouse.y = e.clientY; invMouse.seen = true;
     const el = e.target.closest('.islot');
-    invHover = el ? Number(el.dataset.index) : -1;
+    invHover = el ? { inv: el.dataset.inv, i: Number(el.dataset.index) } : null;
     updateInventoryFloaters();
 }
 
@@ -1046,23 +1509,36 @@ function onInventoryMouseDown(e) {
         if (e.target.closest('#inv-panel')) return;
         const c = cursorHeld.stack;
         if (c) {
-            if (e.button === 0) { throwStack(c.id, c.count); cursorHeld.stack = null; }
-            else if (e.button === 2) { throwStack(c.id, 1); c.count--; if (c.count <= 0) cursorHeld.stack = null; }
+            const dmg = c.damage || 0;
+            if (e.button === 0) { throwStack(c.id, c.count, dmg); cursorHeld.stack = null; }
+            else if (e.button === 2) { throwStack(c.id, 1, dmg); c.count--; if (c.count <= 0) cursorHeld.stack = null; }
             renderInventory();
         }
         return;
     }
 
-    const i = Number(el.dataset.index);
-    invHover = i;
+    const name = el.dataset.inv, i = Number(el.dataset.index);
+    invHover = { inv: name, i };
+
+    if (name === 'out') {
+        if (e.button === 0 || e.button === 2) handleOutputClick(e);
+        renderInventory();
+        return;
+    }
+
+    const target = name === 'craft' ? craftInv : inventory;
+    const key = name + i;
     if (e.button === 0) {
         const now = performance.now();
-        if (e.shiftKey && !cursorHeld.stack) invQuickMove(inventory, i);
-        else if (cursorHeld.stack && invLastClick.index === i && now - invLastClick.time < 350) invCollectSame(inventory, cursorHeld);
-        else invLeftClick(inventory, i, cursorHeld);
-        invLastClick = { time: now, index: i };
+        if (e.shiftKey && !cursorHeld.stack) {
+            if (name === 'main') invQuickMove(inventory, i, inventory, i < 9 ? 9 : 0, i < 9 ? 36 : 9);
+            else invQuickMove(craftInv, i, inventory, 0, 36);
+        }
+        else if (cursorHeld.stack && invLastClick.key === key && now - invLastClick.time < 350) invCollectSame(target, cursorHeld);
+        else invLeftClick(target, i, cursorHeld);
+        invLastClick = { time: now, key };
     } else if (e.button === 2) {
-        invRightClick(inventory, i, cursorHeld);
+        invRightClick(target, i, cursorHeld);
     }
     renderInventory();
 }
@@ -1070,25 +1546,29 @@ function onInventoryMouseDown(e) {
 function openInventory() {
     if (!controls.isLocked || inventoryOpen) return;
     inventoryOpen = true;               // antes do unlock, para o menu de pausa não aparecer
-    invHover = -1;
+    invHover = null;
     invMouse.seen = false;
-    invLastClick = { time: 0, index: -1 };
+    invLastClick = { time: 0, key: '' };
     document.getElementById('inventory').style.display = 'flex';
     renderInventory();
     controls.unlock();
+}
+
+function giveBack(s) {
+    if (!s) return;
+    const left = inventory.add(s.id, s.count, 0, inventory.slots.length, s.damage || 0);
+    if (left > 0) throwStack(s.id, left, s.damage || 0);
 }
 
 function closeInventory(relock) {
     if (!inventoryOpen) return;
     inventoryOpen = false;
 
-    // O que estiver no cursor volta para o inventário; se não couber, vai para o mundo
-    const c = cursorHeld.stack;
-    if (c) {
-        const left = inventory.add(c.id, c.count);
-        if (left > 0) throwStack(c.id, left);
-        cursorHeld.stack = null;
-    }
+    // O que estiver no cursor ou na grade de crafting volta para o inventário; se não couber, vai para o mundo
+    giveBack(cursorHeld.stack);
+    cursorHeld.stack = null;
+    for (let i = 0; i < 4; i++) { giveBack(craftInv.slots[i]); craftInv.slots[i] = null; }
+
     document.getElementById('inventory').style.display = 'none';
     document.getElementById('inv-cursor').style.display = 'none';
     document.getElementById('inv-tooltip').style.display = 'none';
@@ -1107,15 +1587,16 @@ function closeInventory(relock) {
 function handleInventoryKey(event) {
     if (event.code === 'KeyE') { event.preventDefault(); if (!event.repeat) closeInventory(true); return; }
     if (event.code === 'Escape') { closeInventory(false); return; }
-    if (invHover < 0 || cursorHeld.stack) return;
+    if (!invHover || invHover.inv === 'out' || cursorHeld.stack) return;
     if (event.code.startsWith('Digit')) {
         const n = parseInt(event.key);
-        if (n >= 1 && n <= 9) { invSwapHotbar(inventory, invHover, n - 1); renderInventory(); }
+        if (n >= 1 && n <= 9 && invHover.inv === 'main') { invSwapHotbar(inventory, invHover.i, n - 1); renderInventory(); }
     } else if (event.code === 'KeyQ') {
-        const s = inventory.slots[invHover];
+        const inv = invHover.inv === 'main' ? inventory : craftInv;
+        const s = inv.slots[invHover.i];
         if (s) {
-            throwStack(s.id, 1);
-            inventory.removeOne(invHover);
+            throwStack(s.id, 1, s.damage || 0);
+            inv.removeOne(invHover.i);
             renderInventory();
         }
     }
@@ -1144,12 +1625,10 @@ const player = {
 const spawnPoint = new THREE.Vector3();
 
 let bobTimer = 0;
-let playerArm;
 
 let selectedSlot = 0;
-const inventory = new Inventory(36);   // slots 0-8 = barra rápida, 9-35 = mochila (UI completa na Parte 3)
+const inventory = new Inventory(36);   // slots 0-8 = barra rápida, 9-35 = mochila
 let leftHeld = false;
-let armSwing = 0;
 
 // Sobrevivência (será expandida na Fase 3)
 let health = 20, hunger = 20, exhaustion = 0, healthTick = 0;
@@ -1179,13 +1658,7 @@ function updateHotbarUI() {
     for (let i = 0; i < 9; i++) {
         const slot = document.getElementById(`slot-${i}`);
         slot.classList.toggle('active', i === selectedSlot);
-        const s = inventory.slots[i];
-        let html = `<span class="slot-number">${i + 1}</span>`;
-        if (s) {
-            html += `<div class="slot-icon" style="background-image:url('${ITEM_ICONS[s.id]}')"></div>`;
-            if (s.count > 1) html += `<span class="slot-count">${s.count}</span>`;
-        }
-        slot.innerHTML = html;
+        slot.innerHTML = `<span class="slot-number">${i + 1}</span>` + stackHtml(inventory.slots[i]);
     }
 }
 
@@ -1216,15 +1689,16 @@ function updateDebug(rawDt) {
     const target = currentHit
         ? `${BLOCKS[currentHit.type].name} (${currentHit.x}, ${currentHit.y}, ${currentHit.z})`
         : '—';
+    const tt = currentHit ? getBreakTime(currentHit.type, inventory.slots[selectedSlot]).toFixed(2) + 's' : '—';
     debugEl.textContent =
-`Voxel Sandbox — Parte 3
+`Voxel Sandbox — Parte 4
 FPS: ${fps}
 Seed: ${SEED}
 XYZ: ${p.x.toFixed(2)} ${p.y.toFixed(2)} ${p.z.toFixed(2)}
 Chunk: ${floorDiv(p.x, CHUNK_SIZE)}, ${floorDiv(p.z, CHUNK_SIZE)}
 Chunks: ${world.chunks.size} | fila geração: ${world.genQueue.length} | fila malha: ${world.dirty.size}
 No chão: ${player.onGround}
-Alvo: ${target}
+Alvo: ${target} | tempo p/ quebrar: ${tt}
 Mineração: ${Math.round(mining.progress * 100)}% | Drops no mundo: ${itemEntities.length}
 Item na mão: ${selectedItemText()}`;
 }
@@ -1323,7 +1797,6 @@ function updatePhysics(dt) {
 
     const speed = isCrouching ? CROUCH_SPEED : (isSprinting ? SPRINT_SPEED : WALK_SPEED);
 
-    // Direção desejada a partir do yaw da câmera
     // Yaw lido na ordem YXZ (a mesma do PointerLockControls). Usar camera.rotation.y
     // (ordem XYZ) inverte o movimento ao olhar para trás ou muito para cima/baixo.
     yawEuler.setFromQuaternion(camera.quaternion, 'YXZ');
@@ -1399,12 +1872,9 @@ function updatePhysics(dt) {
         else if (hunger >= 18 && health < 20) { health += 1; updateSurvivalUI(); }
     }
 
-    // Balanço do braço
+    // Fase do balanço (usada por updateHand)
     if (player.onGround && hzSpeed > 2.0) bobTimer += dt * (hzSpeed * 1.2);
     else bobTimer += (0 - bobTimer) * Math.min(1, 5 * dt);
-    playerArm.position.y = -0.3 + Math.sin(bobTimer * 2.0) * 0.04;
-    playerArm.position.x = 0.3 + Math.cos(bobTimer) * 0.04;
-    playerArm.rotation.x += (-0.1 + Math.sin(bobTimer * 2.0) * 0.05 + armSwing - playerArm.rotation.x) * Math.min(1, 10 * dt);
 }
 
 // =====================================================================
@@ -1423,16 +1893,9 @@ function init() {
     scene.add(dirLight);
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 300);
-
-    // Braço em primeira pessoa (será refeito na Fase 2/7)
-    playerArm = new THREE.Mesh(
-        new THREE.BoxGeometry(0.2, 0.6, 0.2),
-        new THREE.MeshLambertMaterial({ color: 0xd2a679 })
-    );
-    playerArm.position.set(0.3, -0.3, -0.4);
-    playerArm.rotation.set(-0.1, -0.1, 0);
-    camera.add(playerArm);
     scene.add(camera);
+
+    createHand();
 
     // Contorno do bloco selecionado
     targetMesh = new THREE.LineSegments(
@@ -1443,12 +1906,15 @@ function init() {
     scene.add(targetMesh);
 
     renderer = new THREE.WebGLRenderer({ antialias: false });
+    renderer.autoClear = false;     // dois passes: mundo e depois a mão
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
     window.addEventListener('resize', () => {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
+        handCamera.aspect = window.innerWidth / window.innerHeight;
+        handCamera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
@@ -1510,7 +1976,7 @@ function init() {
         }
         if (event.code.startsWith('Digit')) {
             const num = parseInt(event.key);
-            if (num >= 1 && num <= 9) { selectedSlot = num - 1; updateHotbarUI(); }
+            if (num >= 1 && num <= 9) selectSlot(num - 1);
         }
     });
 
@@ -1528,8 +1994,7 @@ function init() {
 
     document.addEventListener('wheel', (event) => {
         if (!controls.isLocked) return;
-        selectedSlot = (selectedSlot + (event.deltaY > 0 ? 1 : 8)) % 9;
-        updateHotbarUI();
+        selectSlot((selectedSlot + (event.deltaY > 0 ? 1 : 8)) % 9);
     });
 
     document.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -1541,9 +2006,9 @@ function init() {
         if (!currentHit) return;
 
         if (event.button === 2) {
-            // Colocar na face atingida (consome 1 item do slot selecionado)
+            // Colocar na face atingida (consome 1 item do slot selecionado; só itens de bloco)
             const heldStack = inventory.slots[selectedSlot];
-            const type = heldStack ? ITEMS[heldStack.id].block : 0;
+            const type = heldStack ? (ITEMS[heldStack.id].block || 0) : 0;
             const { nx, ny, nz } = currentHit;
             if (type === 0 || (nx === 0 && ny === 0 && nz === 0)) return;
             const px = currentHit.x + nx, py = currentHit.y + ny, pz = currentHit.z + nz;
@@ -1553,7 +2018,7 @@ function init() {
             if (world.setBlock(px, py, pz, type)) {
                 inventory.removeOne(selectedSlot);
                 updateHotbarUI();
-                playerArm.rotation.x = -0.6;
+                handAnim.punch = 1;
             }
         }
     });
@@ -1579,9 +2044,14 @@ function animate() {
         updateItemEntities(dt);
         updateParticles(dt);
     }
+    updateHand(dt);
     world.update(player.pos.x, player.pos.z);
     updateDebug(rawDt);
+
+    renderer.clear();
     renderer.render(scene, camera);
+    renderer.clearDepth();                    // a mão nunca atravessa o terreno
+    renderer.render(handScene, handCamera);
 }
 
 init();
