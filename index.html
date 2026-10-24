@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Voxel Sandbox - Parte 1: Fundação</title>
+<title>Voxel Sandbox - Parte 2: Mineração e Inventário</title>
 <style>
     body { margin: 0; overflow: hidden; background-color: #87CEEB; font-family: sans-serif; }
     #crosshair { position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; margin-top: -10px; margin-left: -10px; pointer-events: none; }
@@ -32,6 +32,8 @@
     .icon-stone { width: 24px; height: 24px; background: #888; }
     .icon-wood { width: 24px; height: 24px; background: #a0522d; border-left: 4px solid #6b3e1b; }
     .icon-dirt { width: 24px; height: 24px; background: #8b4513; }
+    .slot-icon { width: 30px; height: 30px; background-size: 100% 100%; image-rendering: pixelated; }
+    .slot-count { position: absolute; right: 3px; bottom: 1px; color: #fff; font: bold 12px monospace; text-shadow: 1px 1px 0 #000; }
 
     #survival-hud {
         position: absolute; bottom: 70px; left: 50%; transform: translateX(-50%);
@@ -61,9 +63,9 @@
 <div id="debug"></div>
 <div id="menu">
     <h1>Voxel Sandbox</h1>
-    <p>Parte 1 — Fundação (terreno com seed, chunks otimizados, colisão e raycast)</p>
+    <p>Parte 2 — Mineração, drops e inventário</p>
     <button class="btn" id="btn-play">Clique para Jogar</button>
-    <p style="font-size: 14px; opacity: 0.8; margin-top: 15px;">[WASD] Mover | [Espaço] Pular | [Shift] Correr | [Ctrl / C] Agachar | [F3] Debug | Botão esq: quebrar | Botão dir: colocar</p>
+    <p style="font-size: 14px; opacity: 0.8; margin-top: 15px;">[WASD] Mover | [Espaço] Pular | [Shift] Correr | [Ctrl / C] Agachar | [F3] Debug | Botão esq (segure): minerar | Botão dir: colocar | [Q] Soltar item</p>
     <p style="font-size: 12px; opacity: 0.6; margin-top: 0;">Dica: abra com ?seed=123 no final do endereço para gerar outro mundo.</p>
 </div>
 
@@ -113,7 +115,7 @@ const EYE_STAND = 1.62, EYE_CROUCH = 1.27;
 // =====================================================================
 // 2. REGISTRO CENTRAL DE BLOCOS
 // =====================================================================
-const TILE = { GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, STONE: 3, WOOD: 4 };
+const TILE = { GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, STONE: 3, WOOD: 4, COBBLE: 5 };
 const ATLAS_COLUMNS = 8;
 const TILE_PX = 32;
 
@@ -121,11 +123,19 @@ const allFaces = (t) => ({ top: t, side: t, bottom: t });
 
 // Para adicionar um bloco novo: crie o tile no atlas e uma entrada aqui.
 const BLOCKS = {
-    1: { name: 'Grama',   hardness: 0.6, tiles: { top: TILE.GRASS_TOP, side: TILE.GRASS_SIDE, bottom: TILE.DIRT } },
-    2: { name: 'Pedra',   hardness: 1.5, tiles: allFaces(TILE.STONE) },
-    3: { name: 'Madeira', hardness: 2.0, tiles: allFaces(TILE.WOOD) },
-    4: { name: 'Terra',   hardness: 0.5, tiles: allFaces(TILE.DIRT) },
+    // drop = id do item que o bloco solta ao ser quebrado
+    1: { name: 'Grama',      hardness: 0.6, drop: 4, tiles: { top: TILE.GRASS_TOP, side: TILE.GRASS_SIDE, bottom: TILE.DIRT } },
+    2: { name: 'Pedra',      hardness: 1.5, drop: 5, tiles: allFaces(TILE.STONE) },
+    3: { name: 'Madeira',    hardness: 2.0, drop: 3, tiles: allFaces(TILE.WOOD) },
+    4: { name: 'Terra',      hardness: 0.5, drop: 4, tiles: allFaces(TILE.DIRT) },
+    5: { name: 'Pedregulho', hardness: 2.0, drop: 5, tiles: allFaces(TILE.COBBLE) },
 };
+
+// Itens: por enquanto todo bloco vira um item de mesmo id (ferramentas e comida entram nas próximas partes)
+const ITEMS = {};
+for (const [id, b] of Object.entries(BLOCKS)) {
+    ITEMS[id] = { name: b.name, maxStack: 64, block: Number(id), iconTile: b.tiles.top };
+}
 
 // =====================================================================
 // 3. TEXTURAS (ATLAS ÚNICO 32x32 POR TILE, DETERMINÍSTICO)
@@ -148,6 +158,7 @@ function createAtlasTexture() {
     const j = (r) => (rnd() * 2 - 1) * r;
     // Profundidade irregular da faixa de grama na lateral (uma por coluna de pixels)
     const grassEdge = Array.from({ length: TILE_PX }, () => 9 + Math.floor(rnd() * 6));
+    const cobbleShade = Array.from({ length: 40 }, () => 105 + rnd() * 35);
 
     const pixel = (tile, x, y) => {
         switch (tile) {
@@ -157,6 +168,13 @@ function createAtlasTexture() {
                                         ? [85 + j(10), 170 + j(10), 85 + j(10)]
                                         : [139 + j(10), 69 + j(10), 19 + j(5)];
             case TILE.STONE: { const c = 120 + j(15); return [c, c, c]; }
+            case TILE.COBBLE: {
+                const row = Math.floor(y / 8), off = (row % 2) * 5;
+                const col = Math.floor((x + off) / 10);
+                const edge = ((x + off) % 10 === 0) || (y % 8 === 0);
+                const c = edge ? 70 + j(6) : cobbleShade[(row * 5 + col) % cobbleShade.length] + j(8);
+                return [c, c, c];
+            }
             case TILE.WOOD: {
                 const line = (x % 8 < 2) ? -20 : 0;
                 return [160 + line + j(5), 82 + line + j(5), 45 + line + j(5)];
@@ -495,6 +513,348 @@ class World {
 }
 
 // =====================================================================
+// 5B. INVENTÁRIO, DROPS, PARTÍCULAS E MINERAÇÃO
+// =====================================================================
+class Inventory {
+    constructor(size) { this.slots = Array.from({ length: size }, () => null); } // slots 0-8 = hotbar
+
+    // Guarda o item; devolve a quantidade que NÃO coube
+    add(id, count) {
+        const max = ITEMS[id].maxStack;
+        for (const s of this.slots) {                       // 1) completa pilhas existentes
+            if (count <= 0) break;
+            if (s && s.id === id && s.count < max) {
+                const n = Math.min(max - s.count, count);
+                s.count += n; count -= n;
+            }
+        }
+        for (let i = 0; i < this.slots.length && count > 0; i++) {   // 2) ocupa slots vazios
+            if (!this.slots[i]) {
+                const n = Math.min(max, count);
+                this.slots[i] = { id, count: n };
+                count -= n;
+            }
+        }
+        return count;
+    }
+
+    canAdd(id) {
+        const max = ITEMS[id].maxStack;
+        return this.slots.some(s => !s || (s.id === id && s.count < max));
+    }
+
+    removeOne(slotIndex) {
+        const s = this.slots[slotIndex];
+        if (!s) return false;
+        s.count--;
+        if (s.count <= 0) this.slots[slotIndex] = null;
+        return true;
+    }
+}
+
+// --- Ícones e cores derivados do atlas (nada de arte duplicada) ---
+const ITEM_ICONS = {};
+const BLOCK_COLORS = {};
+
+function initItemIcons() {
+    const atlas = world.material.map.image;
+    for (const [id, item] of Object.entries(ITEMS)) {
+        const c = document.createElement('canvas');
+        c.width = c.height = TILE_PX;
+        c.getContext('2d').drawImage(atlas, item.iconTile * TILE_PX, 0, TILE_PX, TILE_PX, 0, 0, TILE_PX, TILE_PX);
+        ITEM_ICONS[id] = c.toDataURL();
+    }
+}
+
+function computeBlockColors() {
+    const ctx = world.material.map.image.getContext('2d');
+    for (const [id, b] of Object.entries(BLOCKS)) {
+        const d = ctx.getImageData(b.tiles.side * TILE_PX, 0, TILE_PX, TILE_PX).data;
+        let r = 0, g = 0, bl = 0;
+        const n = d.length / 4;
+        for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; bl += d[i + 2]; }
+        BLOCK_COLORS[id] = new THREE.Color().setRGB(r / n / 255, g / n / 255, bl / n / 255, THREE.SRGBColorSpace);
+    }
+}
+
+// --- Partículas de quebra ---
+const particles = [];
+const particleGeo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+const particleMats = {};
+
+function spawnBreakParticles(x, y, z, type) {
+    if (!particleMats[type]) particleMats[type] = new THREE.MeshBasicMaterial({ color: BLOCK_COLORS[type] });
+    for (let i = 0; i < 12 && particles.length < 150; i++) {
+        const mesh = new THREE.Mesh(particleGeo, particleMats[type]);
+        mesh.position.set(x + Math.random(), y + Math.random(), z + Math.random());
+        scene.add(mesh);
+        particles.push({
+            mesh,
+            vel: new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 3 + 1, (Math.random() - 0.5) * 3),
+            life: 0.6 + Math.random() * 0.4,
+        });
+    }
+}
+
+function updateParticles(dt) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.life -= dt;
+        if (p.life <= 0) { scene.remove(p.mesh); particles.splice(i, 1); continue; }
+        p.vel.y -= 18 * dt;
+        p.mesh.position.addScaledVector(p.vel, dt);
+    }
+}
+
+// --- Itens soltos no mundo (drops) ---
+const ITEM_SIZE = 0.28;
+const itemEntities = [];
+const itemGeometryCache = {};
+const _pickupCenter = new THREE.Vector3();
+
+function getItemGeometry(itemId) {
+    if (itemGeometryCache[itemId]) return itemGeometryCache[itemId];
+    const tiles = BLOCKS[ITEMS[itemId].block].tiles;
+    const positions = [], normals = [], uvs = [], indices = [];
+    const uWidth = 1 / ATLAS_COLUMNS - 2 * UV_PAD;
+    for (const f of FACES) {
+        const u0 = tiles[f.kind] / ATLAS_COLUMNS + UV_PAD;
+        const ndx = positions.length / 3;
+        for (const c of f.corners) {
+            positions.push((c.pos[0] - 0.5) * ITEM_SIZE, (c.pos[1] - 0.5) * ITEM_SIZE, (c.pos[2] - 0.5) * ITEM_SIZE);
+            normals.push(f.dir[0], f.dir[1], f.dir[2]);
+            uvs.push(u0 + c.uv[0] * uWidth, UV_PAD + c.uv[1] * (1 - 2 * UV_PAD));
+        }
+        indices.push(ndx, ndx + 1, ndx + 2, ndx + 2, ndx + 1, ndx + 3);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geo.setIndex(indices);
+    itemGeometryCache[itemId] = geo;
+    return geo;
+}
+
+function spawnItemEntity(id, count, pos, vel, delay = 0.5) {
+    // Junta com um drop do mesmo tipo que já esteja por perto
+    for (const e of itemEntities) {
+        if (e.id === id && e.pos.distanceToSquared(pos) < 1.0 && e.count + count <= ITEMS[id].maxStack) {
+            e.count += count;
+            return;
+        }
+    }
+    const mesh = new THREE.Mesh(getItemGeometry(id), world.material);
+    mesh.position.copy(pos);
+    scene.add(mesh);
+    itemEntities.push({ id, count, pos: pos.clone(), vel: vel.clone(), mesh, age: 0, delay, onGround: false, phase: Math.random() * 6.28 });
+}
+
+function removeItemEntity(i) {
+    scene.remove(itemEntities[i].mesh);   // geometria é compartilhada (cache), não descartar
+    itemEntities.splice(i, 1);
+}
+
+function updateItemEntities(dt) {
+    const half = ITEM_SIZE / 2;
+    _pickupCenter.set(player.pos.x, player.pos.y + 0.9, player.pos.z);
+
+    for (let i = itemEntities.length - 1; i >= 0; i--) {
+        const e = itemEntities[i];
+        e.age += dt;
+        if (e.age > 300) { removeItemEntity(i); continue; }   // some após 5 minutos
+
+        // Se um bloco foi colocado em cima do item, empurra para cima
+        if (world.isSolidForPhysics(Math.floor(e.pos.x), Math.floor(e.pos.y), Math.floor(e.pos.z))) {
+            e.pos.y = Math.floor(e.pos.y) + 1 + half;
+        }
+
+        // Física simples
+        e.vel.y = Math.max(e.vel.y - 22 * dt, -30);
+        const nx = e.pos.x + e.vel.x * dt;
+        if (world.isSolidForPhysics(Math.floor(nx), Math.floor(e.pos.y), Math.floor(e.pos.z))) e.vel.x = 0; else e.pos.x = nx;
+        const nz = e.pos.z + e.vel.z * dt;
+        if (world.isSolidForPhysics(Math.floor(e.pos.x), Math.floor(e.pos.y), Math.floor(nz))) e.vel.z = 0; else e.pos.z = nz;
+        const ny = e.pos.y + e.vel.y * dt;
+        if (world.isSolidForPhysics(Math.floor(e.pos.x), Math.floor(ny - half), Math.floor(e.pos.z))) {
+            if (e.vel.y < 0) { e.pos.y = Math.floor(ny - half) + 1 + half; e.onGround = true; }
+            e.vel.y = 0;
+        } else {
+            e.pos.y = ny;
+            e.onGround = false;
+        }
+        const friction = Math.min(1, (e.onGround ? 6 : 0.5) * dt);
+        e.vel.x -= e.vel.x * friction;
+        e.vel.z -= e.vel.z * friction;
+
+        // Coleta: só se couber no inventário (senão o item fica no mundo)
+        if (e.age >= e.delay && inventory.canAdd(e.id)) {
+            const dx = _pickupCenter.x - e.pos.x, dy = _pickupCenter.y - e.pos.y, dz = _pickupCenter.z - e.pos.z;
+            const d2 = dx * dx + dy * dy + dz * dz;
+            if (d2 < 0.36) {
+                const left = inventory.add(e.id, e.count);
+                updateHotbarUI();
+                if (left === 0) { removeItemEntity(i); continue; }
+                e.count = left;
+            } else if (d2 < 2.25) {
+                const d = Math.sqrt(d2);
+                e.pos.x += dx / d * 6 * dt; e.pos.y += dy / d * 6 * dt; e.pos.z += dz / d * 6 * dt;
+                e.vel.set(0, 0, 0);
+            }
+        }
+
+        e.mesh.position.set(e.pos.x, e.pos.y + 0.05 + Math.sin(e.age * 3 + e.phase) * 0.04, e.pos.z);
+        e.mesh.rotation.y = e.age * 1.5 + e.phase;
+    }
+}
+
+function dropSelectedItem() {
+    if (!controls.isLocked) return;
+    const s = inventory.slots[selectedSlot];
+    if (!s) return;
+    const id = s.id;
+    inventory.removeOne(selectedSlot);
+    camera.getWorldDirection(tmpDir);
+    const pos = camera.position.clone().addScaledVector(tmpDir, 0.5);
+    pos.y -= 0.2;
+    const vel = tmpDir.clone().multiplyScalar(5);
+    vel.y += 2;
+    spawnItemEntity(id, 1, pos, vel, 1.5);
+    updateHotbarUI();
+}
+
+// --- Rachaduras progressivas ---
+const CRACK_STAGES = 10;
+let crackMesh = null, crackTexture = null;
+
+function createCrackAssets() {
+    const cell = 2, grid = TILE_PX / cell;
+    const rnd = mulberry32(77);
+    const branches = [];
+    for (let b = 0; b < 7; b++) {
+        let fx = grid / 2, fy = grid / 2;
+        let a = (b / 7) * Math.PI * 2 + rnd() * 0.6;
+        const path = [];
+        for (let k = 0; k < 12; k++) {
+            fx += Math.cos(a); fy += Math.sin(a);
+            a += (rnd() - 0.5) * 0.9;
+            path.push([Math.round(fx), Math.round(fy)]);
+        }
+        branches.push(path);
+    }
+    // Intercala os ramos para a rachadura crescer a partir do centro
+    const cells = [], seen = new Set();
+    for (let k = 0; k < 12; k++) {
+        for (const path of branches) {
+            const [cx, cy] = path[k];
+            const key = cx + ',' + cy;
+            if (cx < 0 || cy < 0 || cx >= grid || cy >= grid || seen.has(key)) continue;
+            seen.add(key);
+            cells.push([cx, cy]);
+        }
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = CRACK_STAGES * TILE_PX;
+    canvas.height = TILE_PX;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    for (let st = 0; st < CRACK_STAGES; st++) {
+        const n = Math.ceil(cells.length * (st + 1) / CRACK_STAGES);
+        for (let k = 0; k < n; k++) ctx.fillRect(st * TILE_PX + cells[k][0] * cell, cells[k][1] * cell, cell, cell);
+    }
+    crackTexture = new THREE.CanvasTexture(canvas);
+    crackTexture.magFilter = THREE.NearestFilter;
+    crackTexture.minFilter = THREE.NearestFilter;
+    crackTexture.generateMipmaps = false;
+    crackTexture.colorSpace = THREE.SRGBColorSpace;
+    crackTexture.repeat.set(1 / CRACK_STAGES, 1);
+
+    crackMesh = new THREE.Mesh(
+        new THREE.BoxGeometry(1.003, 1.003, 1.003),
+        new THREE.MeshBasicMaterial({
+            map: crackTexture, transparent: true, depthWrite: false,
+            polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
+        })
+    );
+    crackMesh.visible = false;
+    scene.add(crackMesh);
+}
+
+// --- Mineração ---
+const mining = { active: false, x: 0, y: 0, z: 0, progress: 0, cooldown: 0 };
+let swingTime = 0;
+
+// Tempo (s) para quebrar. Ferramentas (Parte 3) vão alterar toolMultiplier.
+function getBreakTime(type) {
+    const toolMultiplier = 1;
+    return (BLOCKS[type].hardness * 1.5) / toolMultiplier;
+}
+
+function resetMining() {
+    mining.active = false;
+    mining.progress = 0;
+    if (crackMesh) crackMesh.visible = false;
+    armSwing = 0;
+}
+
+function breakBlock(x, y, z) {
+    const type = world.getBlock(x, y, z);
+    if (!type) return;
+    world.setBlock(x, y, z, 0);
+    spawnBreakParticles(x, y, z, type);
+    spawnItemEntity(
+        BLOCKS[type].drop, 1,
+        new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5),
+        new THREE.Vector3((Math.random() - 0.5) * 2, 3, (Math.random() - 0.5) * 2)
+    );
+}
+
+function updateMining(dt) {
+    mining.cooldown = Math.max(0, mining.cooldown - dt);
+    if (!leftHeld || !currentHit) { resetMining(); return; }
+
+    swingTime += dt;
+    armSwing = -Math.abs(Math.sin(swingTime * 9)) * 0.7;
+
+    if (currentHit.y === 0) {          // fundo do mundo: indestrutível
+        mining.progress = 0;
+        crackMesh.visible = false;
+        return;
+    }
+    if (mining.cooldown > 0) return;
+
+    if (!mining.active || mining.x !== currentHit.x || mining.y !== currentHit.y || mining.z !== currentHit.z) {
+        mining.active = true;
+        mining.x = currentHit.x; mining.y = currentHit.y; mining.z = currentHit.z;
+        mining.progress = 0;           // mudou de alvo: perde o progresso
+    }
+
+    mining.progress += dt / getBreakTime(currentHit.type);
+
+    if (mining.progress >= 1) {
+        breakBlock(mining.x, mining.y, mining.z);
+        resetMining();
+        mining.cooldown = 0.2;
+        return;
+    }
+    crackMesh.position.set(mining.x + 0.5, mining.y + 0.5, mining.z + 0.5);
+    crackTexture.offset.x = Math.min(CRACK_STAGES - 1, Math.floor(mining.progress * CRACK_STAGES)) / CRACK_STAGES;
+    crackMesh.visible = mining.progress > 0;
+}
+
+function selectedItemText() {
+    const s = inventory.slots[selectedSlot];
+    return s ? `${ITEMS[s.id].name} x${s.count}` : 'mão vazia';
+}
+
+function initGameplayAssets() {
+    initItemIcons();
+    computeBlockColors();
+    createCrackAssets();
+    updateHotbarUI();
+}
+
+// =====================================================================
 // 6. ESTADO GERAL
 // =====================================================================
 let camera, scene, renderer, controls, world;
@@ -520,7 +880,9 @@ let bobTimer = 0;
 let playerArm;
 
 let selectedSlot = 0;
-const hotbarItems = [1, 2, 3, 4, 0, 0, 0, 0, 0]; // 0 = vazio
+const inventory = new Inventory(36);   // slots 0-8 = barra rápida, 9-35 = mochila (UI completa na Parte 3)
+let leftHeld = false;
+let armSwing = 0;
 
 // Sobrevivência (será expandida na Fase 3)
 let health = 20, hunger = 20, exhaustion = 0, healthTick = 0;
@@ -548,7 +910,15 @@ function updateSurvivalUI() {
 
 function updateHotbarUI() {
     for (let i = 0; i < 9; i++) {
-        document.getElementById(`slot-${i}`).classList.toggle('active', i === selectedSlot);
+        const slot = document.getElementById(`slot-${i}`);
+        slot.classList.toggle('active', i === selectedSlot);
+        const s = inventory.slots[i];
+        let html = `<span class="slot-number">${i + 1}</span>`;
+        if (s) {
+            html += `<div class="slot-icon" style="background-image:url('${ITEM_ICONS[s.id]}')"></div>`;
+            if (s.count > 1) html += `<span class="slot-count">${s.count}</span>`;
+        }
+        slot.innerHTML = html;
     }
 }
 
@@ -580,14 +950,16 @@ function updateDebug(rawDt) {
         ? `${BLOCKS[currentHit.type].name} (${currentHit.x}, ${currentHit.y}, ${currentHit.z})`
         : '—';
     debugEl.textContent =
-`Voxel Sandbox — Parte 1
+`Voxel Sandbox — Parte 2
 FPS: ${fps}
 Seed: ${SEED}
 XYZ: ${p.x.toFixed(2)} ${p.y.toFixed(2)} ${p.z.toFixed(2)}
 Chunk: ${floorDiv(p.x, CHUNK_SIZE)}, ${floorDiv(p.z, CHUNK_SIZE)}
 Chunks: ${world.chunks.size} | fila geração: ${world.genQueue.length} | fila malha: ${world.dirty.size}
 No chão: ${player.onGround}
-Alvo: ${target}`;
+Alvo: ${target}
+Mineração: ${Math.round(mining.progress * 100)}% | Drops no mundo: ${itemEntities.length}
+Item na mão: ${selectedItemText()}`;
 }
 
 // =====================================================================
@@ -765,7 +1137,7 @@ function updatePhysics(dt) {
     else bobTimer += (0 - bobTimer) * Math.min(1, 5 * dt);
     playerArm.position.y = -0.3 + Math.sin(bobTimer * 2.0) * 0.04;
     playerArm.position.x = 0.3 + Math.cos(bobTimer) * 0.04;
-    playerArm.rotation.x += (-0.1 + Math.sin(bobTimer * 2.0) * 0.05 - playerArm.rotation.x) * Math.min(1, 10 * dt);
+    playerArm.rotation.x += (-0.1 + Math.sin(bobTimer * 2.0) * 0.05 + armSwing - playerArm.rotation.x) * Math.min(1, 10 * dt);
 }
 
 // =====================================================================
@@ -820,6 +1192,7 @@ function init() {
     world.update(spawnPoint.x, spawnPoint.z, { gen: Infinity, mesh: Infinity });
     player.pos.copy(spawnPoint);
     camera.position.set(player.pos.x, player.pos.y + player.eye, player.pos.z);
+    initGameplayAssets();
 
     // Controles
     controls = new PointerLockControls(camera, document.body);
@@ -835,6 +1208,8 @@ function init() {
         menu.style.display = 'flex';
         // Evita ações presas ao abrir o menu
         moveForward = moveBackward = moveLeft = moveRight = jumpHeld = isSprinting = wantToCrouch = false;
+        leftHeld = false;
+        resetMining();
         btnPlay.disabled = true;
         const originalText = btnPlay.innerText;
         btnPlay.innerText = 'Aguarde...';
@@ -855,6 +1230,7 @@ function init() {
             case 'KeyS': moveBackward = true; break;
             case 'KeyD': moveRight = true; break;
             case 'Space': jumpHeld = true; break;
+            case 'KeyQ': dropSelectedItem(); break;
             case 'ShiftLeft': case 'ShiftRight': isSprinting = true; break;
             case 'ControlLeft': case 'ControlRight': case 'KeyC': wantToCrouch = true; break;
             case 'F3':
@@ -891,26 +1267,30 @@ function init() {
 
     document.addEventListener('mousedown', (event) => {
         if (!controls.isLocked) return;
+        if (event.button === 0) { leftHeld = true; return; }   // minerar: tratado em updateMining()
         updateTarget();
         if (!currentHit) return;
 
-        if (event.button === 0) {
-            // Quebrar (y = 0 é o fundo do mundo e não pode ser destruído)
-            if (currentHit.y > 0) {
-                world.setBlock(currentHit.x, currentHit.y, currentHit.z, 0);
-                playerArm.rotation.x = -0.6;
-            }
-        } else if (event.button === 2) {
-            // Colocar na face atingida
-            const type = hotbarItems[selectedSlot];
+        if (event.button === 2) {
+            // Colocar na face atingida (consome 1 item do slot selecionado)
+            const heldStack = inventory.slots[selectedSlot];
+            const type = heldStack ? ITEMS[heldStack.id].block : 0;
             const { nx, ny, nz } = currentHit;
             if (type === 0 || (nx === 0 && ny === 0 && nz === 0)) return;
             const px = currentHit.x + nx, py = currentHit.y + ny, pz = currentHit.z + nz;
             if (py < 0 || py >= WORLD_HEIGHT) return;
             if (world.getBlock(px, py, pz) !== 0) return;
             if (intersectsPlayer(px, py, pz)) return;
-            if (world.setBlock(px, py, pz, type)) playerArm.rotation.x = -0.6;
+            if (world.setBlock(px, py, pz, type)) {
+                inventory.removeOne(selectedSlot);
+                updateHotbarUI();
+                playerArm.rotation.x = -0.6;
+            }
         }
+    });
+
+    document.addEventListener('mouseup', (event) => {
+        if (event.button === 0) leftHeld = false;
     });
 
     updateSurvivalUI();
@@ -926,6 +1306,9 @@ function animate() {
     if (controls.isLocked) {
         updatePhysics(dt);
         updateTarget();
+        updateMining(dt);
+        updateItemEntities(dt);
+        updateParticles(dt);
     }
     world.update(player.pos.x, player.pos.z);
     updateDebug(rawDt);
