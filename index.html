@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Voxel Sandbox - Parte 5: Bancada, Forno, Comida e Salvamento</title>
+<title>Voxel Sandbox - Parte 6: Sobrevivência</title>
 <style>
     body { margin: 0; overflow: hidden; background-color: #87CEEB; font-family: sans-serif; }
     #crosshair { position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; margin-top: -10px; margin-left: -10px; pointer-events: none; }
@@ -41,6 +41,13 @@
     .heart { width: 14px; height: 14px; background: #ff3333; border-radius: 50%; box-shadow: 0 0 2px #000; border: 1px solid #800000; }
     .food { width: 14px; height: 14px; background: #ffaa00; border-radius: 3px; box-shadow: 0 0 2px #000; border: 1px solid #8b4500; }
     .empty-stat { background: rgba(0,0,0,0.5); border: 1px solid #111; box-shadow: none; }
+    .heart.half { background: linear-gradient(90deg, #ff3333 50%, rgba(0,0,0,0.5) 50%); }
+    .food.half { background: linear-gradient(90deg, #ffaa00 50%, rgba(0,0,0,0.5) 50%); }
+    .btn:disabled { background: #888; cursor: not-allowed; }
+    #death { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; background: rgba(110,0,0,0.7); color: #fff; z-index: 11; text-align: center; padding: 0 20px; }
+    #death h1 { margin: 0 0 12px; font-size: 40px; }
+    #death p { margin: 0 0 20px; max-width: 460px; font: 14px/1.5 monospace; }
+    #hurt { position: absolute; inset: 0; pointer-events: none; z-index: 4; opacity: 0; background: radial-gradient(ellipse at center, rgba(200,0,0,0) 45%, rgba(200,0,0,0.65) 100%); }
 
     #toast { position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%); z-index: 6; pointer-events: none;
         color: #fff; font: bold 14px monospace; text-shadow: 1px 1px 0 #000; background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 4px; display: none; }
@@ -86,6 +93,12 @@
 <div id="crosshair"></div>
 <div id="debug"></div>
 <div id="toast"></div>
+<div id="hurt"></div>
+<div id="death">
+    <h1>Você morreu</h1>
+    <p id="death-info"></p>
+    <button class="btn" id="btn-respawn">Renascer</button>
+</div>
 <div id="inventory">
     <div id="inv-panel">
         <div class="inv-title" id="inv-title">Inventário</div>
@@ -114,9 +127,9 @@
 </div>
 <div id="menu">
     <h1>Voxel Sandbox</h1>
-    <p>Parte 5 — Bancada 3×3, forno, comida e salvamento automático</p>
+    <p>Parte 6 — Sobrevivência: fome com saturação, regeneração, morte e itens que caem</p>
     <button class="btn" id="btn-play">Clique para Jogar</button>
-    <p style="font-size: 14px; opacity: 0.8; margin-top: 15px;">[WASD] Mover | [Espaço] Pular | [Shift] Correr | [Ctrl / C] Agachar | [F3] Debug | Botão esq (segure): minerar | Botão dir: colocar / usar bancada e forno / comer | [E] Inventário / crafting | [Q] Soltar item</p>
+    <p style="font-size: 14px; opacity: 0.8; margin-top: 15px;">[WASD] Mover | [Espaço] Pular | [Shift] Correr | [Ctrl / C] Agachar | [F3] Debug | Botão esq (segure): minerar | Botão dir: colocar / usar bancada e forno / segurar para comer | [E] Inventário / crafting | [Q] Soltar item</p>
     <p style="font-size: 12px; opacity: 0.6; margin-top: 0;">Dicas: ?seed=123 gera outro mundo · ?reset apaga o save daquela seed · para colocar bloco encostado em bancada/forno, segure Ctrl ou C ao clicar · o jogo salva sozinho a cada 30 s e ao pausar.</p>
 </div>
 
@@ -152,6 +165,8 @@ const MESH_PER_FRAME = 2;      // malhas reconstruídas por quadro
 const REACH = 5;               // alcance de interação (blocos)
 const SEED = Number(new URLSearchParams(location.search).get('seed')) || 1337;
 const SKY_COLOR = 0x87CEEB;
+const FRAME_BUDGET_MS = 7;     // tempo máximo por quadro gasto gerando/montando chunks
+const MAX_PIXEL_RATIO = Number(new URLSearchParams(location.search).get('pr')) || 1.5;   // ?pr=2 para resolução total
 
 // Física do jogador
 const GRAVITY = 30;
@@ -162,6 +177,13 @@ const CROUCH_SPEED = 1.3;
 const PLAYER_RADIUS = 0.3;
 const H_STAND = 1.8, H_CROUCH = 1.5;
 const EYE_STAND = 1.62, EYE_CROUCH = 1.27;
+
+// Sobrevivência
+const MAX_HEALTH = 20, MAX_HUNGER = 20;
+const SPRINT_MIN_HUNGER = 7;      // com 6 ou menos de fome não dá para correr
+const EAT_TIME = 1.6;             // segundos segurando o botão direito para comer
+const INVULN_TIME = 0.5;          // imunidade curta depois de levar dano
+const DEATH_DROP_TTL = 600;       // itens da morte somem em 10 min (contados só com a área carregada)
 
 // Mão em primeira pessoa (ajuste fino de pose aqui)
 const HAND_BASE = { x: 0.42, y: -0.50, z: -0.25 };
@@ -229,7 +251,7 @@ for (const [matKey, m] of Object.entries(TOOL_MATS)) {
 }
 
 // Comida e materiais novos
-ITEMS[ID.APPLE]    = { name: 'Maçã', maxStack: 64, food: { hunger: 4 }, sprite: { kind: 'apple', mat: 'food' }, iconTile: nextTile++ };
+ITEMS[ID.APPLE]    = { name: 'Maçã', maxStack: 64, food: { hunger: 4, sat: 2.4 }, sprite: { kind: 'apple', mat: 'food' }, iconTile: nextTile++ };
 ITEMS[ID.CHARCOAL] = { name: 'Carvão vegetal', maxStack: 64, sprite: { kind: 'charcoal', mat: 'coal' }, iconTile: nextTile++ };
 
 // Forno: o que derrete (tempo em segundos) e quanto cada combustível dura (segundos de chama)
@@ -534,7 +556,8 @@ class Noise2D {
 }
 
 const idx = (lx, y, lz) => lx + lz * CHUNK_SIZE + y * CHUNK_SIZE * CHUNK_SIZE;
-const chunkKey = (cx, cz) => `${cx},${cz}`;
+const chunkKey = (cx, cz) => `${cx},${cz}`;                          // usado só nos salvamentos
+const chunkId = (cx, cz) => ((cx & 0xFFFF) << 16) | (cz & 0xFFFF);   // usado nas consultas quentes
 const floorDiv = (a, b) => Math.floor(a / b);
 
 class TerrainGenerator {
@@ -632,13 +655,14 @@ class World {
         this.chunks = new Map();
         this.edits = new Map();   // chunkKey -> Map(indexLocal -> tipo). Base do salvamento.
         this.dirty = new Set();   // chunks que precisam de malha
+        this.editCache = new Map(); // chunkKey -> Uint16Array pronto para salvar
         this.genQueue = [];
         this.lastPcx = null;
         this.lastPcz = null;
         this.material = new THREE.MeshLambertMaterial({ map: createAtlasTexture() });
     }
 
-    getChunk(cx, cz) { return this.chunks.get(chunkKey(cx, cz)); }
+    getChunk(cx, cz) { return this.chunks.get(chunkId(cx, cz)); }
 
     getBlock(x, y, z) {
         if (y < 0 || y >= WORLD_HEIGHT) return 0;
@@ -670,6 +694,7 @@ class World {
         let ed = this.edits.get(key);
         if (!ed) { ed = new Map(); this.edits.set(key, ed); }
         ed.set(i, type);
+        this.editCache.delete(key);   // o cache do salvamento desse chunk ficou velho
 
         this.meshChunk(chunk);
         if (lx === 0) this.remeshIfReady(cx - 1, cz);
@@ -698,7 +723,7 @@ class World {
                 }
             }
         }
-        this.chunks.set(key, chunk);
+        this.chunks.set(chunkId(cx, cz), chunk);
         this.dirty.add(chunk);
         for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
             const n = this.getChunk(cx + dx, cz + dz);
@@ -801,8 +826,10 @@ class World {
     }
 
     update(px, pz, budgets = {}) {
-        const genBudget = budgets.gen ?? GEN_PER_FRAME;
-        const meshBudget = budgets.mesh ?? MESH_PER_FRAME;
+        const unlimited = budgets.gen === Infinity;     // carga inicial / renascimento: sem limite de tempo
+        const t0 = performance.now();
+        const genDeadline = t0 + FRAME_BUDGET_MS * 0.45;
+        const meshDeadline = t0 + FRAME_BUDGET_MS;
         const pcx = floorDiv(px, CHUNK_SIZE), pcz = floorDiv(pz, CHUNK_SIZE);
 
         if (pcx !== this.lastPcx || pcz !== this.lastPcz) {
@@ -811,10 +838,10 @@ class World {
             this.unloadFar(pcx, pcz);
         }
 
-        let gb = genBudget;
-        while (gb > 0 && this.genQueue.length) {
+        let genCount = 0;
+        while (this.genQueue.length && (unlimited || genCount === 0 || performance.now() < genDeadline)) {
             const c = this.genQueue.shift();
-            if (!this.getChunk(c.cx, c.cz)) { this.generateChunk(c.cx, c.cz); gb--; }
+            if (!this.getChunk(c.cx, c.cz)) { this.generateChunk(c.cx, c.cz); genCount++; }
         }
 
         if (this.dirty.size) {
@@ -825,7 +852,7 @@ class World {
                 cand.push({ c, d: (c.cx - pcx) ** 2 + (c.cz - pcz) ** 2 });
             }
             cand.sort((a, b) => a.d - b.d);
-            for (let i = 0; i < cand.length && i < meshBudget; i++) this.meshChunk(cand[i].c);
+            for (let i = 0; i < cand.length && (unlimited || i === 0 || performance.now() < meshDeadline); i++) this.meshChunk(cand[i].c);
         }
     }
 }
@@ -890,12 +917,17 @@ const BLOCK_COLORS = {};
 
 function initItemIcons() {
     const atlas = world.material.map.image;
+    let iconCss = '';
     for (const [id, item] of Object.entries(ITEMS)) {
         const c = document.createElement('canvas');
         c.width = c.height = TILE_PX;
         c.getContext('2d').drawImage(atlas, item.iconTile * TILE_PX, 0, TILE_PX, TILE_PX, 0, 0, TILE_PX, TILE_PX);
         ITEM_ICONS[id] = c.toDataURL();
+        iconCss += `.ico-${id}{background-image:url('${ITEM_ICONS[id]}')}\n`;
     }
+    const st = document.createElement('style');       // a imagem é decodificada uma vez e reaproveitada
+    st.textContent = iconCss;
+    document.head.appendChild(st);
 }
 
 function computeBlockColors() {
@@ -1111,9 +1143,9 @@ function getItemGeometry(itemId) {
     return geo;
 }
 
-function spawnItemEntity(id, count, pos, vel, delay = 0.5, damage = 0) {
+function spawnItemEntity(id, count, pos, vel, delay = 0.5, damage = 0, opts = {}) {
     // Junta com um drop do mesmo tipo que já esteja por perto (nunca ferramentas)
-    if (ITEMS[id].maxStack > 1) {
+    if (ITEMS[id].maxStack > 1 && !opts.noMerge) {
         for (const e of itemEntities) {
             if (e.id === id && e.pos.distanceToSquared(pos) < 1.0 && e.count + count <= ITEMS[id].maxStack) {
                 e.count += count;
@@ -1125,7 +1157,7 @@ function spawnItemEntity(id, count, pos, vel, delay = 0.5, damage = 0) {
     const mesh = new THREE.Mesh(getItemGeometry(id), mat);
     mesh.position.copy(pos);
     scene.add(mesh);
-    itemEntities.push({ id, count, damage, pos: pos.clone(), vel: vel.clone(), mesh, age: 0, delay, onGround: false, phase: Math.random() * 6.28 });
+    itemEntities.push({ id, count, damage, pos: pos.clone(), vel: vel.clone(), mesh, age: opts.age || 0, ttl: opts.ttl || 300, delay, onGround: false, phase: Math.random() * 6.28 });
 }
 
 function removeItemEntity(i) {
@@ -1139,8 +1171,16 @@ function updateItemEntities(dt) {
 
     for (let i = itemEntities.length - 1; i >= 0; i--) {
         const e = itemEntities[i];
+        // Chunk descarregado: drops comuns somem; itens da morte ficam congelados e invisíveis até você voltar
+        const loaded = !!world.getChunk(floorDiv(e.pos.x, CHUNK_SIZE), floorDiv(e.pos.z, CHUNK_SIZE));
+        if (!loaded) {
+            if (e.ttl > 300) { e.mesh.visible = false; continue; }
+            removeItemEntity(i);
+            continue;
+        }
+        e.mesh.visible = true;
         e.age += dt;
-        if (e.age > 300) { removeItemEntity(i); continue; }   // some após 5 minutos
+        if (e.age > e.ttl) { removeItemEntity(i); continue; }
 
         // Se um bloco foi colocado em cima do item, empurra para cima
         if (world.isSolidForPhysics(Math.floor(e.pos.x), Math.floor(e.pos.y), Math.floor(e.pos.z))) {
@@ -1284,6 +1324,7 @@ function breakBlock(x, y, z) {
         );
     }
     damageTool(selectedSlot, 1);      // gasta 1 de durabilidade por bloco quebrado
+    addExhaustion(0.005);
 }
 
 function updateMining(dt) {
@@ -1346,7 +1387,7 @@ function initGameplayAssets() {
 // =====================================================================
 let handScene, handCamera, handPivot, heldAnchor;
 let heldMesh = null, heldId = -1;
-const handAnim = { mining: 0, phase: 0, punch: 0, sw: 1 };
+const handAnim = { mining: 0, phase: 0, punch: 0, sw: 1, eat: 0 };
 const heldGeoCache = {};
 
 function createHand() {
@@ -1415,11 +1456,15 @@ function updateHand(dt) {
     const swing = Math.max(m, p);
     const dip = (1 - handAnim.sw) * (1 - handAnim.sw) * 0.5;
 
+    handAnim.eat += ((eat.active ? 1 : 0) - handAnim.eat) * Math.min(1, 10 * dt);
+    const ea = handAnim.eat;
+    const wob = Math.sin(performance.now() / 1000 * 22) * 0.015 * ea;
+
     handPivot.position.set(
-        HAND_BASE.x + Math.cos(bobTimer) * 0.012,
-        HAND_BASE.y + Math.sin(bobTimer * 2) * 0.010 - dip - 0.05 * swing,
-        HAND_BASE.z - 0.12 * swing);
-    handPivot.rotation.set(0.35 - 0.9 * swing, 0.25, 0);
+        HAND_BASE.x + Math.cos(bobTimer) * 0.012 - 0.22 * ea,
+        HAND_BASE.y + Math.sin(bobTimer * 2) * 0.010 - dip - 0.05 * swing + 0.20 * ea + wob,
+        HAND_BASE.z - 0.12 * swing + 0.08 * ea);
+    handPivot.rotation.set(0.35 - 0.9 * swing + 0.35 * ea, 0.25 - 0.3 * ea, 0);
 }
 
 // =====================================================================
@@ -1576,7 +1621,7 @@ let craftResult = null;
 
 function stackHtml(s) {
     if (!s) return '';
-    let html = `<div class="slot-icon" style="background-image:url('${ITEM_ICONS[s.id]}')"></div>`;
+    let html = `<div class="slot-icon ico-${s.id}"></div>`;
     if (s.count > 1) html += `<span class="slot-count">${s.count}</span>`;
     const it = ITEMS[s.id];
     if (it.maxDurability && s.damage > 0) {
@@ -1857,50 +1902,148 @@ let selectedSlot = 0;
 const inventory = new Inventory(36);   // slots 0-8 = barra rápida, 9-35 = mochila
 let leftHeld = false;
 
-// Sobrevivência (será expandida na próxima parte)
-let health = 20, hunger = 20, exhaustion = 0, healthTick = 0;
+// Sobrevivência: vida, fome, saturação (reserva que gasta antes da fome) e exaustão (gasto acumulado)
+let health = MAX_HEALTH, hunger = MAX_HUNGER, saturation = 5, exhaustion = 0;
+let regenTimer = 0, starveTimer = 0, invuln = 0, hurtFlash = 0;
+let dead = false;
+const eat = { active: false, progress: 0, slot: -1, id: 0 };
+const hurtEl = document.getElementById('hurt');
+const deathEl = document.getElementById('death');
 
 let prevTime = performance.now();
+const perf = { t: 0, frames: 0, sum: 0, worst: 0, avg: 0, worstShown: 0, buildMs: 0 };
 
 // =====================================================================
 // 7. HUD
 // =====================================================================
+const uiShown = { h: -1, f: -1 };
 function updateSurvivalUI() {
     const healthBar = document.getElementById('health-bar');
     const hungerBar = document.getElementById('hunger-bar');
     if (!healthBar || !hungerBar) return;
+    if (health === uiShown.h && hunger === uiShown.f) return;   // nada mudou: não recria os ícones
+    uiShown.h = health; uiShown.f = hunger;
     healthBar.innerHTML = '';
     hungerBar.innerHTML = '';
+    const level = (v, i) => v >= (i + 1) * 2 ? '' : v >= i * 2 + 1 ? 'half' : 'empty-stat';
     for (let i = 0; i < 10; i++) {
         const heart = document.createElement('div');
-        heart.className = 'heart ' + (health > i * 2 ? '' : 'empty-stat');
+        heart.className = 'heart ' + level(health, i);
         healthBar.appendChild(heart);
         const food = document.createElement('div');
-        food.className = 'food ' + (hunger > i * 2 ? '' : 'empty-stat');
+        food.className = 'food ' + level(hunger, i);
         hungerBar.appendChild(food);
     }
 }
 
+const hotbarEls = [], hotbarHtml = new Array(9).fill('');
 function updateHotbarUI() {
     for (let i = 0; i < 9; i++) {
-        const slot = document.getElementById(`slot-${i}`);
+        const slot = hotbarEls[i] || (hotbarEls[i] = document.getElementById(`slot-${i}`));
         slot.classList.toggle('active', i === selectedSlot);
-        slot.innerHTML = `<span class="slot-number">${i + 1}</span>` + stackHtml(inventory.slots[i]);
+        const html = `<span class="slot-number">${i + 1}</span>` + stackHtml(inventory.slots[i]);
+        if (html !== hotbarHtml[i]) { slot.innerHTML = html; hotbarHtml[i] = html; }   // só mexe no DOM se mudou
     }
 }
 
-function respawn() {
-    health = 20; hunger = 20; exhaustion = 0;
+function addExhaustion(x) { exhaustion += x; }
+
+function resetStats() {
+    health = MAX_HEALTH; hunger = MAX_HUNGER; saturation = 5; exhaustion = 0;
+    regenTimer = 0; starveTimer = 0; hurtFlash = 0;
+}
+
+function takeDamage(amount, source = 'generic') {
+    if (dead || amount <= 0) return;
+    if (invuln > 0 && source !== 'starve') return;     // imunidade curta contra dano repetido
+    health = Math.max(0, health - amount);
+    invuln = INVULN_TIME;
+    hurtFlash = 1;
+    addExhaustion(0.1);
+    updateSurvivalUI();
+    if (health <= 0) die();
+}
+
+// Morte: o inventário inteiro cai no local, o jogador volta ao spawn com vida e fome cheias
+function die() {
+    dead = true;
+    cancelEating();
+    const dx = Math.floor(player.pos.x), dy = Math.floor(player.pos.y), dz = Math.floor(player.pos.z);
+    const origin = new THREE.Vector3(player.pos.x, player.pos.y + 0.8, player.pos.z);
+    let lost = 0;
+    inventory.slots.forEach((st, i) => {
+        if (!st) return;
+        inventory.slots[i] = null;
+        lost += st.count;
+        spawnItemEntity(st.id, st.count, origin,
+            new THREE.Vector3((Math.random() - 0.5) * 5, 3 + Math.random() * 3, (Math.random() - 0.5) * 5),
+            1.5, st.damage || 0, { ttl: DEATH_DROP_TTL });
+    });
+
+    resetStats();
+    invuln = 2;
     player.pos.copy(spawnPoint);
     player.vel.set(0, 0, 0);
     player.fallDistance = 0;
     world.update(spawnPoint.x, spawnPoint.z, { gen: Infinity, mesh: Infinity });
+    camera.position.set(player.pos.x, player.pos.y + player.eye, player.pos.z);
+    updateHotbarUI();
+    updateSurvivalUI();
+
+    document.getElementById('death-info').textContent = lost
+        ? `Seus ${lost} itens caíram em X ${dx}, Y ${dy}, Z ${dz}. Volte lá para recuperá-los antes que sumem (10 min).`
+        : 'Você não tinha itens.';
+    const btn = document.getElementById('btn-respawn');
+    btn.disabled = true;
+    setTimeout(() => { btn.disabled = false; }, 1200);
+    deathEl.style.display = 'flex';
+    controls.unlock();
+    saveGame(true);
 }
 
-function takeDamage(amount) {
-    health -= amount;
-    if (health <= 0) respawn();
-    updateSurvivalUI();
+function cancelEating() { eat.active = false; eat.progress = 0; }
+
+function updateEating(dt) {
+    if (!eat.active) return;
+    const st = inventory.slots[selectedSlot];
+    const food = st && ITEMS[st.id].food;
+    if (!food || selectedSlot !== eat.slot || st.id !== eat.id || hunger >= MAX_HUNGER) { cancelEating(); return; }
+    eat.progress += dt / EAT_TIME;
+    if (eat.progress >= 1) {
+        hunger = Math.min(MAX_HUNGER, hunger + food.hunger);
+        saturation = Math.min(hunger, saturation + food.sat);
+        inventory.removeOne(selectedSlot);
+        updateHotbarUI();
+        updateSurvivalUI();
+        cancelEating();
+    }
+}
+
+// Fome, regeneração e inanição (movimento e ações só acrescentam exaustão)
+function updateSurvival(dt) {
+    invuln = Math.max(0, invuln - dt);
+    if (exhaustion >= 4) {                       // cada 4 de exaustão gasta 1 de saturação; sem saturação, 1 de fome
+        exhaustion -= 4;
+        if (saturation > 0) saturation = Math.max(0, saturation - 1);
+        else if (hunger > 0) { hunger--; updateSurvivalUI(); }
+    }
+    if (hunger >= 18 && health < MAX_HEALTH) {
+        const fast = hunger >= MAX_HUNGER && saturation > 0;   // fome cheia + saturação: cura rápida
+        regenTimer += dt;
+        if (regenTimer >= (fast ? 0.5 : 4)) {
+            regenTimer = 0;
+            health++;
+            addExhaustion(fast ? 1.5 : 3);
+            updateSurvivalUI();
+        }
+        starveTimer = 0;
+    } else {
+        regenTimer = 0;
+        if (hunger <= 0) {                       // inanição: 1 de dano a cada 4 s, mas nunca mata (para em 1)
+            starveTimer += dt;
+            if (starveTimer >= 4) { starveTimer = 0; if (health > 1) takeDamage(1, 'starve'); }
+        } else starveTimer = 0;
+    }
 }
 
 // Debug (F3)
@@ -1918,7 +2061,7 @@ function updateDebug(rawDt) {
         : '—';
     const tt = currentHit ? getBreakTime(currentHit.type, inventory.slots[selectedSlot]).toFixed(2) + 's' : '—';
     debugEl.textContent =
-`Voxel Sandbox — Parte 5
+`Voxel Sandbox — Parte 6
 FPS: ${fps}
 Seed: ${SEED}
 XYZ: ${p.x.toFixed(2)} ${p.y.toFixed(2)} ${p.z.toFixed(2)}
@@ -1927,7 +2070,10 @@ Chunks: ${world.chunks.size} | fila geração: ${world.genQueue.length} | fila m
 No chão: ${player.onGround}
 Alvo: ${target} | tempo p/ quebrar: ${tt}
 Mineração: ${Math.round(mining.progress * 100)}% | Drops no mundo: ${itemEntities.length} | Fornos: ${furnaces.size}
-Item na mão: ${selectedItemText()}`;
+Item na mão: ${selectedItemText()}
+Vida ${health} | Fome ${hunger} | Saturação ${saturation.toFixed(1)} | Exaustão ${exhaustion.toFixed(2)}
+CPU/quadro: média ${perf.avg.toFixed(1)} ms | pior ${perf.worstShown.toFixed(1)} ms | último save: ${perf.buildMs.toFixed(1)} ms
+Desenho: ${renderer.info.render.calls} chamadas | ${(renderer.info.render.triangles / 1000).toFixed(0)}k triângulos | pixel ratio ${renderer.getPixelRatio()}`;
 }
 
 // =====================================================================
@@ -2022,7 +2168,8 @@ function updatePhysics(dt) {
         player.height = H_STAND;
     }
 
-    const speed = isCrouching ? CROUCH_SPEED : (isSprinting ? SPRINT_SPEED : WALK_SPEED);
+    const sprintNow = isSprinting && hunger >= SPRINT_MIN_HUNGER;   // com pouca fome não dá para correr
+    const speed = isCrouching ? CROUCH_SPEED : (sprintNow ? SPRINT_SPEED : WALK_SPEED);
 
     // Yaw lido na ordem YXZ (a mesma do PointerLockControls). Usar camera.rotation.y
     // (ordem XYZ) inverte o movimento ao olhar para trás ou muito para cima/baixo.
@@ -2047,12 +2194,12 @@ function updatePhysics(dt) {
     if (jumpHeld && player.onGround && !isCrouching) {
         player.vel.y = JUMP_SPEED;
         player.onGround = false;
-        exhaustion += 0.2;
+        addExhaustion(sprintNow ? 0.2 : 0.05);
     }
     player.vel.y = Math.max(player.vel.y - GRAVITY * dt, -60);
 
     // FOV ao correr
-    const targetFOV = (isSprinting && moveForward && !isCrouching) ? 85 : 75;
+    const targetFOV = (sprintNow && moveForward && !isCrouching) ? 85 : 75;
     if (Math.abs(camera.fov - targetFOV) > 0.1) {
         camera.fov += (targetFOV - camera.fov) * Math.min(1, 10 * dt);
         camera.updateProjectionMatrix();
@@ -2071,7 +2218,7 @@ function updatePhysics(dt) {
     if (blockedY) {
         if (player.vel.y < 0) {
             player.onGround = true;
-            if (player.fallDistance > 3) takeDamage(Math.floor(player.fallDistance - 3));
+            if (player.fallDistance > 3) takeDamage(Math.floor(player.fallDistance - 3), 'fall');
             player.fallDistance = 0;
         }
         player.vel.y = 0;
@@ -2082,22 +2229,9 @@ function updatePhysics(dt) {
     player.eye += (targetEye - player.eye) * Math.min(1, 15 * dt);
     camera.position.set(p.x, p.y + player.eye, p.z);
 
-    // Fome (será refeita na próxima parte)
+    // Gasto de energia por correr (a fome em si é tratada em updateSurvival)
     const hzSpeed = Math.hypot(player.vel.x, player.vel.z);
-    if (player.onGround && hzSpeed > 0.1) {
-        exhaustion += hzSpeed * dt * (isSprinting ? 0.015 : 0.005);
-    }
-    if (exhaustion >= 4.0) {
-        exhaustion = 0;
-        hunger = Math.max(0, hunger - 1);
-        updateSurvivalUI();
-    }
-    healthTick += dt;
-    if (healthTick >= 2.0) {
-        healthTick = 0;
-        if (hunger <= 0) takeDamage(1);
-        else if (hunger >= 18 && health < 20) { health += 1; updateSurvivalUI(); }
-    }
+    if (player.onGround && hzSpeed > 0.1 && sprintNow && !isCrouching) addExhaustion(hzSpeed * dt * 0.1);
 
     // Fase do balanço (usada por updateHand)
     if (player.onGround && hzSpeed > 2.0) bobTimer += dt * (hzSpeed * 1.2);
@@ -2131,13 +2265,26 @@ async function dbRun(mode, fn) {
 const packStack = (s) => s ? { id: s.id, count: s.count, damage: s.damage || 0 } : null;
 
 function buildSave() {
+    // Cada chunk editado vira um Uint16Array [índice, tipo, índice, tipo...]; só é refeito se o chunk mudou
     const edits = [];
-    for (const [key, m] of world.edits) edits.push([key, Array.from(m)]);
+    for (const [key, m] of world.edits) {
+        let arr = world.editCache.get(key);
+        if (!arr) {
+            arr = new Uint16Array(m.size * 2);
+            let k = 0;
+            for (const [i, t] of m) { arr[k++] = i; arr[k++] = t; }
+            world.editCache.set(key, arr);
+        }
+        edits.push([key, arr]);
+    }
     return {
         v: SAVE_VERSION, seed: SEED, time: Date.now(),
-        player: { x: player.pos.x, y: player.pos.y, z: player.pos.z, health, hunger },
+        player: { x: player.pos.x, y: player.pos.y, z: player.pos.z, health, hunger, saturation },
         selectedSlot,
         inventory: inventory.slots.map(packStack),
+        drops: itemEntities.slice(0, 500).map(e => ({
+            id: e.id, count: e.count, damage: e.damage || 0, x: e.pos.x, y: e.pos.y, z: e.pos.z, age: e.age, ttl: e.ttl,
+        })),
         furnaces: Array.from(furnaces, ([k, f]) => [k, {
             slots: f.inv.slots.map(packStack), burn: f.burn, burnMax: f.burnMax, cook: f.cook,
         }]),
@@ -2154,6 +2301,21 @@ function sanitizeStack(s) {
     return st;
 }
 
+// Drops no chão: entradas inválidas são ignoradas (não invalidam o save inteiro)
+function parseDrops(list) {
+    const out = [];
+    if (!Array.isArray(list)) return out;
+    for (const e of list) {
+        const it = e && ITEMS[e.id];
+        if (!it || !Number.isInteger(e.count) || e.count < 1 || e.count > it.maxStack) continue;
+        if (![e.x, e.y, e.z].every(Number.isFinite)) continue;
+        const dmg = it.maxDurability && e.damage > 0 && e.damage < it.maxDurability ? e.damage : 0;
+        out.push({ id: e.id, count: e.count, damage: dmg, x: e.x, y: e.y, z: e.z,
+                   age: Math.max(0, +e.age || 0), ttl: Math.min(DEATH_DROP_TTL, Math.max(1, +e.ttl || 300)) });
+    }
+    return out;
+}
+
 // Valida tudo antes de aplicar; devolve null se estiver inválido
 function validateSave(d) {
     try {
@@ -2166,8 +2328,11 @@ function validateSave(d) {
         const edits = new Map();
         const maxIdx = CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT;
         for (const [key, list] of d.edits) {
+            const flat = Array.isArray(list[0]) ? list.flat() : list;   // aceita o formato antigo (pares) e o novo (plano)
+            if (flat.length % 2) throw new Error('lista de edições inválida');
             const m = new Map();
-            for (const [i, t] of list) {
+            for (let k = 0; k < flat.length; k += 2) {
+                const i = flat[k], t = flat[k + 1];
                 if (!Number.isInteger(i) || i < 0 || i >= maxIdx) throw new Error('índice inválido');
                 if (t !== 0 && !BLOCKS[t]) throw new Error('bloco inválido');
                 m.set(i, t);
@@ -2184,9 +2349,10 @@ function validateSave(d) {
         }
 
         return {
-            player: { x: p.x, y: p.y, z: p.z, health: Math.min(20, Math.max(1, p.health)), hunger: Math.min(20, Math.max(0, p.hunger)) },
+            player: { x: p.x, y: p.y, z: p.z, health: Math.min(MAX_HEALTH, Math.max(1, p.health)), hunger: Math.min(MAX_HUNGER, Math.max(0, p.hunger)),
+                      saturation: Math.min(MAX_HUNGER, Math.max(0, Number.isFinite(p.saturation) ? p.saturation : 5)) },
             selectedSlot: d.selectedSlot >= 0 && d.selectedSlot < 9 ? d.selectedSlot | 0 : 0,
-            inventory: inv, edits, furnaces: furn,
+            inventory: inv, edits, furnaces: furn, drops: parseDrops(d.drops),
         };
     } catch (e) { return null; }
 }
@@ -2209,7 +2375,10 @@ async function saveGame(quiet) {
     if (saving || !world) return;
     saving = true;
     try {
-        await dbRun('readwrite', s => s.put(buildSave(), SAVE_KEY));
+        const t0 = performance.now();
+        const data = buildSave();
+        perf.buildMs = performance.now() - t0;
+        await dbRun('readwrite', s => s.put(data, SAVE_KEY));
         if (!quiet) showToast('Jogo salvo');
     } catch (e) { console.warn('Falha ao salvar:', e); if (!quiet) showToast('Falha ao salvar'); }
     saving = false;
@@ -2245,7 +2414,8 @@ async function init() {
 
     renderer = new THREE.WebGLRenderer({ antialias: false });
     renderer.autoClear = false;     // dois passes: mundo e depois a mão
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
+    renderer.info.autoReset = false;   // contamos as duas passagens (mundo + mão) juntas
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
     window.addEventListener('resize', () => {
@@ -2265,7 +2435,12 @@ async function init() {
         selectedSlot = save.selectedSlot;
         health = save.player.health;
         hunger = save.player.hunger;
+        saturation = save.player.saturation;
         for (const [k, v] of save.furnaces) furnaces.set(k, v);
+        for (const e of save.drops) {
+            spawnItemEntity(e.id, e.count, new THREE.Vector3(e.x, e.y, e.z), new THREE.Vector3(), 0, e.damage,
+                { age: e.age, ttl: e.ttl, noMerge: true });
+        }
     }
     const sh = world.generator.heightAt(0, 0);
     spawnPoint.set(0.5, sh + 1, 0.5);
@@ -2287,12 +2462,20 @@ async function init() {
         if (promise !== undefined) promise.catch(err => console.warn('Aguardando cooldown do navegador...', err));
     });
     controls.addEventListener('lock', () => { menu.style.display = 'none'; });
+    document.getElementById('btn-respawn').addEventListener('click', () => {
+        dead = false;
+        deathEl.style.display = 'none';
+        const pr = document.body.requestPointerLock();
+        if (pr !== undefined) pr.catch(() => {});
+        setTimeout(() => { if (!controls.isLocked) menu.style.display = 'flex'; }, 400);
+    });
     controls.addEventListener('unlock', () => {
-        if (!inventoryOpen) menu.style.display = 'flex';   // com o inventário aberto não mostra a pausa
+        if (!inventoryOpen && !dead) menu.style.display = 'flex';   // inventário aberto ou tela de morte: sem menu de pausa
         // Evita ações presas ao abrir o menu
         moveForward = moveBackward = moveLeft = moveRight = jumpHeld = isSprinting = wantToCrouch = false;
         leftHeld = false;
         resetMining();
+        cancelEating();
         saveGame(true);
         btnPlay.disabled = true;
         const originalText = btnPlay.innerText;
@@ -2360,17 +2543,12 @@ async function init() {
         const st = currentHit && BLOCKS[currentHit.type].station;
         if (st && !wantToCrouch) { openStation(st, currentHit); return; }
 
-        // 2) Comida: come e recupera fome
+        // 2) Comida: segure o botão direito até terminar de comer (soltar cancela)
         const held = inventory.slots[selectedSlot];
         const food = held && ITEMS[held.id].food;
         if (food) {
-            if (hunger < 20) {
-                hunger = Math.min(20, hunger + food.hunger);
-                inventory.removeOne(selectedSlot);
-                updateHotbarUI();
-                updateSurvivalUI();
-                handAnim.punch = 1;
-            }
+            if (hunger < MAX_HUNGER) { eat.active = true; eat.progress = 0; eat.slot = selectedSlot; eat.id = held.id; }
+            else showToast('Você não está com fome');
             return;
         }
 
@@ -2392,11 +2570,24 @@ async function init() {
 
     document.addEventListener('mouseup', (event) => {
         if (event.button === 0) leftHeld = false;
+        if (event.button === 2) cancelEating();
     });
 
     // Salvamento automático
     setInterval(() => { if (controls.isLocked) saveGame(true); }, 30000);
     document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(true); });
+
+    // Atalhos de teste: abra com ?debug na URL e use dbg no console (F12)
+    if (new URLSearchParams(location.search).has('debug')) {
+        window.dbg = {
+            damage: (n = 1) => { invuln = 0; takeDamage(n); },
+            kill: () => { invuln = 0; takeDamage(999); },
+            hunger: (n) => { hunger = n; updateSurvivalUI(); },
+            saturation: (n) => { saturation = n; },
+            exhaust: (n) => addExhaustion(n),
+            give: (id, n = 1) => { inventory.add(id, n); updateHotbarUI(); },
+        };
+    }
 
     updateSurvivalUI();
 }
@@ -2412,6 +2603,8 @@ function animate() {
         updatePhysics(dt);
         updateTarget();
         updateMining(dt);
+        updateEating(dt);
+        updateSurvival(dt);
         updateItemEntities(dt);
         updateParticles(dt);
     }
@@ -2423,13 +2616,24 @@ function animate() {
         }
     }
     updateHand(dt);
+    if (hurtFlash > 0) { hurtFlash = Math.max(0, hurtFlash - dt * 2); hurtEl.style.opacity = hurtFlash; }
     world.update(player.pos.x, player.pos.z);
     updateDebug(rawDt);
 
+    renderer.info.reset();
     renderer.clear();
     renderer.render(scene, camera);
     renderer.clearDepth();                    // a mão nunca atravessa o terreno
     renderer.render(handScene, handCamera);
+
+    // Tempo de CPU do quadro (lógica + envio de desenho). Se o FPS estiver baixo e isto estiver baixo, o gargalo é a GPU.
+    const cpu = performance.now() - now;
+    perf.sum += cpu; perf.frames++; perf.t += rawDt;
+    if (cpu > perf.worst) perf.worst = cpu;
+    if (perf.t >= 1) {
+        perf.avg = perf.sum / perf.frames; perf.worstShown = perf.worst;
+        perf.t = 0; perf.frames = 0; perf.sum = 0; perf.worst = 0;
+    }
 }
 
 init().then(animate);
