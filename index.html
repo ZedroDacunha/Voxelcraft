@@ -1882,6 +1882,10 @@ let targetMesh;
 let currentHit = null;
 const tmpDir = new THREE.Vector3();
 const yawEuler = new THREE.Euler(0, 0, 0, 'YXZ');
+const look = { yaw: 0, pitch: 0 };                 // orientação da câmera guardada como números
+const lookEuler = new THREE.Euler(0, 0, 0, 'YXZ');
+const LOOK_SPEED = 0.002;                          // mesma sensibilidade do PointerLockControls
+const MAX_PITCH = Math.PI / 2 - 0.02;              // nunca chega a 90°: evita a singularidade (gimbal lock)
 
 let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
 let jumpHeld = false, isSprinting = false, wantToCrouch = false, isCrouching = false;
@@ -1915,15 +1919,15 @@ const perf = { t: 0, frames: 0, sum: 0, worst: 0, avg: 0, worstShown: 0, buildMs
 
 // Resolução de render adaptativa: se o FPS cai abaixo de ~55, reduz a escala aos poucos (e volta a subir quando sobra folga).
 // Se reduzir a resolução não melhora o FPS, o limite não vem da GPU (economia de energia, 30 Hz...) e o modo auto desliga.
-const gfx = { auto: true, max: Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO), min: 0.5, scale: 1, slow: 0, fast: 0, lastFps: null, noGain: 0 };
+const gfx = { auto: true, max: Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO), min: 0.5, scale: 1, slow: 0, fast: 0, lastFps: null, noGain: 0, pending: null };
 gfx.scale = gfx.max;
 
 function setRenderScale(v) {
     gfx.scale = Math.max(gfx.min, Math.min(gfx.max, v));
-    renderer.setPixelRatio(gfx.scale);   // também redimensiona o buffer de desenho
+    gfx.pending = gfx.scale;   // aplicado no início do próximo quadro: redimensionar o buffer depois de desenhar limpa a imagem (pisca)
 }
 
-function adaptResolution(fpsNow) {
+function adaptResolution(fpsNow, cpuMs) {
     if (!gfx.auto || document.hidden) return;
     if (gfx.lastFps !== null) {                       // o último ajuste ajudou?
         gfx.noGain = fpsNow < gfx.lastFps * 1.1 ? gfx.noGain + 1 : 0;
@@ -1935,9 +1939,10 @@ function adaptResolution(fpsNow) {
             return;
         }
     }
-    if (fpsNow < 55 && gfx.scale > gfx.min) {
+    const gpuBound = cpuMs < 0.6 * 1000 / Math.max(fpsNow, 1);   // CPU sobrando = gargalo na GPU; menos resolução ajuda
+    if (fpsNow < 55 && gfx.scale > gfx.min && gpuBound) {
         gfx.fast = 0;
-        if (++gfx.slow >= 2) { gfx.slow = 0; gfx.lastFps = fpsNow; setRenderScale(gfx.scale - 0.15); }
+        if (++gfx.slow >= 3) { gfx.slow = 0; gfx.lastFps = fpsNow; setRenderScale(gfx.scale - 0.15); }
     } else if (fpsNow >= 58 && gfx.scale < gfx.max) {
         gfx.slow = 0;
         if (++gfx.fast >= 8) { gfx.fast = 0; setRenderScale(gfx.scale + 0.1); }
@@ -2216,10 +2221,8 @@ function updatePhysics(dt) {
     const sprintNow = isSprinting && hunger >= SPRINT_MIN_HUNGER;   // com pouca fome não dá para correr
     const speed = isCrouching ? CROUCH_SPEED : (sprintNow ? SPRINT_SPEED : WALK_SPEED);
 
-    // Yaw lido na ordem YXZ (a mesma do PointerLockControls). Usar camera.rotation.y
-    // (ordem XYZ) inverte o movimento ao olhar para trás ou muito para cima/baixo.
-    yawEuler.setFromQuaternion(camera.quaternion, 'YXZ');
-    const yaw = yawEuler.y;
+    // O yaw vem direto do estado de olhar (look.yaw): decompor o quaternion fica instável ao olhar quase na vertical
+    const yaw = look.yaw;
     const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
     const rx = Math.cos(yaw),  rz = -Math.sin(yaw);
     let ix = Number(moveRight) - Number(moveLeft);
@@ -2432,6 +2435,20 @@ async function saveGame(quiet) {
 // =====================================================================
 // 11. INICIALIZAÇÃO
 // =====================================================================
+function applyLook() {
+    lookEuler.set(look.pitch, look.yaw, 0, 'YXZ');
+    camera.quaternion.setFromEuler(lookEuler);
+}
+
+// Olhar com o mouse: o handler (fase de captura) roda antes do PointerLockControls e o impede de girar a câmera de novo
+function onLookMove(e) {
+    if (!controls || !controls.isLocked) return;
+    e.stopImmediatePropagation();
+    look.yaw -= (e.movementX || 0) * LOOK_SPEED;
+    look.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, look.pitch - (e.movementY || 0) * LOOK_SPEED));
+    applyLook();
+}
+
 async function init() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(SKY_COLOR);
@@ -2498,6 +2515,7 @@ async function init() {
     initGameplayAssets();
 
     // Controles
+    document.addEventListener('mousemove', onLookMove, true);
     controls = new PointerLockControls(camera, document.body);
     const menu = document.getElementById('menu');
     const btnPlay = document.getElementById('btn-play');
@@ -2644,6 +2662,7 @@ function animate() {
     const rawDt = (now - prevTime) / 1000;
     prevTime = now;
     const dt = Math.min(rawDt, 0.05);
+    applyLook();                              // garante a orientação certa a cada quadro, venha o evento de onde vier
 
     if (controls.isLocked) {
         updatePhysics(dt);
@@ -2666,6 +2685,7 @@ function animate() {
     world.update(player.pos.x, player.pos.z);
     updateDebug(rawDt);
 
+    if (gfx.pending !== null) { renderer.setPixelRatio(gfx.pending); gfx.pending = null; }
     renderer.info.reset();
     renderer.clear();
     renderer.render(scene, camera);
@@ -2679,7 +2699,7 @@ function animate() {
     if (perf.t >= 1) {
         perf.avg = perf.sum / perf.frames; perf.worstShown = perf.worst;
         perf.fps = perf.frames / perf.t;
-        adaptResolution(perf.fps);
+        adaptResolution(perf.fps, perf.avg);
         perf.t = 0; perf.frames = 0; perf.sum = 0; perf.worst = 0;
     }
 }
