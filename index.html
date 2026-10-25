@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Voxel Sandbox - Parte 4: Ferramentas e Crafting</title>
+<title>Voxel Sandbox - Parte 5: Bancada, Forno, Comida e Salvamento</title>
 <style>
     body { margin: 0; overflow: hidden; background-color: #87CEEB; font-family: sans-serif; }
     #crosshair { position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; margin-top: -10px; margin-left: -10px; pointer-events: none; }
     #crosshair::before, #crosshair::after { content: ''; position: absolute; background-color: white; box-shadow: 0 0 2px black; }
     #crosshair::before { top: 9px; left: 0; width: 20px; height: 2px; }
     #crosshair::after { top: 0; left: 9px; width: 2px; height: 20px; }
-    #menu { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.6); display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; z-index: 10; }
+    #menu { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.6); display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; z-index: 10; text-align: center; }
     #menu h1 { margin: 0 0 10px 0; }
     #menu p { margin: 0 0 20px 0; }
     .btn { padding: 10px 20px; font-size: 16px; background: #55aa55; border: none; color: white; cursor: pointer; border-radius: 4px; }
@@ -62,6 +62,12 @@
     #inv-cursor { position: fixed; width: 30px; height: 30px; pointer-events: none; z-index: 12; display: none; }
     #inv-tooltip { position: fixed; pointer-events: none; z-index: 13; display: none; background: rgba(20,0,30,0.92); border: 2px solid #3a1a5c; color: #fff; font: 12px monospace; padding: 3px 6px; white-space: pre; }
 
+    .fur-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .flame { width: 30px; height: 12px; background: #111; border: 1px solid #555; }
+    #fur-flame { height: 100%; width: 0; background: #f80; }
+    .prog { width: 44px; height: 12px; background: #111; border: 1px solid #555; }
+    #fur-prog { height: 100%; width: 0; background: #eee; }
+
     #debug {
         position: absolute; top: 8px; left: 8px; z-index: 5; display: none; pointer-events: none;
         color: #fff; font: 12px/1.4 monospace; background: rgba(0,0,0,0.55); padding: 6px 8px; white-space: pre; border-radius: 4px;
@@ -82,11 +88,20 @@
 <div id="toast"></div>
 <div id="inventory">
     <div id="inv-panel">
-        <div class="inv-title">Inventário</div>
-        <div class="craft-row">
+        <div class="inv-title" id="inv-title">Inventário</div>
+        <div class="craft-row" id="craft-row">
             <div id="inv-craft" class="inv-grid craft-grid"></div>
             <div class="craft-arrow">➜</div>
             <div id="inv-out"></div>
+        </div>
+        <div class="craft-row" id="furnace-row" style="display:none">
+            <div class="fur-col">
+                <div id="fur-in"></div>
+                <div class="flame"><div id="fur-flame"></div></div>
+                <div id="fur-fuel"></div>
+            </div>
+            <div class="prog"><div id="fur-prog"></div></div>
+            <div id="fur-out"></div>
         </div>
         <div id="inv-main" class="inv-grid"></div>
         <div class="inv-sep"></div>
@@ -99,10 +114,10 @@
 </div>
 <div id="menu">
     <h1>Voxel Sandbox</h1>
-    <p>Parte 4 — Ferramentas, crafting 2×2 e mão em primeira pessoa</p>
+    <p>Parte 5 — Bancada 3×3, forno, comida e salvamento automático</p>
     <button class="btn" id="btn-play">Clique para Jogar</button>
-    <p style="font-size: 14px; opacity: 0.8; margin-top: 15px;">[WASD] Mover | [Espaço] Pular | [Shift] Correr | [Ctrl / C] Agachar | [F3] Debug | Botão esq (segure): minerar | Botão dir: colocar | [E] Inventário / crafting | [Q] Soltar item</p>
-    <p style="font-size: 12px; opacity: 0.6; margin-top: 0;">Dica: abra com ?seed=123 no final do endereço para gerar outro mundo. Comece quebrando uma árvore!</p>
+    <p style="font-size: 14px; opacity: 0.8; margin-top: 15px;">[WASD] Mover | [Espaço] Pular | [Shift] Correr | [Ctrl / C] Agachar | [F3] Debug | Botão esq (segure): minerar | Botão dir: colocar / usar bancada e forno / comer | [E] Inventário / crafting | [Q] Soltar item</p>
+    <p style="font-size: 12px; opacity: 0.6; margin-top: 0;">Dicas: ?seed=123 gera outro mundo · ?reset apaga o save daquela seed · para colocar bloco encostado em bancada/forno, segure Ctrl ou C ao clicar · o jogo salva sozinho a cada 30 s e ao pausar.</p>
 </div>
 
 <div id="hotbar">
@@ -157,18 +172,22 @@ const HELD_BLOCK_POS = [0.03, 0.07, -0.04];
 // =====================================================================
 // 2. REGISTRO CENTRAL DE BLOCOS E ITENS
 // =====================================================================
-const TILE = { GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, STONE: 3, WOOD: 4, COBBLE: 5, LEAVES: 6, PLANKS: 7 };
-const ATLAS_COLUMNS = 16;
+const TILE = { GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, STONE: 3, WOOD: 4, COBBLE: 5, LEAVES: 6, PLANKS: 7,
+               CRAFT_TOP: 8, CRAFT_SIDE: 9, FURNACE_FRONT: 10, FURNACE_TOP: 11 };
+const ATLAS_COLUMNS = 32;
 const TILE_PX = 32;
 
 const allFaces = (t) => ({ top: t, side: t, bottom: t });
 
 // IDs fixos (bloco = item de mesmo id; itens que não são blocos começam em 20)
-const ID = { GRASS: 1, STONE: 2, LOG: 3, DIRT: 4, COBBLE: 5, PLANKS: 6, LEAVES: 7, STICK: 20 };
+const ID = { GRASS: 1, STONE: 2, LOG: 3, DIRT: 4, COBBLE: 5, PLANKS: 6, LEAVES: 7,
+             CRAFTING_TABLE: 8, FURNACE: 9,
+             STICK: 20, APPLE: 30, CHARCOAL: 31 };
 
 // Para adicionar um bloco novo: crie o tile no atlas e uma entrada aqui.
-//  drop: id do item solto (null = nada) | tool: ferramenta ideal
-//  requiresTool + minTier: sem a ferramenta certa o bloco demora mais e NÃO solta nada
+//  drop: id do item solto (null = nada) | dropChance: chance de soltar (padrão 1)
+//  tool: ferramenta ideal | requiresTool + minTier: sem a ferramenta certa não solta nada
+//  station: 'crafting' | 'furnace' (botão direito abre a interface)
 const BLOCKS = {
     1: { name: 'Grama',      hardness: 0.6, drop: ID.DIRT,   tool: 'shovel', tiles: { top: TILE.GRASS_TOP, side: TILE.GRASS_SIDE, bottom: TILE.DIRT } },
     2: { name: 'Pedra',      hardness: 1.5, drop: ID.COBBLE, tool: 'pickaxe', requiresTool: true, minTier: 1, tiles: allFaces(TILE.STONE) },
@@ -176,16 +195,20 @@ const BLOCKS = {
     4: { name: 'Terra',      hardness: 0.5, drop: ID.DIRT,   tool: 'shovel', tiles: allFaces(TILE.DIRT) },
     5: { name: 'Pedregulho', hardness: 2.0, drop: ID.COBBLE, tool: 'pickaxe', requiresTool: true, minTier: 1, tiles: allFaces(TILE.COBBLE) },
     6: { name: 'Tábuas',     hardness: 2.0, drop: ID.PLANKS, tool: 'axe',    tiles: allFaces(TILE.PLANKS) },
-    7: { name: 'Folhas',     hardness: 0.2, drop: null,      tool: null,     tiles: allFaces(TILE.LEAVES) },
+    7: { name: 'Folhas',     hardness: 0.2, drop: ID.APPLE, dropChance: 0.06, tool: null, tiles: allFaces(TILE.LEAVES) },
+    8: { name: 'Bancada',    hardness: 2.5, drop: ID.CRAFTING_TABLE, tool: 'axe', station: 'crafting',
+         tiles: { top: TILE.CRAFT_TOP, side: TILE.CRAFT_SIDE, bottom: TILE.PLANKS } },
+    9: { name: 'Forno',      hardness: 3.5, drop: ID.FURNACE, tool: 'pickaxe', requiresTool: true, minTier: 1, station: 'furnace',
+         icon: TILE.FURNACE_FRONT, tiles: { top: TILE.FURNACE_TOP, side: TILE.FURNACE_FRONT, bottom: TILE.COBBLE } },
 };
 
 const ITEMS = {};
 for (const [id, b] of Object.entries(BLOCKS)) {
-    ITEMS[id] = { name: b.name, maxStack: 64, block: Number(id), iconTile: b.tiles.top };
+    ITEMS[id] = { name: b.name, maxStack: 64, block: Number(id), iconTile: b.icon ?? b.tiles.top };
 }
 
 // Itens com sprite pixelado (ganham um tile no atlas, depois dos tiles de bloco)
-let nextTile = 8;
+let nextTile = Object.keys(TILE).length;
 ITEMS[ID.STICK] = { name: 'Graveto', maxStack: 64, sprite: { kind: 'stick', mat: 'wood' }, iconTile: nextTile++ };
 
 const TOOL_MATS = {
@@ -204,6 +227,17 @@ for (const [matKey, m] of Object.entries(TOOL_MATS)) {
         m['id_' + kind] = id;
     });
 }
+
+// Comida e materiais novos
+ITEMS[ID.APPLE]    = { name: 'Maçã', maxStack: 64, food: { hunger: 4 }, sprite: { kind: 'apple', mat: 'food' }, iconTile: nextTile++ };
+ITEMS[ID.CHARCOAL] = { name: 'Carvão vegetal', maxStack: 64, sprite: { kind: 'charcoal', mat: 'coal' }, iconTile: nextTile++ };
+
+// Forno: o que derrete (tempo em segundos) e quanto cada combustível dura (segundos de chama)
+const SMELT = {
+    [ID.COBBLE]: { result: ID.STONE,    time: 10 },
+    [ID.LOG]:    { result: ID.CHARCOAL, time: 10 },
+};
+const FUEL = { [ID.PLANKS]: 15, [ID.LOG]: 15, [ID.STICK]: 5, [ID.CHARCOAL]: 80 };
 
 // ---- Receitas (dados puros). Formato: grade de linhas; null = vazio ----
 const RECIPES = [];
@@ -225,14 +259,25 @@ for (const m of Object.values(TOOL_MATS)) {
     defRecipe([[M, M], [M, S]],    m.id_axe);
     defRecipe([[M], [S]],          m.id_shovel);
 }
+defRecipe([[ID.PLANKS, ID.PLANKS], [ID.PLANKS, ID.PLANKS]], ID.CRAFTING_TABLE);
+{
+    const C = ID.COBBLE;
+    defRecipe([[C, C, C], [C, null, C], [C, C, C]], ID.FURNACE);   // só cabe na bancada 3x3
+}
 
 function shapesEqual(a, b) {
     if (a.length !== b.length || a[0].length !== b[0].length) return false;
     return a.every((row, r) => row.every((v, c) => v === b[r][c]));
 }
-function matchRecipe(craftInv) {
-    const s = craftInv.slots;
-    const grid = trimShape([[s[0]?.id ?? null, s[1]?.id ?? null], [s[2]?.id ?? null, s[3]?.id ?? null]]);
+// craftN = 2 (inventário) ou 3 (bancada); lê os primeiros craftN*craftN slots
+function matchRecipe(inv) {
+    const n = craftN, s = inv.slots, rows = [];
+    for (let r = 0; r < n; r++) {
+        const row = [];
+        for (let c = 0; c < n; c++) row.push(s[r * n + c]?.id ?? null);
+        rows.push(row);
+    }
+    const grid = trimShape(rows);
     if (!grid) return null;
     const mirrored = grid.map(row => row.slice().reverse());
     for (const r of RECIPES) {
@@ -260,7 +305,7 @@ function hash2(x, z, s) {
     return (h >>> 0) / 4294967296;
 }
 
-// --- Sprites 16x16 de ferramentas (usados no atlas, no braço e nos drops) ---
+// --- Sprites 16x16 de ferramentas e itens (usados no atlas, no braço e nos drops) ---
 const HANDLE_L = [156, 106, 52], HANDLE_D = [112, 74, 34];
 const HEAD_COLORS = {
     wood:  { l: [176, 128, 70],  d: [130, 90, 45] },
@@ -272,6 +317,24 @@ function spritePixels(kind, mat) {
     if (spriteCache[key]) return spriteCache[key];
     const g = Array.from({ length: 16 }, () => Array(16).fill(null));
     const put = (x, y, c) => { if (x >= 0 && x < 16 && y >= 0 && y < 16) g[y][x] = c; };
+
+    // Itens redondos (sem cabo)
+    if (kind === 'apple' || kind === 'charcoal') {
+        for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+            if (kind === 'apple') {
+                const dx = (x - 7.5) / 4.5, dy = (y - 9.5) / 4.5;
+                if (dx * dx + dy * dy <= 1)
+                    put(x, y, ((x === 6 && y === 7) || (x === 5 && y === 8)) ? [240, 110, 100] : (dx + dy > 0.9 ? [150, 25, 30] : [205, 40, 45]));
+            } else {
+                const dx = (x - 7.5) / 5, dy = (y - 9) / 3.6;
+                if (dx * dx + dy * dy <= 1) put(x, y, (x + y) % 3 === 0 ? [75, 75, 82] : [38, 38, 44]);
+            }
+        }
+        if (kind === 'apple') { put(8, 4, [110, 70, 30]); put(8, 5, [110, 70, 30]); put(9, 4, [60, 150, 50]); put(10, 4, [60, 150, 50]); }
+        spriteCache[key] = g;
+        return g;
+    }
+
     const hLen = kind === 'stick' ? 13 : kind === 'shovel' ? 10 : 10;
     for (let x = 3; x <= hLen; x++) { put(x, 16 - x, HANDLE_L); put(x + 1, 16 - x, HANDLE_D); }
 
@@ -345,6 +408,29 @@ function createAtlasTexture() {
                 const vseam = ((x + board * 11) % 16 === 0) && !seam;
                 const shade = seam ? 65 : vseam ? 35 : (board % 2) * 8;
                 return [178 - shade + j(5), 133 - shade + j(5), 78 - shade + j(4)];
+            }
+            case TILE.CRAFT_TOP: {
+                const edge = x < 3 || x > 28 || y < 3 || y > 28;
+                if (edge) return [105 + j(5), 68 + j(4), 32 + j(3)];
+                if (x === 10 || x === 21 || y === 10 || y === 21) return [95 + j(4), 62 + j(4), 30 + j(3)];
+                return [178 + j(6), 133 + j(6), 78 + j(4)];
+            }
+            case TILE.CRAFT_SIDE: {
+                if (y < 5) return [105 + j(5), 68 + j(4), 32 + j(3)];
+                const s = (x % 16 === 0) ? 40 : 0;
+                return [170 - s + j(6), 125 - s + j(6), 72 - s + j(4)];
+            }
+            case TILE.FURNACE_FRONT: {
+                if (x >= 9 && x <= 22 && y >= 12 && y <= 24) {
+                    if (y >= 21) return [235 + j(10), 125 + j(20), 30 + j(10)];   // brasa
+                    return [28 + j(4), 28 + j(4), 32 + j(4)];
+                }
+                const c = ((x < 2 || x > 29 || y < 2 || y > 29) ? 80 : 125) + j(10);
+                return [c, c, c];
+            }
+            case TILE.FURNACE_TOP: {
+                const c = ((x < 3 || x > 28 || y < 3 || y > 28) ? 85 : 110) + j(8);
+                return [c, c, c];
             }
         }
         return [255, 0, 255]; // tile desconhecido = magenta
@@ -544,7 +630,7 @@ class World {
         this.seed = seed;
         this.generator = new TerrainGenerator(seed);
         this.chunks = new Map();
-        this.edits = new Map();   // chunkKey -> Map(indexLocal -> tipo). Base do futuro salvamento.
+        this.edits = new Map();   // chunkKey -> Map(indexLocal -> tipo). Base do salvamento.
         this.dirty = new Set();   // chunks que precisam de malha
         this.genQueue = [];
         this.lastPcx = null;
@@ -745,7 +831,7 @@ class World {
 }
 
 // =====================================================================
-// 5B. INVENTÁRIO, DROPS, PARTÍCULAS, FERRAMENTAS E MINERAÇÃO
+// 5B. INVENTÁRIO, DROPS, PARTÍCULAS, FERRAMENTAS, MINERAÇÃO E FORNOS
 // =====================================================================
 // Pilha: { id, count, damage? }  (damage = durabilidade já gasta; só ferramentas)
 class Inventory {
@@ -865,6 +951,65 @@ function showToast(text) {
     el.style.display = 'block';
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { el.style.display = 'none'; }, 2000);
+}
+
+// --- Fornos: um estado por bloco de forno, guardado por coordenada ---
+// f = { inv: Inventory(3) [0 entrada, 1 combustível, 2 saída], burn, burnMax, cook }
+const furnaces = new Map();   // "x,y,z" -> f
+let station = null;           // estação aberta: { type: 'crafting' | 'furnace', furnace? }
+let furnaceDirty = false;
+
+function updateFurnaces(dt) {
+    for (const f of furnaces.values()) {
+        const s = f.inv.slots;
+        const rec = s[0] && SMELT[s[0].id];
+        const canSmelt = !!rec && (!s[2] || (s[2].id === rec.result && s[2].count < ITEMS[rec.result].maxStack));
+        const open = station && station.furnace === f;
+
+        if (f.burn <= 0 && canSmelt && s[1] && FUEL[s[1].id]) {   // acende consumindo 1 combustível
+            f.burn = f.burnMax = FUEL[s[1].id];
+            f.inv.removeOne(1);
+            if (open) furnaceDirty = true;
+        }
+        if (f.burn > 0) {
+            f.burn = Math.max(0, f.burn - dt);
+            if (canSmelt) {
+                f.cook += dt;
+                if (f.cook >= rec.time) {
+                    f.cook = 0;
+                    f.inv.removeOne(0);
+                    if (s[2]) s[2].count++; else s[2] = { id: rec.result, count: 1 };
+                    if (open) furnaceDirty = true;
+                }
+            } else f.cook = Math.max(0, f.cook - dt * 2);
+        } else f.cook = Math.max(0, f.cook - dt * 2);
+    }
+}
+
+function updateFurnaceBars() {
+    const f = station && station.furnace;
+    if (!f) return;
+    document.getElementById('fur-flame').style.width = (f.burnMax ? f.burn / f.burnMax * 100 : 0) + '%';
+    const rec = f.inv.slots[0] && SMELT[f.inv.slots[0].id];
+    document.getElementById('fur-prog').style.width = (rec ? Math.min(1, f.cook / rec.time) * 100 : 0) + '%';
+}
+
+function spillFurnace(x, y, z) {
+    const key = `${x},${y},${z}`, f = furnaces.get(key);
+    if (!f) return;
+    for (const s of f.inv.slots) if (s) {
+        spawnItemEntity(s.id, s.count, new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5),
+            new THREE.Vector3((Math.random() - 0.5) * 2, 3, (Math.random() - 0.5) * 2), 0.5, s.damage || 0);
+    }
+    furnaces.delete(key);
+}
+
+function openStation(type, hit) {
+    if (type === 'crafting') { openInventory({ type }); return; }
+    const key = `${hit.x},${hit.y},${hit.z}`;
+    let f = furnaces.get(key);
+    if (!f) { f = { inv: new Inventory(3), burn: 0, burnMax: 0, cook: 0 }; furnaces.set(key, f); }
+    openInventory({ type, furnace: f });
 }
 
 // --- Partículas de quebra ---
@@ -1128,9 +1273,10 @@ function breakBlock(x, y, z) {
     const held = inventory.slots[selectedSlot];
     const harvest = canHarvest(type, held);
     const drop = BLOCKS[type].drop;
+    if (type === ID.FURNACE) spillFurnace(x, y, z);     // o conteúdo do forno cai no mundo
     world.setBlock(x, y, z, 0);
     spawnBreakParticles(x, y, z, type);
-    if (harvest && drop) {
+    if (harvest && drop && Math.random() < (BLOCKS[type].dropChance ?? 1)) {
         spawnItemEntity(
             drop, 1,
             new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5),
@@ -1241,7 +1387,9 @@ function refreshHeldItem() {
         const key = 'spr' + id;
         if (!heldGeoCache[key]) heldGeoCache[key] = buildSpriteGeo(spritePixels(item.sprite.kind, item.sprite.mat), px, px);
         heldMesh = new THREE.Mesh(heldGeoCache[key], spriteMaterial);
-        heldMesh.position.set(3.5 * px, 4.5 * px, 0);     // pixel (4,12) do sprite = ponto de empunhadura
+        // Ferramentas e graveto: pixel (4,12) do sprite = ponto de empunhadura. Maçã/carvão: centrado.
+        const hasHandle = !!item.tool || item.sprite.kind === 'stick';
+        heldMesh.position.set(hasHandle ? 3.5 * px : 0, hasHandle ? 4.5 * px : 0, 0);
         heldAnchor.rotation.set(...HELD_TOOL_ROT);
     } else {
         const key = 'blk' + id;
@@ -1275,13 +1423,14 @@ function updateHand(dt) {
 }
 
 // =====================================================================
-// 5D. TELA DE INVENTÁRIO + CRAFTING 2x2 (tecla E)
+// 5D. TELA DE INVENTÁRIO + CRAFTING 2x2 / 3x3 + FORNO (tecla E / botão direito)
 // =====================================================================
 
 // --- Operações puras sobre os slots. Só MOVEM itens entre slots e cursor:
 //     nunca criam nem destroem, o que impede duplicação/perda. ---
 const cursorHeld = { stack: null };   // pilha presa ao cursor
-const craftInv = new Inventory(4);    // grade 2x2 (slots 0,1 / 2,3)
+const craftInv = new Inventory(9);    // usa os primeiros craftN*craftN slots
+let craftN = 2;                       // 2 = inventário, 3 = bancada
 
 const stackable = (id) => ITEMS[id].maxStack > 1;
 
@@ -1358,7 +1507,7 @@ function invSwapHotbar(inv, i, h) {
 
 // --- Crafting ---
 function craftConsume() {
-    for (let i = 0; i < 4; i++) if (craftInv.slots[i]) craftInv.removeOne(i);
+    for (let i = 0; i < craftN * craftN; i++) if (craftInv.slots[i]) craftInv.removeOne(i);
 }
 
 function handleOutputClick(e) {
@@ -1384,12 +1533,45 @@ function handleOutputClick(e) {
     // qualquer outro caso: não faz nada (nada é consumido nem perdido)
 }
 
+// --- Forno: cliques nos 3 slots (0 entrada, 1 combustível, 2 saída) ---
+function furnaceClick(e, i) {
+    const f = station.furnace, c = cursorHeld.stack;
+    if (e.button !== 0 && e.button !== 2) return;
+    if (i === 2) {                                           // saída: só retirar
+        const s = f.inv.slots[2];
+        if (!s) return;
+        if (e.shiftKey && !c) invQuickMove(f.inv, 2, inventory, 0, 36);
+        else if (!c) { if (e.button === 2) invRightClick(f.inv, 2, cursorHeld); else invLeftClick(f.inv, 2, cursorHeld); }
+        else if (c.id === s.id && stackable(c.id)) {
+            const n = Math.min(ITEMS[c.id].maxStack - c.count, s.count);
+            c.count += n; s.count -= n;
+            if (s.count <= 0) f.inv.slots[2] = null;
+        }
+        return;
+    }
+    if (c && !(i === 0 ? SMELT[c.id] : FUEL[c.id])) return;  // item não aceito nesse slot
+    if (e.shiftKey && !c) invQuickMove(f.inv, i, inventory, 0, 36);
+    else if (e.button === 2) invRightClick(f.inv, i, cursorHeld);
+    else invLeftClick(f.inv, i, cursorHeld);
+    if (i === 0) f.cook = 0;
+}
+
+// Shift+clique na mochila com o forno aberto: manda para entrada ou combustível
+function quickToFurnace(i) {
+    const s = inventory.slots[i];
+    if (!s) return;
+    const dst = SMELT[s.id] ? 0 : FUEL[s.id] ? 1 : -1;
+    if (dst < 0) return;
+    invQuickMove(inventory, i, station.furnace.inv, dst, dst + 1);
+    if (dst === 0) station.furnace.cook = 0;
+}
+
 // --- Interface ---
 let inventoryOpen = false;
-let invHover = null;                 // { inv: 'main' | 'craft' | 'out', i }
+let invHover = null;                 // { inv: 'main' | 'craft' | 'out' | 'furnace', i }
 let invLastClick = { time: 0, key: '' };
 const invMouse = { x: 0, y: 0, seen: false };
-let invSlotEls = [], craftSlotEls = [], outSlotEl = null;
+let invSlotEls = [], craftSlotEls = [], furnaceSlotEls = [], outSlotEl = null;
 let craftResult = null;
 
 function stackHtml(s) {
@@ -1419,7 +1601,8 @@ function buildInventoryUI() {
     const craft = document.getElementById('inv-craft');
     const out = document.getElementById('inv-out');
     invSlotEls = new Array(36);
-    craftSlotEls = new Array(4);
+    craftSlotEls = new Array(9);
+    furnaceSlotEls = new Array(3);
     const make = (name, i, parent) => {
         const el = document.createElement('div');
         el.className = 'islot';
@@ -1430,9 +1613,13 @@ function buildInventoryUI() {
     };
     for (let i = 9; i < 36; i++) invSlotEls[i] = make('main', i, main);
     for (let i = 0; i < 9; i++) invSlotEls[i] = make('main', i, bar);
-    for (let i = 0; i < 4; i++) craftSlotEls[i] = make('craft', i, craft);
+    for (let i = 0; i < 9; i++) craftSlotEls[i] = make('craft', i, craft);
     outSlotEl = make('out', 0, out);
     outSlotEl.classList.add('out');
+    furnaceSlotEls[0] = make('furnace', 0, document.getElementById('fur-in'));
+    furnaceSlotEls[1] = make('furnace', 1, document.getElementById('fur-fuel'));
+    furnaceSlotEls[2] = make('furnace', 2, document.getElementById('fur-out'));
+    furnaceSlotEls[2].classList.add('out');
 
     const overlay = document.getElementById('inventory');
     overlay.addEventListener('mousedown', onInventoryMouseDown);
@@ -1441,16 +1628,23 @@ function buildInventoryUI() {
 
 function buildRecipeList() {
     const nm = (id) => id ? ITEMS[id].name : '·';
-    const lines = RECIPES.map(r =>
-        r.shape.map(row => row.map(nm).join(' + ')).join(' / ') + ` → ${r.count}× ${ITEMS[r.result].name}`);
+    const lines = RECIPES.map(r => {
+        const big = r.shape.length > 2 || r.shape[0].length > 2;
+        return r.shape.map(row => row.map(nm).join(' + ')).join(' / ') +
+            ` → ${r.count}× ${ITEMS[r.result].name}` + (big ? ' [bancada]' : '');
+    });
+    const sm = Object.entries(SMELT).map(([id, r]) => `${ITEMS[id].name} → ${ITEMS[r.result].name} (${r.time}s)`);
+    const fu = Object.entries(FUEL).map(([id, t]) => `${ITEMS[id].name} ${t}s`);
     document.getElementById('inv-recipes').innerHTML =
-        '<b>Receitas (grade 2×2, vale espelhado):</b><br>' + lines.join('<br>');
+        '<b>Receitas (vale espelhado):</b><br>' + lines.join('<br>') +
+        '<br><b>Forno:</b><br>' + sm.join('<br>') + '<br><b>Combustíveis:</b> ' + fu.join(', ');
 }
 
 function hoveredStack() {
     if (!invHover) return null;
     if (invHover.inv === 'main') return inventory.slots[invHover.i];
     if (invHover.inv === 'craft') return craftInv.slots[invHover.i];
+    if (invHover.inv === 'furnace') return station && station.furnace ? station.furnace.inv.slots[invHover.i] : null;
     return craftResult;
 }
 
@@ -1470,6 +1664,8 @@ function updateInventoryFloaters() {
         const it = ITEMS[hovered.id];
         let text = it.name + (hovered.count > 1 ? ` (x${hovered.count})` : '');
         if (it.maxDurability) text += `\nDurabilidade: ${it.maxDurability - (hovered.damage || 0)}/${it.maxDurability}`;
+        if (it.food) text += `\nRecupera ${it.food.hunger} de fome`;
+        if (FUEL[hovered.id]) text += `\nCombustível: ${FUEL[hovered.id]}s`;
         tip.textContent = text;
         tip.style.left = (invMouse.x + 14) + 'px';
         tip.style.top = (invMouse.y + 14) + 'px';
@@ -1479,15 +1675,32 @@ function updateInventoryFloaters() {
     }
 }
 
+// Ajusta o painel conforme a estação aberta (inventário 2x2, bancada 3x3 ou forno)
+function applyInventoryLayout() {
+    const isFurnace = !!station && station.type === 'furnace';
+    document.getElementById('craft-row').style.display = isFurnace ? 'none' : 'flex';
+    document.getElementById('furnace-row').style.display = isFurnace ? 'flex' : 'none';
+    document.getElementById('inv-title').textContent =
+        isFurnace ? 'Forno' : station ? 'Bancada de criação (3×3)' : 'Inventário (criação 2×2)';
+    document.getElementById('inv-craft').style.gridTemplateColumns = `repeat(${craftN}, 44px)`;
+    craftSlotEls.forEach((el, i) => { el.style.display = i < craftN * craftN ? '' : 'none'; });
+}
+
 function renderInventory() {
     for (let i = 0; i < 36; i++) {
         const el = invSlotEls[i];
         el.innerHTML = stackHtml(inventory.slots[i]);
         el.classList.toggle('sel', i === selectedSlot);
     }
-    for (let i = 0; i < 4; i++) craftSlotEls[i].innerHTML = stackHtml(craftInv.slots[i]);
-    craftResult = matchRecipe(craftInv);
-    outSlotEl.innerHTML = craftResult ? stackHtml(craftResult) : '';
+    if (station && station.type === 'furnace') {
+        for (let i = 0; i < 3; i++) furnaceSlotEls[i].innerHTML = stackHtml(station.furnace.inv.slots[i]);
+        craftResult = null;
+        updateFurnaceBars();
+    } else {
+        for (let i = 0; i < craftN * craftN; i++) craftSlotEls[i].innerHTML = stackHtml(craftInv.slots[i]);
+        craftResult = matchRecipe(craftInv);
+        outSlotEl.innerHTML = craftResult ? stackHtml(craftResult) : '';
+    }
     updateInventoryFloaters();
     updateHotbarUI();
 }
@@ -1525,13 +1738,19 @@ function onInventoryMouseDown(e) {
         renderInventory();
         return;
     }
+    if (name === 'furnace') {
+        if (station && station.furnace) furnaceClick(e, i);
+        renderInventory();
+        return;
+    }
 
     const target = name === 'craft' ? craftInv : inventory;
     const key = name + i;
     if (e.button === 0) {
         const now = performance.now();
         if (e.shiftKey && !cursorHeld.stack) {
-            if (name === 'main') invQuickMove(inventory, i, inventory, i < 9 ? 9 : 0, i < 9 ? 36 : 9);
+            if (name === 'main' && station && station.type === 'furnace') quickToFurnace(i);
+            else if (name === 'main') invQuickMove(inventory, i, inventory, i < 9 ? 9 : 0, i < 9 ? 36 : 9);
             else invQuickMove(craftInv, i, inventory, 0, 36);
         }
         else if (cursorHeld.stack && invLastClick.key === key && now - invLastClick.time < 350) invCollectSame(target, cursorHeld);
@@ -1543,12 +1762,16 @@ function onInventoryMouseDown(e) {
     renderInventory();
 }
 
-function openInventory() {
+// st = null (inventário comum) ou { type: 'crafting' | 'furnace', furnace? }
+function openInventory(st = null) {
     if (!controls.isLocked || inventoryOpen) return;
+    station = st;
+    craftN = st && st.type === 'crafting' ? 3 : 2;
     inventoryOpen = true;               // antes do unlock, para o menu de pausa não aparecer
     invHover = null;
     invMouse.seen = false;
     invLastClick = { time: 0, key: '' };
+    applyInventoryLayout();
     document.getElementById('inventory').style.display = 'flex';
     renderInventory();
     controls.unlock();
@@ -1567,12 +1790,16 @@ function closeInventory(relock) {
     // O que estiver no cursor ou na grade de crafting volta para o inventário; se não couber, vai para o mundo
     giveBack(cursorHeld.stack);
     cursorHeld.stack = null;
-    for (let i = 0; i < 4; i++) { giveBack(craftInv.slots[i]); craftInv.slots[i] = null; }
+    for (let i = 0; i < 9; i++) { giveBack(craftInv.slots[i]); craftInv.slots[i] = null; }
+    station = null;
+    furnaceDirty = false;
+    craftN = 2;
 
     document.getElementById('inventory').style.display = 'none';
     document.getElementById('inv-cursor').style.display = 'none';
     document.getElementById('inv-tooltip').style.display = 'none';
     updateHotbarUI();
+    saveGame(true);
 
     const menu = document.getElementById('menu');
     if (relock) {
@@ -1587,7 +1814,7 @@ function closeInventory(relock) {
 function handleInventoryKey(event) {
     if (event.code === 'KeyE') { event.preventDefault(); if (!event.repeat) closeInventory(true); return; }
     if (event.code === 'Escape') { closeInventory(false); return; }
-    if (!invHover || invHover.inv === 'out' || cursorHeld.stack) return;
+    if (!invHover || invHover.inv === 'out' || invHover.inv === 'furnace' || cursorHeld.stack) return;
     if (event.code.startsWith('Digit')) {
         const n = parseInt(event.key);
         if (n >= 1 && n <= 9 && invHover.inv === 'main') { invSwapHotbar(inventory, invHover.i, n - 1); renderInventory(); }
@@ -1630,7 +1857,7 @@ let selectedSlot = 0;
 const inventory = new Inventory(36);   // slots 0-8 = barra rápida, 9-35 = mochila
 let leftHeld = false;
 
-// Sobrevivência (será expandida na Fase 3)
+// Sobrevivência (será expandida na próxima parte)
 let health = 20, hunger = 20, exhaustion = 0, healthTick = 0;
 
 let prevTime = performance.now();
@@ -1691,7 +1918,7 @@ function updateDebug(rawDt) {
         : '—';
     const tt = currentHit ? getBreakTime(currentHit.type, inventory.slots[selectedSlot]).toFixed(2) + 's' : '—';
     debugEl.textContent =
-`Voxel Sandbox — Parte 4
+`Voxel Sandbox — Parte 5
 FPS: ${fps}
 Seed: ${SEED}
 XYZ: ${p.x.toFixed(2)} ${p.y.toFixed(2)} ${p.z.toFixed(2)}
@@ -1699,7 +1926,7 @@ Chunk: ${floorDiv(p.x, CHUNK_SIZE)}, ${floorDiv(p.z, CHUNK_SIZE)}
 Chunks: ${world.chunks.size} | fila geração: ${world.genQueue.length} | fila malha: ${world.dirty.size}
 No chão: ${player.onGround}
 Alvo: ${target} | tempo p/ quebrar: ${tt}
-Mineração: ${Math.round(mining.progress * 100)}% | Drops no mundo: ${itemEntities.length}
+Mineração: ${Math.round(mining.progress * 100)}% | Drops no mundo: ${itemEntities.length} | Fornos: ${furnaces.size}
 Item na mão: ${selectedItemText()}`;
 }
 
@@ -1855,7 +2082,7 @@ function updatePhysics(dt) {
     player.eye += (targetEye - player.eye) * Math.min(1, 15 * dt);
     camera.position.set(p.x, p.y + player.eye, p.z);
 
-    // Fome (será refeita na Fase 3)
+    // Fome (será refeita na próxima parte)
     const hzSpeed = Math.hypot(player.vel.x, player.vel.z);
     if (player.onGround && hzSpeed > 0.1) {
         exhaustion += hzSpeed * dt * (isSprinting ? 0.015 : 0.005);
@@ -1878,9 +2105,120 @@ function updatePhysics(dt) {
 }
 
 // =====================================================================
+// 10B. SALVAMENTO (IndexedDB, um registro por seed)
+// =====================================================================
+const SAVE_KEY = 'world-' + SEED;
+const SAVE_VERSION = 1;
+
+function dbOpen() {
+    return new Promise((res, rej) => {
+        const r = indexedDB.open('voxel-sandbox', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('worlds');
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+    });
+}
+async function dbRun(mode, fn) {
+    const db = await dbOpen();
+    return new Promise((res, rej) => {
+        const tx = db.transaction('worlds', mode);
+        const req = fn(tx.objectStore('worlds'));
+        tx.oncomplete = () => { db.close(); res(req.result); };
+        tx.onerror = tx.onabort = () => { db.close(); rej(tx.error); };
+    });
+}
+
+const packStack = (s) => s ? { id: s.id, count: s.count, damage: s.damage || 0 } : null;
+
+function buildSave() {
+    const edits = [];
+    for (const [key, m] of world.edits) edits.push([key, Array.from(m)]);
+    return {
+        v: SAVE_VERSION, seed: SEED, time: Date.now(),
+        player: { x: player.pos.x, y: player.pos.y, z: player.pos.z, health, hunger },
+        selectedSlot,
+        inventory: inventory.slots.map(packStack),
+        furnaces: Array.from(furnaces, ([k, f]) => [k, {
+            slots: f.inv.slots.map(packStack), burn: f.burn, burnMax: f.burnMax, cook: f.cook,
+        }]),
+        edits,
+    };
+}
+
+function sanitizeStack(s) {
+    if (!s) return null;
+    const it = ITEMS[s.id];
+    if (!it || !Number.isInteger(s.count) || s.count < 1 || s.count > it.maxStack) throw new Error('pilha inválida');
+    const st = { id: s.id, count: s.count };
+    if (it.maxDurability && s.damage > 0 && s.damage < it.maxDurability) st.damage = s.damage;
+    return st;
+}
+
+// Valida tudo antes de aplicar; devolve null se estiver inválido
+function validateSave(d) {
+    try {
+        if (!d || d.v !== SAVE_VERSION || d.seed !== SEED) return null;
+        const p = d.player;
+        if (![p.x, p.y, p.z, p.health, p.hunger].every(Number.isFinite)) return null;
+        if (!Array.isArray(d.inventory) || d.inventory.length !== inventory.slots.length) return null;
+        const inv = d.inventory.map(sanitizeStack);
+
+        const edits = new Map();
+        const maxIdx = CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT;
+        for (const [key, list] of d.edits) {
+            const m = new Map();
+            for (const [i, t] of list) {
+                if (!Number.isInteger(i) || i < 0 || i >= maxIdx) throw new Error('índice inválido');
+                if (t !== 0 && !BLOCKS[t]) throw new Error('bloco inválido');
+                m.set(i, t);
+            }
+            edits.set(String(key), m);
+        }
+
+        const furn = new Map();
+        for (const [k, f] of (d.furnaces || [])) {
+            if (!/^-?\d+,\d+,-?\d+$/.test(k) || !Array.isArray(f.slots) || f.slots.length !== 3) throw new Error('forno inválido');
+            const finv = new Inventory(3);
+            finv.slots = f.slots.map(sanitizeStack);
+            furn.set(k, { inv: finv, burn: Math.max(0, +f.burn || 0), burnMax: Math.max(0, +f.burnMax || 0), cook: Math.max(0, +f.cook || 0) });
+        }
+
+        return {
+            player: { x: p.x, y: p.y, z: p.z, health: Math.min(20, Math.max(1, p.health)), hunger: Math.min(20, Math.max(0, p.hunger)) },
+            selectedSlot: d.selectedSlot >= 0 && d.selectedSlot < 9 ? d.selectedSlot | 0 : 0,
+            inventory: inv, edits, furnaces: furn,
+        };
+    } catch (e) { return null; }
+}
+
+async function loadGame() {
+    try {
+        if (new URLSearchParams(location.search).has('reset')) {
+            await dbRun('readwrite', s => s.delete(SAVE_KEY));
+            return null;
+        }
+        const data = await dbRun('readonly', s => s.get(SAVE_KEY));
+        const ok = validateSave(data);
+        if (data && !ok) console.warn('Save inválido ou de outra versão: ignorado.');
+        return ok;
+    } catch (e) { console.warn('IndexedDB indisponível:', e); return null; }
+}
+
+let saving = false;
+async function saveGame(quiet) {
+    if (saving || !world) return;
+    saving = true;
+    try {
+        await dbRun('readwrite', s => s.put(buildSave(), SAVE_KEY));
+        if (!quiet) showToast('Jogo salvo');
+    } catch (e) { console.warn('Falha ao salvar:', e); if (!quiet) showToast('Falha ao salvar'); }
+    saving = false;
+}
+
+// =====================================================================
 // 11. INICIALIZAÇÃO
 // =====================================================================
-function init() {
+async function init() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(SKY_COLOR);
     // Névoa proporcional à distância de renderização: só suaviza a borda dos chunks
@@ -1918,12 +2256,24 @@ function init() {
         renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // Mundo + carga inicial síncrona ao redor do spawn
+    // Mundo + save + carga inicial síncrona ao redor do ponto de partida
     world = new World(scene, SEED);
+    const save = await loadGame();
+    if (save) {
+        world.edits = save.edits;
+        inventory.slots = save.inventory;
+        selectedSlot = save.selectedSlot;
+        health = save.player.health;
+        hunger = save.player.hunger;
+        for (const [k, v] of save.furnaces) furnaces.set(k, v);
+    }
     const sh = world.generator.heightAt(0, 0);
     spawnPoint.set(0.5, sh + 1, 0.5);
-    world.update(spawnPoint.x, spawnPoint.z, { gen: Infinity, mesh: Infinity });
-    player.pos.copy(spawnPoint);
+    const start = save ? save.player : spawnPoint;
+    world.update(start.x, start.z, { gen: Infinity, mesh: Infinity });
+    player.pos.set(start.x, start.y, start.z);
+    // Se o save apontar para dentro de um bloco, sobe até achar espaço livre
+    for (let guard = 0; guard < 70 && collides(player.pos.x, player.pos.y, player.pos.z, player.height); guard++) player.pos.y += 1;
     camera.position.set(player.pos.x, player.pos.y + player.eye, player.pos.z);
     initGameplayAssets();
 
@@ -1943,6 +2293,7 @@ function init() {
         moveForward = moveBackward = moveLeft = moveRight = jumpHeld = isSprinting = wantToCrouch = false;
         leftHeld = false;
         resetMining();
+        saveGame(true);
         btnPlay.disabled = true;
         const originalText = btnPlay.innerText;
         btnPlay.innerText = 'Aguarde...';
@@ -2002,30 +2353,50 @@ function init() {
     document.addEventListener('mousedown', (event) => {
         if (!controls.isLocked) return;
         if (event.button === 0) { leftHeld = true; return; }   // minerar: tratado em updateMining()
+        if (event.button !== 2) return;
         updateTarget();
-        if (!currentHit) return;
 
-        if (event.button === 2) {
-            // Colocar na face atingida (consome 1 item do slot selecionado; só itens de bloco)
-            const heldStack = inventory.slots[selectedSlot];
-            const type = heldStack ? (ITEMS[heldStack.id].block || 0) : 0;
-            const { nx, ny, nz } = currentHit;
-            if (type === 0 || (nx === 0 && ny === 0 && nz === 0)) return;
-            const px = currentHit.x + nx, py = currentHit.y + ny, pz = currentHit.z + nz;
-            if (py < 0 || py >= WORLD_HEIGHT) return;
-            if (world.getBlock(px, py, pz) !== 0) return;
-            if (intersectsPlayer(px, py, pz)) return;
-            if (world.setBlock(px, py, pz, type)) {
+        // 1) Bancada / forno: abre a interface (agachado = colocar bloco ao lado)
+        const st = currentHit && BLOCKS[currentHit.type].station;
+        if (st && !wantToCrouch) { openStation(st, currentHit); return; }
+
+        // 2) Comida: come e recupera fome
+        const held = inventory.slots[selectedSlot];
+        const food = held && ITEMS[held.id].food;
+        if (food) {
+            if (hunger < 20) {
+                hunger = Math.min(20, hunger + food.hunger);
                 inventory.removeOne(selectedSlot);
                 updateHotbarUI();
+                updateSurvivalUI();
                 handAnim.punch = 1;
             }
+            return;
+        }
+
+        // 3) Colocar bloco na face atingida (consome 1 item; só itens de bloco)
+        if (!currentHit) return;
+        const type = held ? (ITEMS[held.id].block || 0) : 0;
+        const { nx, ny, nz } = currentHit;
+        if (type === 0 || (nx === 0 && ny === 0 && nz === 0)) return;
+        const px = currentHit.x + nx, py = currentHit.y + ny, pz = currentHit.z + nz;
+        if (py < 0 || py >= WORLD_HEIGHT) return;
+        if (world.getBlock(px, py, pz) !== 0) return;
+        if (intersectsPlayer(px, py, pz)) return;
+        if (world.setBlock(px, py, pz, type)) {
+            inventory.removeOne(selectedSlot);
+            updateHotbarUI();
+            handAnim.punch = 1;
         }
     });
 
     document.addEventListener('mouseup', (event) => {
         if (event.button === 0) leftHeld = false;
     });
+
+    // Salvamento automático
+    setInterval(() => { if (controls.isLocked) saveGame(true); }, 30000);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(true); });
 
     updateSurvivalUI();
 }
@@ -2044,6 +2415,13 @@ function animate() {
         updateItemEntities(dt);
         updateParticles(dt);
     }
+    if (controls.isLocked || inventoryOpen) {
+        updateFurnaces(dt);                       // fornos continuam queimando com a tela aberta ou fechada
+        if (inventoryOpen && station && station.type === 'furnace') {
+            if (furnaceDirty) { furnaceDirty = false; renderInventory(); }
+            else updateFurnaceBars();
+        }
+    }
     updateHand(dt);
     world.update(player.pos.x, player.pos.z);
     updateDebug(rawDt);
@@ -2054,8 +2432,7 @@ function animate() {
     renderer.render(handScene, handCamera);
 }
 
-init();
-animate();
+init().then(animate);
 </script>
 </body>
 </html>
