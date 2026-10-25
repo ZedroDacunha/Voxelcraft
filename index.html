@@ -129,7 +129,7 @@
     <h1>Voxel Sandbox</h1>
     <p>Parte 6 — Sobrevivência: fome com saturação, regeneração, morte e itens que caem</p>
     <button class="btn" id="btn-play">Clique para Jogar</button>
-    <p style="font-size: 14px; opacity: 0.8; margin-top: 15px;">[WASD] Mover | [Espaço] Pular | [Shift] Correr | [Ctrl / C] Agachar | [F3] Debug | Botão esq (segure): minerar | Botão dir: colocar / usar bancada e forno / segurar para comer | [E] Inventário / crafting | [Q] Soltar item</p>
+    <p style="font-size: 14px; opacity: 0.8; margin-top: 15px;">[WASD] Mover | [Espaço] Pular | [Shift] Correr | [Ctrl / C] Agachar | [F3] Debug | [F4] Qualidade | Botão esq (segure): minerar | Botão dir: colocar / usar bancada e forno / segurar para comer | [E] Inventário / crafting | [Q] Soltar item</p>
     <p style="font-size: 12px; opacity: 0.6; margin-top: 0;">Dicas: ?seed=123 gera outro mundo · ?reset apaga o save daquela seed · para colocar bloco encostado em bancada/forno, segure Ctrl ou C ao clicar · o jogo salva sozinho a cada 30 s e ao pausar.</p>
 </div>
 
@@ -1911,7 +1911,52 @@ const hurtEl = document.getElementById('hurt');
 const deathEl = document.getElementById('death');
 
 let prevTime = performance.now();
-const perf = { t: 0, frames: 0, sum: 0, worst: 0, avg: 0, worstShown: 0, buildMs: 0 };
+const perf = { t: 0, frames: 0, sum: 0, worst: 0, avg: 0, worstShown: 0, buildMs: 0, fps: 0 };
+
+// Resolução de render adaptativa: se o FPS cai abaixo de ~55, reduz a escala aos poucos (e volta a subir quando sobra folga).
+// Se reduzir a resolução não melhora o FPS, o limite não vem da GPU (economia de energia, 30 Hz...) e o modo auto desliga.
+const gfx = { auto: true, max: Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO), min: 0.5, scale: 1, slow: 0, fast: 0, lastFps: null, noGain: 0 };
+gfx.scale = gfx.max;
+
+function setRenderScale(v) {
+    gfx.scale = Math.max(gfx.min, Math.min(gfx.max, v));
+    renderer.setPixelRatio(gfx.scale);   // também redimensiona o buffer de desenho
+}
+
+function adaptResolution(fpsNow) {
+    if (!gfx.auto || document.hidden) return;
+    if (gfx.lastFps !== null) {                       // o último ajuste ajudou?
+        gfx.noGain = fpsNow < gfx.lastFps * 1.1 ? gfx.noGain + 1 : 0;
+        gfx.lastFps = null;
+        if (gfx.noGain >= 3) {
+            gfx.auto = false;
+            setRenderScale(gfx.max);
+            showToast('FPS não melhora com menos resolução: veja economia de energia / aceleração de hardware');
+            return;
+        }
+    }
+    if (fpsNow < 55 && gfx.scale > gfx.min) {
+        gfx.fast = 0;
+        if (++gfx.slow >= 2) { gfx.slow = 0; gfx.lastFps = fpsNow; setRenderScale(gfx.scale - 0.15); }
+    } else if (fpsNow >= 58 && gfx.scale < gfx.max) {
+        gfx.slow = 0;
+        if (++gfx.fast >= 8) { gfx.fast = 0; setRenderScale(gfx.scale + 0.1); }
+    } else { gfx.slow = 0; gfx.fast = 0; }
+}
+
+const QUALITY_MODES = ['auto', 'max', 1, 0.75, 0.5];
+let qualityIdx = 0;
+function cycleQuality() {
+    qualityIdx = (qualityIdx + 1) % QUALITY_MODES.length;
+    const m = QUALITY_MODES[qualityIdx];
+    gfx.noGain = 0; gfx.lastFps = null; gfx.slow = 0; gfx.fast = 0;
+    if (m === 'auto') { gfx.auto = true; setRenderScale(gfx.max); showToast('Qualidade: automática'); }
+    else {
+        gfx.auto = false;
+        setRenderScale(m === 'max' ? gfx.max : m);
+        showToast('Qualidade: ' + (m === 'max' ? 'máxima' : Math.round(m * 100) + '%'));
+    }
+}
 
 // =====================================================================
 // 7. HUD
@@ -2073,7 +2118,7 @@ Mineração: ${Math.round(mining.progress * 100)}% | Drops no mundo: ${itemEntit
 Item na mão: ${selectedItemText()}
 Vida ${health} | Fome ${hunger} | Saturação ${saturation.toFixed(1)} | Exaustão ${exhaustion.toFixed(2)}
 CPU/quadro: média ${perf.avg.toFixed(1)} ms | pior ${perf.worstShown.toFixed(1)} ms | último save: ${perf.buildMs.toFixed(1)} ms
-Desenho: ${renderer.info.render.calls} chamadas | ${(renderer.info.render.triangles / 1000).toFixed(0)}k triângulos | pixel ratio ${renderer.getPixelRatio()}`;
+Desenho: ${renderer.info.render.calls} chamadas | ${(renderer.info.render.triangles / 1000).toFixed(0)}k triângulos | escala de render ${gfx.scale.toFixed(2)} (${gfx.auto ? 'auto' : 'manual'}) · F4 muda`;
 }
 
 // =====================================================================
@@ -2412,9 +2457,9 @@ async function init() {
     targetMesh.visible = false;
     scene.add(targetMesh);
 
-    renderer = new THREE.WebGLRenderer({ antialias: false });
+    renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
     renderer.autoClear = false;     // dois passes: mundo e depois a mão
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
+    renderer.setPixelRatio(gfx.scale);
     renderer.info.autoReset = false;   // contamos as duas passagens (mundo + mão) juntas
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
@@ -2502,6 +2547,7 @@ async function init() {
             case 'KeyE': if (!event.repeat) openInventory(); break;
             case 'ShiftLeft': case 'ShiftRight': isSprinting = true; break;
             case 'ControlLeft': case 'ControlRight': case 'KeyC': wantToCrouch = true; break;
+            case 'F4': event.preventDefault(); cycleQuality(); break;
             case 'F3':
                 event.preventDefault();
                 debugVisible = !debugVisible;
@@ -2632,6 +2678,8 @@ function animate() {
     if (cpu > perf.worst) perf.worst = cpu;
     if (perf.t >= 1) {
         perf.avg = perf.sum / perf.frames; perf.worstShown = perf.worst;
+        perf.fps = perf.frames / perf.t;
+        adaptResolution(perf.fps);
         perf.t = 0; perf.frames = 0; perf.sum = 0; perf.worst = 0;
     }
 }
