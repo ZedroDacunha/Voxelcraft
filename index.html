@@ -165,6 +165,7 @@ const MESH_PER_FRAME = 2;      // malhas reconstruídas por quadro
 const REACH = 5;               // alcance de interação (blocos)
 const SEED = Number(new URLSearchParams(location.search).get('seed')) || 1337;
 const SKY_COLOR = 0x87CEEB;
+const GPU_PREF = new URLSearchParams(location.search).get('gpu') === 'default' ? 'default' : 'high-performance';   // ?gpu=default para testar sem pedir a GPU dedicada
 const FRAME_BUDGET_MS = 7;     // tempo máximo por quadro gasto gerando/montando chunks
 const MAX_PIXEL_RATIO = Number(new URLSearchParams(location.search).get('pr')) || 1.5;   // ?pr=2 para resolução total
 
@@ -843,6 +844,7 @@ class World {
             const c = this.genQueue.shift();
             if (!this.getChunk(c.cx, c.cz)) { this.generateChunk(c.cx, c.cz); genCount++; }
         }
+        this.frameGen = genCount; this.frameMesh = 0;
 
         if (this.dirty.size) {
             const cand = [];
@@ -852,7 +854,9 @@ class World {
                 cand.push({ c, d: (c.cx - pcx) ** 2 + (c.cz - pcz) ** 2 });
             }
             cand.sort((a, b) => a.d - b.d);
-            for (let i = 0; i < cand.length && (unlimited || i === 0 || performance.now() < meshDeadline); i++) this.meshChunk(cand[i].c);
+            let n = 0;
+            for (; n < cand.length && (unlimited || n === 0 || performance.now() < meshDeadline); n++) this.meshChunk(cand[n].c);
+            this.frameMesh = n;
         }
     }
 }
@@ -1848,8 +1852,7 @@ function closeInventory(relock) {
 
     const menu = document.getElementById('menu');
     if (relock) {
-        const pr = document.body.requestPointerLock();
-        if (pr !== undefined) pr.catch(() => {});
+        requestLock();
         setTimeout(() => { if (!controls.isLocked) menu.style.display = 'flex'; }, 400);
     } else {
         menu.style.display = 'flex';    // Esc: abre o menu de pausa
@@ -1882,7 +1885,8 @@ let targetMesh;
 let currentHit = null;
 const tmpDir = new THREE.Vector3();
 const yawEuler = new THREE.Euler(0, 0, 0, 'YXZ');
-const look = { yaw: 0, pitch: 0 };                 // orientação da câmera guardada como números
+const look = { yaw: 0, pitch: 0, spikes: 0, maxDelta: 0 };   // orientação da câmera + diagnóstico do mouse
+const MAX_EVENT_DELTA = 350;                       // um único evento de mouse acima disso (px) é tratado como pico falso
 const lookEuler = new THREE.Euler(0, 0, 0, 'YXZ');
 const LOOK_SPEED = 0.002;                          // mesma sensibilidade do PointerLockControls
 const MAX_PITCH = Math.PI / 2 - 0.02;              // nunca chega a 90°: evita a singularidade (gimbal lock)
@@ -1915,7 +1919,7 @@ const hurtEl = document.getElementById('hurt');
 const deathEl = document.getElementById('death');
 
 let prevTime = performance.now();
-const perf = { t: 0, frames: 0, sum: 0, worst: 0, avg: 0, worstShown: 0, buildMs: 0, fps: 0 };
+const perf = { t: 0, frames: 0, sum: 0, worst: 0, avg: 0, worstShown: 0, buildMs: 0, fps: 0, long: 0, lastLong: '—', ctxLost: 0 };
 
 // Resolução de render adaptativa: se o FPS cai abaixo de ~55, reduz a escala aos poucos (e volta a subir quando sobra folga).
 // Se reduzir a resolução não melhora o FPS, o limite não vem da GPU (economia de energia, 30 Hz...) e o modo auto desliga.
@@ -2123,7 +2127,9 @@ Mineração: ${Math.round(mining.progress * 100)}% | Drops no mundo: ${itemEntit
 Item na mão: ${selectedItemText()}
 Vida ${health} | Fome ${hunger} | Saturação ${saturation.toFixed(1)} | Exaustão ${exhaustion.toFixed(2)}
 CPU/quadro: média ${perf.avg.toFixed(1)} ms | pior ${perf.worstShown.toFixed(1)} ms | último save: ${perf.buildMs.toFixed(1)} ms
-Desenho: ${renderer.info.render.calls} chamadas | ${(renderer.info.render.triangles / 1000).toFixed(0)}k triângulos | escala de render ${gfx.scale.toFixed(2)} (${gfx.auto ? 'auto' : 'manual'}) · F4 muda`;
+Desenho: ${renderer.info.render.calls} chamadas | ${(renderer.info.render.triangles / 1000).toFixed(0)}k triângulos | escala de render ${gfx.scale.toFixed(2)} (${gfx.auto ? 'auto' : 'manual'}) · F4 muda
+Mouse: movimento bruto ${lockInfo.raw === null ? 'desconhecido' : lockInfo.raw ? 'sim' : 'não'} | picos ignorados: ${look.spikes} | maior delta: ${look.maxDelta.toFixed(0)} px
+Quadros longos (>60 ms): ${perf.long} | último: ${perf.lastLong} | contexto GL perdido: ${perf.ctxLost}`;
 }
 
 // =====================================================================
@@ -2444,9 +2450,33 @@ function applyLook() {
 function onLookMove(e) {
     if (!controls || !controls.isLocked) return;
     e.stopImmediatePropagation();
-    look.yaw -= (e.movementX || 0) * LOOK_SPEED;
-    look.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, look.pitch - (e.movementY || 0) * LOOK_SPEED));
+    const mx = e.movementX || 0, my = e.movementY || 0;
+    const big = Math.max(Math.abs(mx), Math.abs(my));
+    if (big > look.maxDelta) look.maxDelta = big;
+    if (big > MAX_EVENT_DELTA) { look.spikes++; return; }      // pico falso do pointer lock: ignora este evento
+    look.yaw -= mx * LOOK_SPEED;
+    look.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, look.pitch - my * LOOK_SPEED));
     applyLook();
+}
+
+// Pede o travamento do mouse SEM a aceleração do sistema ("movimento bruto"): evita trancos ao girar rápido
+const lockInfo = { raw: null };    // null = o navegador não informa
+function requestLock() {
+    const el = document.body;
+    const fallback = () => {
+        lockInfo.raw = false;
+        const p2 = el.requestPointerLock();
+        if (p2 && p2.catch) p2.catch(err => console.warn('Aguardando cooldown do navegador...', err));
+    };
+    let pr;
+    try { pr = el.requestPointerLock({ unadjustedMovement: true }); } catch (e) { fallback(); return; }
+    if (pr && pr.then) {
+        pr.then(() => { lockInfo.raw = true; })
+          .catch(err => {
+              if (err && err.name === 'NotSupportedError') fallback();      // sistema sem movimento bruto: usa o modo normal
+              else console.warn('Aguardando cooldown do navegador...', err);
+          });
+    }
 }
 
 async function init() {
@@ -2474,12 +2504,14 @@ async function init() {
     targetMesh.visible = false;
     scene.add(targetMesh);
 
-    renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+    renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: GPU_PREF });
     renderer.autoClear = false;     // dois passes: mundo e depois a mão
     renderer.setPixelRatio(gfx.scale);
     renderer.info.autoReset = false;   // contamos as duas passagens (mundo + mão) juntas
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
+    renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); perf.ctxLost++; showToast('Contexto WebGL perdido (driver/GPU)'); });
+    renderer.domElement.addEventListener('webglcontextrestored', () => showToast('Contexto WebGL restaurado'));
     window.addEventListener('resize', () => {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
@@ -2520,16 +2552,12 @@ async function init() {
     const menu = document.getElementById('menu');
     const btnPlay = document.getElementById('btn-play');
 
-    btnPlay.addEventListener('click', () => {
-        const promise = document.body.requestPointerLock();
-        if (promise !== undefined) promise.catch(err => console.warn('Aguardando cooldown do navegador...', err));
-    });
+    btnPlay.addEventListener('click', () => requestLock());
     controls.addEventListener('lock', () => { menu.style.display = 'none'; });
     document.getElementById('btn-respawn').addEventListener('click', () => {
         dead = false;
         deathEl.style.display = 'none';
-        const pr = document.body.requestPointerLock();
-        if (pr !== undefined) pr.catch(() => {});
+        requestLock();
         setTimeout(() => { if (!controls.isLocked) menu.style.display = 'flex'; }, 400);
     });
     controls.addEventListener('unlock', () => {
@@ -2696,6 +2724,10 @@ function animate() {
     const cpu = performance.now() - now;
     perf.sum += cpu; perf.frames++; perf.t += rawDt;
     if (cpu > perf.worst) perf.worst = cpu;
+    if (rawDt > 0.06) {   // quadro de mais de 60 ms: registra o que aconteceu (CPU baixa + quadro longo = GPU/navegador/sistema)
+        perf.long++;
+        perf.lastLong = `${(rawDt * 1000).toFixed(0)} ms (CPU ${cpu.toFixed(0)} ms, chunks gerados ${world.frameGen ?? 0}, malhas ${world.frameMesh ?? 0}, salvando: ${saving ? 'sim' : 'não'})`;
+    }
     if (perf.t >= 1) {
         perf.avg = perf.sum / perf.frames; perf.worstShown = perf.worst;
         perf.fps = perf.frames / perf.t;
