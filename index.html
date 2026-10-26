@@ -1081,9 +1081,34 @@ class World {
             map: atlas, alphaTest: 0.5, transparent: false, depthWrite: true, vertexColors: true,
         });
         
+        this.configureTorchFlicker(this.chunkMaterial);
+        this.configureTorchFlicker(this.cutoutMaterial);
         this.water = new WaterSystem(atlas);
     }
 
+    configureTorchFlicker(material) {
+        material.onBeforeCompile = shader => {
+            shader.uniforms.uTorchTime = { value: 0 };
+            shader.vertexShader = shader.vertexShader.replace(
+                '#include <common>',
+                '#include <common>\nattribute float torchInfluence;\nvarying float vTorchInfluence;'
+            );
+            shader.vertexShader = shader.vertexShader.replace(
+                '#include <color_vertex>',
+                '#include <color_vertex>\nvTorchInfluence = torchInfluence;'
+            );
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <common>',
+                '#include <common>\nuniform float uTorchTime;\nvarying float vTorchInfluence;'
+            );
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <color_fragment>',
+                '#include <color_fragment>\nfloat torchFlicker = 1.0 + vTorchInfluence * (0.035 * sin(uTorchTime * 8.7) + 0.02 * sin(uTorchTime * 13.1 + 1.2));\ndiffuseColor.rgb *= torchFlicker;'
+            );
+            material.userData.torchFlickerShader = shader;
+        };
+        material.customProgramCacheKey = () => 'voxel-torch-flicker-v1';
+    }
     rebuildSkyLightColumn(chunk, lx, lz) {
         let light = 15;
         for (let y = WORLD_HEIGHT - 1; y >= 0; y--) {
@@ -1440,7 +1465,7 @@ class World {
             const illumination = Math.max(0.18 + sky * 0.82, 0.18 + Math.min(2.2, local * 2.4) * 0.82);
             const base = (0.58 + level * 0.14) * illumination;
             const warmth = Math.min(0.22, local * 0.24);
-            return [base * (1 + warmth), base, base * (1 - warmth * 0.85)];
+            return [base * (1 + warmth), base, base * (1 - warmth * 0.85), local];
         };
 
         const initialVertexCapacity = CS * CS * 8;
@@ -1449,6 +1474,7 @@ class World {
         let normals = new Float32Array(initialVertexCapacity * 3);
         let uvs = new Float32Array(initialVertexCapacity * 2);
         let colors = new Float32Array(initialVertexCapacity * 3);
+        let torchInfluence = new Float32Array(initialVertexCapacity);
         let indices = new Uint32Array(initialIndexCapacity);
         let cutoutIndices = new Uint32Array(initialIndexCapacity);
         let waterIndices = new Uint32Array(initialIndexCapacity);
@@ -1489,6 +1515,7 @@ class World {
                         normals = growTypedArray(normals, (vertexCount + 4) * 3);
                         uvs = growTypedArray(uvs, (vertexCount + 4) * 2);
                         colors = growTypedArray(colors, (vertexCount + 4) * 3);
+                        torchInfluence = growTypedArray(torchInfluence, vertexCount + 4);
                         let target, targetOffset;
                         if (renderMode === 'cutout' || renderMode === 'torch') {
                             cutoutIndices = growTypedArray(cutoutIndices, cutoutIndexCount + 6);
@@ -1520,6 +1547,7 @@ class World {
                             uvs[uv + 1] = UV_PAD + c.uv[1] * (1 - 2 * UV_PAD);
                             const shade = ambientOcclusionAt(lx, y, lz, f, c, renderMode !== 'liquid');
                             colors[p] = shade[0]; colors[p + 1] = shade[1]; colors[p + 2] = shade[2];
+                            torchInfluence[vertex] = shade[3];
                         }
                         vertexCount += 4;
                         target[targetOffset] = ndx; target[targetOffset + 1] = ndx + 1;
@@ -1538,6 +1566,7 @@ class World {
         geo.setAttribute('normal', new THREE.BufferAttribute(normals.subarray(0, vertexCount * 3), 3));
         geo.setAttribute('uv', new THREE.BufferAttribute(uvs.subarray(0, vertexCount * 2), 2));
         geo.setAttribute('color', new THREE.BufferAttribute(colors.subarray(0, vertexCount * 3), 3));
+        geo.setAttribute('torchInfluence', new THREE.BufferAttribute(torchInfluence.subarray(0, vertexCount), 1));
 
         const totalIndexCount = indexCount + cutoutIndexCount + waterIndexCount;
         const mergedIndices = vertexCount > 65535 ? new Uint32Array(totalIndexCount) : new Uint16Array(totalIndexCount);
@@ -1595,6 +1624,11 @@ class World {
         const t0 = performance.now();
         const genDeadline = t0 + FRAME_BUDGET_MS * 0.45;
         const meshDeadline = t0 + FRAME_BUDGET_MS;
+        const torchTime = t0 * 0.001;
+        for (const material of [this.chunkMaterial, this.cutoutMaterial]) {
+            const shader = material.userData.torchFlickerShader;
+            if (shader) shader.uniforms.uTorchTime.value = torchTime;
+        }
         const pcx = floorDiv(px, CHUNK_SIZE), pcz = floorDiv(pz, CHUNK_SIZE);
 
         if (pcx !== this.lastPcx || pcz !== this.lastPcz) {
