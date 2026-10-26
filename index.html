@@ -415,10 +415,9 @@ function createAtlasTexture() {
     canvas.height = TILE_PX;
     const ctx = canvas.getContext('2d', { alpha: true });
     ctx.imageSmoothingEnabled = false;
-    const rnd = mulberry32(2024);
-    const j = (r) => (rnd() * 2 - 1) * r;
-    const grassEdges = [0, 1].map(v => Array.from({ length: TILE_PX }, () => 8 + Math.floor(rnd() * 7) + v));
-    const cobbleShade = Array.from({ length: 40 }, () => 104 + rnd() * 32);
+    const grassEdges = [0, 1].map(v => Array.from({ length: TILE_PX }, (_, x) =>
+        8 + Math.floor(hash2(x, v, 2024) * 7) + v));
+    const cobbleShade = Array.from({ length: 40 }, (_, i) => 104 + hash2(i, 0, 2077) * 32);
     const variantBase = {
         [TILE.GRASS_TOP_ALT]: TILE.GRASS_TOP, [TILE.GRASS_SIDE_ALT]: TILE.GRASS_SIDE,
         [TILE.DIRT_ALT]: TILE.DIRT, [TILE.STONE_ALT]: TILE.STONE, [TILE.LEAVES_ALT]: TILE.LEAVES,
@@ -442,6 +441,12 @@ function createAtlasTexture() {
     const pixel = (sourceTile, x, y) => {
         const tile = variantBase[sourceTile] ?? sourceTile;
         const alt = sourceTile !== tile ? 1 : 0;
+        let noiseSample = 0;
+        const j = (radius) => {
+            const value = hash2(x + noiseSample * 31, y - noiseSample * 17, 2024 + sourceTile * 101);
+            noiseSample++;
+            return (value * 2 - 1) * radius;
+        };
         switch (tile) {
             case TILE.GRASS_TOP: {
                 const band = (x * 5 + y * 3 + alt) % 7;
