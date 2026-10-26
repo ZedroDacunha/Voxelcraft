@@ -1118,6 +1118,9 @@ class World {
         this.edits = new Map();
         this.dirty = new Set();
         this.lightDirty = new Set();
+        this.lightSourceChunks = new Set();
+        this.lastLightMs = 0;
+        this.lastMeshMs = 0;
         this.sandQueue = [];
         this.queuedSand = new Set();
         this.animatedSandTargets = new Set();
@@ -1221,6 +1224,7 @@ class World {
         if (!region.length) return;
 
         const regionIndex = new Map(region.map((part, i) => [part, i]));
+        const hasBlockEmitter = region.some(part => this.lightSourceChunks.has(chunkKey(part.cx, part.cz)));
         for (const part of region) {
             this.lightDirty.delete(part);
             part.blockLight.fill(0);
@@ -1228,30 +1232,50 @@ class World {
                 for (let lz = 0; lz < CHUNK_SIZE; lz++) this.rebuildSkyLightColumn(part, lx, lz);
             }
         }
-        this.propagateSkyLight(region, regionIndex);
+        this.propagateSkyLight(region, regionIndex, hasBlockEmitter);
         for (const part of region) this.dirty.add(part);
     }
 
-    propagateSkyLight(region, regionIndex) {
+    propagateSkyLight(region, regionIndex, hasBlockEmitter = true) {
         this.propagateLightChannel(region, regionIndex, 'skyLight', false);
-        this.propagateLightChannel(region, regionIndex, 'blockLight', true);
+        if (hasBlockEmitter) this.propagateLightChannel(region, regionIndex, 'blockLight', true);
     }
 
     propagateLightChannel(region, regionIndex, channel, seedEmitters) {
         const volume = CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT;
         const buckets = Array.from({ length: 16 }, () => []);
+        const directions = [[1,0,0], [-1,0,0], [0,1,0], [0,-1,0], [0,0,1], [0,0,-1]];
         let hasEmitter = false;
+        const canSeedSky = (chunk, lx, y, lz, level) => {
+            for (const [dx, dy, dz] of directions) {
+                const ny = y + dy;
+                if (ny < 0 || ny >= WORLD_HEIGHT) continue;
+                let nx = lx + dx, nz = lz + dz;
+                let cx = chunk.cx, cz = chunk.cz;
+                if (nx < 0) { cx--; nx += CHUNK_SIZE; } else if (nx >= CHUNK_SIZE) { cx++; nx -= CHUNK_SIZE; }
+                if (nz < 0) { cz--; nz += CHUNK_SIZE; } else if (nz >= CHUNK_SIZE) { cz++; nz -= CHUNK_SIZE; }
+                const target = this.getChunk(cx, cz);
+                if (regionIndex.get(target) === undefined) continue;
+                if (level - 1 > target[channel][idx(nx, ny, nz)]) return true;
+            }
+            return false;
+        };
         for (let chunkIndex = 0; chunkIndex < region.length; chunkIndex++) {
             const chunk = region[chunkIndex];
             const lightMap = chunk[channel];
             for (let i = 0; i < lightMap.length; i++) {
+                let emission = 0;
                 if (seedEmitters) {
-                    const emission = BLOCKS[chunk.data[i]]?.light ?? 0;
+                    emission = BLOCKS[chunk.data[i]]?.light ?? 0;
                     if (emission > lightMap[i]) lightMap[i] = emission;
                     if (emission > 0) hasEmitter = true;
                 }
                 const level = lightMap[i];
-                if (level > 1) buckets[level].push(chunkIndex * volume + i);
+                if (level > 1 && (seedEmitters ? emission > 0 : canSeedSky(
+                    chunk, i % CHUNK_SIZE,
+                    Math.floor(i / (CHUNK_SIZE * CHUNK_SIZE)),
+                    Math.floor(i / CHUNK_SIZE) % CHUNK_SIZE, level
+                ))) buckets[level].push(chunkIndex * volume + i);
             }
         }
         if (seedEmitters && !hasEmitter) return;
@@ -1369,6 +1393,15 @@ class World {
     }
     getChunk(cx, cz) { return this.chunks.get(chunkKey(cx, cz)); }
 
+    refreshLightSourceChunk(cx, cz, chunk = this.getChunk(cx, cz)) {
+        const key = chunkKey(cx, cz);
+        if (!chunk) { this.lightSourceChunks.delete(key); return; }
+        for (const type of chunk.data) {
+            if (BLOCKS[type]?.light > 0) { this.lightSourceChunks.add(key); return; }
+        }
+        this.lightSourceChunks.delete(key);
+    }
+
     getBlock(x, y, z) {
         if (y < 0 || y >= WORLD_HEIGHT) return 0;
         const chunk = this.getChunk(floorDiv(x, CHUNK_SIZE), floorDiv(z, CHUNK_SIZE));
@@ -1395,6 +1428,7 @@ class World {
         const oldType = chunk.data[i];
         if (oldType === ID.SAND && type !== ID.SAND) this.cancelFallingSand(x, y, z);
         chunk.data[i] = type;
+        if ((BLOCKS[oldType]?.light ?? 0) !== (BLOCKS[type]?.light ?? 0)) this.refreshLightSourceChunk(cx, cz, chunk);
         if (type === ID.SAND) this.queueFallingSand(x, y, z);
         if (type !== oldType && (type === 0 || BLOCKS[type]?.solid === false) && y + 1 < WORLD_HEIGHT) {
             this.queueFallingSand(x, y + 1, z);
@@ -1538,9 +1572,11 @@ class World {
     finishGeneratedChunk(chunk) {
         const key = chunkKey(chunk.cx, chunk.cz);
         const ed = this.edits.get(key);
+        let hasEditedLightSource = false;
         if (ed) {
             for (const [i, t] of ed) {
                 chunk.data[i] = t;
+                if (BLOCKS[t]?.light > 0) hasEditedLightSource = true;
                 const y = Math.floor(i / (CHUNK_SIZE * CHUNK_SIZE));
                 const lx = i % CHUNK_SIZE;
                 const lz = Math.floor(i / CHUNK_SIZE) % CHUNK_SIZE;
@@ -1553,7 +1589,8 @@ class World {
             }
         }
         this.chunks.set(key, chunk);
-        this.rebuildSkyLight(chunk);
+        if (hasEditedLightSource) this.refreshLightSourceChunk(chunk.cx, chunk.cz, chunk);
+        this.lightDirty.add(chunk);
         this.dirty.add(chunk);
         for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
             const neighbor = this.getChunk(chunk.cx + dx, chunk.cz + dz);
@@ -1812,6 +1849,7 @@ class World {
                 }
                 this.dirty.delete(c);
                 this.lightDirty.delete(c);
+                this.lightSourceChunks.delete(key);
                 this.chunks.delete(key);
                 for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
                     if (dx === 0 && dz === 0) continue;
@@ -1858,9 +1896,12 @@ class World {
         this.frameGen = genCount; this.frameMesh = 0;
         // Agrupa alterações do mesmo chunk e limita o custo da propagação por quadro.
         let lightCount = 0;
+        this.lastLightMs = 0;
         for (const chunk of this.lightDirty) {
             this.lightDirty.delete(chunk);
+            const lightStart = performance.now();
             this.rebuildSkyLight(chunk);
+            this.lastLightMs += performance.now() - lightStart;
             if (++lightCount >= 1 && !unlimited) break;
         }
 
@@ -1873,8 +1914,15 @@ class World {
             }
             cand.sort((a, b) => a.d - b.d);
             let n = 0;
-            for (; n < cand.length && (unlimited || n === 0 || performance.now() < meshDeadline); n++) this.meshChunk(cand[n].c);
+            this.lastMeshMs = 0;
+            for (; n < cand.length && (unlimited || n === 0 || performance.now() < meshDeadline); n++) {
+                const meshStart = performance.now();
+                this.meshChunk(cand[n].c);
+                this.lastMeshMs += performance.now() - meshStart;
+            }
             this.frameMesh = n;
+        } else {
+            this.lastMeshMs = 0;
         }
     }
 }
@@ -3072,16 +3120,35 @@ function updateSky() {
 let cloudMesh = null, cloudNoise = null;
 const cloudMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.88, fog: false });
 const cloudState = { scroll: 0, key: '', cells: 0 };
+const cloudNoiseCache = new Map();
+const CLOUD_NOISE_CACHE_LIMIT = 8192;
 const CLOUD_BRIGHT = { top: 1.0, side: 0.84, bottom: 0.68 };
 const CLOUD_NIGHT = new THREE.Color(0x232a46), CLOUD_DUSK = new THREE.Color(0xffb690);
 const _cloudCol = new THREE.Color();
 
 function createClouds() {
     cloudNoise = new Noise2D(SEED + 555);
+    cloudNoiseCache.clear();
     cloudMesh = new THREE.Mesh(new THREE.BufferGeometry(), cloudMat);
     cloudMesh.frustumCulled = false;
     cloudMesh.renderOrder = -0.5;
     scene.add(cloudMesh);
+}
+
+function cloudDensityAt(x, z) {
+    const key = `${x},${z}`;
+    if (cloudNoiseCache.has(key)) {
+        const density = cloudNoiseCache.get(key);
+        cloudNoiseCache.delete(key);
+        cloudNoiseCache.set(key, density);
+        return density;
+    }
+    const density = cloudNoise.fbm(x * CLOUD_SCALE, z * CLOUD_SCALE, 3);
+    cloudNoiseCache.set(key, density);
+    if (cloudNoiseCache.size > CLOUD_NOISE_CACHE_LIMIT) {
+        cloudNoiseCache.delete(cloudNoiseCache.keys().next().value);
+    }
+    return density;
 }
 
 function buildCloudGeometry(camCx, camCz, ci) {
@@ -3092,7 +3159,7 @@ function buildCloudGeometry(camCx, camCz, ci) {
         for (let i = 0; i < G; i++) {
             const di = i - half, dj = j - half;
             if (di * di + dj * dj > half * half) continue;
-            const n = cloudNoise.fbm((di + camCx - ci) * CLOUD_SCALE, (dj + camCz) * CLOUD_SCALE, 3);
+            const n = cloudDensityAt(di + camCx - ci, dj + camCz);
             if (n > CLOUD_THRESHOLD) { filled[i + j * G] = 1; count++; }
         }
     }
@@ -3468,7 +3535,8 @@ Alvo: ${target} | tempo p/ quebrar: ${tt}
 Mineração: ${Math.round(mining.progress * 100)}% | Drops no mundo: ${itemEntities.length} | Fornos: ${furnaces.size} | Baús: ${chests.size}
 Item na mão: ${selectedItemText()}
 Vida ${health} | Fome ${hunger} | Fôlego ${breath} | Saturação ${saturation.toFixed(1)} | Exaustão ${exhaustion.toFixed(2)}
-CPU/quadro: média ${perf.avg.toFixed(1)} ms | pior ${perf.worstShown.toFixed(1)} ms | último save: ${perf.buildMs.toFixed(1)} ms
+CPU/quadro: média ${perf.avg.toFixed(1)} ms | pior ${perf.worstShown.toFixed(1)} ms | malha ${world.lastMeshMs.toFixed(1)} ms | luz ${world.lastLightMs.toFixed(1)} ms | último save: ${perf.buildMs.toFixed(1)} ms
+Última pausa >60 ms: ${perf.lastLong}
 Desenho: ${renderer.info.render.calls} chamadas | ${(renderer.info.render.triangles / 1000).toFixed(0)}k triângulos | escala de render ${gfx.scale.toFixed(2)} (${gfx.auto ? 'auto' : 'manual'}) · F4 muda`;
 }
 
@@ -4321,7 +4389,7 @@ function animate() {
     if (cpu > perf.worst) perf.worst = cpu;
     if (rawDt > 0.06) {
         perf.long++;
-        perf.lastLong = `${(rawDt * 1000).toFixed(0)} ms (CPU ${cpu.toFixed(0)} ms, chunks gerados ${world.frameGen ?? 0}, malhas ${world.frameMesh ?? 0}, salvando: ${saving ? 'sim' : 'não'})`;
+        perf.lastLong = `${(rawDt * 1000).toFixed(0)} ms (CPU ${cpu.toFixed(0)} ms, chunks gerados ${world.frameGen ?? 0}, malhas ${world.frameMesh ?? 0}, malha ${world.lastMeshMs?.toFixed(1) ?? '0'} ms, luz ${world.lastLightMs?.toFixed(1) ?? '0'} ms, salvando: ${saving ? 'sim' : 'não'})`;
     }
     if (perf.t >= 1) {
         perf.avg = perf.sum / perf.frames; perf.worstShown = perf.worst;
