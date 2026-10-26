@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Voxel Sandbox - Parte 7: Baús</title>
+<title>Voxel Sandbox - Parte 9: Nuvens</title>
 <style>
     body { margin: 0; overflow: hidden; background-color: #87CEEB; font-family: sans-serif; }
     #crosshair { position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; margin-top: -10px; margin-left: -10px; pointer-events: none; }
@@ -122,10 +122,10 @@
 </div>
 <div id="menu">
     <h1>Voxel Sandbox</h1>
-    <p>Parte 7 — Baús de 27 espaços com salvamento (receita: 8 tábuas em anel, na bancada)</p>
+    <p>Parte 9 — Nuvens voxel: manchas de tamanho controlado que andam pelo céu e mudam de cor com o dia e a noite</p>
     <button class="btn" id="btn-play">Clique para Jogar</button>
     <p style="font-size: 14px; opacity: 0.8; margin-top: 15px;">[WASD] Mover | [Espaço] Pular | [Shift] Correr | [Ctrl / C] Agachar | [F3] Debug | [F4] Qualidade | Botão esq (segure): minerar | Botão dir: colocar / usar bancada e forno / segurar para comer | [E] Inventário / crafting | [Q] Soltar item</p>
-    <p style="font-size: 12px; opacity: 0.6; margin-top: 0;">Dicas: ?seed=123 gera outro mundo · ?reset apaga o save daquela seed · para colocar bloco encostado em bancada/forno, segure Ctrl ou C ao clicar · o jogo salva sozinho a cada 30 s e ao pausar.</p>
+    <p style="font-size: 12px; opacity: 0.6; margin-top: 0;">Dicas: ?seed=123 gera outro mundo · ?reset apaga o save daquela seed · ?debug libera dbg.time(0.25) no console (0 = nascer do sol, 0.25 = meio-dia, 0.5 = pôr do sol, 0.75 = meia-noite) · para colocar bloco encostado em bancada/forno, segure Ctrl ou C ao clicar · o jogo salva sozinho a cada 30 s e ao pausar.</p>
 </div>
 
 <div id="hud-bottom">
@@ -181,6 +181,19 @@ const SPRINT_MIN_HUNGER = 7;      // com 6 ou menos de fome não dá para correr
 const EAT_TIME = 1.6;             // segundos segurando o botão direito para comer
 const INVULN_TIME = 0.5;          // imunidade curta depois de levar dano
 const DEATH_DROP_TTL = 600;       // itens da morte somem em 10 min (contados só com a área carregada)
+
+// Dia e noite (PARTE 8)
+const DAY_LENGTH = 1200;          // segundos reais por dia completo do mundo (20 min)
+const START_TIME = 0.2;           // 0 = nascer do sol, 0.25 = meio-dia, 0.5 = pôr do sol, 0.75 = meia-noite
+// Nuvens (PARTE 9)
+const CLOUD_CELL = 8;             // lado de cada bloco de nuvem (blocos do mundo)
+const CLOUD_THICK = 3;            // espessura
+const CLOUD_GRID = 32;            // 32x32 células ao redor do jogador (alcance de ~128 blocos)
+const CLOUD_Y = 80;               // altura das nuvens (o terreno vai até 64)
+const CLOUD_SPEED = 1.6;          // blocos por segundo
+const CLOUD_SCALE = 0.13;         // tamanho das manchas (menor = nuvens maiores)
+const CLOUD_THRESHOLD = 0.12;     // maior = menos céu coberto (0.12 deixa cerca de 1/3 coberto)
+const SKY_DISTANCE = 250;        // distância do sol, da lua e das estrelas (a câmera enxerga até 300)
 
 // Mão em primeira pessoa (ajuste fino de pose aqui)
 const HAND_BASE = { x: 0.42, y: -0.50, z: -0.25 };
@@ -1421,7 +1434,7 @@ function initGameplayAssets() {
 // =====================================================================
 // 5C. MÃO EM PRIMEIRA PESSOA (cena própria, renderizada por cima do mundo)
 // =====================================================================
-let handScene, handCamera, handPivot, heldAnchor;
+let handScene, handCamera, handPivot, heldAnchor, handAmbient;
 let heldMesh = null, heldId = -1;
 const handAnim = { mining: 0, phase: 0, punch: 0, sw: 1, eat: 0 };
 const heldGeoCache = {};
@@ -1429,7 +1442,8 @@ const heldGeoCache = {};
 function createHand() {
     handScene = new THREE.Scene();
     handCamera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 5);
-    handScene.add(new THREE.AmbientLight(0xffffff, 0.75));
+    handAmbient = new THREE.AmbientLight(0xffffff, 0.75);   // a intensidade acompanha o dia (updateSky)
+    handScene.add(handAmbient);
     const dl = new THREE.DirectionalLight(0xffffff, 0.5);
     dl.position.set(0.5, 1, 0.8);
     handScene.add(dl);
@@ -1926,6 +1940,192 @@ function handleInventoryKey(event) {
 }
 
 // =====================================================================
+// 5E. CICLO DE DIA E NOITE (PARTE 8)
+//     Uma única variável (worldTime, 0..1) comanda sol, lua, estrelas, cor do céu,
+//     névoa e intensidade das luzes. Nada é pintado nas texturas: a luz da cena muda.
+// =====================================================================
+let worldTime = START_TIME;           // 0 nascer do sol · 0.25 meio-dia · 0.5 pôr do sol · 0.75 meia-noite
+let hemiLight, sunLight, sunMesh, moonMesh, starPoints;
+const SKY_DAY = new THREE.Color(SKY_COLOR);
+const SKY_NIGHT = new THREE.Color(0x070b1c);
+const SKY_DUSK = new THREE.Color(0xf08a4b);
+const LIGHT_WARM = new THREE.Color(0xffb070);
+const LIGHT_WHITE = new THREE.Color(0xffffff);
+const LIGHT_MOON = new THREE.Color(0x8fa6ff);
+const _skyCol = new THREE.Color();
+const _sunDir = new THREE.Vector3();
+const sky = { elevation: 1, day: 1 };   // elevação do sol (-1..1) e fator de luz do dia (0..1), úteis ao debug
+
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
+const smoothstep = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+
+function makeSquareMesh(size, color) {
+    const m = new THREE.Mesh(
+        new THREE.PlaneGeometry(size, size),
+        new THREE.MeshBasicMaterial({ color, fog: false, depthWrite: false, side: THREE.DoubleSide }));
+    m.renderOrder = -1;
+    m.frustumCulled = false;
+    return m;
+}
+
+// Sol e lua quadrados + campo de estrelas (criados uma vez, só reposicionados a cada quadro)
+function createSky() {
+    sunMesh = makeSquareMesh(36, 0xfff2a8);
+    moonMesh = makeSquareMesh(26, 0xdfe6f5);
+    scene.add(sunMesh, moonMesh);
+
+    const rnd = mulberry32(4242);
+    const pos = new Float32Array(400 * 3);
+    for (let i = 0; i < 400; i++) {
+        const u = rnd() * 2 - 1, a = rnd() * Math.PI * 2, r = Math.sqrt(1 - u * u);   // ponto uniforme na esfera
+        pos[i * 3] = Math.cos(a) * r * SKY_DISTANCE;
+        pos[i * 3 + 1] = u * SKY_DISTANCE;
+        pos[i * 3 + 2] = Math.sin(a) * r * SKY_DISTANCE;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    starPoints = new THREE.Points(geo, new THREE.PointsMaterial({
+        color: 0xffffff, size: 2, sizeAttenuation: false, fog: false, transparent: true, opacity: 0, depthWrite: false }));
+    starPoints.frustumCulled = false;
+    scene.add(starPoints);
+}
+
+// Avança o relógio do mundo (só roda com o jogo ativo, não durante a pausa)
+function updateWorldClock(dt) {
+    worldTime = (worldTime + dt / DAY_LENGTH) % 1;
+}
+
+function updateSky() {
+    const a = worldTime * Math.PI * 2;
+    _sunDir.set(Math.cos(a), Math.sin(a), 0.3).normalize();      // o sol nasce em +X e se põe em -X
+    const e = _sunDir.y;
+    const day = smoothstep(-0.12, 0.28, e);                     // 0 = noite, 1 = dia pleno
+    const warm = clamp01(1 - Math.abs(e) / 0.3) * 0.9;           // laranja só perto do horizonte
+    sky.elevation = e; sky.day = day;
+
+    // Cor do céu e da névoa: noite -> dia, com um tom quente no amanhecer e no entardecer
+    _skyCol.copy(SKY_NIGHT).lerp(SKY_DAY, day).lerp(SKY_DUSK, warm * (1 - Math.abs(day - 0.5) * 0.6));
+    scene.background.copy(_skyCol);
+    scene.fog.color.copy(_skyCol);
+
+    // Luzes do mundo
+    hemiLight.intensity = 0.22 + 0.58 * day;
+    if (e >= -0.05) {                                            // luz vem do sol
+        sunLight.position.copy(_sunDir).multiplyScalar(50);
+        sunLight.color.copy(LIGHT_WHITE).lerp(LIGHT_WARM, warm);
+        sunLight.intensity = 0.62 * smoothstep(-0.05, 0.2, e);
+    } else {                                                     // luz fraca vinda da lua
+        sunLight.position.set(-_sunDir.x * 50, -_sunDir.y * 50, -_sunDir.z * 50);
+        sunLight.color.copy(LIGHT_MOON);
+        sunLight.intensity = 0.14 * smoothstep(-0.05, -0.25, e);
+    }
+    handAmbient.intensity = 0.38 + 0.37 * day;                   // a mão escurece junto com o mundo
+
+    // Sol, lua e estrelas acompanham a câmera (parecem infinitamente distantes)
+    const cp = camera.position;
+    sunMesh.position.copy(cp).addScaledVector(_sunDir, SKY_DISTANCE);
+    sunMesh.lookAt(cp);
+    moonMesh.position.copy(cp).addScaledVector(_sunDir, -SKY_DISTANCE);
+    moonMesh.lookAt(cp);
+    sunMesh.visible = e > -0.2;
+    moonMesh.visible = e < 0.2;
+    starPoints.position.copy(cp);
+    starPoints.rotation.z = a;
+    starPoints.material.opacity = clamp01((0.35 - day) / 0.35) * 0.9;
+    starPoints.visible = starPoints.material.opacity > 0.01;
+    updateCloudTint(day, warm);
+}
+
+// =====================================================================
+// 5F. NUVENS VOXEL (PARTE 9)
+//     Uma única malha, reconstruída só quando o padrão avança uma célula (a cada ~5 s)
+//     ou quando o jogador cruza uma célula. Tamanho e cobertura controlados: sempre sobra céu aberto.
+// =====================================================================
+let cloudMesh = null, cloudNoise = null;
+const cloudMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.88, fog: false });
+const cloudState = { scroll: 0, key: '', cells: 0 };
+const CLOUD_BRIGHT = { top: 1.0, side: 0.84, bottom: 0.68 };   // sombreado fixo por face (sombra sutil)
+const CLOUD_NIGHT = new THREE.Color(0x232a46), CLOUD_DUSK = new THREE.Color(0xffb690);
+const _cloudCol = new THREE.Color();
+
+function createClouds() {
+    cloudNoise = new Noise2D(SEED + 555);
+    cloudMesh = new THREE.Mesh(new THREE.BufferGeometry(), cloudMat);
+    cloudMesh.frustumCulled = false;
+    cloudMesh.renderOrder = -0.5;       // depois do céu, antes do mundo transparente
+    scene.add(cloudMesh);
+}
+
+function buildCloudGeometry(camCx, camCz, ci) {
+    const G = CLOUD_GRID, half = G / 2;
+    const filled = new Uint8Array(G * G);
+    let count = 0;
+    for (let j = 0; j < G; j++) {
+        for (let i = 0; i < G; i++) {
+            const di = i - half, dj = j - half;
+            if (di * di + dj * dj > half * half) continue;                      // recorte circular: sem cantos
+            const n = cloudNoise.fbm((di + camCx - ci) * CLOUD_SCALE, (dj + camCz) * CLOUD_SCALE, 3);
+            if (n > CLOUD_THRESHOLD) { filled[i + j * G] = 1; count++; }
+        }
+    }
+    cloudState.cells = count;
+    const has = (i, j) => i >= 0 && j >= 0 && i < G && j < G && filled[i + j * G] === 1;
+
+    const pos = [], nor = [], col = [], ind = [];
+    const S = CLOUD_CELL, H = CLOUD_THICK;
+    for (let j = 0; j < G; j++) {
+        for (let i = 0; i < G; i++) {
+            if (!filled[i + j * G]) continue;
+            const ox = (i - half) * S, oz = (j - half) * S;
+            for (const f of FACES) {
+                if (f.dir[1] === 0 && has(i + f.dir[0], j + f.dir[2])) continue;   // lado encostado em outra nuvem
+                const b = f.dir[1] > 0 ? CLOUD_BRIGHT.top : f.dir[1] < 0 ? CLOUD_BRIGHT.bottom : CLOUD_BRIGHT.side;
+                const base = pos.length / 3;
+                for (const c of f.corners) {
+                    pos.push(ox + c.pos[0] * S, c.pos[1] * H, oz + c.pos[2] * S);
+                    nor.push(f.dir[0], f.dir[1], f.dir[2]);
+                    col.push(b, b, b);
+                }
+                ind.push(base, base + 1, base + 2, base + 2, base + 1, base + 3);
+            }
+        }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    geo.setIndex(ind);
+    return geo;
+}
+
+function updateClouds(dt) {
+    cloudState.scroll += dt * CLOUD_SPEED / CLOUD_CELL;     // em células; as nuvens andam para +X
+    const ci = Math.floor(cloudState.scroll), frac = cloudState.scroll - ci;
+    const camCx = Math.floor(camera.position.x / CLOUD_CELL), camCz = Math.floor(camera.position.z / CLOUD_CELL);
+    const key = camCx + ',' + camCz + ',' + ci;
+    if (key !== cloudState.key) {
+        cloudState.key = key;
+        const old = cloudMesh.geometry;
+        cloudMesh.geometry = buildCloudGeometry(camCx, camCz, ci);
+        old.dispose();
+    }
+    cloudMesh.position.set((camCx + frac) * CLOUD_CELL, CLOUD_Y, camCz * CLOUD_CELL);   // desliza suave entre as reconstruções
+}
+
+// Cor das nuvens: branca de dia, alaranjada no entardecer, azul-acinzentada à noite
+function updateCloudTint(day, warm) {
+    _cloudCol.copy(CLOUD_NIGHT).lerp(LIGHT_WHITE, day).lerp(CLOUD_DUSK, warm * 0.55);
+    cloudMat.color.copy(_cloudCol);
+}
+
+// 0 = 06:00 (nascer do sol), 0.25 = 12:00, 0.5 = 18:00, 0.75 = 00:00
+function worldClockText() {
+    const h = (worldTime * 24 + 6) % 24;
+    const hh = Math.floor(h), mm = Math.floor((h - hh) * 60);
+    return String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+}
+
+// =====================================================================
 // 6. ESTADO GERAL
 // =====================================================================
 let camera, scene, renderer, controls, world;
@@ -2163,13 +2363,15 @@ function updateDebug(rawDt) {
         : '—';
     const tt = currentHit ? getBreakTime(currentHit.type, inventory.slots[selectedSlot]).toFixed(2) + 's' : '—';
     debugEl.textContent =
-`Voxel Sandbox — Parte 7
+`Voxel Sandbox — Parte 9
 FPS: ${fps}
+Nuvens: ${cloudState.cells} células (de ${CLOUD_GRID * CLOUD_GRID}) | altura ${CLOUD_Y}
 Seed: ${SEED}
 XYZ: ${p.x.toFixed(2)} ${p.y.toFixed(2)} ${p.z.toFixed(2)}
 Chunk: ${floorDiv(p.x, CHUNK_SIZE)}, ${floorDiv(p.z, CHUNK_SIZE)}
 Chunks: ${world.chunks.size} | fila geração: ${world.genQueue.length} | fila malha: ${world.dirty.size}
 No chão: ${player.onGround}
+Hora do mundo: ${worldClockText()} (tempo ${worldTime.toFixed(3)}) | sol ${sky.elevation.toFixed(2)} | luz do dia ${sky.day.toFixed(2)}
 Alvo: ${target} | tempo p/ quebrar: ${tt}
 Mineração: ${Math.round(mining.progress * 100)}% | Drops no mundo: ${itemEntities.length} | Fornos: ${furnaces.size} | Baús: ${chests.size}
 Item na mão: ${selectedItemText()}
@@ -2381,6 +2583,7 @@ function buildSave() {
     }
     return {
         v: SAVE_VERSION, seed: SEED, time: Date.now(),
+        worldTime,   // Parte 8: hora do mundo (saves antigos, sem este campo, voltam à hora inicial)
         player: { x: player.pos.x, y: player.pos.y, z: player.pos.z, health, hunger, saturation },
         selectedSlot,
         inventory: inventory.slots.map(packStack),
@@ -2471,6 +2674,7 @@ function validateSave(d) {
                       saturation: Math.min(MAX_HUNGER, Math.max(0, Number.isFinite(p.saturation) ? p.saturation : 5)) },
             selectedSlot: d.selectedSlot >= 0 && d.selectedSlot < 9 ? d.selectedSlot | 0 : 0,
             inventory: inv, edits, furnaces: furn, drops: parseDrops(d.drops), chests: parseChests(d.chests),
+            worldTime: Number.isFinite(d.worldTime) ? ((d.worldTime % 1) + 1) % 1 : START_TIME,
         };
     } catch (e) { return null; }
 }
@@ -2550,15 +2754,18 @@ async function init() {
     const viewDist = RENDER_DISTANCE * CHUNK_SIZE;
     scene.fog = new THREE.Fog(SKY_COLOR, viewDist * 0.55, viewDist * 0.95);
 
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 0.8));
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
-    dirLight.position.set(10, 20, 10);
-    scene.add(dirLight);
+    hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8);   // intensidade comandada por updateSky
+    scene.add(hemiLight);
+    sunLight = new THREE.DirectionalLight(0xffffff, 0.6);             // sol de dia, lua de noite
+    sunLight.position.set(10, 20, 10);
+    scene.add(sunLight);
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 300);
     scene.add(camera);
 
     createHand();
+    createSky();
+    createClouds();
 
     // Contorno do bloco selecionado
     targetMesh = new THREE.LineSegments(
@@ -2594,6 +2801,7 @@ async function init() {
         health = save.player.health;
         hunger = save.player.hunger;
         saturation = save.player.saturation;
+        worldTime = save.worldTime;
         for (const [k, v] of save.furnaces) furnaces.set(k, v);
         for (const [k, v] of save.chests) chests.set(k, v);
         for (const e of save.drops) {
@@ -2610,6 +2818,7 @@ async function init() {
     for (let guard = 0; guard < 70 && collides(player.pos.x, player.pos.y, player.pos.z, player.height); guard++) player.pos.y += 1;
     camera.position.set(player.pos.x, player.pos.y + player.eye, player.pos.z);
     initGameplayAssets();
+    updateSky();   // já começa com a cor e a luz certas para a hora salva
 
     // Controles
     document.addEventListener('mousemove', onLookMove, true);
@@ -2743,6 +2952,7 @@ async function init() {
             saturation: (n) => { saturation = n; },
             exhaust: (n) => addExhaustion(n),
             give: (id, n = 1) => { inventory.add(id, n); updateHotbarUI(); },
+            time: (t) => { worldTime = ((t % 1) + 1) % 1; updateSky(); },   // 0 amanhecer · 0.25 meio-dia · 0.5 entardecer · 0.75 meia-noite
         };
     }
 
@@ -2767,12 +2977,16 @@ function animate() {
         updateParticles(dt);
     }
     if (controls.isLocked || inventoryOpen) {
+        updateWorldClock(dt);                     // o tempo corre com o jogo ativo ou com o inventário aberto, nunca na pausa
         updateFurnaces(dt);                       // fornos continuam queimando com a tela aberta ou fechada
         if (inventoryOpen && station && station.type === 'furnace') {
             if (furnaceDirty) { furnaceDirty = false; renderInventory(); }
             else updateFurnaceBars();
         }
     }
+    updateSky();
+    if (controls.isLocked || inventoryOpen) updateClouds(dt);   // as nuvens param na pausa, como o relógio
+    else updateClouds(0);
     updateHand(dt);
     if (hurtFlash > 0) { hurtFlash = Math.max(0, hurtFlash - dt * 2); hurtEl.style.opacity = hurtFlash; }
     world.update(player.pos.x, player.pos.z);
