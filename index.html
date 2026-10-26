@@ -1068,6 +1068,24 @@ function buildTorchFlameGeometry(centers) {
     geometry.setIndex(indices); geometry.computeVertexNormals();
     return geometry;
 }
+
+function buildHeldTorchFlameGeometry() {
+    const positions = [], uvs = [], phases = [], indices = [];
+    const halfWidth = 0.119, halfDepth = 0.055, bottom = 0, height = 0.272, phase = 1.9;
+    for (let plane = 0; plane < 2; plane++) {
+        const base = positions.length / 3;
+        if (plane === 0) positions.push(-halfWidth,bottom,0.002, halfWidth,bottom,0.002, -halfWidth,bottom+height,0.002, halfWidth,bottom+height,0.002);
+        else positions.push(0,bottom,-halfDepth, 0,bottom,halfDepth, 0,bottom+height,-halfDepth, 0,bottom+height,halfDepth);
+        uvs.push(0,0, 1,0, 0,1, 1,1); phases.push(phase, phase, phase, phase);
+        indices.push(base,base+1,base+2, base+2,base+1,base+3);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geometry.setAttribute('flamePhase', new THREE.Float32BufferAttribute(phases, 1));
+    geometry.setIndex(indices); geometry.computeVertexNormals();
+    return geometry;
+}
 const TORCH_PARTS = [
     { min: [0.45, 0.02, 0.45], max: [0.55, 0.70, 0.55], tiles: { top: TILE.WOOD_END, side: TILE.WOOD, bottom: TILE.WOOD_END } },
 ];
@@ -1117,7 +1135,7 @@ class World {
             map: atlas, alphaTest: 0.5, transparent: false, depthWrite: true, vertexColors: true,
         });
         
-        this.torchFlameMaterial = new THREE.MeshBasicMaterial({ map: createTorchFlameTexture(), transparent: true, alphaTest: 0.05, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
+        this.torchFlameMaterial = new THREE.MeshBasicMaterial({ map: createTorchFlameTexture(), transparent: false, alphaTest: 0.5, depthWrite: true, side: THREE.DoubleSide, toneMapped: false });
         this.configureTorchFlameAnimation(this.torchFlameMaterial);
         this.configureTorchFlicker(this.chunkMaterial);
         this.configureTorchFlicker(this.cutoutMaterial);
@@ -2277,7 +2295,7 @@ function initGameplayAssets() {
 // 5C. MÃO EM PRIMEIRA PESSOA
 // =====================================================================
 let handScene, handCamera, handPivot, heldAnchor, handAmbient;
-let heldMesh = null, heldId = -1;
+let heldMesh = null, heldFlameMesh = null, heldId = -1;
 const handAnim = { mining: 0, phase: 0, punch: 0, sw: 1, eat: 0 };
 const heldGeoCache = {};
 
@@ -2312,13 +2330,21 @@ function refreshHeldItem() {
     heldId = id;
     handAnim.sw = 0;
     if (heldMesh) { heldAnchor.remove(heldMesh); heldMesh = null; }
+    if (heldFlameMesh) { heldAnchor.remove(heldFlameMesh); heldFlameMesh = null; }
     heldAnchor.rotation.set(0, 0, 0);
     if (!id) return;
     const item = ITEMS[id];
     if (item.sprite) {
         const px = 0.034;
         const key = 'spr' + id;
-        if (!heldGeoCache[key]) heldGeoCache[key] = buildSpriteGeo(spritePixels(item.sprite.kind, item.sprite.mat), px, px);
+        if (!heldGeoCache[key]) {
+            let pixels = spritePixels(item.sprite.kind, item.sprite.mat);
+            if (item.sprite.kind === 'torch') {
+                pixels = pixels.map(row => row.slice());
+                for (let y = 0; y <= 7; y++) pixels[y].fill(null);
+            }
+            heldGeoCache[key] = buildSpriteGeo(pixels, px, px);
+        }
         heldMesh = new THREE.Mesh(heldGeoCache[key], spriteMaterial);
         const hasHandle = !!item.tool || item.sprite.kind === 'stick';
         heldMesh.position.set(hasHandle ? 3.5 * px : 0, hasHandle ? 4.5 * px : 0, 0);
@@ -2334,6 +2360,11 @@ function refreshHeldItem() {
         heldAnchor.rotation.set(...HELD_BLOCK_ROT);
     }
     heldAnchor.add(heldMesh);
+    if (item.sprite?.kind === 'torch') {
+        if (!heldGeoCache.torchFlame) heldGeoCache.torchFlame = buildHeldTorchFlameGeometry();
+        heldFlameMesh = new THREE.Mesh(heldGeoCache.torchFlame, world.torchFlameMaterial);
+        heldAnchor.add(heldFlameMesh);
+    }
 }
 
 function updateHand(dt) {
