@@ -222,7 +222,8 @@ const allFaces = (t) => ({ top: t, side: t, bottom: t });
 const ID = { GRASS: 1, STONE: 2, LOG: 3, DIRT: 4, COBBLE: 5, PLANKS: 6, LEAVES: 7,
              CRAFTING_TABLE: 8, FURNACE: 9, CHEST: 10,
              COAL_ORE: 11, IRON_ORE: 12, GOLD_ORE: 13, DIAMOND_ORE: 14,
-             SAND: 15, WATER: 16, // NOVOS BLOCOS PARA O JOGO
+             SAND: 15, WATER: 16, WATER_FLOW_1: 40, WATER_FLOW_2: 41, WATER_FLOW_3: 42,
+             WATER_FLOW_4: 43, WATER_FLOW_5: 44, WATER_FLOW_6: 45, WATER_FLOW_7: 46, WATER_FALL: 47,
              STICK: 20, APPLE: 30, CHARCOAL: 31 };
 
 const BLOCKS = {
@@ -247,6 +248,21 @@ const BLOCKS = {
     [ID.WATER]: { name: 'Água',      hardness: 100, drop: null, tool: null, render: 'liquid', solid: false, collectible: false, tiles: allFaces(TILE.WATER) }, // Água só existe no mundo
 };
 
+BLOCKS[ID.WATER].waterLevel = 1;
+BLOCKS[ID.WATER].waterSource = true;
+for (let level = 1; level <= 7; level++) {
+    BLOCKS[ID.WATER_FLOW_1 + level - 1] = {
+        name: 'Água corrente', hardness: 100, drop: null, tool: null,
+        render: 'liquid', solid: false, collectible: false, flowing: true,
+        flowLevel: level, waterLevel: level / 8, tiles: allFaces(TILE.WATER),
+    };
+}
+BLOCKS[ID.WATER_FALL] = {
+    name: 'Queda d’água', hardness: 100, drop: null, tool: null,
+    render: 'liquid', solid: false, collectible: false, flowing: true, falling: true,
+    flowLevel: 8, waterLevel: 1, tiles: allFaces(TILE.WATER),
+};
+
 for (const block of Object.values(BLOCKS)) {
     block.render ??= 'opaque';
     block.solid ??= true;
@@ -255,6 +271,16 @@ for (const block of Object.values(BLOCKS)) {
 class WaterSystem {
     static get surfaceHeight() { return 0.88; }
     static isBlock(type) { return BLOCKS[type]?.render === 'liquid'; }
+    static flowBlockForLevel(level) {
+        const clamped = Math.max(1, Math.min(7, Math.round(level)));
+        return ID.WATER_FLOW_1 + clamped - 1;
+    }
+    static surfaceHeightFor(type, aboveType) {
+        const block = BLOCKS[type];
+        if (block?.falling) return 1;
+        if (block?.flowing) return block.waterLevel;
+        return aboveType === 0 ? WaterSystem.surfaceHeight : 1;
+    }
 
     constructor(atlas) {
         this.material = new THREE.MeshLambertMaterial({
@@ -262,6 +288,9 @@ class WaterSystem {
         });
         this.headInWater = false;
         this.feetInWater = false;
+        this.flowQueue = [];
+        this.queuedCells = new Set();
+        this.flowTimer = 0;
     }
 
     isAdjacent(world, x, y, z) {
@@ -284,9 +313,60 @@ class WaterSystem {
         if (this.headInWater !== wasHeadInWater) updateBreathUI();
     }
 
-    animate(now) {
+    enqueue(x, y, z) {
+        if (y < 0 || y >= WORLD_HEIGHT || this.flowQueue.length >= 4096) return;
+        const key = `${x},${y},${z}`;
+        if (this.queuedCells.has(key)) return;
+        this.queuedCells.add(key);
+        this.flowQueue.push({ x, y, z, key });
+    }
+
+    activate(world, x, y, z) {
+        const cells = [[0,0,0], [1,0,0], [-1,0,0], [0,1,0], [0,-1,0], [0,0,1], [0,0,-1]];
+        for (const [dx, dy, dz] of cells) {
+            const px = x + dx, py = y + dy, pz = z + dz;
+            if (WaterSystem.isBlock(world.getBlock(px, py, pz))) this.enqueue(px, py, pz);
+        }
+    }
+
+    updateFlow(world, dt) {
+        this.flowTimer += dt;
+        if (this.flowTimer < 0.18) return;
+        this.flowTimer = 0;
+
+        const directions = [[1,0], [-1,0], [0,1], [0,-1]];
+        for (let step = 0; step < 8 && this.flowQueue.length; step++) {
+            const cell = this.flowQueue.shift();
+            this.queuedCells.delete(cell.key);
+            const type = world.getBlock(cell.x, cell.y, cell.z);
+            const block = BLOCKS[type];
+            if (!block || block.render !== 'liquid') continue;
+
+            const level = block.waterSource || block.falling ? 8 : block.flowLevel;
+            const belowY = cell.y - 1;
+            if (belowY > 0 && world.getBlock(cell.x, belowY, cell.z) === 0) {
+                if (world.setBlock(cell.x, belowY, cell.z, ID.WATER_FALL)) {
+                    this.enqueue(cell.x, belowY, cell.z);
+                    continue;
+                }
+            }
+            if (level <= 1) continue;
+
+            const nextType = WaterSystem.flowBlockForLevel(level - 1);
+            for (const [dx, dz] of directions) {
+                const x = cell.x + dx, z = cell.z + dz;
+                const adjacentType = world.getBlock(x, cell.y, z);
+                const adjacent = BLOCKS[adjacentType];
+                if (adjacentType !== 0 && !(adjacent?.flowing && adjacent.flowLevel < level - 1)) continue;
+                if (world.setBlock(x, cell.y, z, nextType)) this.enqueue(x, cell.y, z);
+            }
+        }
+    }
+
+    update(world, dt, now) {
         const pulse = Math.sin(now * 0.0017);
         this.material.color.setRGB(0.96 + pulse * 0.025, 0.98 + pulse * 0.02, 1);
+        this.updateFlow(world, dt);
     }
 }
 
@@ -784,7 +864,11 @@ class TerrainGenerator {
                 const riverWaterTop = riverStrength > 0.72 ? Math.max(WATER_LEVEL, Math.floor(baseHeight) - 2) : WATER_LEVEL;
                 if (h < riverWaterTop) {
                     for (let y = h + 1; y <= riverWaterTop; y++) {
-                        chunk.data[idx(lx, y, lz)] = ID.WATER;
+                        const isShallowChannel = riverStrength > 0.72 && riverWaterTop > WATER_LEVEL && y === riverWaterTop;
+                        const channelLevel = 7;
+                        chunk.data[idx(lx, y, lz)] = isShallowChannel
+                            ? WaterSystem.flowBlockForLevel(channelLevel)
+                            : ID.WATER;
                     }
                 }
 
@@ -993,19 +1077,29 @@ class World {
         const nzm = this.getChunk(chunk.cx, chunk.cz - 1);
         const nzp = this.getChunk(chunk.cx, chunk.cz + 1);
 
-        const solid = (lx, y, lz, currentType) => {
-            if (y < 0) return true;
-            if (y >= WORLD_HEIGHT) return false;
-            let nType = 0;
-            if (lx < 0)        nType = nxm ? nxm.data[(CS - 1) + lz * CS + y * CS2] : 1;
-            else if (lx >= CS) nType = nxp ? nxp.data[0 + lz * CS + y * CS2] : 1;
-            else if (lz < 0)   nType = nzm ? nzm.data[lx + (CS - 1) * CS + y * CS2] : 1;
-            else if (lz >= CS) nType = nzp ? nzp.data[lx + 0 + y * CS2] : 1;
-            else               nType = data[lx + lz * CS + y * CS2];
-            
+        const blockAt = (lx, y, lz) => {
+            if (y < 0) return 1;
+            if (y >= WORLD_HEIGHT) return 0;
+            if (lx < 0)        return nxm ? nxm.data[(CS - 1) + lz * CS + y * CS2] : 1;
+            if (lx >= CS)      return nxp ? nxp.data[0 + lz * CS + y * CS2] : 1;
+            if (lz < 0)        return nzm ? nzm.data[lx + (CS - 1) * CS + y * CS2] : 1;
+            if (lz >= CS)      return nzp ? nzp.data[lx + y * CS2] : 1;
+            return data[lx + lz * CS + y * CS2];
+        };
+
+        const solid = (lx, y, lz, currentType, dir) => {
+            const nx = lx + dir[0], ny = y + dir[1], nz = lz + dir[2];
+            const nType = blockAt(nx, ny, nz);
             const currentRender = BLOCKS[currentType]?.render;
             const neighborRender = BLOCKS[nType]?.render;
-            if (currentRender === 'liquid') return nType !== 0;
+            if (currentRender === 'liquid') {
+                if (nType === 0) return false;
+                if (neighborRender !== 'liquid') return true;
+                if (dir[1] !== 0) return true;
+                const currentHeight = WaterSystem.surfaceHeightFor(currentType, blockAt(lx, y + 1, lz));
+                const neighborHeight = WaterSystem.surfaceHeightFor(nType, blockAt(nx, ny + 1, nz));
+                return currentHeight <= neighborHeight + 0.0001;
+            }
             return nType !== 0 && neighborRender !== 'liquid';
         };
 
@@ -1022,15 +1116,24 @@ class World {
                     const tiles = block.tiles;
                     const renderMode = block.render;
                     const aboveType = y + 1 < WORLD_HEIGHT ? data[lx + lz * CS + (y + 1) * CS2] : 0;
-                    const blockTop = renderMode === 'liquid' && aboveType === 0 ? WaterSystem.surfaceHeight : 1;
+                    const blockTop = renderMode === 'liquid' ? WaterSystem.surfaceHeightFor(t, aboveType) : 1;
                     for (const f of FACES) {
-                        if (solid(lx + f.dir[0], y + f.dir[1], lz + f.dir[2], t)) continue;
+                        const neighborX = lx + f.dir[0], neighborY = y + f.dir[1], neighborZ = lz + f.dir[2];
+                        const neighborType = blockAt(neighborX, neighborY, neighborZ);
+                        if (solid(lx, y, lz, t, f.dir)) continue;
                         const wx = chunk.cx * CS + lx, wz = chunk.cz * CS + lz;
                         const tile = variantTile(tiles[f.kind], wx, y, wz);
                         const u0 = tile / ATLAS_COLUMNS + UV_PAD;
                         const ndx = positions.length / 3;
                         for (const c of f.corners) {
-                            const py = y + (renderMode === 'liquid' && c.pos[1] === 1 ? blockTop : c.pos[1]);
+                            let py = y + c.pos[1];
+                            if (renderMode === 'liquid') {
+                                if (c.pos[1] === 1) py = y + blockTop;
+                                else if (f.kind === 'side' && BLOCKS[neighborType]?.render === 'liquid') {
+                                    const neighborAbove = blockAt(neighborX, neighborY + 1, neighborZ);
+                                    py = y + WaterSystem.surfaceHeightFor(neighborType, neighborAbove);
+                                }
+                            }
                             positions.push(lx + c.pos[0], py, lz + c.pos[2]);
                             normals.push(f.dir[0], f.dir[1], f.dir[2]);
                             uvs.push(u0 + c.uv[0] * uWidth, UV_PAD + c.uv[1] * (1 - 2 * UV_PAD));
@@ -1589,6 +1692,7 @@ function breakBlock(x, y, z) {
     if (type === ID.CHEST) spillChest(x, y, z);
     const touchesWater = world.water.isAdjacent(world, x, y, z);
     world.setBlock(x, y, z, touchesWater ? ID.WATER : 0);
+    if (touchesWater) world.water.activate(world, x, y, z);
     spawnBreakParticles(x, y, z, type);
     if (harvest && drop && Math.random() < (BLOCKS[type].dropChance ?? 1)) {
         spawnItemEntity(
@@ -3252,7 +3356,7 @@ function animate() {
         updateParticles(dt);
     }
     world.water.updateSubmersion(world, player);
-    world.water.animate(now);
+    world.water.update(world, dt, now);
 
     if (controls.isLocked || inventoryOpen) {
         updateWorldClock(dt);
