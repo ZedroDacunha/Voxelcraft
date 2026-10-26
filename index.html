@@ -1054,16 +1054,17 @@ function createTorchFlameTexture() {
 }
 
 function buildTorchFlameGeometry(centers) {
-    const positions = [], uvs = [], indices = [], half = 0.16, bottom = 0.66, height = 0.36;
-    for (const [x, y, z] of centers) for (let plane = 0; plane < 2; plane++) {
+    const positions = [], uvs = [], phases = [], indices = [], half = 0.16, bottom = 0.66, height = 0.36;
+    for (const [x, y, z, phase] of centers) for (let plane = 0; plane < 2; plane++) {
         const base = positions.length / 3;
         if (plane === 0) positions.push(x-half,y+bottom,z, x+half,y+bottom,z, x-half,y+bottom+height,z, x+half,y+bottom+height,z);
         else positions.push(x,y+bottom,z-half, x,y+bottom,z+half, x,y+bottom+height,z-half, x,y+bottom+height,z+half);
-        uvs.push(0,0, 1,0, 0,1, 1,1); indices.push(base,base+1,base+2, base+2,base+1,base+3);
+        uvs.push(0,0, 1,0, 0,1, 1,1); phases.push(phase, phase, phase, phase); indices.push(base,base+1,base+2, base+2,base+1,base+3);
     }
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geometry.setAttribute('flamePhase', new THREE.Float32BufferAttribute(phases, 1));
     geometry.setIndex(indices); geometry.computeVertexNormals();
     return geometry;
 }
@@ -1117,6 +1118,7 @@ class World {
         });
         
         this.torchFlameMaterial = new THREE.MeshBasicMaterial({ map: createTorchFlameTexture(), transparent: true, alphaTest: 0.05, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
+        this.configureTorchFlameAnimation(this.torchFlameMaterial);
         this.configureTorchFlicker(this.chunkMaterial);
         this.configureTorchFlicker(this.cutoutMaterial);
         this.water = new WaterSystem(atlas);
@@ -1144,6 +1146,21 @@ class World {
             material.userData.torchFlickerShader = shader;
         };
         material.customProgramCacheKey = () => 'voxel-torch-flicker-v1';
+    }
+    configureTorchFlameAnimation(material) {
+        material.onBeforeCompile = shader => {
+            shader.uniforms.uFlameTime = { value: 0 };
+            shader.vertexShader = shader.vertexShader.replace(
+                '#include <common>',
+                '#include <common>\nuniform float uFlameTime;\nattribute float flamePhase;'
+            );
+            shader.vertexShader = shader.vertexShader.replace(
+                '#include <begin_vertex>',
+                '#include <begin_vertex>\nfloat flameTip = uv.y * uv.y;\ntransformed.x += flameTip * (0.018 * sin(uFlameTime * 7.0 + flamePhase + position.x * 9.0 + position.z * 6.0));\ntransformed.z += flameTip * (0.012 * sin(uFlameTime * 5.3 + flamePhase * 1.37 + position.x * 5.0 + position.z * 8.0));'
+            );
+            material.userData.flameAnimationShader = shader;
+        };
+        material.customProgramCacheKey = () => 'voxel-torch-flame-animation-v1';
     }
     rebuildSkyLightColumn(chunk, lx, lz) {
         let light = 15;
@@ -1541,7 +1558,9 @@ class World {
                     const orientation = block.orientation || [0, 0];
                     if (renderMode === 'torch') {
                         const lean = block.orientation ? (0.82 * 0.35 - 0.38) : 0;
-                        torchFlameCenters.push([lx + 0.5 + orientation[0] * lean, y, lz + 0.5 + orientation[1] * lean]);
+                        const wx = chunk.cx * CS + lx, wz = chunk.cz * CS + lz;
+                        const phase = Math.abs(Math.sin(wx * 12.9898 + wz * 78.233) * 43758.5453) % (Math.PI * 2);
+                        torchFlameCenters.push([lx + 0.5 + orientation[0] * lean, y, lz + 0.5 + orientation[1] * lean, phase]);
                     }
                     for (let shapeIndex = 0; shapeIndex < shapeCount; shapeIndex++) {
                         const shape = renderMode === 'torch' ? TORCH_PARTS[shapeIndex] : null;
@@ -1675,6 +1694,8 @@ class World {
         const torchTime = t0 * 0.001;
         const flamePulse = 0.95 + 0.05 * Math.sin(torchTime * 9.4);
         this.torchFlameMaterial.color.setRGB(flamePulse, flamePulse * 0.96, flamePulse * 0.9);
+        const flameShader = this.torchFlameMaterial.userData.flameAnimationShader;
+        if (flameShader) flameShader.uniforms.uFlameTime.value = torchTime;
         for (const material of [this.chunkMaterial, this.cutoutMaterial]) {
             const shader = material.userData.torchFlickerShader;
             if (shader) shader.uniforms.uTorchTime.value = torchTime;
