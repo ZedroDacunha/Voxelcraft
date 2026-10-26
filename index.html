@@ -142,7 +142,7 @@
     <p>Parte 11 — Água, Natação, Fôlego e Geração de Praias com Areia!</p>
     <button class="btn" id="btn-play" disabled>Clique para Jogar</button>
     <p style="font-size: 14px; opacity: 0.8; margin-top: 15px;">[WASD] Mover | [Espaço] Pular/Nadar | [Shift] Correr | [C] Agachar/Mergulhar | [F3] Debug | [F4] Qualidade | Botão esq: minerar | Botão dir: colocar / usar bancada e forno</p>
-    <p style="font-size: 12px; opacity: 0.6; margin-top: 0;">Na água, segure C para mergulhar e Espaço para subir. As margens de lagos/mares geram areia automaticamente.</p>
+    <p style="font-size: 12px; opacity: 0.6; margin-top: 0;">Na água, segure C para mergulhar e Espaço para subir; solte e pressione Espaço novamente para outro impulso na superfície.</p>
 </div>
 
 <div id="hud-bottom">
@@ -2694,6 +2694,7 @@ let invLastClick = { time: 0, key: '' };
 const invMouse = { x: 0, y: 0, seen: false };
 let invSlotEls = [], craftSlotEls = [], furnaceSlotEls = [], chestSlotEls = [], outSlotEl = null;
 let craftResult = null;
+const slotHtmlCache = new WeakMap();
 
 function stackHtml(s) {
     if (!s) return '';
@@ -2705,6 +2706,13 @@ function stackHtml(s) {
         html += `<div class="dur"><div style="width:${(f * 100).toFixed(0)}%;background:hsl(${(f * 120).toFixed(0)},80%,45%)"></div></div>`;
     }
     return html;
+}
+
+function updateSlotElement(el, stack) {
+    const html = stackHtml(stack);
+    if (slotHtmlCache.get(el) === html) return;
+    el.innerHTML = html;
+    slotHtmlCache.set(el, html);
 }
 
 function throwStack(id, count, damage = 0) {
@@ -2815,20 +2823,20 @@ function applyInventoryLayout() {
 function renderInventory() {
     for (let i = 0; i < 36; i++) {
         const el = invSlotEls[i];
-        el.innerHTML = stackHtml(inventory.slots[i]);
+        updateSlotElement(el, inventory.slots[i]);
         el.classList.toggle('sel', i === selectedSlot);
     }
     if (station && station.type === 'chest') {
-        for (let i = 0; i < 27; i++) chestSlotEls[i].innerHTML = stackHtml(station.chest.inv.slots[i]);
+        for (let i = 0; i < 27; i++) updateSlotElement(chestSlotEls[i], station.chest.inv.slots[i]);
         craftResult = null;
     } else if (station && station.type === 'furnace') {
-        for (let i = 0; i < 3; i++) furnaceSlotEls[i].innerHTML = stackHtml(station.furnace.inv.slots[i]);
+        for (let i = 0; i < 3; i++) updateSlotElement(furnaceSlotEls[i], station.furnace.inv.slots[i]);
         craftResult = null;
         updateFurnaceBars();
     } else {
-        for (let i = 0; i < craftN * craftN; i++) craftSlotEls[i].innerHTML = stackHtml(craftInv.slots[i]);
+        for (let i = 0; i < craftN * craftN; i++) updateSlotElement(craftSlotEls[i], craftInv.slots[i]);
         craftResult = matchRecipe(craftInv);
-        outSlotEl.innerHTML = craftResult ? stackHtml(craftResult) : '';
+        updateSlotElement(outSlotEl, craftResult);
     }
     updateInventoryFloaters();
     updateHotbarUI();
@@ -3158,7 +3166,7 @@ const LOOK_SPEED = 0.002;
 const MAX_PITCH = Math.PI / 2 - 0.02;
 
 let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
-let jumpHeld = false, isSprinting = false, wantToCrouch = false, isCrouching = false;
+let jumpHeld = false, swimStrokeLocked = false, isSprinting = false, wantToCrouch = false, isCrouching = false;
 
 const player = {
     pos: new THREE.Vector3(),
@@ -3234,20 +3242,42 @@ function cycleQuality() {
 // =====================================================================
 // 7. HUD E STATUS DE SOBREVIVÊNCIA
 // =====================================================================
-const uiShown = { h: -1, f: -1 };
+const uiShown = { h: -1, f: -1, b: -1, breathVisible: null };
+const survivalIcons = { hearts: [], food: [], bubbles: [] };
+
+function ensureSurvivalIcons(bar, cache, className) {
+    if (cache.length) return;
+    for (let i = 0; i < 10; i++) {
+        const icon = document.createElement('div');
+        icon.className = className;
+        bar.appendChild(icon);
+        cache.push(icon);
+    }
+}
+
+function updateSurvivalIcons(cache, kind, value) {
+    for (let i = 0; i < 10; i++) {
+        const state = value >= (i + 1) * 2 ? '' : value >= i * 2 + 1 ? 'half' : 'empty-stat';
+        const className = state ? `${kind} ${state}` : kind;
+        if (cache[i].className !== className) cache[i].className = className;
+    }
+}
 
 function updateBreathUI() {
     const breathBar = document.getElementById('breath-bar');
     if (!breathBar) return;
-    breathBar.innerHTML = '';
-    // Esconde a barra se estiver fora da água e de tanque cheio
-    if (breath >= MAX_BREATH && !world.water.headInWater) return;
-    
-    for (let i = 0; i < 10; i++) {
-        const bubble = document.createElement('div');
-        bubble.className = 'bubble ' + (breath > i * 2 ? '' : 'empty-stat');
-        breathBar.appendChild(bubble);
+    const visible = !(breath >= MAX_BREATH && !world.water.headInWater);
+    if (uiShown.breathVisible !== visible) {
+        breathBar.style.display = visible ? 'flex' : 'none';
+        uiShown.breathVisible = visible;
     }
+    if (!visible || uiShown.b === breath) return;
+    ensureSurvivalIcons(breathBar, survivalIcons.bubbles, 'bubble');
+    for (let i = 0; i < 10; i++) {
+        const className = breath > i * 2 ? 'bubble' : 'bubble empty-stat';
+        if (survivalIcons.bubbles[i].className !== className) survivalIcons.bubbles[i].className = className;
+    }
+    uiShown.b = breath;
 }
 
 function updateSurvivalUI() {
@@ -3255,19 +3285,15 @@ function updateSurvivalUI() {
     const hungerBar = document.getElementById('hunger-bar');
     if (!healthBar || !hungerBar) return;
     updateBreathUI();
-    
-    if (health === uiShown.h && hunger === uiShown.f) return;
-    uiShown.h = health; uiShown.f = hunger;
-    healthBar.innerHTML = '';
-    hungerBar.innerHTML = '';
-    const level = (v, i) => v >= (i + 1) * 2 ? '' : v >= i * 2 + 1 ? 'half' : 'empty-stat';
-    for (let i = 0; i < 10; i++) {
-        const heart = document.createElement('div');
-        heart.className = 'heart ' + level(health, i);
-        healthBar.appendChild(heart);
-        const food = document.createElement('div');
-        food.className = 'food ' + level(hunger, i);
-        hungerBar.appendChild(food);
+    if (health !== uiShown.h) {
+        ensureSurvivalIcons(healthBar, survivalIcons.hearts, 'heart');
+        updateSurvivalIcons(survivalIcons.hearts, 'heart', health);
+        uiShown.h = health;
+    }
+    if (hunger !== uiShown.f) {
+        ensureSurvivalIcons(hungerBar, survivalIcons.food, 'food');
+        updateSurvivalIcons(survivalIcons.food, 'food', hunger);
+        uiShown.f = hunger;
     }
 }
 
@@ -3531,6 +3557,7 @@ function updatePhysics(dt) {
 
     world.water.updateSubmersion(world, player);
     const inWater = world.water.headInWater || world.water.feetInWater;
+    const atWaterSurface = world.water.feetInWater && !world.water.headInWater;
     const wantsDive = inWater && wantToCrouch;
     const wantsCrouch = !inWater && wantToCrouch;
 
@@ -3570,14 +3597,17 @@ function updatePhysics(dt) {
     if (inWater) {
         if (wantsDive) {
             player.vel.y = Math.max(player.vel.y - 12.0 * dt, -3.2);
-        } else if (jumpHeld) {
+        } else if (atWaterSurface && jumpHeld && !swimStrokeLocked) {
+            player.vel.y = Math.max(player.vel.y, 3.2);
+            swimStrokeLocked = true;
+        } else if (world.water.headInWater && jumpHeld && !swimStrokeLocked) {
             player.vel.y += 15.0 * dt;
             if (player.vel.y > 4.0) player.vel.y = 4.0; // Velocidade terminal subindo
         }
         player.vel.y *= Math.exp(-5.0 * dt); // Arrasto estável mesmo com variação no FPS
         player.vel.y -= (GRAVITY * 0.1) * dt;    // Gravidade muito fraca (simula peso d'água)
     } else {
-        if (jumpHeld && player.onGround && !isCrouching) {
+        if (jumpHeld && !swimStrokeLocked && player.onGround && !isCrouching) {
             player.vel.y = JUMP_SPEED;
             player.onGround = false;
             addExhaustion(sprintNow ? 0.2 : 0.05);
@@ -3996,7 +4026,7 @@ async function init() {
         const inventoryExit = inventoryOpen || inventoryUnlockPending;
         inventoryUnlockPending = false;
         if (!inventoryExit && !dead) menu.style.display = 'flex';
-        moveForward = moveBackward = moveLeft = moveRight = jumpHeld = isSprinting = wantToCrouch = false;
+        moveForward = moveBackward = moveLeft = moveRight = jumpHeld = swimStrokeLocked = isSprinting = wantToCrouch = false;
         leftHeld = false;
         resetMining();
         cancelEating();
@@ -4047,7 +4077,7 @@ async function init() {
             case 'KeyA': moveLeft = false; break;
             case 'KeyS': moveBackward = false; break;
             case 'KeyD': moveRight = false; break;
-            case 'Space': jumpHeld = false; break;
+            case 'Space': jumpHeld = false; swimStrokeLocked = false; break;
             case 'ShiftLeft': case 'ShiftRight': isSprinting = false; break;
             case 'KeyC': wantToCrouch = false; break;
         }
