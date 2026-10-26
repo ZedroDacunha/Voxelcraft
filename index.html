@@ -622,11 +622,15 @@ class Noise2D {
     static fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
     static lerp(t, a, b) { return a + t * (b - a); }
     static grad(h, x, y) {
-        switch (h & 3) {
+        switch (h & 7) {
             case 0: return x + y;
             case 1: return -x + y;
             case 2: return x - y;
-            default: return -x - y;
+            case 3: return -x - y;
+            case 4: return x * Math.SQRT2;
+            case 5: return -x * Math.SQRT2;
+            case 6: return y * Math.SQRT2;
+            default: return -y * Math.SQRT2;
         }
     }
     noise(x, y) {
@@ -655,6 +659,9 @@ const idx = (lx, y, lz) => lx + lz * CHUNK_SIZE + y * CHUNK_SIZE * CHUNK_SIZE;
 const chunkKey = (cx, cz) => `${cx},${cz}`;
 const chunkId = (cx, cz) => ((cx & 0xFFFF) << 16) | (cz & 0xFFFF);
 const floorDiv = (a, b) => Math.floor(a / b);
+const BIOME = Object.freeze({ PLAINS: 0, FOREST: 1, DESERT: 2, ROCKY: 3 });
+const TREE_CHANCE_FOREST = 0.035;
+const TREE_CHANCE_PLAINS = 0.008;
 
 class TerrainGenerator {
 
@@ -662,6 +669,16 @@ class TerrainGenerator {
         this.seed = seed;
         this.continents = new Noise2D(seed);
         this.hills = new Noise2D(seed + 1013);
+        this.temperature = new Noise2D(seed + 2131);
+        this.moisture = new Noise2D(seed + 3769);
+    }
+    biomeAt(wx, wz) {
+        const temperature = this.temperature.fbm(wx * 0.002, wz * 0.002, 2);
+        const moisture = this.moisture.fbm(wx * 0.0024, wz * 0.0024, 2);
+        if (temperature > 0.12 && moisture < -0.05) return BIOME.DESERT;
+        if (temperature < -0.14) return BIOME.ROCKY;
+        if (moisture > 0.10) return BIOME.FOREST;
+        return BIOME.PLAINS;
     }
     heightAt(wx, wz) {
         const c = this.continents.fbm(wx * 0.006, wz * 0.006, 4);
@@ -673,23 +690,30 @@ class TerrainGenerator {
     fill(chunk) {
         const ox = chunk.cx * CHUNK_SIZE, oz = chunk.cz * CHUNK_SIZE;
         const heights = new Int16Array(CHUNK_SIZE * CHUNK_SIZE);
+        const biomes = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
         for (let lx = 0; lx < CHUNK_SIZE; lx++) {
             for (let lz = 0; lz < CHUNK_SIZE; lz++) {
-                const h = this.heightAt(ox + lx, oz + lz);
-                heights[lx + lz * CHUNK_SIZE] = h;
+                const wx = ox + lx, wz = oz + lz;
+                const h = this.heightAt(wx, wz);
+                const column = lx + lz * CHUNK_SIZE;
+                const biome = this.biomeAt(wx, wz);
+                heights[column] = h;
+                biomes[column] = biome;
                 
                 // Terreno sólido
                 for (let y = 0; y <= h; y++) {
                     let type;
-                    if (y === 0) type = 2;
+                    if (y === 0) type = ID.STONE;
                     else if (y === h) {
-                        type = (h <= WATER_LEVEL + 1) ? ID.SAND : 1; // Areia perto da água
+                        type = (h <= WATER_LEVEL + 1 || biome === BIOME.DESERT) ? ID.SAND :
+                            (biome === BIOME.ROCKY ? ID.STONE : ID.GRASS);
                     }
                     else if (y >= h - 3) {
-                        type = (h <= WATER_LEVEL + 1) ? ID.SAND : 4; 
+                        type = (h <= WATER_LEVEL + 1 || biome === BIOME.DESERT) ? ID.SAND :
+                            (biome === BIOME.ROCKY ? ID.STONE : ID.DIRT);
                     }
                     else {
-                        type = 2;
+                        type = ID.STONE;
                         const ore = hash2(ox + lx + y * 31, oz + lz - y * 17, this.seed + 91);
                         if (y < 18 && ore < 0.004) type = ID.DIAMOND_ORE;
                         else if (y < 28 && ore < 0.010) type = ID.GOLD_ORE;
@@ -710,9 +734,9 @@ class TerrainGenerator {
                 if (WATER_LEVEL > chunk.maxY) chunk.maxY = WATER_LEVEL; // Atualiza a maxY caso a água seja maior que o terreno
             }
         }
-        this.plantTrees(chunk, heights, ox, oz);
+        this.plantTrees(chunk, heights, biomes, ox, oz);
     }
-    plantTrees(chunk, heights, ox, oz) {
+    plantTrees(chunk, heights, biomes, ox, oz) {
         const set = (lx, y, lz, t) => {
             if (y < 0 || y >= WORLD_HEIGHT) return;
             const i = idx(lx, y, lz);
@@ -722,8 +746,12 @@ class TerrainGenerator {
             for (let lz = 2; lz <= 13; lz++) {
                 const wx = ox + lx, wz = oz + lz;
                 if (Math.abs(wx) < 4 && Math.abs(wz) < 4) continue;
-                if (hash2(wx, wz, this.seed) > 0.012) continue;
-                const h = heights[lx + lz * CHUNK_SIZE];
+                const column = lx + lz * CHUNK_SIZE;
+                const biome = biomes[column];
+                if (biome === BIOME.DESERT || biome === BIOME.ROCKY) continue;
+                const treeChance = biome === BIOME.FOREST ? TREE_CHANCE_FOREST : TREE_CHANCE_PLAINS;
+                if (hash2(wx, wz, this.seed) > treeChance) continue;
+                const h = heights[column];
                 
                 if (h <= WATER_LEVEL + 1) continue; // Sem árvores debaixo d'água ou nas praias
                 
@@ -752,7 +780,7 @@ function findSpawn(gen) {
         const noTreeNear = (x, z) => {
             for (let dx = -3; dx <= 3; dx++)
                 for (let dz = -3; dz <= 3; dz++)
-                    if (hash2(x + dx, z + dz, gen.seed) <= 0.012) return false;
+                    if (hash2(x + dx, z + dz, gen.seed) <= TREE_CHANCE_FOREST) return false;
             return true;
         };
 
