@@ -1118,6 +1118,12 @@ class World {
         this.edits = new Map();
         this.dirty = new Set();
         this.lightDirty = new Set();
+        this.sandQueue = [];
+        this.queuedSand = new Set();
+        this.animatedSandTargets = new Set();
+        this.animatedSandByKey = new Map();
+        this.fallingSandAnimations = [];
+        this.nextSandStepAt = 0;
         this.editCache = new Map();
         this.genQueue = [];
         this.lastPcx = null;
@@ -1130,6 +1136,7 @@ class World {
         this.createTerrainWorker();
         const atlas = createAtlasTexture();
         this.material = new THREE.MeshLambertMaterial({ map: atlas });
+        this.sandFallGeometry = buildCubeGeo(BLOCKS[ID.SAND].tiles, 1);
         this.chunkMaterial = new THREE.MeshLambertMaterial({ map: atlas, vertexColors: true });
         this.cutoutMaterial = new THREE.MeshLambertMaterial({
             map: atlas, alphaTest: 0.5, transparent: false, depthWrite: true, vertexColors: true,
@@ -1385,7 +1392,13 @@ class World {
         if (!chunk) return false;
         const lx = x - cx * CHUNK_SIZE, lz = z - cz * CHUNK_SIZE;
         const i = idx(lx, y, lz);
+        const oldType = chunk.data[i];
+        if (oldType === ID.SAND && type !== ID.SAND) this.cancelFallingSand(x, y, z);
         chunk.data[i] = type;
+        if (type === ID.SAND) this.queueFallingSand(x, y, z);
+        if (type !== oldType && (type === 0 || BLOCKS[type]?.solid === false) && y + 1 < WORLD_HEIGHT) {
+            this.queueFallingSand(x, y + 1, z);
+        }
         this.lightDirty.add(chunk);
         if (type !== 0 && y > chunk.maxY) chunk.maxY = y;
 
@@ -1402,6 +1415,105 @@ class World {
         if (lz === 0) this.remeshIfReady(cx, cz - 1);
         if (lz === CHUNK_SIZE - 1) this.remeshIfReady(cx, cz + 1);
         return true;
+    }
+
+    queueFallingSand(x, y, z) {
+        if (y <= 0 || y >= WORLD_HEIGHT) return;
+        const key = `${x},${y},${z}`;
+        if (this.queuedSand.has(key)) return;
+        this.queuedSand.add(key);
+        this.sandQueue.push({ x, y, z, key });
+    }
+
+    cancelFallingSand(x, y, z) {
+        const key = `${x},${y},${z}`;
+        const animation = this.animatedSandByKey.get(key);
+        if (!animation) return;
+        this.animatedSandByKey.delete(key);
+        this.animatedSandTargets.delete(key);
+        this.scene.remove(animation.mesh);
+        const index = this.fallingSandAnimations.indexOf(animation);
+        if (index !== -1) this.fallingSandAnimations.splice(index, 1);
+        const chunk = this.getChunk(floorDiv(x, CHUNK_SIZE), floorDiv(z, CHUNK_SIZE));
+        if (chunk) this.dirty.add(chunk);
+    }
+
+    updateFallingSand() {
+        const now = performance.now();
+        for (let i = this.fallingSandAnimations.length - 1; i >= 0; i--) {
+            const animation = this.fallingSandAnimations[i];
+            const progress = Math.min(1, (now - animation.startedAt) / animation.duration);
+            const eased = progress * progress * (3 - 2 * progress);
+            animation.mesh.position.y = animation.startY + (animation.targetY - animation.startY) * eased;
+            if (progress < 1) continue;
+
+            this.scene.remove(animation.mesh);
+            this.fallingSandAnimations.splice(i, 1);
+            this.animatedSandByKey.delete(animation.key);
+            this.animatedSandTargets.delete(animation.key);
+            const chunk = this.getChunk(floorDiv(animation.x, CHUNK_SIZE), floorDiv(animation.z, CHUNK_SIZE));
+            if (chunk) this.dirty.add(chunk);
+            this.queueFallingSand(animation.x, animation.targetBlockY, animation.z);
+            this.queueFallingSand(animation.x, animation.sourceY + 1, animation.z);
+        }
+
+        if (now < this.nextSandStepAt) return;
+        this.nextSandStepAt = now + 80;
+        for (let starts = 0; starts < 2 && this.sandQueue.length; starts++) {
+            const cell = this.sandQueue.pop();
+            this.queuedSand.delete(cell.key);
+            if (this.getBlock(cell.x, cell.y, cell.z) !== ID.SAND) continue;
+            if (this.animatedSandTargets.has(cell.key)) continue;
+
+            const cx = floorDiv(cell.x, CHUNK_SIZE), cz = floorDiv(cell.z, CHUNK_SIZE);
+            if (!this.getChunk(cx, cz)) continue;
+            const passThrough = [];
+            let targetY = cell.y;
+            while (targetY > 1) {
+                const belowType = this.getBlock(cell.x, targetY - 1, cell.z);
+                if (belowType === 0) { targetY--; continue; }
+                const belowBlock = BLOCKS[belowType];
+                if (belowBlock?.solid === false) {
+                    passThrough.push({ y: targetY - 1, type: belowType });
+                    targetY--;
+                    continue;
+                }
+                break;
+            }
+            if (targetY === cell.y) continue;
+
+            if (!this.setBlock(cell.x, cell.y, cell.z, 0)) continue;
+            for (const displaced of passThrough) {
+                if (!this.setBlock(cell.x, displaced.y, cell.z, 0)) continue;
+                if (WaterSystem.isBlock(displaced.type)) {
+                    this.water.activate(this, cell.x, displaced.y, cell.z);
+                    continue;
+                }
+                const droppedId = BLOCKS[displaced.type]?.drop;
+                if (droppedId && ITEMS[droppedId]) {
+                    spawnItemEntity(droppedId, 1,
+                        new THREE.Vector3(cell.x + 0.5, displaced.y + 0.5, cell.z + 0.5),
+                        new THREE.Vector3(0, 0.12, 0), 0.35);
+                }
+            }
+            if (this.setBlock(cell.x, targetY, cell.z, ID.SAND)) {
+                const key = `${cell.x},${targetY},${cell.z}`;
+                const mesh = new THREE.Mesh(this.sandFallGeometry, this.material);
+                mesh.position.set(cell.x + 0.5, cell.y + 0.5, cell.z + 0.5);
+                this.scene.add(mesh);
+                const animation = {
+                    x: cell.x, z: cell.z, sourceY: cell.y, targetBlockY: targetY,
+                    key, mesh, startedAt: now,
+                    duration: Math.min(1.25, 0.42 + Math.sqrt(cell.y - targetY) * 0.13),
+                    startY: cell.y + 0.5, targetY: targetY + 0.5,
+                };
+                this.fallingSandAnimations.push(animation);
+                this.animatedSandTargets.add(key);
+                this.animatedSandByKey.set(key, animation);
+            } else {
+                this.setBlock(cell.x, cell.y, cell.z, ID.SAND);
+            }
+        }
     }
 
     remeshIfReady(cx, cz) {
@@ -1429,8 +1541,13 @@ class World {
         if (ed) {
             for (const [i, t] of ed) {
                 chunk.data[i] = t;
+                const y = Math.floor(i / (CHUNK_SIZE * CHUNK_SIZE));
+                const lx = i % CHUNK_SIZE;
+                const lz = Math.floor(i / CHUNK_SIZE) % CHUNK_SIZE;
+                const x = chunk.cx * CHUNK_SIZE + lx, z = chunk.cz * CHUNK_SIZE + lz;
+                if (t === ID.SAND) this.queueFallingSand(x, y, z);
+                if (t === 0 && y + 1 < WORLD_HEIGHT) this.queueFallingSand(x, y + 1, z);
                 if (t !== 0) {
-                    const y = Math.floor(i / (CHUNK_SIZE * CHUNK_SIZE));
                     if (y > chunk.maxY) chunk.maxY = y;
                 }
             }
@@ -1567,6 +1684,7 @@ class World {
                 for (let lx = 0; lx < CS; lx++) {
                     const t = data[lx + lz * CS + y * CS2];
                     if (t === 0) continue;
+                    if (t === ID.SAND && this.animatedSandTargets.has(`${chunk.cx * CS + lx},${y},${chunk.cz * CS + lz}`)) continue;
                     const block = BLOCKS[t];
                     const tiles = block.tiles;
                     const renderMode = block.render;
@@ -1682,6 +1800,11 @@ class World {
     unloadFar(pcx, pcz) {
         for (const [key, c] of this.chunks) {
             if (Math.max(Math.abs(c.cx - pcx), Math.abs(c.cz - pcz)) > RENDER_DISTANCE + 2) {
+                for (const animation of [...this.fallingSandAnimations]) {
+                    if (floorDiv(animation.x, CHUNK_SIZE) === c.cx && floorDiv(animation.z, CHUNK_SIZE) === c.cz) {
+                        this.cancelFallingSand(animation.x, animation.targetBlockY, animation.z);
+                    }
+                }
                 if (c.flameMesh) { this.scene.remove(c.flameMesh); c.flameMesh.geometry.dispose(); }
                 if (c.mesh) {
                     this.scene.remove(c.mesh);
@@ -1705,6 +1828,7 @@ class World {
     }
 
     update(px, pz, budgets = {}) {
+        this.updateFallingSand();
         const unlimited = budgets.gen === Infinity;
         const t0 = performance.now();
         const genDeadline = t0 + FRAME_BUDGET_MS * 0.45;
