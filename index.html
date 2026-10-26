@@ -2295,7 +2295,7 @@ function initGameplayAssets() {
 // 5C. MÃO EM PRIMEIRA PESSOA
 // =====================================================================
 let handScene, handCamera, handPivot, heldAnchor, handAmbient;
-let heldMesh = null, heldFlameMesh = null, heldId = -1;
+let heldMesh = null, heldFlameMesh = null, heldTorchLight = null, heldId = -1;
 const handAnim = { mining: 0, phase: 0, punch: 0, sw: 1, eat: 0 };
 const heldGeoCache = {};
 
@@ -2304,6 +2304,9 @@ function createHand() {
     handCamera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 5);
     handAmbient = new THREE.AmbientLight(0xffffff, 0.75);
     handScene.add(handAmbient);
+    heldTorchLight = new THREE.PointLight(0xffb45b, 0, 7, 2);
+    heldTorchLight.castShadow = false;
+    scene.add(heldTorchLight);
     const dl = new THREE.DirectionalLight(0xffffff, 0.5);
     dl.position.set(0.5, 1, 0.8);
     handScene.add(dl);
@@ -2369,6 +2372,7 @@ function refreshHeldItem() {
 
 function updateHand(dt) {
     refreshHeldItem();
+    updateHeldTorchLight();
     const miningNow = (leftHeld && currentHit && currentHit.y !== 0) ? 1 : 0;
     handAnim.mining += (miningNow - handAnim.mining) * Math.min(1, 12 * dt);
     if (miningNow) handAnim.phase += dt * 9;
@@ -2389,6 +2393,19 @@ function updateHand(dt) {
         HAND_BASE.y + Math.sin(bobTimer * 2) * 0.010 - dip - 0.05 * swing + 0.20 * ea + wob,
         HAND_BASE.z - 0.12 * swing + 0.08 * ea);
     handPivot.rotation.set(0.35 - 0.9 * swing + 0.35 * ea, 0.25 - 0.3 * ea, 0);
+}
+
+function updateHeldTorchLight() {
+    if (!heldTorchLight || !camera || !world?.water) return;
+    const torchSelected = inventory.slots[selectedSlot]?.id === ID.TORCH;
+    if (!torchSelected || world.water.headInWater) {
+        heldTorchLight.intensity = 0;
+        return;
+    }
+    const time = performance.now() * 0.001;
+    heldTorchLight.intensity = 1.05 + 0.12 * Math.sin(time * 8.7) + 0.05 * Math.sin(time * 13.1 + 1.2);
+    heldTorchLight.position.set(0.34, -0.25, -0.7);
+    camera.localToWorld(heldTorchLight.position);
 }
 
 // =====================================================================
