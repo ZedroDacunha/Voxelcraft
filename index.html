@@ -1070,49 +1070,80 @@ class World {
     }
 
     rebuildSkyLight(chunk) {
-        for (let lx = 0; lx < CHUNK_SIZE; lx++) {
-            for (let lz = 0; lz < CHUNK_SIZE; lz++) this.rebuildSkyLightColumn(chunk, lx, lz);
+        // A luz só alcança 15 células; um anel de chunks cobre qualquer influência local,
+        // inclusive diagonais nas quinas, e evita recalcular o mundo inteiro.
+        const region = [];
+        for (let dx = -1; dx <= 1; dx++) {
+            for (let dz = -1; dz <= 1; dz++) {
+                const part = this.getChunk(chunk.cx + dx, chunk.cz + dz);
+                if (part) region.push(part);
+            }
         }
-        this.propagateSkyLight(chunk);
+        if (!region.length) return;
+
+        const regionIndex = new Map(region.map((part, i) => [part, i]));
+        for (const part of region) {
+            this.lightDirty.delete(part);
+            for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+                for (let lz = 0; lz < CHUNK_SIZE; lz++) this.rebuildSkyLightColumn(part, lx, lz);
+            }
+        }
+        this.propagateSkyLight(region, regionIndex);
+        for (const part of region) this.dirty.add(part);
     }
 
-    propagateSkyLight(chunk) {
-        const lightMap = chunk.skyLight;
-        // Processa níveis do mais forte ao mais fraco, sem espalhar luz entre chunks nesta etapa.
+    propagateSkyLight(region, regionIndex) {
+        const volume = CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT;
         const buckets = Array.from({ length: 16 }, () => []);
-        for (let i = 0; i < lightMap.length; i++) {
-            const level = lightMap[i];
-            if (level > 1) buckets[level].push(i);
+        for (let chunkIndex = 0; chunkIndex < region.length; chunkIndex++) {
+            const lightMap = region[chunkIndex].skyLight;
+            for (let i = 0; i < lightMap.length; i++) {
+                const level = lightMap[i];
+                if (level > 1) buckets[level].push(chunkIndex * volume + i);
+            }
         }
+
+        const spread = (sourceLevel, sourceChunk, nx, y, nz, buckets) => {
+            if (y < 0 || y >= WORLD_HEIGHT) return;
+            let cx = sourceChunk.cx, cz = sourceChunk.cz;
+            if (nx < 0) { cx--; nx += CHUNK_SIZE; }
+            else if (nx >= CHUNK_SIZE) { cx++; nx -= CHUNK_SIZE; }
+            if (nz < 0) { cz--; nz += CHUNK_SIZE; }
+            else if (nz >= CHUNK_SIZE) { cz++; nz -= CHUNK_SIZE; }
+
+            const target = this.getChunk(cx, cz);
+            const targetChunkIndex = regionIndex.get(target);
+            if (targetChunkIndex === undefined) return;
+            const targetIndex = idx(nx, y, nz);
+            const type = target.data[targetIndex];
+            const block = BLOCKS[type];
+            if (type !== 0 && block?.solid !== false && type !== ID.LEAVES && !WaterSystem.isBlock(type)) return;
+
+            const attenuation = type === ID.LEAVES ? 3 : WaterSystem.isBlock(type) ? 2 : 1;
+            const candidate = sourceLevel - attenuation;
+            if (candidate <= target.skyLight[targetIndex]) return;
+            target.skyLight[targetIndex] = candidate;
+            if (candidate > 1) buckets[candidate].push(targetChunkIndex * volume + targetIndex);
+        };
 
         for (let level = 15; level > 1; level--) {
             const queue = buckets[level];
             for (let cursor = 0; cursor < queue.length; cursor++) {
-                const i = queue[cursor];
-                if (lightMap[i] !== level) continue;
+                const node = queue[cursor];
+                const chunkIndex = Math.floor(node / volume);
+                const i = node - chunkIndex * volume;
+                const chunk = region[chunkIndex];
+                if (chunk.skyLight[i] !== level) continue;
 
                 const lx = i % CHUNK_SIZE;
                 const lz = Math.floor(i / CHUNK_SIZE) % CHUNK_SIZE;
                 const y = Math.floor(i / (CHUNK_SIZE * CHUNK_SIZE));
-                const neighbors = [
-                    [lx + 1, y, lz], [lx - 1, y, lz],
-                    [lx, y + 1, lz], [lx, y - 1, lz],
-                    [lx, y, lz + 1], [lx, y, lz - 1],
-                ];
-
-                for (const [nx, ny, nz] of neighbors) {
-                    if (nx < 0 || nx >= CHUNK_SIZE || nz < 0 || nz >= CHUNK_SIZE || ny < 0 || ny >= WORLD_HEIGHT) continue;
-                    const ni = idx(nx, ny, nz);
-                    const type = chunk.data[ni];
-                    const block = BLOCKS[type];
-                    if (type !== 0 && block?.solid !== false && type !== ID.LEAVES && !WaterSystem.isBlock(type)) continue;
-
-                    const attenuation = type === ID.LEAVES ? 3 : WaterSystem.isBlock(type) ? 2 : 1;
-                    const candidate = level - attenuation;
-                    if (candidate <= lightMap[ni]) continue;
-                    lightMap[ni] = candidate;
-                    if (candidate > 1) buckets[candidate].push(ni);
-                }
+                spread(level, chunk, lx + 1, y, lz, buckets);
+                spread(level, chunk, lx - 1, y, lz, buckets);
+                spread(level, chunk, lx, y + 1, lz, buckets);
+                spread(level, chunk, lx, y - 1, lz, buckets);
+                spread(level, chunk, lx, y, lz + 1, buckets);
+                spread(level, chunk, lx, y, lz - 1, buckets);
             }
         }
     }
@@ -1272,8 +1303,8 @@ class World {
                 }
             }
         }
-        this.rebuildSkyLight(chunk);
         this.chunks.set(key, chunk);
+        this.rebuildSkyLight(chunk);
         this.dirty.add(chunk);
         for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
             const neighbor = this.getChunk(chunk.cx + dx, chunk.cz + dz);
@@ -1484,6 +1515,7 @@ class World {
                     c.mesh.geometry.dispose();
                 }
                 this.dirty.delete(c);
+                this.lightDirty.delete(c);
                 this.chunks.delete(key);
             }
         }
@@ -1518,10 +1550,6 @@ class World {
         for (const chunk of this.lightDirty) {
             this.lightDirty.delete(chunk);
             this.rebuildSkyLight(chunk);
-            for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
-                const neighbor = this.getChunk(chunk.cx + dx, chunk.cz + dz);
-                if (neighbor) this.dirty.add(neighbor);
-            }
             if (++lightCount >= 1 && !unlimited) break;
         }
 
