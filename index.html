@@ -1059,7 +1059,8 @@ class World {
         ed.set(i, type);
         this.editCache.delete(key);
 
-        this.meshChunk(chunk);
+        // Agenda a remalha para o orçamento de frame de World.update().
+        this.dirty.add(chunk);
         if (lx === 0) this.remeshIfReady(cx - 1, cz);
         if (lx === CHUNK_SIZE - 1) this.remeshIfReady(cx + 1, cz);
         if (lz === 0) this.remeshIfReady(cx, cz - 1);
@@ -1069,7 +1070,7 @@ class World {
 
     remeshIfReady(cx, cz) {
         const c = this.getChunk(cx, cz);
-        if (c && !this.dirty.has(c)) this.meshChunk(c);
+        if (c) this.dirty.add(c);
     }
 
     generateChunk(cx, cz) {
