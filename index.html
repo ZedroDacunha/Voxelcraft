@@ -216,6 +216,7 @@ const TILE = { GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, STONE: 3, WOOD: 4, COBBLE: 
                GRASS_TOP_ALT: 19, GRASS_SIDE_ALT: 20, DIRT_ALT: 21, STONE_ALT: 22, LEAVES_ALT: 23,
                SAND: 24, WATER: 25 }; // NOVOS TILES PARA AREIA E ÁGUA
 const TILE_PX = 32;
+const WATER_SURFACE_HEIGHT = 0.88;
 
 const allFaces = (t) => ({ top: t, side: t, bottom: t });
 
@@ -665,7 +666,8 @@ class TerrainGenerator {
     heightAt(wx, wz) {
         const c = this.continents.fbm(wx * 0.006, wz * 0.006, 4);
         const h = this.hills.fbm(wx * 0.03, wz * 0.03, 3);
-        const height = 24 + c * 10 + h * 4 + Math.max(0, c - 0.15) * 30;
+        const plateau = smoothstep(0.1, 0.8, c) * 14;
+        const height = 27 + c * 9 + h * 4 + plateau;
         return Math.max(3, Math.min(WORLD_HEIGHT - 4, Math.floor(height)));
     }
     fill(chunk) {
@@ -932,7 +934,11 @@ class World {
                 for (let lx = 0; lx < CS; lx++) {
                     const t = data[lx + lz * CS + y * CS2];
                     if (t === 0) continue;
-                    const tiles = BLOCKS[t].tiles;
+                    const block = BLOCKS[t];
+                    const tiles = block.tiles;
+                    const renderMode = block.render;
+                    const aboveType = y + 1 < WORLD_HEIGHT ? data[lx + lz * CS + (y + 1) * CS2] : 0;
+                    const blockTop = renderMode === 'liquid' && aboveType === 0 ? WATER_SURFACE_HEIGHT : 1;
                     for (const f of FACES) {
                         if (solid(lx + f.dir[0], y + f.dir[1], lz + f.dir[2], t)) continue;
                         const wx = chunk.cx * CS + lx, wz = chunk.cz * CS + lz;
@@ -940,11 +946,11 @@ class World {
                         const u0 = tile / ATLAS_COLUMNS + UV_PAD;
                         const ndx = positions.length / 3;
                         for (const c of f.corners) {
-                            positions.push(lx + c.pos[0], y + c.pos[1], lz + c.pos[2]);
+                            const py = y + (renderMode === 'liquid' && c.pos[1] === 1 ? blockTop : c.pos[1]);
+                            positions.push(lx + c.pos[0], py, lz + c.pos[2]);
                             normals.push(f.dir[0], f.dir[1], f.dir[2]);
                             uvs.push(u0 + c.uv[0] * uWidth, UV_PAD + c.uv[1] * (1 - 2 * UV_PAD));
                         }
-                        const renderMode = BLOCKS[t].render;
                         const target = renderMode === 'cutout' ? cutoutIndices :
                             (renderMode === 'liquid' ? waterIndices : indices);
                         target.push(ndx, ndx + 1, ndx + 2, ndx + 2, ndx + 1, ndx + 3);
@@ -3183,6 +3189,8 @@ function animate() {
         updateParticles(dt);
     }
     updateWaterState();
+    const waterPulse = Math.sin(now * 0.0017);
+    world.waterMaterial.color.setRGB(0.96 + waterPulse * 0.025, 0.98 + waterPulse * 0.02, 1);
 
     if (controls.isLocked || inventoryOpen) {
         updateWorldClock(dt);
