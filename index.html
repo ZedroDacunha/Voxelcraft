@@ -1544,6 +1544,7 @@ const ITEM_SIZE = 0.28;
 const itemEntities = [];
 const itemGeometryCache = {};
 const _pickupCenter = new THREE.Vector3();
+const _pickupRay = new THREE.Vector3();
 
 function getItemGeometry(itemId) {
     if (itemGeometryCache[itemId]) return itemGeometryCache[itemId];
@@ -1619,13 +1620,18 @@ function updateItemEntities(dt) {
         if (e.age >= e.delay && inventory.canAdd(e.id)) {
             const dx = _pickupCenter.x - e.pos.x, dy = _pickupCenter.y - e.pos.y, dz = _pickupCenter.z - e.pos.z;
             const d2 = dx * dx + dy * dy + dz * dz;
-            if (d2 < 0.36) {
+            const d = Math.sqrt(d2);
+            const blocked = d > 0.001 && raycastVoxels(
+                e.pos,
+                _pickupRay.set(dx / d, dy / d, dz / d),
+                Math.max(0, d - 0.05)
+            );
+            if (!blocked && d2 < 0.36) {
                 const left = inventory.add(e.id, e.count, 0, inventory.slots.length, e.damage);
                 updateHotbarUI();
                 if (left === 0) { removeItemEntity(i); continue; }
                 e.count = left;
-            } else if (d2 < 2.25) {
-                const d = Math.sqrt(d2);
+            } else if (!blocked && d2 < 2.25) {
                 e.pos.x += dx / d * 6 * dt; e.pos.y += dy / d * 6 * dt; e.pos.z += dz / d * 6 * dt;
                 e.vel.set(0, 0, 0);
             }
