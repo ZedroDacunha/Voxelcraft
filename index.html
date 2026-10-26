@@ -1475,7 +1475,14 @@ function breakBlock(x, y, z) {
     const drop = BLOCKS[type].drop;
     if (type === ID.FURNACE) spillFurnace(x, y, z);
     if (type === ID.CHEST) spillChest(x, y, z);
-    world.setBlock(x, y, z, 0);
+    const touchesWater =
+        world.getBlock(x + 1, y, z) === ID.WATER ||
+        world.getBlock(x - 1, y, z) === ID.WATER ||
+        world.getBlock(x, y + 1, z) === ID.WATER ||
+        world.getBlock(x, y - 1, z) === ID.WATER ||
+        world.getBlock(x, y, z + 1) === ID.WATER ||
+        world.getBlock(x, y, z - 1) === ID.WATER;
+    world.setBlock(x, y, z, touchesWater ? ID.WATER : 0);
     spawnBreakParticles(x, y, z, type);
     if (harvest && drop && Math.random() < (BLOCKS[type].dropChance ?? 1)) {
         spawnItemEntity(
