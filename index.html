@@ -1613,38 +1613,41 @@ class World {
         const nxp = this.getChunk(chunk.cx + 1, chunk.cz);
         const nzm = this.getChunk(chunk.cx, chunk.cz - 1);
         const nzp = this.getChunk(chunk.cx, chunk.cz + 1);
+        const neighbors = [
+            [this.getChunk(chunk.cx - 1, chunk.cz - 1), nzm, this.getChunk(chunk.cx + 1, chunk.cz - 1)],
+            [nxm, chunk, nxp],
+            [this.getChunk(chunk.cx - 1, chunk.cz + 1), nzp, this.getChunk(chunk.cx + 1, chunk.cz + 1)]
+        ];
 
         const blockAt = (lx, y, lz) => {
             if (y < 0) return 1;
             if (y >= WORLD_HEIGHT) return 0;
-            if (lx < 0 && lz < 0) { const n = this.getChunk(chunk.cx - 1, chunk.cz - 1); return n ? n.data[(CS - 1) + (CS - 1) * CS + y * CS2] : 0; }
-            if (lx < 0 && lz >= CS) { const n = this.getChunk(chunk.cx - 1, chunk.cz + 1); return n ? n.data[(CS - 1) + y * CS2] : 0; }
-            if (lx >= CS && lz < 0) { const n = this.getChunk(chunk.cx + 1, chunk.cz - 1); return n ? n.data[(CS - 1) * CS + y * CS2] : 0; }
-            if (lx >= CS && lz >= CS) { const n = this.getChunk(chunk.cx + 1, chunk.cz + 1); return n ? n.data[y * CS2] : 0; }
-            if (lx < 0)        return nxm ? nxm.data[(CS - 1) + lz * CS + y * CS2] : 1;
-            if (lx >= CS)      return nxp ? nxp.data[0 + lz * CS + y * CS2] : 1;
-            if (lz < 0)        return nzm ? nzm.data[lx + (CS - 1) * CS + y * CS2] : 1;
-            if (lz >= CS)      return nzp ? nzp.data[lx + y * CS2] : 1;
+            if (lx < 0 || lx >= CS || lz < 0 || lz >= CS) {
+                const xOffset = lx < 0 ? -1 : lx >= CS ? 1 : 0;
+                const zOffset = lz < 0 ? -1 : lz >= CS ? 1 : 0;
+                const neighbor = neighbors[zOffset + 1][xOffset + 1];
+                if (!neighbor) return xOffset && zOffset ? 0 : 1;
+                const localX = lx - xOffset * CS, localZ = lz - zOffset * CS;
+                return neighbor.data[localX + localZ * CS + y * CS2];
+            }
             return data[lx + lz * CS + y * CS2];
         };
 
-        const skyLightAt = (lx, y, lz) => {
-            if (y < 0) return 0;
-            if (y >= WORLD_HEIGHT) return 15;
-            const cxOffset = floorDiv(lx, CS), czOffset = floorDiv(lz, CS);
-            const target = cxOffset === 0 && czOffset === 0 ? chunk : this.getChunk(chunk.cx + cxOffset, chunk.cz + czOffset);
+        const sampleLight = (channel, lx, y, lz, outsideY) => {
+            if (y < 0 || y >= WORLD_HEIGHT) return outsideY;
+            const xOffset = lx < 0 ? -1 : lx >= CS ? 1 : 0;
+            const zOffset = lz < 0 ? -1 : lz >= CS ? 1 : 0;
+            const target = neighbors[zOffset + 1][xOffset + 1];
             if (!target) return 0;
-            const localX = lx - cxOffset * CS, localZ = lz - czOffset * CS;
-            return target.skyLight[idx(localX, y, localZ)];
+            const localX = lx - xOffset * CS, localZ = lz - zOffset * CS;
+            return target[channel][localX + localZ * CS + y * CS2];
+        };
+        const skyLightAt = (lx, y, lz) => {
+            return sampleLight('skyLight', lx, y, lz, y < 0 ? 0 : 15);
         };
 
         const blockLightAt = (lx, y, lz) => {
-            if (y < 0 || y >= WORLD_HEIGHT) return 0;
-            const cxOffset = floorDiv(lx, CS), czOffset = floorDiv(lz, CS);
-            const target = cxOffset === 0 && czOffset === 0 ? chunk : this.getChunk(chunk.cx + cxOffset, chunk.cz + czOffset);
-            if (!target) return 0;
-            const localX = lx - cxOffset * CS, localZ = lz - czOffset * CS;
-            return target.blockLight[idx(localX, y, localZ)];
+            return sampleLight('blockLight', lx, y, lz, 0);
         };
         const solid = (lx, y, lz, currentType, dir) => {
             const nx = lx + dir[0], ny = y + dir[1], nz = lz + dir[2];
@@ -1915,7 +1918,7 @@ class World {
             cand.sort((a, b) => a.d - b.d);
             let n = 0;
             this.lastMeshMs = 0;
-            for (; n < cand.length && (unlimited || n === 0 || performance.now() < meshDeadline); n++) {
+            for (; n < cand.length && (unlimited || performance.now() < meshDeadline); n++) {
                 const meshStart = performance.now();
                 this.meshChunk(cand[n].c);
                 this.lastMeshMs += performance.now() - meshStart;
@@ -1923,6 +1926,124 @@ class World {
             this.frameMesh = n;
         } else {
             this.lastMeshMs = 0;
+        }
+    }
+}
+
+// =====================================================================
+// 5A. CRIATURAS PASSIVAS — Mofim
+// =====================================================================
+class CreatureSystem {
+    constructor(world) {
+        this.world = world;
+        this.entities = [];
+        this.nextSpawnAt = 0;
+        this.spawnAttempt = 0;
+        this.nextId = 1;
+        this.cube = new THREE.BoxGeometry(1, 1, 1);
+        this.materials = {
+            body: new THREE.MeshLambertMaterial({ color: 0x438f78 }),
+            belly: new THREE.MeshLambertMaterial({ color: 0xb7d8a1 }),
+            wing: new THREE.MeshLambertMaterial({ color: 0xb8e5d8, transparent: true, opacity: 0.78 }),
+            eye: new THREE.MeshLambertMaterial({ color: 0x173b42 }),
+            glow: new THREE.MeshBasicMaterial({ color: 0xf2c86b })
+        };
+    }
+
+    surfaceAt(x, z) {
+        const bx = Math.floor(x), bz = Math.floor(z);
+        if (!this.world.getChunk(floorDiv(bx, CHUNK_SIZE), floorDiv(bz, CHUNK_SIZE))) return null;
+        const y = this.world.generator.heightAt(bx, bz);
+        const top = this.world.getBlock(bx, y, bz);
+        if (top !== ID.GRASS && top !== ID.DIRT) return null;
+        if (this.world.getBlock(bx, y + 1, bz) !== 0 || this.world.getBlock(bx, y + 2, bz) !== 0) return null;
+        return y + 1;
+    }
+
+    addPart(group, material, x, y, z, sx, sy, sz) {
+        const mesh = new THREE.Mesh(this.cube, material);
+        mesh.position.set(x, y, z);
+        mesh.scale.set(sx, sy, sz);
+        mesh.castShadow = false;
+        mesh.receiveShadow = false;
+        group.add(mesh);
+        return mesh;
+    }
+
+    createModel() {
+        const group = new THREE.Group();
+        this.addPart(group, this.materials.body, 0, 0.24, 0, 0.46, 0.34, 0.42);
+        this.addPart(group, this.materials.belly, 0, 0.18, 0.215, 0.28, 0.18, 0.025);
+        this.addPart(group, this.materials.body, 0, 0.43, 0.105, 0.30, 0.28, 0.28);
+        this.addPart(group, this.materials.eye, -0.075, 0.46, 0.248, 0.045, 0.06, 0.025);
+        this.addPart(group, this.materials.eye, 0.075, 0.46, 0.248, 0.045, 0.06, 0.025);
+        const leftWing = this.addPart(group, this.materials.wing, -0.29, 0.32, -0.015, 0.24, 0.12, 0.035);
+        const rightWing = this.addPart(group, this.materials.wing, 0.29, 0.32, -0.015, 0.24, 0.12, 0.035);
+        leftWing.rotation.z = -0.25;
+        rightWing.rotation.z = 0.25;
+        this.addPart(group, this.materials.glow, 0, 0.62, 0.08, 0.07, 0.07, 0.07);
+        return { group, leftWing, rightWing };
+    }
+
+    trySpawn(playerPos, now) {
+        if (now < this.nextSpawnAt || this.entities.length >= 3) return;
+        this.nextSpawnAt = now + 4.5;
+        const seed = this.world.seed + this.spawnAttempt++ * 7919;
+        for (let attempt = 0; attempt < 10; attempt++) {
+            const angle = hash2(seed, attempt, 41) * Math.PI * 2;
+            const distance = 9 + hash2(seed, attempt, 89) * 15;
+            const x = playerPos.x + Math.cos(angle) * distance;
+            const z = playerPos.z + Math.sin(angle) * distance;
+            const y = this.surfaceAt(x, z);
+            if (y === null) continue;
+            if (this.entities.some(e => (e.x - x) ** 2 + (e.z - z) ** 2 < 64)) continue;
+            const model = this.createModel();
+            model.group.position.set(x, y, z);
+            this.world.scene.add(model.group);
+            this.entities.push({ id: this.nextId++, x, y, z, targetX: x, targetZ: z, turnAt: now,
+                phase: hash2(seed, attempt, 131) * Math.PI * 2, heading: 0, ...model });
+            return;
+        }
+    }
+
+    update(dt, playerPos, active) {
+        if (!active) return;
+        const now = performance.now() * 0.001;
+        this.trySpawn(playerPos, now);
+        for (let i = this.entities.length - 1; i >= 0; i--) {
+            const e = this.entities[i];
+            const dxp = e.x - playerPos.x, dzp = e.z - playerPos.z;
+            if (dxp * dxp + dzp * dzp > 38 * 38) {
+                this.world.scene.remove(e.group);
+                this.entities.splice(i, 1);
+                continue;
+            }
+            if (now >= e.turnAt) {
+                const seed = this.world.seed + e.id * 104729 + Math.floor(now * 0.2);
+                const angle = hash2(seed, e.id, 7) * Math.PI * 2;
+                const distance = 1.5 + hash2(seed, e.id, 13) * 3;
+                e.targetX = e.x + Math.cos(angle) * distance;
+                e.targetZ = e.z + Math.sin(angle) * distance;
+                e.turnAt = now + 2 + hash2(seed, e.id, 23) * 3;
+            }
+            const dx = e.targetX - e.x, dz = e.targetZ - e.z;
+            const distance = Math.hypot(dx, dz);
+            if (distance > 0.08) {
+                const step = Math.min(distance, 0.72 * dt);
+                const nx = e.x + dx / distance * step, nz = e.z + dz / distance * step;
+                const ny = this.surfaceAt(nx, nz);
+                if (ny !== null && Math.abs(ny - e.y) <= 1) {
+                    e.x = nx; e.z = nz; e.y = ny;
+                    e.heading = Math.atan2(dx, dz);
+                } else {
+                    e.turnAt = now;
+                }
+            }
+            e.group.position.set(e.x, e.y + Math.sin(now * 3 + e.phase) * 0.035, e.z);
+            e.group.rotation.y = e.heading;
+            const flap = Math.sin(now * 8 + e.phase) * 0.18;
+            e.leftWing.rotation.z = -0.25 + flap;
+            e.rightWing.rotation.z = 0.25 - flap;
         }
     }
 }
@@ -3221,7 +3342,7 @@ function worldClockText() {
 // =====================================================================
 // 6. ESTADO GERAL
 // =====================================================================
-let camera, scene, renderer, controls, world;
+let camera, scene, renderer, controls, world, creatureSystem;
 let targetMesh;
 let currentHit = null;
 const tmpDir = new THREE.Vector3();
@@ -4150,6 +4271,7 @@ async function init() {
     });
 
     world = new World(scene, SEED);
+    creatureSystem = new CreatureSystem(world);
     const save = await loadGame();
     if (save) {
         world.edits = save.edits;
@@ -4342,6 +4464,7 @@ function animate() {
 
     if (controls.isLocked) {
         updatePhysics(dt);
+        creatureSystem.update(dt, player.pos, true);
         updateTarget();
         updateMining(dt);
         updateEating(dt);
