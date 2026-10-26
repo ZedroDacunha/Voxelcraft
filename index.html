@@ -1673,6 +1673,8 @@ class World {
         const genDeadline = t0 + FRAME_BUDGET_MS * 0.45;
         const meshDeadline = t0 + FRAME_BUDGET_MS;
         const torchTime = t0 * 0.001;
+        const flamePulse = 0.95 + 0.05 * Math.sin(torchTime * 9.4);
+        this.torchFlameMaterial.color.setRGB(flamePulse, flamePulse * 0.96, flamePulse * 0.9);
         for (const material of [this.chunkMaterial, this.cutoutMaterial]) {
             const shader = material.userData.torchFlickerShader;
             if (shader) shader.uniforms.uTorchTime.value = torchTime;
