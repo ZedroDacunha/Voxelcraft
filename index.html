@@ -2858,7 +2858,7 @@ function updatePhysics(dt) {
             player.vel.y += 15.0 * dt;
             if (player.vel.y > 4.0) player.vel.y = 4.0; // Velocidade terminal subindo
         }
-        player.vel.y -= player.vel.y * 5.0 * dt; // Arrasto na água (boia devagar)
+        player.vel.y *= Math.exp(-5.0 * dt); // Arrasto estável mesmo com variação no FPS
         player.vel.y -= (GRAVITY * 0.1) * dt;    // Gravidade muito fraca (simula peso d'água)
     } else {
         if (jumpHeld && player.onGround && !isCrouching) {
