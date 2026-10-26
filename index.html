@@ -245,11 +245,12 @@ const BLOCKS = {
     13: { name: 'Minério de ouro',     hardness: 4.0, drop: ID.GOLD_ORE,    tool: 'pickaxe', requiresTool: true, minTier: 2, tiles: allFaces(TILE.GOLD_ORE) },
     14: { name: 'Minério de diamante', hardness: 4.5, drop: ID.DIAMOND_ORE, tool: 'pickaxe', requiresTool: true, minTier: 2, tiles: allFaces(TILE.DIAMOND_ORE) },
     15: { name: 'Areia',     hardness: 0.5, drop: ID.SAND, tool: 'shovel', tiles: allFaces(TILE.SAND) }, // Adicionado o Bloco de Areia
-    16: { name: 'Água',      hardness: 100, drop: null, tool: null, tiles: allFaces(TILE.WATER) },       // Adicionado o Bloco de Água
+    16: { name: 'Água',      hardness: 100, drop: null, tool: null, noItem: true, tiles: allFaces(TILE.WATER) }, // Água só existe no mundo
 };
 
 const ITEMS = {};
 for (const [id, b] of Object.entries(BLOCKS)) {
+    if (b.noItem) continue;
     ITEMS[id] = { name: b.name, maxStack: 64, block: Number(id), iconTile: b.icon ?? b.tiles.top };
 }
 
@@ -2761,6 +2762,7 @@ function buildSave() {
 
 function sanitizeStack(s) {
     if (!s) return null;
+    if (s.id === ID.WATER) return null; // Remove a água dos saves antigos sem invalidar o mundo
     const it = ITEMS[s.id];
     if (!it || !Number.isInteger(s.count) || s.count < 1 || s.count > it.maxStack) throw new Error('pilha inválida');
     const st = { id: s.id, count: s.count };
