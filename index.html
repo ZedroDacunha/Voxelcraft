@@ -3011,7 +3011,7 @@ function buildSave() {
         player: { x: player.pos.x, y: player.pos.y, z: player.pos.z, health, hunger, saturation },
         selectedSlot,
         inventory: inventory.slots.map(packStack),
-        drops: itemEntities.slice(0, 500).map(e => ({
+        drops: itemEntities.filter(e => e.age < e.ttl).map(e => ({
             id: e.id, count: e.count, damage: e.damage || 0, x: e.pos.x, y: e.pos.y, z: e.pos.z, age: e.age, ttl: e.ttl,
         })),
         chests: Array.from(chests, ([k, c]) => [k, c.inv.slots.map(packStack)]),
