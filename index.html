@@ -215,7 +215,6 @@ const TILE = { GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, STONE: 3, WOOD: 4, COBBLE: 
                WOOD_END: 14, COAL_ORE: 15, IRON_ORE: 16, GOLD_ORE: 17, DIAMOND_ORE: 18,
                GRASS_TOP_ALT: 19, GRASS_SIDE_ALT: 20, DIRT_ALT: 21, STONE_ALT: 22, LEAVES_ALT: 23,
                SAND: 24, WATER: 25 }; // NOVOS TILES PARA AREIA E ÁGUA
-const ATLAS_COLUMNS = 40;
 const TILE_PX = 32;
 
 const allFaces = (t) => ({ top: t, side: t, bottom: t });
@@ -227,30 +226,37 @@ const ID = { GRASS: 1, STONE: 2, LOG: 3, DIRT: 4, COBBLE: 5, PLANKS: 6, LEAVES: 
              STICK: 20, APPLE: 30, CHARCOAL: 31 };
 
 const BLOCKS = {
-    1: { name: 'Grama',      hardness: 0.6, drop: ID.DIRT,   tool: 'shovel', tiles: { top: TILE.GRASS_TOP, side: TILE.GRASS_SIDE, bottom: TILE.DIRT } },
-    2: { name: 'Pedra',      hardness: 1.5, drop: ID.COBBLE, tool: 'pickaxe', requiresTool: true, minTier: 1, tiles: allFaces(TILE.STONE) },
-    3: { name: 'Madeira',    hardness: 2.0, drop: ID.LOG,    tool: 'axe',    tiles: { top: TILE.WOOD_END, side: TILE.WOOD, bottom: TILE.WOOD_END } },
-    4: { name: 'Terra',      hardness: 0.5, drop: ID.DIRT,   tool: 'shovel', tiles: allFaces(TILE.DIRT) },
-    5: { name: 'Pedregulho', hardness: 2.0, drop: ID.COBBLE, tool: 'pickaxe', requiresTool: true, minTier: 1, tiles: allFaces(TILE.COBBLE) },
-    6: { name: 'Tábuas',     hardness: 2.0, drop: ID.PLANKS, tool: 'axe',    tiles: allFaces(TILE.PLANKS) },
-    7: { name: 'Folhas',     hardness: 0.2, drop: ID.APPLE, dropChance: 0.06, tool: null, tiles: allFaces(TILE.LEAVES) },
-    8: { name: 'Bancada',    hardness: 2.5, drop: ID.CRAFTING_TABLE, tool: 'axe', station: 'crafting',
+    [ID.GRASS]: { name: 'Grama',      hardness: 0.6, drop: ID.DIRT,   tool: 'shovel', tiles: { top: TILE.GRASS_TOP, side: TILE.GRASS_SIDE, bottom: TILE.DIRT } },
+    [ID.STONE]: { name: 'Pedra',      hardness: 1.5, drop: ID.COBBLE, tool: 'pickaxe', requiresTool: true, minTier: 1, tiles: allFaces(TILE.STONE) },
+    [ID.LOG]: { name: 'Madeira',    hardness: 2.0, drop: ID.LOG,    tool: 'axe',    tiles: { top: TILE.WOOD_END, side: TILE.WOOD, bottom: TILE.WOOD_END } },
+    [ID.DIRT]: { name: 'Terra',      hardness: 0.5, drop: ID.DIRT,   tool: 'shovel', tiles: allFaces(TILE.DIRT) },
+    [ID.COBBLE]: { name: 'Pedregulho', hardness: 2.0, drop: ID.COBBLE, tool: 'pickaxe', requiresTool: true, minTier: 1, tiles: allFaces(TILE.COBBLE) },
+    [ID.PLANKS]: { name: 'Tábuas',     hardness: 2.0, drop: ID.PLANKS, tool: 'axe',    tiles: allFaces(TILE.PLANKS) },
+    [ID.LEAVES]: { name: 'Folhas',     hardness: 0.2, drop: ID.APPLE, dropChance: 0.06, tool: null, render: 'cutout', tiles: allFaces(TILE.LEAVES) },
+    [ID.CRAFTING_TABLE]: { name: 'Bancada',    hardness: 2.5, drop: ID.CRAFTING_TABLE, tool: 'axe', station: 'crafting',
          tiles: { top: TILE.CRAFT_TOP, side: TILE.CRAFT_SIDE, bottom: TILE.PLANKS } },
-    9: { name: 'Forno',      hardness: 3.5, drop: ID.FURNACE, tool: 'pickaxe', requiresTool: true, minTier: 1, station: 'furnace',
+    [ID.FURNACE]: { name: 'Forno',      hardness: 3.5, drop: ID.FURNACE, tool: 'pickaxe', requiresTool: true, minTier: 1, station: 'furnace',
          icon: TILE.FURNACE_FRONT, tiles: { top: TILE.FURNACE_TOP, side: TILE.FURNACE_FRONT, bottom: TILE.COBBLE } },
-    10: { name: 'Baú',     hardness: 2.5, drop: ID.CHEST, tool: 'axe', station: 'chest',
+    [ID.CHEST]: { name: 'Baú',     hardness: 2.5, drop: ID.CHEST, tool: 'axe', station: 'chest',
           tiles: { top: TILE.CHEST_TOP, side: TILE.CHEST_SIDE, bottom: TILE.CHEST_TOP } },
-    11: { name: 'Minério de carvão',   hardness: 3.0, drop: ID.COAL_ORE,    tool: 'pickaxe', requiresTool: true, minTier: 1, tiles: allFaces(TILE.COAL_ORE) },
-    12: { name: 'Minério de ferro',    hardness: 3.5, drop: ID.IRON_ORE,    tool: 'pickaxe', requiresTool: true, minTier: 1, tiles: allFaces(TILE.IRON_ORE) },
-    13: { name: 'Minério de ouro',     hardness: 4.0, drop: ID.GOLD_ORE,    tool: 'pickaxe', requiresTool: true, minTier: 2, tiles: allFaces(TILE.GOLD_ORE) },
-    14: { name: 'Minério de diamante', hardness: 4.5, drop: ID.DIAMOND_ORE, tool: 'pickaxe', requiresTool: true, minTier: 2, tiles: allFaces(TILE.DIAMOND_ORE) },
-    15: { name: 'Areia',     hardness: 0.5, drop: ID.SAND, tool: 'shovel', tiles: allFaces(TILE.SAND) }, // Adicionado o Bloco de Areia
-    16: { name: 'Água',      hardness: 100, drop: null, tool: null, noItem: true, tiles: allFaces(TILE.WATER) }, // Água só existe no mundo
+    [ID.COAL_ORE]: { name: 'Minério de carvão',   hardness: 3.0, drop: ID.COAL_ORE,    tool: 'pickaxe', requiresTool: true, minTier: 1, tiles: allFaces(TILE.COAL_ORE) },
+    [ID.IRON_ORE]: { name: 'Minério de ferro',    hardness: 3.5, drop: ID.IRON_ORE,    tool: 'pickaxe', requiresTool: true, minTier: 1, tiles: allFaces(TILE.IRON_ORE) },
+    [ID.GOLD_ORE]: { name: 'Minério de ouro',     hardness: 4.0, drop: ID.GOLD_ORE,    tool: 'pickaxe', requiresTool: true, minTier: 2, tiles: allFaces(TILE.GOLD_ORE) },
+    [ID.DIAMOND_ORE]: { name: 'Minério de diamante', hardness: 4.5, drop: ID.DIAMOND_ORE, tool: 'pickaxe', requiresTool: true, minTier: 2, tiles: allFaces(TILE.DIAMOND_ORE) },
+    [ID.SAND]: { name: 'Areia',     hardness: 0.5, drop: ID.SAND, tool: 'shovel', tiles: allFaces(TILE.SAND) }, // Adicionado o Bloco de Areia
+    [ID.WATER]: { name: 'Água',      hardness: 100, drop: null, tool: null, render: 'liquid', solid: false, collectible: false, tiles: allFaces(TILE.WATER) }, // Água só existe no mundo
 };
+
+for (const block of Object.values(BLOCKS)) {
+    block.render ??= 'opaque';
+    block.solid ??= true;
+    block.collectible ??= block.drop != null;
+}
+const isLiquidBlock = (type) => BLOCKS[type]?.render === 'liquid';
 
 const ITEMS = {};
 for (const [id, b] of Object.entries(BLOCKS)) {
-    if (b.noItem) continue;
+    if (!b.collectible) continue;
     ITEMS[id] = { name: b.name, maxStack: 64, block: Number(id), iconTile: b.icon ?? b.tiles.top };
 }
 
@@ -276,6 +282,12 @@ for (const [matKey, m] of Object.entries(TOOL_MATS)) {
 
 ITEMS[ID.APPLE]    = { name: 'Maçã', maxStack: 64, food: { hunger: 4, sat: 2.4 }, sprite: { kind: 'apple', mat: 'food' }, iconTile: nextTile++ };
 ITEMS[ID.CHARCOAL] = { name: 'Carvão vegetal', maxStack: 64, sprite: { kind: 'charcoal', mat: 'coal' }, iconTile: nextTile++ };
+
+const ATLAS_COLUMNS = [
+    ...Object.values(TILE),
+    ...Object.values(BLOCKS).flatMap(block => Object.values(block.tiles)),
+    ...Object.values(ITEMS).map(item => item.iconTile),
+].reduce((columns, tile) => Math.max(columns, tile + 1), 0);
 
 const SMELT = { [ID.COBBLE]: { result: ID.STONE, time: 10 }, [ID.LOG]: { result: ID.CHARCOAL, time: 10 } };
 const FUEL = { [ID.PLANKS]: 15, [ID.LOG]: 15, [ID.STICK]: 5, [ID.CHARCOAL]: 80 };
@@ -821,7 +833,7 @@ class World {
         const chunk = this.getChunk(floorDiv(x, CHUNK_SIZE), floorDiv(z, CHUNK_SIZE));
         if (!chunk) return true;
         const type = chunk.data[idx(x - chunk.cx * CHUNK_SIZE, y, z - chunk.cz * CHUNK_SIZE)];
-        return type !== 0 && type !== ID.WATER; // Água não é sólida!
+        return type !== 0 && (BLOCKS[type]?.solid ?? true);
     }
 
     setBlock(x, y, z, type) {
@@ -900,10 +912,10 @@ class World {
             else if (lz >= CS) nType = nzp ? nzp.data[lx + 0 + y * CS2] : 1;
             else               nType = data[lx + lz * CS + y * CS2];
             
-            // Regra de Culling para Água: Não renderiza face se tocar em outra água ou bloco sólido
-            if (currentType === ID.WATER) return nType !== 0; 
-            // Blocos sólidos: Escondem a face apenas se tocarem em outro bloco sólido (Água não esconde a pedra atrás dela)
-            return nType !== 0 && nType !== ID.WATER;
+            const currentRender = BLOCKS[currentType]?.render;
+            const neighborRender = BLOCKS[nType]?.render;
+            if (currentRender === 'liquid') return nType !== 0;
+            return nType !== 0 && neighborRender !== 'liquid';
         };
 
         const positions = [], normals = [], uvs = [];
@@ -927,7 +939,9 @@ class World {
                             normals.push(f.dir[0], f.dir[1], f.dir[2]);
                             uvs.push(u0 + c.uv[0] * uWidth, UV_PAD + c.uv[1] * (1 - 2 * UV_PAD));
                         }
-                        const target = t === ID.LEAVES ? cutoutIndices : (t === ID.WATER ? waterIndices : indices);
+                        const renderMode = BLOCKS[t].render;
+                        const target = renderMode === 'cutout' ? cutoutIndices :
+                            (renderMode === 'liquid' ? waterIndices : indices);
                         target.push(ndx, ndx + 1, ndx + 2, ndx + 2, ndx + 1, ndx + 3);
                     }
                 }
@@ -1320,7 +1334,10 @@ function spawnItemEntity(id, count, pos, vel, delay = 0.5, damage = 0, opts = {}
             }
         }
     }
-    const mat = ITEMS[id].sprite ? spriteMaterial : (id === ID.LEAVES ? world.cutoutMaterial : (id === ID.WATER ? world.waterMaterial : world.material));
+    const block = ITEMS[id].block != null ? BLOCKS[ITEMS[id].block] : null;
+    const mat = ITEMS[id].sprite ? spriteMaterial :
+        (block?.render === 'cutout' ? world.cutoutMaterial :
+            (block?.render === 'liquid' ? world.waterMaterial : world.material));
     const mesh = new THREE.Mesh(getItemGeometry(id), mat);
     mesh.position.copy(pos);
     scene.add(mesh);
@@ -1476,12 +1493,12 @@ function breakBlock(x, y, z) {
     if (type === ID.FURNACE) spillFurnace(x, y, z);
     if (type === ID.CHEST) spillChest(x, y, z);
     const touchesWater =
-        world.getBlock(x + 1, y, z) === ID.WATER ||
-        world.getBlock(x - 1, y, z) === ID.WATER ||
-        world.getBlock(x, y + 1, z) === ID.WATER ||
-        world.getBlock(x, y - 1, z) === ID.WATER ||
-        world.getBlock(x, y, z + 1) === ID.WATER ||
-        world.getBlock(x, y, z - 1) === ID.WATER;
+        isLiquidBlock(world.getBlock(x + 1, y, z)) ||
+        isLiquidBlock(world.getBlock(x - 1, y, z)) ||
+        isLiquidBlock(world.getBlock(x, y + 1, z)) ||
+        isLiquidBlock(world.getBlock(x, y - 1, z)) ||
+        isLiquidBlock(world.getBlock(x, y, z + 1)) ||
+        isLiquidBlock(world.getBlock(x, y, z - 1));
     world.setBlock(x, y, z, touchesWater ? ID.WATER : 0);
     spawnBreakParticles(x, y, z, type);
     if (harvest && drop && Math.random() < (BLOCKS[type].dropChance ?? 1)) {
@@ -1605,7 +1622,9 @@ function refreshHeldItem() {
     } else {
         const key = 'blk' + id;
         if (!heldGeoCache[key]) heldGeoCache[key] = buildCubeGeo(BLOCKS[item.block].tiles, 0.3);
-        const mat = id === ID.LEAVES ? world.cutoutMaterial : (id === ID.WATER ? world.waterMaterial : world.material);
+        const block = BLOCKS[item.block];
+        const mat = block?.render === 'cutout' ? world.cutoutMaterial :
+            (block?.render === 'liquid' ? world.waterMaterial : world.material);
         heldMesh = new THREE.Mesh(heldGeoCache[key], mat);
         heldMesh.position.set(...HELD_BLOCK_POS);
         heldAnchor.rotation.set(...HELD_BLOCK_ROT);
@@ -2252,8 +2271,8 @@ function updateWaterState() {
     const pz = Math.floor(player.pos.z);
     const headY = Math.floor(player.pos.y + player.eye);
     const feetY = Math.floor(player.pos.y);
-    headInWater = world.getBlock(px, headY, pz) === ID.WATER;
-    feetInWater = world.getBlock(px, feetY, pz) === ID.WATER;
+    headInWater = isLiquidBlock(world.getBlock(px, headY, pz));
+    feetInWater = isLiquidBlock(world.getBlock(px, feetY, pz));
     if (headInWater !== wasHeadInWater) updateBreathUI();
 }
 
@@ -2594,7 +2613,7 @@ function raycastVoxels(origin, dir, maxDist) {
     for (let i = 0; i < 128 && t <= maxDist; i++) {
         const type = world.getBlock(x, y, z);
         // Permite que o raio ignore blocos de água, possibilitando interagir com blocos submersos
-        if (type !== 0 && type !== ID.WATER) return { x, y, z, nx, ny, nz, type, dist: t };
+        if (type !== 0 && !isLiquidBlock(type)) return { x, y, z, nx, ny, nz, type, dist: t };
         
         if (tmx < tmy && tmx < tmz) { x += sx; t = tmx; tmx += tdx; nx = -sx; ny = 0; nz = 0; }
         else if (tmy < tmz)         { y += sy; t = tmy; tmy += tdy; nx = 0; ny = -sy; nz = 0; }
@@ -3108,7 +3127,7 @@ async function init() {
         
         // Se a posição para colocar o bloco contiver água, o bloco irá substituí-la normalmente!
         const blockAtTarget = world.getBlock(px, py, pz);
-        if (blockAtTarget !== 0 && blockAtTarget !== ID.WATER) return; 
+        if (blockAtTarget !== 0 && !isLiquidBlock(blockAtTarget)) return; 
         
         if (intersectsPlayer(px, py, pz)) return;
         if (world.setBlock(px, py, pz, type)) {
