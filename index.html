@@ -638,6 +638,7 @@ const chunkId = (cx, cz) => ((cx & 0xFFFF) << 16) | (cz & 0xFFFF);
 const floorDiv = (a, b) => Math.floor(a / b);
 
 class TerrainGenerator {
+
     constructor(seed) {
         this.seed = seed;
         this.continents = new Noise2D(seed);
@@ -722,6 +723,29 @@ class TerrainGenerator {
             }
         }
     }
+}
+
+function findSpawn(gen) {
+        const STEP = 4, MAX_R = 512;
+        const minH = WATER_LEVEL + 2;
+
+        const noTreeNear = (x, z) => {
+            for (let dx = -3; dx <= 3; dx++)
+                for (let dz = -3; dz <= 3; dz++)
+                    if (hash2(x + dx, z + dz, gen.seed) <= 0.012) return false;
+            return true;
+        };
+
+        for (let r = 0; r <= MAX_R; r += STEP) {
+            for (let dx = -r; dx <= r; dx += STEP) {
+                for (let dz = -r; dz <= r; dz += STEP) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
+                    const h = gen.heightAt(dx, dz);
+                    if (h >= minH && noTreeNear(dx, dz)) return { x: dx + 0.5, y: h + 1, z: dz + 0.5 };
+                }
+            }
+        }
+        return { x: 0.5, y: Math.max(gen.heightAt(0, 0), WATER_LEVEL) + 1, z: 0.5 };
 }
 
 // =====================================================================
@@ -2941,8 +2965,8 @@ async function init() {
                 { age: e.age, ttl: e.ttl, noMerge: true });
         }
     }
-    const sh = world.generator.heightAt(0, 0);
-    spawnPoint.set(0.5, sh + 1, 0.5);
+    const sp = findSpawn(world.generator);
+    spawnPoint.set(sp.x, sp.y, sp.z);
     const start = save ? save.player : spawnPoint;
     world.update(start.x, start.z, { gen: Infinity, mesh: Infinity });
     player.pos.set(start.x, start.y, start.z);
