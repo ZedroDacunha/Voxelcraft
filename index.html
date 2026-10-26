@@ -671,6 +671,13 @@ class TerrainGenerator {
         this.hills = new Noise2D(seed + 1013);
         this.temperature = new Noise2D(seed + 2131);
         this.moisture = new Noise2D(seed + 3769);
+        this.caves = new Noise2D(seed + 5021);
+        this.caveBranches = new Noise2D(seed + 6073);
+    }
+    isCave(wx, y, wz) {
+        const tunnel = this.caves.noise((wx + y * 0.7) * 0.045, (wz - y * 0.38) * 0.045);
+        const branch = this.caveBranches.noise((wx - y * 0.42) * 0.045, (wz + y * 0.65) * 0.045);
+        return Math.abs(tunnel) < 0.06 && Math.abs(branch) < 0.06;
     }
     biomeAt(wx, wz) {
         const temperature = this.temperature.fbm(wx * 0.002, wz * 0.002, 2);
@@ -720,6 +727,7 @@ class TerrainGenerator {
                         else if (y < 42 && ore < 0.025) type = ID.IRON_ORE;
                         else if (ore < 0.050) type = ID.COAL_ORE;
                     }
+                    if (type === ID.STONE && y >= 6 && y <= h - 4 && this.isCave(wx, y, wz)) type = 0;
                     chunk.data[idx(lx, y, lz)] = type;
                 }
                 
