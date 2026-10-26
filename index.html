@@ -818,7 +818,7 @@ class Noise2D {
 
 const idx = (lx, y, lz) => lx + lz * CHUNK_SIZE + y * CHUNK_SIZE * CHUNK_SIZE;
 const chunkKey = (cx, cz) => `${cx},${cz}`;
-const chunkId = (cx, cz) => ((cx & 0xFFFF) << 16) | (cz & 0xFFFF);
+
 const floorDiv = (a, b) => Math.floor(a / b);
 const BIOME = Object.freeze({ PLAINS: 0, FOREST: 1, DESERT: 2, ROCKY: 3 });
 const TREE_CHANCE_FOREST = 0.035;
@@ -1039,7 +1039,7 @@ class World {
         this.water = new WaterSystem(atlas);
     }
 
-    getChunk(cx, cz) { return this.chunks.get(chunkId(cx, cz)); }
+    getChunk(cx, cz) { return this.chunks.get(chunkKey(cx, cz)); }
 
     getBlock(x, y, z) {
         if (y < 0 || y >= WORLD_HEIGHT) return 0;
@@ -1101,7 +1101,7 @@ class World {
                 }
             }
         }
-        this.chunks.set(chunkId(cx, cz), chunk);
+        this.chunks.set(chunkKey(cx, cz), chunk);
         this.dirty.add(chunk);
         for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
             const n = this.getChunk(cx + dx, cz + dz);
