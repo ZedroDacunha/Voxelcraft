@@ -298,7 +298,7 @@ class WaterSystem {
 
     constructor(atlas) {
         this.material = new THREE.MeshLambertMaterial({
-            map: atlas, transparent: true, opacity: 0.75, depthWrite: false, side: THREE.DoubleSide
+            map: atlas, transparent: true, opacity: 0.75, depthWrite: false, side: THREE.DoubleSide, vertexColors: true
         });
         this.headInWater = false;
         this.feetInWater = false;
@@ -1038,8 +1038,9 @@ class World {
         this.createTerrainWorker();
         const atlas = createAtlasTexture();
         this.material = new THREE.MeshLambertMaterial({ map: atlas });
+        this.chunkMaterial = new THREE.MeshLambertMaterial({ map: atlas, vertexColors: true });
         this.cutoutMaterial = new THREE.MeshLambertMaterial({
-            map: atlas, alphaTest: 0.5, transparent: false, depthWrite: true,
+            map: atlas, alphaTest: 0.5, transparent: false, depthWrite: true, vertexColors: true,
         });
         
         this.water = new WaterSystem(atlas);
@@ -1226,6 +1227,10 @@ class World {
         const blockAt = (lx, y, lz) => {
             if (y < 0) return 1;
             if (y >= WORLD_HEIGHT) return 0;
+            if (lx < 0 && lz < 0) { const n = this.getChunk(chunk.cx - 1, chunk.cz - 1); return n ? n.data[(CS - 1) + (CS - 1) * CS + y * CS2] : 0; }
+            if (lx < 0 && lz >= CS) { const n = this.getChunk(chunk.cx - 1, chunk.cz + 1); return n ? n.data[(CS - 1) + y * CS2] : 0; }
+            if (lx >= CS && lz < 0) { const n = this.getChunk(chunk.cx + 1, chunk.cz - 1); return n ? n.data[(CS - 1) * CS + y * CS2] : 0; }
+            if (lx >= CS && lz >= CS) { const n = this.getChunk(chunk.cx + 1, chunk.cz + 1); return n ? n.data[y * CS2] : 0; }
             if (lx < 0)        return nxm ? nxm.data[(CS - 1) + lz * CS + y * CS2] : 1;
             if (lx >= CS)      return nxp ? nxp.data[0 + lz * CS + y * CS2] : 1;
             if (lz < 0)        return nzm ? nzm.data[lx + (CS - 1) * CS + y * CS2] : 1;
@@ -1249,11 +1254,31 @@ class World {
             return nType !== 0 && neighborRender !== 'liquid';
         };
 
+        const occludesAO = type => type !== 0 && BLOCKS[type]?.render !== 'liquid';
+        const ambientOcclusionAt = (lx, y, lz, face, corner) => {
+            let axisA, axisB;
+            if (face.dir[0] !== 0) { axisA = 1; axisB = 2; }
+            else if (face.dir[1] !== 0) { axisA = 0; axisB = 2; }
+            else { axisA = 0; axisB = 1; }
+            const signA = corner.pos[axisA] === 0 ? -1 : 1;
+            const signB = corner.pos[axisB] === 0 ? -1 : 1;
+            const baseX = lx + face.dir[0], baseY = y + face.dir[1], baseZ = lz + face.dir[2];
+            let ax = 0, ay = 0, az = 0, bx = 0, by = 0, bz = 0;
+            if (axisA === 0) ax = signA; else if (axisA === 1) ay = signA; else az = signA;
+            if (axisB === 0) bx = signB; else if (axisB === 1) by = signB; else bz = signB;
+            const sideA = occludesAO(blockAt(baseX + ax, baseY + ay, baseZ + az)) ? 1 : 0;
+            const sideB = occludesAO(blockAt(baseX + bx, baseY + by, baseZ + bz)) ? 1 : 0;
+            const cornerOcclusion = occludesAO(blockAt(baseX + ax + bx, baseY + ay + by, baseZ + az + bz)) ? 1 : 0;
+            const level = sideA && sideB ? 0 : 3 - sideA - sideB - cornerOcclusion;
+            return 0.58 + level * 0.14;
+        };
+
         const initialVertexCapacity = CS * CS * 8;
         const initialIndexCapacity = CS * CS * 12;
         let positions = new Float32Array(initialVertexCapacity * 3);
         let normals = new Float32Array(initialVertexCapacity * 3);
         let uvs = new Float32Array(initialVertexCapacity * 2);
+        let colors = new Float32Array(initialVertexCapacity * 3);
         let indices = new Uint32Array(initialIndexCapacity);
         let cutoutIndices = new Uint32Array(initialIndexCapacity);
         let waterIndices = new Uint32Array(initialIndexCapacity);
@@ -1289,6 +1314,7 @@ class World {
                         positions = growTypedArray(positions, (vertexCount + 4) * 3);
                         normals = growTypedArray(normals, (vertexCount + 4) * 3);
                         uvs = growTypedArray(uvs, (vertexCount + 4) * 2);
+                        colors = growTypedArray(colors, (vertexCount + 4) * 3);
                         let target, targetOffset;
                         if (renderMode === 'cutout') {
                             cutoutIndices = growTypedArray(cutoutIndices, cutoutIndexCount + 6);
@@ -1316,6 +1342,8 @@ class World {
                             normals[p] = f.dir[0]; normals[p + 1] = f.dir[1]; normals[p + 2] = f.dir[2];
                             uvs[uv] = u0 + c.uv[0] * uWidth;
                             uvs[uv + 1] = UV_PAD + c.uv[1] * (1 - 2 * UV_PAD);
+                            const shade = renderMode === 'liquid' ? 1 : ambientOcclusionAt(lx, y, lz, f, c);
+                            colors[p] = shade; colors[p + 1] = shade; colors[p + 2] = shade;
                         }
                         vertexCount += 4;
                         target[targetOffset] = ndx; target[targetOffset + 1] = ndx + 1;
@@ -1332,6 +1360,7 @@ class World {
         geo.setAttribute('position', new THREE.BufferAttribute(positions.subarray(0, vertexCount * 3), 3));
         geo.setAttribute('normal', new THREE.BufferAttribute(normals.subarray(0, vertexCount * 3), 3));
         geo.setAttribute('uv', new THREE.BufferAttribute(uvs.subarray(0, vertexCount * 2), 2));
+        geo.setAttribute('color', new THREE.BufferAttribute(colors.subarray(0, vertexCount * 3), 3));
 
         const totalIndexCount = indexCount + cutoutIndexCount + waterIndexCount;
         const mergedIndices = vertexCount > 65535 ? new Uint32Array(totalIndexCount) : new Uint16Array(totalIndexCount);
@@ -1341,7 +1370,7 @@ class World {
         if (waterIndexCount) { mergedIndices.set(waterIndices.subarray(0, waterIndexCount), offset); geo.addGroup(offset, waterIndexCount, 2); }
         geo.setIndex(new THREE.BufferAttribute(mergedIndices, 1));
 
-        const mesh = new THREE.Mesh(geo, [this.material, this.cutoutMaterial, this.water.material]);
+        const mesh = new THREE.Mesh(geo, [this.chunkMaterial, this.cutoutMaterial, this.water.material]);
         mesh.position.set(chunk.cx * CS, 0, chunk.cz * CS);
         this.scene.add(mesh);
         chunk.mesh = mesh;
