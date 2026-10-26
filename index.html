@@ -3679,7 +3679,11 @@ function updatePhysics(dt) {
 // =====================================================================
 const SAVE_KEY = 'world-' + SEED;
 const SAVE_BACKUP_KEY = SAVE_KEY + '-backup';
+const SAVE_LOCK_KEY = SAVE_KEY + '-writer-lock';
 const SAVE_VERSION = 1;
+const SAVE_LOCK_TTL = 30000;
+const SAVE_TAB_ID = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+let saveLockOwned = false, saveLockHeartbeat = null;
 
 function dbOpen() {
     return new Promise((res, rej) => {
@@ -3699,6 +3703,90 @@ async function dbRun(mode, fn) {
     });
 }
 
+async function writeSaveIfOwner(data) {
+    const db = await dbOpen();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('worlds', 'readwrite');
+        const store = tx.objectStore('worlds');
+        let wrote = false;
+        const request = store.get(SAVE_LOCK_KEY);
+        request.onsuccess = () => {
+            if (request.result?.id !== SAVE_TAB_ID) return;
+            wrote = true;
+            store.put(data, SAVE_KEY);
+            store.put({ id: SAVE_TAB_ID, heartbeat: Date.now() }, SAVE_LOCK_KEY);
+        };
+        tx.oncomplete = () => { db.close(); resolve(wrote); };
+        tx.onerror = tx.onabort = () => { db.close(); reject(tx.error || new Error('Falha ao gravar o save.')); };
+    });
+}
+
+async function acquireSaveLock() {
+    const db = await dbOpen();
+    const acquired = await new Promise((resolve, reject) => {
+        const tx = db.transaction('worlds', 'readwrite');
+        const store = tx.objectStore('worlds');
+        let ownsLock = false;
+        const request = store.get(SAVE_LOCK_KEY);
+        request.onsuccess = () => {
+            const lease = request.result;
+            const expired = !lease || !Number.isFinite(lease.heartbeat) || Date.now() - lease.heartbeat > SAVE_LOCK_TTL;
+            if (expired || lease.id === SAVE_TAB_ID) {
+                ownsLock = true;
+                store.put({ id: SAVE_TAB_ID, heartbeat: Date.now() }, SAVE_LOCK_KEY);
+            }
+        };
+        tx.oncomplete = () => { db.close(); resolve(ownsLock); };
+        tx.onerror = tx.onabort = () => { db.close(); reject(tx.error || new Error('Não foi possível obter o bloqueio do save.')); };
+    });
+
+    saveLockOwned = acquired;
+    if (!acquired) return false;
+    saveLockHeartbeat = setInterval(async () => {
+        try {
+            const lease = await dbRun('readwrite', store => {
+                const request = store.get(SAVE_LOCK_KEY);
+                request.onsuccess = () => {
+                    if (request.result?.id === SAVE_TAB_ID) {
+                        store.put({ id: SAVE_TAB_ID, heartbeat: Date.now() }, SAVE_LOCK_KEY);
+                    }
+                };
+                return request;
+            });
+            if (lease?.id !== SAVE_TAB_ID) {
+                saveLockOwned = false;
+                saveWriteBlocked = true;
+                clearInterval(saveLockHeartbeat);
+                saveLockHeartbeat = null;
+                showToast('Outra aba assumiu o save; salvamento bloqueado aqui');
+            }
+        } catch (error) {
+            saveLockOwned = false;
+            saveWriteBlocked = true;
+            clearInterval(saveLockHeartbeat);
+            saveLockHeartbeat = null;
+            console.warn('Não foi possível renovar o bloqueio do save:', error);
+        }
+    }, 5000);
+    return true;
+}
+
+function releaseSaveLock() {
+    if (!saveLockOwned) return;
+    saveLockOwned = false;
+    if (saveLockHeartbeat) clearInterval(saveLockHeartbeat);
+    saveLockHeartbeat = null;
+    dbRun('readwrite', store => {
+        const request = store.get(SAVE_LOCK_KEY);
+        request.onsuccess = () => {
+            if (request.result?.id === SAVE_TAB_ID) store.delete(SAVE_LOCK_KEY);
+        };
+        return request;
+    }).catch(error => console.warn('Não foi possível liberar o bloqueio do save:', error));
+}
+
+window.addEventListener('pagehide', releaseSaveLock);
+
 const packStack = (s) => s ? { id: s.id, count: s.count, damage: s.damage || 0 } : null;
 
 function buildSave() {
@@ -3716,7 +3804,7 @@ function buildSave() {
     return {
         v: SAVE_VERSION, seed: SEED, time: Date.now(),
         worldTime,
-        player: { x: player.pos.x, y: player.pos.y, z: player.pos.z, health, hunger, saturation },
+        player: { x: player.pos.x, y: player.pos.y, z: player.pos.z, health, hunger, saturation, breath },
         selectedSlot,
         inventory: inventory.slots.map(packStack),
         drops: itemEntities.filter(e => e.age < e.ttl).map(e => ({
@@ -3776,6 +3864,7 @@ function validateSave(d) {
         if (!d || d.v !== SAVE_VERSION || d.seed !== SEED) return null;
         const p = d.player;
         if (![p.x, p.y, p.z, p.health, p.hunger].every(Number.isFinite)) return null;
+        if (p.breath !== undefined && !Number.isFinite(p.breath)) return null;
         if (!Array.isArray(d.inventory) || d.inventory.length !== inventory.slots.length) return null;
         const inv = d.inventory.map(sanitizeStack);
 
@@ -3804,7 +3893,8 @@ function validateSave(d) {
 
         return {
             player: { x: p.x, y: p.y, z: p.z, health: Math.min(MAX_HEALTH, Math.max(1, p.health)), hunger: Math.min(MAX_HUNGER, Math.max(0, p.hunger)),
-                      saturation: Math.min(MAX_HUNGER, Math.max(0, Number.isFinite(p.saturation) ? p.saturation : 5)) },
+                      saturation: Math.min(MAX_HUNGER, Math.max(0, Number.isFinite(p.saturation) ? p.saturation : 5)),
+                      breath: Math.min(MAX_BREATH, Math.max(0, Number.isFinite(p.breath) ? p.breath : MAX_BREATH)) },
             selectedSlot: d.selectedSlot >= 0 && d.selectedSlot < 9 ? d.selectedSlot | 0 : 0,
             inventory: inv, edits, furnaces: furn, drops: parseDrops(d.drops), chests: parseChests(d.chests),
             worldTime: Number.isFinite(d.worldTime) ? ((d.worldTime % 1) + 1) % 1 : START_TIME,
@@ -3816,7 +3906,14 @@ let saveWriteBlocked = false;
 
 async function loadGame() {
     try {
+        const ownsSave = await acquireSaveLock();
+        if (!ownsSave) {
+            saveWriteBlocked = true;
+            console.warn('Este mundo já está aberto em outra aba; o salvamento foi desativado aqui.');
+            showToast('Mundo aberto em outra aba; salvamento desativado neste jogo');
+        }
         if (new URLSearchParams(location.search).has('reset')) {
+            if (!ownsSave) return null;
             await dbRun('readwrite', s => s.delete(SAVE_KEY));
             return null;
         }
@@ -3824,10 +3921,12 @@ async function loadGame() {
         const ok = validateSave(data);
         if (data && !ok) {
             console.warn('Save inválido ou de outra versão: criando backup antes de continuar.');
-            saveWriteBlocked = true;
-            await dbRun('readwrite', s => s.put(data, SAVE_BACKUP_KEY));
-            saveWriteBlocked = false;
-            console.warn('Backup do save anterior criado:', SAVE_BACKUP_KEY);
+            if (ownsSave) {
+                saveWriteBlocked = true;
+                await dbRun('readwrite', s => s.put(data, SAVE_BACKUP_KEY));
+                saveWriteBlocked = false;
+                console.warn('Backup do save anterior criado:', SAVE_BACKUP_KEY);
+            }
         }
         return ok;
     } catch (e) {
@@ -3840,8 +3939,8 @@ async function loadGame() {
 let saving = false;
 async function saveGame(quiet) {
     if (saving || !world) return;
-    if (saveWriteBlocked) {
-        if (!quiet) showToast('Salvamento bloqueado para proteger o mundo anterior');
+    if (saveWriteBlocked || !saveLockOwned) {
+        if (!quiet) showToast('Salvamento bloqueado para proteger o mundo aberto em outra aba');
         return;
     }
     saving = true;
@@ -3849,8 +3948,12 @@ async function saveGame(quiet) {
         const t0 = performance.now();
         const data = buildSave();
         perf.buildMs = performance.now() - t0;
-        await dbRun('readwrite', s => s.put(data, SAVE_KEY));
-        if (!quiet) showToast('Jogo salvo');
+        const wrote = await writeSaveIfOwner(data);
+        if (!wrote) {
+            saveLockOwned = false;
+            saveWriteBlocked = true;
+            if (!quiet) showToast('Outra aba está usando este mundo; salvamento bloqueado');
+        } else if (!quiet) showToast('Jogo salvo');
     } catch (e) { console.warn('Falha ao salvar:', e); if (!quiet) showToast('Falha ao salvar'); }
     saving = false;
 }
@@ -3987,6 +4090,7 @@ async function init() {
         health = save.player.health;
         hunger = save.player.hunger;
         saturation = save.player.saturation;
+        breath = save.player.breath;
         worldTime = save.worldTime;
         for (const [k, v] of save.furnaces) furnaces.set(k, v);
         for (const [k, v] of save.chests) chests.set(k, v);
