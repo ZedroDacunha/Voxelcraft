@@ -216,7 +216,6 @@ const TILE = { GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, STONE: 3, WOOD: 4, COBBLE: 
                GRASS_TOP_ALT: 19, GRASS_SIDE_ALT: 20, DIRT_ALT: 21, STONE_ALT: 22, LEAVES_ALT: 23,
                SAND: 24, WATER: 25 }; // NOVOS TILES PARA AREIA E ÁGUA
 const TILE_PX = 32;
-const WATER_SURFACE_HEIGHT = 0.88;
 
 const allFaces = (t) => ({ top: t, side: t, bottom: t });
 
@@ -253,7 +252,43 @@ for (const block of Object.values(BLOCKS)) {
     block.solid ??= true;
     block.collectible ??= block.drop != null;
 }
-const isLiquidBlock = (type) => BLOCKS[type]?.render === 'liquid';
+class WaterSystem {
+    static get surfaceHeight() { return 0.88; }
+    static isBlock(type) { return BLOCKS[type]?.render === 'liquid'; }
+
+    constructor(atlas) {
+        this.material = new THREE.MeshLambertMaterial({
+            map: atlas, transparent: true, opacity: 0.75, depthWrite: false, side: THREE.DoubleSide
+        });
+        this.headInWater = false;
+        this.feetInWater = false;
+    }
+
+    isAdjacent(world, x, y, z) {
+        return WaterSystem.isBlock(world.getBlock(x + 1, y, z)) ||
+            WaterSystem.isBlock(world.getBlock(x - 1, y, z)) ||
+            WaterSystem.isBlock(world.getBlock(x, y + 1, z)) ||
+            WaterSystem.isBlock(world.getBlock(x, y - 1, z)) ||
+            WaterSystem.isBlock(world.getBlock(x, y, z + 1)) ||
+            WaterSystem.isBlock(world.getBlock(x, y, z - 1));
+    }
+
+    updateSubmersion(world, player) {
+        const wasHeadInWater = this.headInWater;
+        const px = Math.floor(player.pos.x);
+        const pz = Math.floor(player.pos.z);
+        const headY = Math.floor(player.pos.y + player.eye);
+        const feetY = Math.floor(player.pos.y);
+        this.headInWater = WaterSystem.isBlock(world.getBlock(px, headY, pz));
+        this.feetInWater = WaterSystem.isBlock(world.getBlock(px, feetY, pz));
+        if (this.headInWater !== wasHeadInWater) updateBreathUI();
+    }
+
+    animate(now) {
+        const pulse = Math.sin(now * 0.0017);
+        this.material.color.setRGB(0.96 + pulse * 0.025, 0.98 + pulse * 0.02, 1);
+    }
+}
 
 const ITEMS = {};
 for (const [id, b] of Object.entries(BLOCKS)) {
@@ -871,10 +906,7 @@ class World {
             map: atlas, alphaTest: 0.5, transparent: false, depthWrite: true,
         });
         
-        // Novo Material Transparente para Água
-        this.waterMaterial = new THREE.MeshLambertMaterial({
-            map: atlas, transparent: true, opacity: 0.75, depthWrite: false, side: THREE.DoubleSide
-        });
+        this.water = new WaterSystem(atlas);
     }
 
     getChunk(cx, cz) { return this.chunks.get(chunkId(cx, cz)); }
@@ -990,7 +1022,7 @@ class World {
                     const tiles = block.tiles;
                     const renderMode = block.render;
                     const aboveType = y + 1 < WORLD_HEIGHT ? data[lx + lz * CS + (y + 1) * CS2] : 0;
-                    const blockTop = renderMode === 'liquid' && aboveType === 0 ? WATER_SURFACE_HEIGHT : 1;
+                    const blockTop = renderMode === 'liquid' && aboveType === 0 ? WaterSystem.surfaceHeight : 1;
                     for (const f of FACES) {
                         if (solid(lx + f.dir[0], y + f.dir[1], lz + f.dir[2], t)) continue;
                         const wx = chunk.cx * CS + lx, wz = chunk.cz * CS + lz;
@@ -1025,7 +1057,7 @@ class World {
         if (cutoutIndices.length) { geo.addGroup(offset, cutoutIndices.length, 1); offset += cutoutIndices.length; }
         if (waterIndices.length) { geo.addGroup(offset, waterIndices.length, 2); }
 
-        const mesh = new THREE.Mesh(geo, [this.material, this.cutoutMaterial, this.waterMaterial]);
+        const mesh = new THREE.Mesh(geo, [this.material, this.cutoutMaterial, this.water.material]);
         mesh.position.set(chunk.cx * CS, 0, chunk.cz * CS);
         this.scene.add(mesh);
         chunk.mesh = mesh;
@@ -1400,7 +1432,7 @@ function spawnItemEntity(id, count, pos, vel, delay = 0.5, damage = 0, opts = {}
     const block = ITEMS[id].block != null ? BLOCKS[ITEMS[id].block] : null;
     const mat = ITEMS[id].sprite ? spriteMaterial :
         (block?.render === 'cutout' ? world.cutoutMaterial :
-            (block?.render === 'liquid' ? world.waterMaterial : world.material));
+            (block?.render === 'liquid' ? world.water.material : world.material));
     const mesh = new THREE.Mesh(getItemGeometry(id), mat);
     mesh.position.copy(pos);
     scene.add(mesh);
@@ -1555,13 +1587,7 @@ function breakBlock(x, y, z) {
     const drop = BLOCKS[type].drop;
     if (type === ID.FURNACE) spillFurnace(x, y, z);
     if (type === ID.CHEST) spillChest(x, y, z);
-    const touchesWater =
-        isLiquidBlock(world.getBlock(x + 1, y, z)) ||
-        isLiquidBlock(world.getBlock(x - 1, y, z)) ||
-        isLiquidBlock(world.getBlock(x, y + 1, z)) ||
-        isLiquidBlock(world.getBlock(x, y - 1, z)) ||
-        isLiquidBlock(world.getBlock(x, y, z + 1)) ||
-        isLiquidBlock(world.getBlock(x, y, z - 1));
+    const touchesWater = world.water.isAdjacent(world, x, y, z);
     world.setBlock(x, y, z, touchesWater ? ID.WATER : 0);
     spawnBreakParticles(x, y, z, type);
     if (harvest && drop && Math.random() < (BLOCKS[type].dropChance ?? 1)) {
@@ -1687,7 +1713,7 @@ function refreshHeldItem() {
         if (!heldGeoCache[key]) heldGeoCache[key] = buildCubeGeo(BLOCKS[item.block].tiles, 0.3);
         const block = BLOCKS[item.block];
         const mat = block?.render === 'cutout' ? world.cutoutMaterial :
-            (block?.render === 'liquid' ? world.waterMaterial : world.material);
+            (block?.render === 'liquid' ? world.water.material : world.material);
         heldMesh = new THREE.Mesh(heldGeoCache[key], mat);
         heldMesh.position.set(...HELD_BLOCK_POS);
         heldAnchor.rotation.set(...HELD_BLOCK_ROT);
@@ -2324,21 +2350,6 @@ const MAX_PITCH = Math.PI / 2 - 0.02;
 let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
 let jumpHeld = false, isSprinting = false, wantToCrouch = false, isCrouching = false;
 
-// Estado da Água
-let headInWater = false;
-let feetInWater = false;
-
-function updateWaterState() {
-    const wasHeadInWater = headInWater;
-    const px = Math.floor(player.pos.x);
-    const pz = Math.floor(player.pos.z);
-    const headY = Math.floor(player.pos.y + player.eye);
-    const feetY = Math.floor(player.pos.y);
-    headInWater = isLiquidBlock(world.getBlock(px, headY, pz));
-    feetInWater = isLiquidBlock(world.getBlock(px, feetY, pz));
-    if (headInWater !== wasHeadInWater) updateBreathUI();
-}
-
 const player = {
     pos: new THREE.Vector3(),
     vel: new THREE.Vector3(),
@@ -2420,7 +2431,7 @@ function updateBreathUI() {
     if (!breathBar) return;
     breathBar.innerHTML = '';
     // Esconde a barra se estiver fora da água e de tanque cheio
-    if (breath >= MAX_BREATH && !headInWater) return;
+    if (breath >= MAX_BREATH && !world.water.headInWater) return;
     
     for (let i = 0; i < 10; i++) {
         const bubble = document.createElement('div');
@@ -2498,7 +2509,7 @@ function die() {
     resetStats();
     invuln = 2;
     player.pos.copy(spawnPoint);
-    updateWaterState();
+    world.water.updateSubmersion(world, player);
     player.vel.set(0, 0, 0);
     player.fallDistance = 0;
     world.update(spawnPoint.x, spawnPoint.z, { gen: Infinity, mesh: Infinity });
@@ -2539,7 +2550,7 @@ function updateSurvival(dt) {
     invuln = Math.max(0, invuln - dt);
     
     // --- Lógica de Fôlego e Afogamento ---
-    if (headInWater) {
+    if (world.water.headInWater) {
         breathTimer += dt;
         if (breathTimer >= 1.5) { // 1.5s por cada bolha consumida
             breathTimer = 0;
@@ -2603,7 +2614,7 @@ function updateDebug(rawDt) {
     const tt = currentHit ? getBreakTime(currentHit.type, inventory.slots[selectedSlot]).toFixed(2) + 's' : '—';
     debugEl.textContent =
 `Voxel Sandbox — Parte 11 (Mares)
-FPS: ${fps} | Água: ${headInWater ? 'Mergulhado' : (feetInWater ? 'Cintura' : 'Não')}
+FPS: ${fps} | Água: ${world.water.headInWater ? 'Mergulhado' : (world.water.feetInWater ? 'Cintura' : 'Não')}
 Nuvens: ${cloudState.cells} células (de ${CLOUD_GRID * CLOUD_GRID}) | altura ${CLOUD_Y}
 Seed: ${SEED}
 XYZ: ${p.x.toFixed(2)} ${p.y.toFixed(2)} ${p.z.toFixed(2)}
@@ -2676,7 +2687,7 @@ function raycastVoxels(origin, dir, maxDist) {
     for (let i = 0; i < 128 && t <= maxDist; i++) {
         const type = world.getBlock(x, y, z);
         // Permite que o raio ignore blocos de água, possibilitando interagir com blocos submersos
-        if (type !== 0 && !isLiquidBlock(type)) return { x, y, z, nx, ny, nz, type, dist: t };
+        if (type !== 0 && !WaterSystem.isBlock(type)) return { x, y, z, nx, ny, nz, type, dist: t };
         
         if (tmx < tmy && tmx < tmz) { x += sx; t = tmx; tmx += tdx; nx = -sx; ny = 0; nz = 0; }
         else if (tmy < tmz)         { y += sy; t = tmy; tmy += tdy; nx = 0; ny = -sy; nz = 0; }
@@ -2702,8 +2713,8 @@ function updateTarget() {
 function updatePhysics(dt) {
     const p = player.pos;
 
-    updateWaterState();
-    const inWater = headInWater || feetInWater;
+    world.water.updateSubmersion(world, player);
+    const inWater = world.water.headInWater || world.water.feetInWater;
 
     if (wantToCrouch && !isCrouching) {
         isCrouching = true;
@@ -3190,7 +3201,7 @@ async function init() {
         
         // Se a posição para colocar o bloco contiver água, o bloco irá substituí-la normalmente!
         const blockAtTarget = world.getBlock(px, py, pz);
-        if (blockAtTarget !== 0 && !isLiquidBlock(blockAtTarget)) return; 
+        if (blockAtTarget !== 0 && !WaterSystem.isBlock(blockAtTarget)) return; 
         
         if (intersectsPlayer(px, py, pz)) return;
         if (world.setBlock(px, py, pz, type)) {
@@ -3240,9 +3251,8 @@ function animate() {
         updateItemEntities(dt);
         updateParticles(dt);
     }
-    updateWaterState();
-    const waterPulse = Math.sin(now * 0.0017);
-    world.waterMaterial.color.setRGB(0.96 + waterPulse * 0.025, 0.98 + waterPulse * 0.02, 1);
+    world.water.updateSubmersion(world, player);
+    world.water.animate(now);
 
     if (controls.isLocked || inventoryOpen) {
         updateWorldClock(dt);
@@ -3255,7 +3265,7 @@ function animate() {
     updateSky();
     
     // Override da visão embaixo d'água
-    if (headInWater) {
+    if (world.water.headInWater) {
         scene.fog.color.setHex(0x113366);
         scene.fog.near = 0.1;
         scene.fog.far = 15;
