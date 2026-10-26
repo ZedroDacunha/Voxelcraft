@@ -329,6 +329,28 @@ class WaterSystem {
         }
     }
 
+    hasNearbySource(world, start, maxSteps = 7) {
+        const queue = [{ x: start.x, y: start.y, z: start.z, steps: 0 }];
+        const visited = new Set([`${start.x},${start.y},${start.z}`]);
+        const directions = [[1,0,0], [-1,0,0], [0,1,0], [0,-1,0], [0,0,1], [0,0,-1]];
+        for (let i = 0; i < queue.length; i++) {
+            const cell = queue[i];
+            const block = BLOCKS[world.getBlock(cell.x, cell.y, cell.z)];
+            if (block?.waterSource) return true;
+            if (cell.steps >= maxSteps) continue;
+            for (const [dx, dy, dz] of directions) {
+                const x = cell.x + dx, y = cell.y + dy, z = cell.z + dz;
+                if (y < 0 || y >= WORLD_HEIGHT) continue;
+                const key = `${x},${y},${z}`;
+                const nextSteps = cell.steps + (dy === 0 ? 1 : 0);
+                if (visited.has(key) || nextSteps > maxSteps || !WaterSystem.isBlock(world.getBlock(x, y, z))) continue;
+                visited.add(key);
+                queue.push({ x, y, z, steps: nextSteps });
+            }
+        }
+        return false;
+    }
+
     updateFlow(world, dt) {
         this.flowTimer += dt;
         if (this.flowTimer < 0.18) return;
@@ -341,6 +363,16 @@ class WaterSystem {
             const type = world.getBlock(cell.x, cell.y, cell.z);
             const block = BLOCKS[type];
             if (!block || block.render !== 'liquid') continue;
+
+            // Fontes permanecem; água de fluxo sem fonte próxima evapora.
+            if (!block.waterSource && !this.hasNearbySource(world, cell, 7)) {
+                if (world.setBlock(cell.x, cell.y, cell.z, 0)) {
+                    for (const [dx, dy, dz] of [[1,0,0], [-1,0,0], [0,1,0], [0,-1,0], [0,0,1], [0,0,-1]]) {
+                        this.enqueue(cell.x + dx, cell.y + dy, cell.z + dz);
+                    }
+                }
+                continue;
+            }
 
             const level = block.waterSource || block.falling ? 8 : block.flowLevel;
             const belowY = cell.y - 1;
