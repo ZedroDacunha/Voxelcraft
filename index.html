@@ -1027,6 +1027,7 @@ class World {
         this.chunks = new Map();
         this.edits = new Map();
         this.dirty = new Set();
+        this.lightDirty = new Set();
         this.editCache = new Map();
         this.genQueue = [];
         this.lastPcx = null;
@@ -1071,6 +1072,48 @@ class World {
     rebuildSkyLight(chunk) {
         for (let lx = 0; lx < CHUNK_SIZE; lx++) {
             for (let lz = 0; lz < CHUNK_SIZE; lz++) this.rebuildSkyLightColumn(chunk, lx, lz);
+        }
+        this.propagateSkyLight(chunk);
+    }
+
+    propagateSkyLight(chunk) {
+        const lightMap = chunk.skyLight;
+        // Processa níveis do mais forte ao mais fraco, sem espalhar luz entre chunks nesta etapa.
+        const buckets = Array.from({ length: 16 }, () => []);
+        for (let i = 0; i < lightMap.length; i++) {
+            const level = lightMap[i];
+            if (level > 1) buckets[level].push(i);
+        }
+
+        for (let level = 15; level > 1; level--) {
+            const queue = buckets[level];
+            for (let cursor = 0; cursor < queue.length; cursor++) {
+                const i = queue[cursor];
+                if (lightMap[i] !== level) continue;
+
+                const lx = i % CHUNK_SIZE;
+                const lz = Math.floor(i / CHUNK_SIZE) % CHUNK_SIZE;
+                const y = Math.floor(i / (CHUNK_SIZE * CHUNK_SIZE));
+                const neighbors = [
+                    [lx + 1, y, lz], [lx - 1, y, lz],
+                    [lx, y + 1, lz], [lx, y - 1, lz],
+                    [lx, y, lz + 1], [lx, y, lz - 1],
+                ];
+
+                for (const [nx, ny, nz] of neighbors) {
+                    if (nx < 0 || nx >= CHUNK_SIZE || nz < 0 || nz >= CHUNK_SIZE || ny < 0 || ny >= WORLD_HEIGHT) continue;
+                    const ni = idx(nx, ny, nz);
+                    const type = chunk.data[ni];
+                    const block = BLOCKS[type];
+                    if (type !== 0 && block?.solid !== false && type !== ID.LEAVES && !WaterSystem.isBlock(type)) continue;
+
+                    const attenuation = type === ID.LEAVES ? 3 : WaterSystem.isBlock(type) ? 2 : 1;
+                    const candidate = level - attenuation;
+                    if (candidate <= lightMap[ni]) continue;
+                    lightMap[ni] = candidate;
+                    if (candidate > 1) buckets[candidate].push(ni);
+                }
+            }
         }
     }
     createTerrainWorker() {
@@ -1180,7 +1223,7 @@ class World {
         const lx = x - cx * CHUNK_SIZE, lz = z - cz * CHUNK_SIZE;
         const i = idx(lx, y, lz);
         chunk.data[i] = type;
-        this.rebuildSkyLightColumn(chunk, lx, lz);
+        this.lightDirty.add(chunk);
         if (type !== 0 && y > chunk.maxY) chunk.maxY = y;
 
         const key = chunkKey(cx, cz);
@@ -1470,6 +1513,17 @@ class World {
             if (!this.getChunk(c.cx, c.cz) && !this.pendingChunkKeys.has(chunkKey(c.cx, c.cz))) { this.generateChunk(c.cx, c.cz); genCount++; }
         }
         this.frameGen = genCount; this.frameMesh = 0;
+        // Agrupa alterações do mesmo chunk e limita o custo da propagação por quadro.
+        let lightCount = 0;
+        for (const chunk of this.lightDirty) {
+            this.lightDirty.delete(chunk);
+            this.rebuildSkyLight(chunk);
+            for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+                const neighbor = this.getChunk(chunk.cx + dx, chunk.cz + dz);
+                if (neighbor) this.dirty.add(neighbor);
+            }
+            if (++lightCount >= 1 && !unlimited) break;
+        }
 
         if (this.dirty.size) {
             const cand = [];
