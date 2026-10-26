@@ -736,12 +736,13 @@ function createAtlasTexture() {
                 const center = 15 + Math.sin(y * 0.52) * 3;
                 const width = y < 6 ? 3 + Math.floor(y / 2) : y < 18 ? 7 : y < 25 ? 5 : 2;
                 const dx = Math.abs(x - center);
-                if (dx > width || (hash2(x, y, 858) < 0.08 && y < 24)) return [0, 0, 0, 0];
+                if (dx > width) return [0, 0, 0, 0];
                 if (y < 6) return [220 + j(12), 38 + j(8), 20 + j(6)];
                 if (y < 13) return [255, 114 + j(14), 18 + j(8)];
                 if (y < 23) return [255, 220 + j(12), 48 + j(10)];
                 return [255, 248, 205];
-            }            case TILE.WATER: {
+            }
+            case TILE.WATER: {
                 return [45 + j(8), 110 + j(8), 215 + j(8)];
             }
         }
@@ -1028,12 +1029,46 @@ class Chunk {
         this.blockLight = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT);
         this.maxY = 0;
         this.mesh = null;
+        this.flameMesh = null;
     }
 }
 
+function createTorchFlameTexture() {
+    const canvas = document.createElement('canvas'); canvas.width = 16; canvas.height = 32;
+    const ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false;
+    for (let y = 0; y < 32; y++) {
+        const center = 8 + Math.sin(y * 0.48) * 1.2;
+        const width = y < 5 ? 1.5 + y * 0.55 : y < 15 ? 5 + (y - 5) * 0.2 : y < 25 ? 7 - (y - 15) * 0.22 : 4 - (y - 25) * 0.25;
+        for (let x = 0; x < 16; x++) {
+            const dx = Math.abs(x + 0.5 - center);
+            if (dx > width) continue;
+            const color = y < 6 ? (dx < width * 0.45 ? '#ff7a18' : '#d92e18') : y < 14 ? (dx < width * 0.42 ? '#fff06a' : '#ff7b12') : y < 25 ? (dx < width * 0.48 ? '#fff5a0' : '#ffd52b') : (dx < width * 0.45 ? '#fff9df' : '#ffdc42');
+            ctx.fillStyle = color; ctx.fillRect(x, y, 1, 1);
+        }
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.magFilter = THREE.NearestFilter; texture.minFilter = THREE.NearestFilter; texture.generateMipmaps = false;
+    if ('colorSpace' in texture && THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
+    return texture;
+}
+
+function buildTorchFlameGeometry(centers) {
+    const positions = [], uvs = [], indices = [], half = 0.16, bottom = 0.66, height = 0.36;
+    for (const [x, y, z] of centers) for (let plane = 0; plane < 2; plane++) {
+        const base = positions.length / 3;
+        if (plane === 0) positions.push(x-half,y+bottom,z, x+half,y+bottom,z, x-half,y+bottom+height,z, x+half,y+bottom+height,z);
+        else positions.push(x,y+bottom,z-half, x,y+bottom,z+half, x,y+bottom+height,z-half, x,y+bottom+height,z+half);
+        uvs.push(0,0, 1,0, 0,1, 1,1); indices.push(base,base+1,base+2, base+2,base+1,base+3);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geometry.setIndex(indices); geometry.computeVertexNormals();
+    return geometry;
+}
 const TORCH_PARTS = [
-    { min: [0.43, 0.02, 0.43], max: [0.57, 0.70, 0.57], tiles: { top: TILE.WOOD_END, side: TILE.WOOD, bottom: TILE.WOOD_END } },
-    { min: [0.35, 0.68, 0.35], max: [0.65, 0.94, 0.65], tiles: allFaces(TILE.TORCH_FLAME) },
+    { min: [0.45, 0.02, 0.45], max: [0.55, 0.70, 0.55], tiles: { top: TILE.WOOD_END, side: TILE.WOOD, bottom: TILE.WOOD_END } },
 ];
 const FACES = [
     { kind: 'side',   dir: [-1, 0, 0], corners: [ { pos: [0,1,0], uv: [0,1] }, { pos: [0,0,0], uv: [0,0] }, { pos: [0,1,1], uv: [1,1] }, { pos: [0,0,1], uv: [1,0] } ] },
@@ -1081,6 +1116,7 @@ class World {
             map: atlas, alphaTest: 0.5, transparent: false, depthWrite: true, vertexColors: true,
         });
         
+        this.torchFlameMaterial = new THREE.MeshBasicMaterial({ map: createTorchFlameTexture(), transparent: true, alphaTest: 0.05, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
         this.configureTorchFlicker(this.chunkMaterial);
         this.configureTorchFlicker(this.cutoutMaterial);
         this.water = new WaterSystem(atlas);
@@ -1091,7 +1127,7 @@ class World {
             shader.uniforms.uTorchTime = { value: 0 };
             shader.vertexShader = shader.vertexShader.replace(
                 '#include <common>',
-                '#include <common>\nattribute float torchInfluence;\nvarying float vTorchInfluence;'
+                '#include <common>\nuniform float uTorchTime;\nattribute float torchInfluence;\nvarying float vTorchInfluence;'
             );
             shader.vertexShader = shader.vertexShader.replace(
                 '#include <color_vertex>',
@@ -1375,6 +1411,7 @@ class World {
 
     meshChunk(chunk) {
         this.dirty.delete(chunk);
+        if (chunk.flameMesh) { this.scene.remove(chunk.flameMesh); chunk.flameMesh.geometry.dispose(); chunk.flameMesh = null; }
         if (chunk.mesh) {
             this.scene.remove(chunk.mesh);
             chunk.mesh.geometry.dispose();
@@ -1488,6 +1525,7 @@ class World {
             return grown;
         };
         const uWidth = 1 / ATLAS_COLUMNS - 2 * UV_PAD;
+        const torchFlameCenters = [];
 
         for (let y = 0; y <= chunk.maxY; y++) {
             for (let lz = 0; lz < CS; lz++) {
@@ -1501,6 +1539,10 @@ class World {
                     const blockTop = renderMode === 'liquid' ? WaterSystem.surfaceHeightFor(t, aboveType) : 1;
                     const shapeCount = renderMode === 'torch' ? TORCH_PARTS.length : 1;
                     const orientation = block.orientation || [0, 0];
+                    if (renderMode === 'torch') {
+                        const lean = block.orientation ? (0.82 * 0.35 - 0.38) : 0;
+                        torchFlameCenters.push([lx + 0.5 + orientation[0] * lean, y, lz + 0.5 + orientation[1] * lean]);
+                    }
                     for (let shapeIndex = 0; shapeIndex < shapeCount; shapeIndex++) {
                         const shape = renderMode === 'torch' ? TORCH_PARTS[shapeIndex] : null;
                         for (const f of FACES) {
@@ -1580,6 +1622,11 @@ class World {
         mesh.position.set(chunk.cx * CS, 0, chunk.cz * CS);
         this.scene.add(mesh);
         chunk.mesh = mesh;
+        if (torchFlameCenters.length) {
+            chunk.flameMesh = new THREE.Mesh(buildTorchFlameGeometry(torchFlameCenters), this.torchFlameMaterial);
+            chunk.flameMesh.position.set(chunk.cx * CS, 0, chunk.cz * CS);
+            this.scene.add(chunk.flameMesh);
+        }
     }
 
     rebuildGenQueue(pcx, pcz) {
@@ -1598,6 +1645,7 @@ class World {
     unloadFar(pcx, pcz) {
         for (const [key, c] of this.chunks) {
             if (Math.max(Math.abs(c.cx - pcx), Math.abs(c.cz - pcz)) > RENDER_DISTANCE + 2) {
+                if (c.flameMesh) { this.scene.remove(c.flameMesh); c.flameMesh.geometry.dispose(); }
                 if (c.mesh) {
                     this.scene.remove(c.mesh);
                     c.mesh.geometry.dispose();
