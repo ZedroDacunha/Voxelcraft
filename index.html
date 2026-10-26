@@ -1431,12 +1431,16 @@ class World {
             const sideB = occludesAO(sideBType) ? 1 : 0;
             const cornerOcclusion = occludesAO(cornerType) ? 1 : 0;
             const level = includeAO ? (sideA && sideB ? 0 : 3 - sideA - sideB - cornerOcclusion) : 3;
-            const sampleLight = (x, yy, z) => Math.max(skyLightAt(x, yy, z), blockLightAt(x, yy, z));
-            const light = (sampleLight(baseX, baseY, baseZ) + sampleLight(baseX + ax, baseY + ay, baseZ + az) +
-                sampleLight(baseX + bx, baseY + by, baseZ + bz) + sampleLight(baseX + ax + bx, baseY + ay + by, baseZ + az + bz)) / 60;
-            const sky = skyLightAt(baseX, baseY, baseZ) / 15;
-            const illumination = Math.max(0.18 + sky * 0.82, 0.18 + Math.min(2.2, light * 2.4) * 0.82);
-            return (0.58 + level * 0.14) * illumination;
+            const sampleSky = (x, yy, z) => skyLightAt(x, yy, z);
+            const sampleBlock = (x, yy, z) => blockLightAt(x, yy, z);
+            const sky = (sampleSky(baseX, baseY, baseZ) + sampleSky(baseX + ax, baseY + ay, baseZ + az) +
+                sampleSky(baseX + bx, baseY + by, baseZ + bz) + sampleSky(baseX + ax + bx, baseY + ay + by, baseZ + az + bz)) / 60;
+            const local = (sampleBlock(baseX, baseY, baseZ) + sampleBlock(baseX + ax, baseY + ay, baseZ + az) +
+                sampleBlock(baseX + bx, baseY + by, baseZ + bz) + sampleBlock(baseX + ax + bx, baseY + ay + by, baseZ + az + bz)) / 60;
+            const illumination = Math.max(0.18 + sky * 0.82, 0.18 + Math.min(2.2, local * 2.4) * 0.82);
+            const base = (0.58 + level * 0.14) * illumination;
+            const warmth = Math.min(0.22, local * 0.24);
+            return [base * (1 + warmth), base, base * (1 - warmth * 0.85)];
         };
 
         const initialVertexCapacity = CS * CS * 8;
@@ -1515,7 +1519,7 @@ class World {
                             uvs[uv] = u0 + c.uv[0] * uWidth;
                             uvs[uv + 1] = UV_PAD + c.uv[1] * (1 - 2 * UV_PAD);
                             const shade = ambientOcclusionAt(lx, y, lz, f, c, renderMode !== 'liquid');
-                            colors[p] = shade; colors[p + 1] = shade; colors[p + 2] = shade;
+                            colors[p] = shade[0]; colors[p + 1] = shade[1]; colors[p + 2] = shade[2];
                         }
                         vertexCount += 4;
                         target[targetOffset] = ndx; target[targetOffset + 1] = ndx + 1;
