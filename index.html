@@ -2920,20 +2920,34 @@ function updatePhysics(dt) {
     const blockedY = moveAxis('y', player.vel.y * dt);
     const dy = p.y - yBefore;
     player.onGround = false;
-    
-    // Anula o dano de queda ao atingir a água
-    if (inWater) {
+
+    // Detecta água atravessada no passo, mesmo se o jogador cair até o chão no mesmo frame.
+    let crossedWater = inWater;
+    if (!crossedWater && dy < 0) {
+        const minX = Math.floor(p.x - PLAYER_RADIUS), maxX = Math.floor(p.x + PLAYER_RADIUS);
+        const minZ = Math.floor(p.z - PLAYER_RADIUS), maxZ = Math.floor(p.z + PLAYER_RADIUS);
+        const minY = Math.floor(p.y), maxY = Math.floor(yBefore + player.height);
+        for (let y = minY; y <= maxY && !crossedWater; y++) {
+            for (let x = minX; x <= maxX && !crossedWater; x++) {
+                for (let z = minZ; z <= maxZ; z++) {
+                    if (WaterSystem.isBlock(world.getBlock(x, y, z))) { crossedWater = true; break; }
+                }
+            }
+        }
+    }
+
+    if (crossedWater) {
         player.fallDistance = 0;
     } else if (dy < 0) {
         player.fallDistance += -dy;
     } else if (dy > 0) {
         player.fallDistance = 0;
     }
-    
+
     if (blockedY) {
         if (player.vel.y < 0) {
             player.onGround = true;
-            if (player.fallDistance > 3) takeDamage(Math.floor(player.fallDistance - 3), 'fall');
+            if (!crossedWater && player.fallDistance > 3) takeDamage(Math.floor(player.fallDistance - 3), 'fall');
             player.fallDistance = 0;
         }
         player.vel.y = 0;
