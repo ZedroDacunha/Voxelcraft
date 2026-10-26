@@ -13,6 +13,13 @@
     #menu { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.6); display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; z-index: 10; text-align: center; }
     #menu h1 { margin: 0 0 10px 0; }
     #menu p { margin: 0 0 20px 0; }
+    #world-loading { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: rgba(5, 9, 16, 0.94); color: #fff; text-align: center; }
+    #world-loading[hidden] { display: none; }
+    .world-loading-card { width: min(420px, calc(100vw - 48px)); padding: 28px; background: rgba(26, 34, 48, 0.95); border: 2px solid #52637b; border-radius: 8px; box-shadow: 0 12px 40px rgba(0,0,0,.45); }
+    #world-loading-title { margin: 0 0 18px; font: bold 22px monospace; }
+    .world-loading-track { height: 16px; overflow: hidden; background: #10151c; border: 1px solid #718096; border-radius: 4px; }
+    #world-loading-fill { width: 0; height: 100%; background: linear-gradient(90deg, #4c9d61, #8bd36b); transition: width .12s linear; }
+    #world-loading-detail { margin: 12px 0 0; color: #cbd5e1; font: 13px monospace; }
     .btn { padding: 10px 20px; font-size: 16px; background: #55aa55; border: none; color: white; cursor: pointer; border-radius: 4px; }
     .btn:hover { background: #66cc66; }
 
@@ -123,10 +130,17 @@
     <div id="inv-cursor"></div>
     <div id="inv-tooltip"></div>
 </div>
+<div id="world-loading" role="status" aria-live="polite">
+    <div class="world-loading-card">
+        <p id="world-loading-title">Preparando o mundo...</p>
+        <div class="world-loading-track"><div id="world-loading-fill"></div></div>
+        <p id="world-loading-detail">Carregando terreno e construindo as áreas próximas.</p>
+    </div>
+</div>
 <div id="menu">
     <h1>Voxel Sandbox</h1>
     <p>Parte 11 — Água, Natação, Fôlego e Geração de Praias com Areia!</p>
-    <button class="btn" id="btn-play">Clique para Jogar</button>
+    <button class="btn" id="btn-play" disabled>Clique para Jogar</button>
     <p style="font-size: 14px; opacity: 0.8; margin-top: 15px;">[WASD] Mover | [Espaço] Pular/Nadar | [Shift] Correr | [C] Agachar | [F3] Debug | [F4] Qualidade | Botão esq: minerar | Botão dir: colocar / usar bancada e forno</p>
     <p style="font-size: 12px; opacity: 0.6; margin-top: 0;">Dicas: Mergulhe na água para ver as físicas de natação e a barra de fôlego! As margens de lagos/mares geram areia automaticamente.</p>
 </div>
@@ -2655,7 +2669,7 @@ function die() {
     world.water.updateSubmersion(world, player);
     player.vel.set(0, 0, 0);
     player.fallDistance = 0;
-    world.update(spawnPoint.x, spawnPoint.z, { gen: Infinity, mesh: Infinity });
+    world.update(spawnPoint.x, spawnPoint.z);
     camera.position.set(player.pos.x, player.pos.y + player.eye, player.pos.z);
     updateHotbarUI();
     updateSurvivalUI();
@@ -2665,7 +2679,13 @@ function die() {
         : 'Você não tinha itens.';
     const btn = document.getElementById('btn-respawn');
     btn.disabled = true;
-    setTimeout(() => { btn.disabled = false; }, 1200);
+    btn.textContent = 'Preparando...';
+    waitForWorldRegion(spawnPoint.x, spawnPoint.z, { driveUpdates: false })
+        .then(() => new Promise(resolve => setTimeout(resolve, 1200)))
+        .then(() => {
+            if (dead) { btn.disabled = false; btn.textContent = 'Renascer'; }
+        })
+        .catch(error => console.error('Falha ao preparar o respawn:', error));
     deathEl.style.display = 'flex';
     controls.unlock();
     saveGame(true);
@@ -3187,6 +3207,48 @@ function requestLock() {
     }
 }
 
+function getWorldRegionStatus(x, z) {
+    const cx = floorDiv(x, CHUNK_SIZE), cz = floorDiv(z, CHUNK_SIZE);
+    const total = (RENDER_DISTANCE * 2 + 1) ** 2;
+    let loaded = 0, meshed = 0;
+    for (let dx = -RENDER_DISTANCE; dx <= RENDER_DISTANCE; dx++) {
+        for (let dz = -RENDER_DISTANCE; dz <= RENDER_DISTANCE; dz++) {
+            const chunk = world.getChunk(cx + dx, cz + dz);
+            if (!chunk) continue;
+            loaded++;
+            if (chunk.mesh) meshed++;
+        }
+    }
+    return { loaded, meshed, total };
+}
+
+function setWorldLoadProgress(status) {
+    const percent = Math.min(100, Math.floor(status.meshed / status.total * 100));
+    document.getElementById('world-loading-title').textContent = `Gerando mundo... ${percent}%`;
+    document.getElementById('world-loading-fill').style.width = `${percent}%`;
+    document.getElementById('world-loading-detail').textContent = `Áreas prontas: ${status.meshed} de ${status.total}`;
+}
+
+function isWorldRegionReady(x, z) {
+    const status = getWorldRegionStatus(x, z);
+    return status.meshed === status.total;
+}
+
+async function waitForWorldRegion(x, z, { driveUpdates = true, onProgress = null } = {}) {
+    while (!isWorldRegionReady(x, z)) {
+        if (driveUpdates) world.update(x, z);
+        const status = getWorldRegionStatus(x, z);
+        if (onProgress) onProgress(status);
+        await new Promise(resolve => requestAnimationFrame(resolve));
+    }
+    if (onProgress) onProgress(getWorldRegionStatus(x, z));
+}
+
+function showWorldLoadError(error) {
+    console.error('Falha ao preparar o mundo:', error);
+    document.getElementById('world-loading-title').textContent = 'Não foi possível carregar o mundo';
+    document.getElementById('world-loading-detail').textContent = 'Recarregue a página para tentar novamente.';
+}
 async function init() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(SKY_COLOR);
@@ -3249,7 +3311,7 @@ async function init() {
     const sp = findSpawn(world.generator);
     spawnPoint.set(sp.x, sp.y, sp.z);
     const start = save ? save.player : spawnPoint;
-    world.update(start.x, start.z, { gen: Infinity, mesh: Infinity });
+    await waitForWorldRegion(start.x, start.z, { driveUpdates: true, onProgress: setWorldLoadProgress });
     player.pos.set(start.x, start.y, start.z);
     for (let guard = 0; guard < 70 && collides(player.pos.x, player.pos.y, player.pos.z, player.height); guard++) player.pos.y += 1;
     camera.position.set(player.pos.x, player.pos.y + player.eye, player.pos.z);
@@ -3392,6 +3454,8 @@ async function init() {
     }
 
     updateSurvivalUI();
+    document.getElementById('btn-play').disabled = false;
+    document.getElementById('world-loading').hidden = true;
 }
 
 function animate() {
@@ -3461,7 +3525,7 @@ function animate() {
     }
 }
 
-init().then(animate);
+init().then(animate).catch(showWorldLoadError);
 </script>
 </body>
 </html>
