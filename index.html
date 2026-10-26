@@ -1587,8 +1587,8 @@ function updateItemEntities(dt) {
         const e = itemEntities[i];
         const loaded = !!world.getChunk(floorDiv(e.pos.x, CHUNK_SIZE), floorDiv(e.pos.z, CHUNK_SIZE));
         if (!loaded) {
-            if (e.ttl > 300) { e.mesh.visible = false; continue; }
-            removeItemEntity(i);
+            // Mantém qualquer drop enquanto o chunk está descarregado; o TTL pausa fora da área carregada.
+            e.mesh.visible = false;
             continue;
         }
         e.mesh.visible = true;
@@ -2639,7 +2639,7 @@ function die() {
         lost += st.count;
         spawnItemEntity(st.id, st.count, origin,
             new THREE.Vector3((Math.random() - 0.5) * 5, 3 + Math.random() * 3, (Math.random() - 0.5) * 5),
-            1.5, st.damage || 0, { ttl: DEATH_DROP_TTL });
+            1.5, st.damage || 0, { ttl: DEATH_DROP_TTL, noMerge: true });
     });
 
     resetStats();
