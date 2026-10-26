@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Voxel Sandbox - Parte 10: Texturas</title>
+<title>Voxel Sandbox - Parte 11: Água, Praias e Natação</title>
 <style>
     body { margin: 0; overflow: hidden; background-color: #87CEEB; font-family: sans-serif; }
     #crosshair { position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; margin-top: -10px; margin-left: -10px; pointer-events: none; }
@@ -31,13 +31,16 @@
     .dur div { height: 100%; }
 
     #survival-hud { display: flex; justify-content: space-between; align-items: flex-end; padding: 0 6px; }   /* vida na borda esquerda do 1º slot, fome na borda direita do último */
+    #left-stats { display: flex; flex-direction: column; gap: 4px; } /* Agrupa Fôlego e Vida */
     .stat-bar { display: flex; gap: 4px; }
     .heart { width: 14px; height: 14px; background: #ff3333; border-radius: 50%; box-shadow: 0 0 2px #000; border: 1px solid #800000; }
     .food { width: 14px; height: 14px; background: #ffaa00; border-radius: 3px; box-shadow: 0 0 2px #000; border: 1px solid #8b4500; }
+    .bubble { width: 12px; height: 12px; background: #55ccff; border-radius: 50%; box-shadow: inset -2px -2px 4px rgba(0,0,0,0.2), 0 0 2px #000; border: 1px solid #0055aa; margin-top: 1px; }
     .empty-stat { background: rgba(0,0,0,0.5); border: 1px solid #111; box-shadow: none; }
     .heart.half { background: linear-gradient(90deg, #ff3333 50%, rgba(0,0,0,0.5) 50%); }
     .food.half { background: linear-gradient(90deg, #ffaa00 50%, rgba(0,0,0,0.5) 50%); }
     .btn:disabled { background: #888; cursor: not-allowed; }
+    
     #death { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; background: rgba(110,0,0,0.7); color: #fff; z-index: 11; text-align: center; padding: 0 20px; }
     #death h1 { margin: 0 0 12px; font-size: 40px; }
     #death p { margin: 0 0 20px; max-width: 460px; font: 14px/1.5 monospace; }
@@ -122,15 +125,18 @@
 </div>
 <div id="menu">
     <h1>Voxel Sandbox</h1>
-    <p>Parte 10 — Pixel art 32 × 32: atlas organizado, variantes discretas, folhas recortadas e materiais com faces próprias</p>
+    <p>Parte 11 — Água, Natação, Fôlego e Geração de Praias com Areia!</p>
     <button class="btn" id="btn-play">Clique para Jogar</button>
-    <p style="font-size: 14px; opacity: 0.8; margin-top: 15px;">[WASD] Mover | [Espaço] Pular | [Shift] Correr | [Ctrl / C] Agachar | [F3] Debug | [F4] Qualidade | Botão esq (segure): minerar | Botão dir: colocar / usar bancada e forno / segurar para comer | [E] Inventário / crafting | [Q] Soltar item</p>
-    <p style="font-size: 12px; opacity: 0.6; margin-top: 0;">Dicas: ?seed=123 gera outro mundo · ?reset apaga o save daquela seed · ?debug libera dbg.time(0.25) no console (0 = nascer do sol, 0.25 = meio-dia, 0.5 = pôr do sol, 0.75 = meia-noite) · para colocar bloco encostado em bancada/forno, segure Ctrl ou C ao clicar · o jogo salva sozinho a cada 30 s e ao pausar.</p>
+    <p style="font-size: 14px; opacity: 0.8; margin-top: 15px;">[WASD] Mover | [Espaço] Pular/Nadar | [Shift] Correr | [Ctrl / C] Agachar | [F3] Debug | [F4] Qualidade | Botão esq: minerar | Botão dir: colocar / usar bancada e forno</p>
+    <p style="font-size: 12px; opacity: 0.6; margin-top: 0;">Dicas: Mergulhe na água para ver as físicas de natação e a barra de fôlego! As margens de lagos/mares geram areia automaticamente.</p>
 </div>
 
 <div id="hud-bottom">
 <div id="survival-hud">
-    <div class="stat-bar" id="health-bar"></div>
+    <div id="left-stats">
+        <div class="stat-bar" id="breath-bar"></div>
+        <div class="stat-bar" id="health-bar"></div>
+    </div>
     <div class="stat-bar" id="hunger-bar"></div>
 </div>
 <div id="hotbar">
@@ -161,9 +167,9 @@ const MESH_PER_FRAME = 2;      // malhas reconstruídas por quadro
 const REACH = 5;               // alcance de interação (blocos)
 const SEED = Number(new URLSearchParams(location.search).get('seed')) || 1337;
 const SKY_COLOR = 0x87CEEB;
-const GPU_PREF = new URLSearchParams(location.search).get('gpu') === 'default' ? 'default' : 'high-performance';   // ?gpu=default para testar sem pedir a GPU dedicada
+const GPU_PREF = new URLSearchParams(location.search).get('gpu') === 'default' ? 'default' : 'high-performance';
 const FRAME_BUDGET_MS = 7;     // tempo máximo por quadro gasto gerando/montando chunks
-const MAX_PIXEL_RATIO = Number(new URLSearchParams(location.search).get('pr')) || 1.5;   // ?pr=2 para resolução total
+const MAX_PIXEL_RATIO = Number(new URLSearchParams(location.search).get('pr')) || 1.5;
 
 // Física do jogador
 const GRAVITY = 30;
@@ -174,28 +180,28 @@ const CROUCH_SPEED = 1.3;
 const PLAYER_RADIUS = 0.3;
 const H_STAND = 1.8, H_CROUCH = 1.5;
 const EYE_STAND = 1.62, EYE_CROUCH = 1.27;
+const WATER_LEVEL = 26; // Nível base do mar
 
 // Sobrevivência
-const MAX_HEALTH = 20, MAX_HUNGER = 20;
-const SPRINT_MIN_HUNGER = 7;      // com 6 ou menos de fome não dá para correr
-const EAT_TIME = 1.6;             // segundos segurando o botão direito para comer
-const INVULN_TIME = 0.5;          // imunidade curta depois de levar dano
-const DEATH_DROP_TTL = 600;       // itens da morte somem em 10 min (contados só com a área carregada)
+const MAX_HEALTH = 20, MAX_HUNGER = 20, MAX_BREATH = 20;
+const SPRINT_MIN_HUNGER = 7;
+const EAT_TIME = 1.6;
+const INVULN_TIME = 0.5;
+const DEATH_DROP_TTL = 600;
 
-// Dia e noite (PARTE 8)
-const DAY_LENGTH = 1200;          // segundos reais por dia completo do mundo (20 min)
-const START_TIME = 0.2;           // 0 = nascer do sol, 0.25 = meio-dia, 0.5 = pôr do sol, 0.75 = meia-noite
-// Nuvens (PARTE 9)
-const CLOUD_CELL = 8;             // lado de cada bloco de nuvem (blocos do mundo)
-const CLOUD_THICK = 3;            // espessura
-const CLOUD_GRID = 32;            // 32x32 células ao redor do jogador (alcance de ~128 blocos)
-const CLOUD_Y = 80;               // altura das nuvens (o terreno vai até 64)
-const CLOUD_SPEED = 1.6;          // blocos por segundo
-const CLOUD_SCALE = 0.13;         // tamanho das manchas (menor = nuvens maiores)
-const CLOUD_THRESHOLD = 0.12;     // maior = menos céu coberto (0.12 deixa cerca de 1/3 coberto)
-const SKY_DISTANCE = 250;        // distância do sol, da lua e das estrelas (a câmera enxerga até 300)
+// Dia, Noite e Nuvens
+const DAY_LENGTH = 1200;
+const START_TIME = 0.2;
+const CLOUD_CELL = 8;
+const CLOUD_THICK = 3;
+const CLOUD_GRID = 32;
+const CLOUD_Y = 80;
+const CLOUD_SPEED = 1.6;
+const CLOUD_SCALE = 0.13;
+const CLOUD_THRESHOLD = 0.12;
+const SKY_DISTANCE = 250;
 
-// Mão em primeira pessoa (ajuste fino de pose aqui)
+// Mão em primeira pessoa
 const HAND_BASE = { x: 0.42, y: -0.50, z: -0.25 };
 const HELD_TOOL_ROT = [0.3, -0.55, 0.0];
 const HELD_BLOCK_ROT = [0.25, 0.7, 0.0];
@@ -204,26 +210,22 @@ const HELD_BLOCK_POS = [0.03, 0.07, -0.04];
 // =====================================================================
 // 2. REGISTRO CENTRAL DE BLOCOS E ITENS
 // =====================================================================
-// Atlas organizado por família: terreno, madeira, construção, minérios e variantes.
 const TILE = { GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, STONE: 3, WOOD: 4, COBBLE: 5, LEAVES: 6, PLANKS: 7,
                CRAFT_TOP: 8, CRAFT_SIDE: 9, FURNACE_FRONT: 10, FURNACE_TOP: 11, CHEST_TOP: 12, CHEST_SIDE: 13,
                WOOD_END: 14, COAL_ORE: 15, IRON_ORE: 16, GOLD_ORE: 17, DIAMOND_ORE: 18,
-               GRASS_TOP_ALT: 19, GRASS_SIDE_ALT: 20, DIRT_ALT: 21, STONE_ALT: 22, LEAVES_ALT: 23 };
+               GRASS_TOP_ALT: 19, GRASS_SIDE_ALT: 20, DIRT_ALT: 21, STONE_ALT: 22, LEAVES_ALT: 23,
+               SAND: 24, WATER: 25 }; // NOVOS TILES PARA AREIA E ÁGUA
 const ATLAS_COLUMNS = 40;
 const TILE_PX = 32;
 
 const allFaces = (t) => ({ top: t, side: t, bottom: t });
 
-// IDs fixos (bloco = item de mesmo id; itens que não são blocos começam em 20)
 const ID = { GRASS: 1, STONE: 2, LOG: 3, DIRT: 4, COBBLE: 5, PLANKS: 6, LEAVES: 7,
              CRAFTING_TABLE: 8, FURNACE: 9, CHEST: 10,
              COAL_ORE: 11, IRON_ORE: 12, GOLD_ORE: 13, DIAMOND_ORE: 14,
+             SAND: 15, WATER: 16, // NOVOS BLOCOS PARA O JOGO
              STICK: 20, APPLE: 30, CHARCOAL: 31 };
 
-// Para adicionar um bloco novo: crie o tile no atlas e uma entrada aqui.
-//  drop: id do item solto (null = nada) | dropChance: chance de soltar (padrão 1)
-//  tool: ferramenta ideal | requiresTool + minTier: sem a ferramenta certa não solta nada
-//  station: 'crafting' | 'furnace' (botão direito abre a interface)
 const BLOCKS = {
     1: { name: 'Grama',      hardness: 0.6, drop: ID.DIRT,   tool: 'shovel', tiles: { top: TILE.GRASS_TOP, side: TILE.GRASS_SIDE, bottom: TILE.DIRT } },
     2: { name: 'Pedra',      hardness: 1.5, drop: ID.COBBLE, tool: 'pickaxe', requiresTool: true, minTier: 1, tiles: allFaces(TILE.STONE) },
@@ -242,6 +244,8 @@ const BLOCKS = {
     12: { name: 'Minério de ferro',    hardness: 3.5, drop: ID.IRON_ORE,    tool: 'pickaxe', requiresTool: true, minTier: 1, tiles: allFaces(TILE.IRON_ORE) },
     13: { name: 'Minério de ouro',     hardness: 4.0, drop: ID.GOLD_ORE,    tool: 'pickaxe', requiresTool: true, minTier: 2, tiles: allFaces(TILE.GOLD_ORE) },
     14: { name: 'Minério de diamante', hardness: 4.5, drop: ID.DIAMOND_ORE, tool: 'pickaxe', requiresTool: true, minTier: 2, tiles: allFaces(TILE.DIAMOND_ORE) },
+    15: { name: 'Areia',     hardness: 0.5, drop: ID.SAND, tool: 'shovel', tiles: allFaces(TILE.SAND) }, // Adicionado o Bloco de Areia
+    16: { name: 'Água',      hardness: 100, drop: null, tool: null, tiles: allFaces(TILE.WATER) },       // Adicionado o Bloco de Água
 };
 
 const ITEMS = {};
@@ -249,7 +253,6 @@ for (const [id, b] of Object.entries(BLOCKS)) {
     ITEMS[id] = { name: b.name, maxStack: 64, block: Number(id), iconTile: b.icon ?? b.tiles.top };
 }
 
-// Itens com sprite pixelado (ganham um tile no atlas, depois dos tiles de bloco)
 let nextTile = Object.keys(TILE).length;
 ITEMS[ID.STICK] = { name: 'Graveto', maxStack: 64, sprite: { kind: 'stick', mat: 'wood' }, iconTile: nextTile++ };
 
@@ -270,18 +273,12 @@ for (const [matKey, m] of Object.entries(TOOL_MATS)) {
     });
 }
 
-// Comida e materiais novos
 ITEMS[ID.APPLE]    = { name: 'Maçã', maxStack: 64, food: { hunger: 4, sat: 2.4 }, sprite: { kind: 'apple', mat: 'food' }, iconTile: nextTile++ };
 ITEMS[ID.CHARCOAL] = { name: 'Carvão vegetal', maxStack: 64, sprite: { kind: 'charcoal', mat: 'coal' }, iconTile: nextTile++ };
 
-// Forno: o que derrete (tempo em segundos) e quanto cada combustível dura (segundos de chama)
-const SMELT = {
-    [ID.COBBLE]: { result: ID.STONE,    time: 10 },
-    [ID.LOG]:    { result: ID.CHARCOAL, time: 10 },
-};
+const SMELT = { [ID.COBBLE]: { result: ID.STONE, time: 10 }, [ID.LOG]: { result: ID.CHARCOAL, time: 10 } };
 const FUEL = { [ID.PLANKS]: 15, [ID.LOG]: 15, [ID.STICK]: 5, [ID.CHARCOAL]: 80 };
 
-// ---- Receitas (dados puros). Formato: grade de linhas; null = vazio ----
 const RECIPES = [];
 function trimShape(rows) {
     let r0 = rows.length, r1 = -1, c0 = Infinity, c1 = -1;
@@ -302,18 +299,13 @@ for (const m of Object.values(TOOL_MATS)) {
     defRecipe([[M], [S]],          m.id_shovel);
 }
 defRecipe([[ID.PLANKS, ID.PLANKS], [ID.PLANKS, ID.PLANKS]], ID.CRAFTING_TABLE);
-{
-    const C = ID.COBBLE;
-    defRecipe([[C, C, C], [C, null, C], [C, C, C]], ID.FURNACE);   // só cabe na bancada 3x3
-    const P = ID.PLANKS;
-    defRecipe([[P, P, P], [P, null, P], [P, P, P]], ID.CHEST);     // idem
-}
+defRecipe([[ID.COBBLE, ID.COBBLE, ID.COBBLE], [ID.COBBLE, null, ID.COBBLE], [ID.COBBLE, ID.COBBLE, ID.COBBLE]], ID.FURNACE);
+defRecipe([[ID.PLANKS, ID.PLANKS, ID.PLANKS], [ID.PLANKS, null, ID.PLANKS], [ID.PLANKS, ID.PLANKS, ID.PLANKS]], ID.CHEST);
 
 function shapesEqual(a, b) {
     if (a.length !== b.length || a[0].length !== b[0].length) return false;
     return a.every((row, r) => row.every((v, c) => v === b[r][c]));
 }
-// craftN = 2 (inventário) ou 3 (bancada); lê os primeiros craftN*craftN slots
 function matchRecipe(inv) {
     const n = craftN, s = inv.slots, rows = [];
     for (let r = 0; r < n; r++) {
@@ -349,12 +341,8 @@ function hash2(x, z, s) {
     return (h >>> 0) / 4294967296;
 }
 
-// --- Sprites 16x16 de ferramentas e itens (usados no atlas, no braço e nos drops) ---
 const HANDLE_L = [156, 106, 52], HANDLE_D = [112, 74, 34];
-const HEAD_COLORS = {
-    wood:  { l: [176, 128, 70],  d: [130, 90, 45] },
-    stone: { l: [150, 150, 152], d: [106, 106, 110] },
-};
+const HEAD_COLORS = { wood: { l: [176, 128, 70], d: [130, 90, 45] }, stone: { l: [150, 150, 152], d: [106, 106, 110] } };
 const spriteCache = {};
 function spritePixels(kind, mat) {
     const key = kind + ':' + mat;
@@ -362,7 +350,6 @@ function spritePixels(kind, mat) {
     const g = Array.from({ length: 16 }, () => Array(16).fill(null));
     const put = (x, y, c) => { if (x >= 0 && x < 16 && y >= 0 && y < 16) g[y][x] = c; };
 
-    // Itens redondos (sem cabo)
     if (kind === 'apple' || kind === 'charcoal') {
         for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
             if (kind === 'apple') {
@@ -375,18 +362,16 @@ function spritePixels(kind, mat) {
             }
         }
         if (kind === 'apple') { put(8, 4, [110, 70, 30]); put(8, 5, [110, 70, 30]); put(9, 4, [60, 150, 50]); put(10, 4, [60, 150, 50]); }
-        spriteCache[key] = g;
-        return g;
+        return (spriteCache[key] = g);
     }
 
     const hLen = kind === 'stick' ? 13 : kind === 'shovel' ? 10 : 10;
     for (let x = 3; x <= hLen; x++) { put(x, 16 - x, HANDLE_L); put(x + 1, 16 - x, HANDLE_D); }
 
-    const head = new Set();
-    const add = (x, y) => head.add(x + ',' + y);
+    const head = new Set(), add = (x, y) => head.add(x + ',' + y);
     if (kind === 'pickaxe') {
         for (let t = -4; t <= 4; t++) {
-            const k = Math.abs(t) >= 3 ? 1 : 0;           // pontas curvadas para trás
+            const k = Math.abs(t) >= 3 ? 1 : 0;
             add(10 + t - k, 6 + t + k);
             if (Math.abs(t) <= 3) add(11 + t, 5 + t);
         }
@@ -408,8 +393,7 @@ function spritePixels(kind, mat) {
             put(x, y, dark ? hc.d : hc.l);
         }
     }
-    spriteCache[key] = g;
-    return g;
+    return (spriteCache[key] = g);
 }
 
 function createAtlasTexture() {
@@ -495,7 +479,6 @@ function createAtlasTexture() {
                 return [ring || core ? 119 + j(3) : 174 + j(4), ring || core ? 79 + j(3) : 124 + j(4), ring || core ? 42 + j(2) : 66 + j(3)];
             }
             case TILE.LEAVES: {
-                // Hash sem alinhamento + rejeição de vizinhos: aberturas de um pixel, nunca faixas.
                 const leafHole = (px, py) => hash2(px, py, 800 + alt) < 0.07;
                 if (leafHole(x, y) && !leafHole(x - 1, y) && !leafHole(x + 1, y) &&
                     !leafHole(x, y - 1) && !leafHole(x, y + 1)) return [0, 0, 0, 0];
@@ -543,6 +526,13 @@ function createAtlasTexture() {
                 const c = ((x < 3 || x > 28 || y < 3 || y > 28) ? 85 : 110) + j(6);
                 return [c, c, c];
             }
+            case TILE.SAND: {
+                const c = 215 + j(12);
+                return [c, c - 20, c - 70];
+            }
+            case TILE.WATER: {
+                return [45 + j(8), 110 + j(8), 215 + j(8)];
+            }
         }
         return [255, 0, 255];
     };
@@ -551,14 +541,12 @@ function createAtlasTexture() {
         for (let x = 0; x < TILE_PX; x++) for (let y = 0; y < TILE_PX; y++) {
             const raw = pixel(tile, x, y);
             if (raw[3] === 0) continue;
-            // Quantização por canal mantém uma paleta curta e coerente entre materiais.
             const c = raw.slice(0, 3).map(v => Math.max(0, Math.min(255, Math.round(v / 8) * 8)));
             ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
             ctx.fillRect(tile * TILE_PX + x, y, 1, 1);
         }
     }
 
-    // Sprites 16x16 ampliados por inteiros, com transparência preservada.
     for (const item of Object.values(ITEMS)) {
         if (!item.sprite) continue;
         const pix = spritePixels(item.sprite.kind, item.sprite.mat);
@@ -645,8 +633,8 @@ class Noise2D {
 }
 
 const idx = (lx, y, lz) => lx + lz * CHUNK_SIZE + y * CHUNK_SIZE * CHUNK_SIZE;
-const chunkKey = (cx, cz) => `${cx},${cz}`;                          // usado só nos salvamentos
-const chunkId = (cx, cz) => ((cx & 0xFFFF) << 16) | (cz & 0xFFFF);   // usado nas consultas quentes
+const chunkKey = (cx, cz) => `${cx},${cz}`;
+const chunkId = (cx, cz) => ((cx & 0xFFFF) << 16) | (cz & 0xFFFF);
 const floorDiv = (a, b) => Math.floor(a / b);
 
 class TerrainGenerator {
@@ -668,14 +656,19 @@ class TerrainGenerator {
             for (let lz = 0; lz < CHUNK_SIZE; lz++) {
                 const h = this.heightAt(ox + lx, oz + lz);
                 heights[lx + lz * CHUNK_SIZE] = h;
-                if (h > chunk.maxY) chunk.maxY = h;
+                
+                // Terreno sólido
                 for (let y = 0; y <= h; y++) {
                     let type;
-                    if (y === 0) type = 2;            // fundo do mundo (indestrutível)
-                    else if (y === h) type = 1;       // grama
-                    else if (y >= h - 3) type = 4;    // terra
+                    if (y === 0) type = 2;
+                    else if (y === h) {
+                        type = (h <= WATER_LEVEL + 1) ? ID.SAND : 1; // Areia perto da água
+                    }
+                    else if (y >= h - 3) {
+                        type = (h <= WATER_LEVEL + 1) ? ID.SAND : 4; 
+                    }
                     else {
-                        type = 2;                     // pedra com veios esparsos e determinísticos
+                        type = 2;
                         const ore = hash2(ox + lx + y * 31, oz + lz - y * 17, this.seed + 91);
                         if (y < 18 && ore < 0.004) type = ID.DIAMOND_ORE;
                         else if (y < 28 && ore < 0.010) type = ID.GOLD_ORE;
@@ -684,11 +677,20 @@ class TerrainGenerator {
                     }
                     chunk.data[idx(lx, y, lz)] = type;
                 }
+                
+                // Preenche buracos com água até o nível do mar
+                if (h < WATER_LEVEL) {
+                    for (let y = h + 1; y <= WATER_LEVEL; y++) {
+                        chunk.data[idx(lx, y, lz)] = ID.WATER;
+                    }
+                }
+                
+                if (h > chunk.maxY) chunk.maxY = h;
+                if (WATER_LEVEL > chunk.maxY) chunk.maxY = WATER_LEVEL; // Atualiza a maxY caso a água seja maior que o terreno
             }
         }
         this.plantTrees(chunk, heights, ox, oz);
     }
-    // Árvores simples: só em colunas 2..13 do chunk, assim a copa nunca cruza a borda do chunk
     plantTrees(chunk, heights, ox, oz) {
         const set = (lx, y, lz, t) => {
             if (y < 0 || y >= WORLD_HEIGHT) return;
@@ -698,18 +700,21 @@ class TerrainGenerator {
         for (let lx = 2; lx <= 13; lx++) {
             for (let lz = 2; lz <= 13; lz++) {
                 const wx = ox + lx, wz = oz + lz;
-                if (Math.abs(wx) < 4 && Math.abs(wz) < 4) continue;        // mantém o spawn livre
+                if (Math.abs(wx) < 4 && Math.abs(wz) < 4) continue;
                 if (hash2(wx, wz, this.seed) > 0.012) continue;
                 const h = heights[lx + lz * CHUNK_SIZE];
-                const th = 4 + Math.floor(hash2(wx, wz, this.seed + 7) * 3);  // tronco 4..6
+                
+                if (h <= WATER_LEVEL + 1) continue; // Sem árvores debaixo d'água ou nas praias
+                
+                const th = 4 + Math.floor(hash2(wx, wz, this.seed + 7) * 3);
                 if (h + th + 2 >= WORLD_HEIGHT) continue;
                 for (let k = 1; k <= th; k++) set(lx, h + k, lz, ID.LOG);
                 for (let dy = th - 2; dy <= th + 1; dy++) {
                     const r = dy >= th ? 1 : 2;
                     for (let dx = -r; dx <= r; dx++) {
                         for (let dz = -r; dz <= r; dz++) {
-                            if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;      // sem cantos
-                            if (dy === th + 1 && Math.abs(dx) + Math.abs(dz) > 1) continue; // topo em cruz
+                            if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
+                            if (dy === th + 1 && Math.abs(dx) + Math.abs(dz) > 1) continue;
                             set(lx + dx, h + dy, lz + dz, ID.LEAVES);
                         }
                     }
@@ -727,12 +732,11 @@ class Chunk {
         this.cx = cx;
         this.cz = cz;
         this.data = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT);
-        this.maxY = 0;      // maior Y com bloco (acelera a malha)
+        this.maxY = 0;
         this.mesh = null;
     }
 }
 
-// Cada face: direção, tipo de tile e 4 cantos (CCW visto de fora)
 const FACES = [
     { kind: 'side',   dir: [-1, 0, 0], corners: [ { pos: [0,1,0], uv: [0,1] }, { pos: [0,0,0], uv: [0,0] }, { pos: [0,1,1], uv: [1,1] }, { pos: [0,0,1], uv: [1,0] } ] },
     { kind: 'side',   dir: [ 1, 0, 0], corners: [ { pos: [1,1,1], uv: [0,1] }, { pos: [1,0,1], uv: [0,0] }, { pos: [1,1,0], uv: [1,1] }, { pos: [1,0,0], uv: [1,0] } ] },
@@ -743,7 +747,6 @@ const FACES = [
 ];
 const UV_PAD = 0.0005;
 
-// Variantes discretas por posição: repetem o mesmo desenho-base sem efeito xadrez.
 function variantTile(tile, wx, y, wz) {
     if (hash2(wx + y * 13, wz - y * 7, 404) > 0.16) return tile;
     if (tile === TILE.GRASS_TOP) return TILE.GRASS_TOP_ALT;
@@ -760,17 +763,21 @@ class World {
         this.seed = seed;
         this.generator = new TerrainGenerator(seed);
         this.chunks = new Map();
-        this.edits = new Map();   // chunkKey -> Map(indexLocal -> tipo). Base do salvamento.
-        this.dirty = new Set();   // chunks que precisam de malha
-        this.editCache = new Map(); // chunkKey -> Uint16Array pronto para salvar
+        this.edits = new Map();
+        this.dirty = new Set();
+        this.editCache = new Map();
         this.genQueue = [];
         this.lastPcx = null;
         this.lastPcz = null;
         const atlas = createAtlasTexture();
         this.material = new THREE.MeshLambertMaterial({ map: atlas });
-        // Cutout binário preserva pixels nítidos e a ordenação correta da copa.
         this.cutoutMaterial = new THREE.MeshLambertMaterial({
             map: atlas, alphaTest: 0.5, transparent: false, depthWrite: true,
+        });
+        
+        // Novo Material Transparente para Água
+        this.waterMaterial = new THREE.MeshLambertMaterial({
+            map: atlas, transparent: true, opacity: 0.75, depthWrite: false, side: THREE.DoubleSide
         });
     }
 
@@ -783,13 +790,13 @@ class World {
         return chunk.data[idx(x - chunk.cx * CHUNK_SIZE, y, z - chunk.cz * CHUNK_SIZE)];
     }
 
-    // Colisão: chunk não carregado conta como sólido (o jogador nunca atravessa o vazio)
     isSolidForPhysics(x, y, z) {
         if (y < 0) return true;
         if (y >= WORLD_HEIGHT) return false;
         const chunk = this.getChunk(floorDiv(x, CHUNK_SIZE), floorDiv(z, CHUNK_SIZE));
         if (!chunk) return true;
-        return chunk.data[idx(x - chunk.cx * CHUNK_SIZE, y, z - chunk.cz * CHUNK_SIZE)] !== 0;
+        const type = chunk.data[idx(x - chunk.cx * CHUNK_SIZE, y, z - chunk.cz * CHUNK_SIZE)];
+        return type !== 0 && type !== ID.WATER; // Água não é sólida!
     }
 
     setBlock(x, y, z, type) {
@@ -806,7 +813,7 @@ class World {
         let ed = this.edits.get(key);
         if (!ed) { ed = new Map(); this.edits.set(key, ed); }
         ed.set(i, type);
-        this.editCache.delete(key);   // o cache do salvamento desse chunk ficou velho
+        this.editCache.delete(key);
 
         this.meshChunk(chunk);
         if (lx === 0) this.remeshIfReady(cx - 1, cz);
@@ -839,7 +846,7 @@ class World {
         this.dirty.add(chunk);
         for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
             const n = this.getChunk(cx + dx, cz + dz);
-            if (n) this.dirty.add(n); // vizinho precisa ocultar faces da borda
+            if (n) this.dirty.add(n);
         }
     }
 
@@ -858,18 +865,24 @@ class World {
         const nzm = this.getChunk(chunk.cx, chunk.cz - 1);
         const nzp = this.getChunk(chunk.cx, chunk.cz + 1);
 
-        // Há bloco (opaco) nessa posição? Fora do mundo embaixo = sim; chunk ausente = sim (oculta a face)
-        const solid = (lx, y, lz) => {
+        const solid = (lx, y, lz, currentType) => {
             if (y < 0) return true;
             if (y >= WORLD_HEIGHT) return false;
-            if (lx < 0)   return nxm ? nxm.data[(CS - 1) + lz * CS + y * CS2] !== 0 : true;
-            if (lx >= CS) return nxp ? nxp.data[0 + lz * CS + y * CS2] !== 0 : true;
-            if (lz < 0)   return nzm ? nzm.data[lx + (CS - 1) * CS + y * CS2] !== 0 : true;
-            if (lz >= CS) return nzp ? nzp.data[lx + 0 + y * CS2] !== 0 : true;
-            return data[lx + lz * CS + y * CS2] !== 0;
+            let nType = 0;
+            if (lx < 0)        nType = nxm ? nxm.data[(CS - 1) + lz * CS + y * CS2] : 1;
+            else if (lx >= CS) nType = nxp ? nxp.data[0 + lz * CS + y * CS2] : 1;
+            else if (lz < 0)   nType = nzm ? nzm.data[lx + (CS - 1) * CS + y * CS2] : 1;
+            else if (lz >= CS) nType = nzp ? nzp.data[lx + 0 + y * CS2] : 1;
+            else               nType = data[lx + lz * CS + y * CS2];
+            
+            // Regra de Culling para Água: Não renderiza face se tocar em outra água ou bloco sólido
+            if (currentType === ID.WATER) return nType !== 0; 
+            // Blocos sólidos: Escondem a face apenas se tocarem em outro bloco sólido (Água não esconde a pedra atrás dela)
+            return nType !== 0 && nType !== ID.WATER;
         };
 
-        const positions = [], normals = [], uvs = [], indices = [], cutoutIndices = [];
+        const positions = [], normals = [], uvs = [];
+        const indices = [], cutoutIndices = [], waterIndices = [];
         const uWidth = 1 / ATLAS_COLUMNS - 2 * UV_PAD;
 
         for (let y = 0; y <= chunk.maxY; y++) {
@@ -879,7 +892,7 @@ class World {
                     if (t === 0) continue;
                     const tiles = BLOCKS[t].tiles;
                     for (const f of FACES) {
-                        if (solid(lx + f.dir[0], y + f.dir[1], lz + f.dir[2])) continue;
+                        if (solid(lx + f.dir[0], y + f.dir[1], lz + f.dir[2], t)) continue;
                         const wx = chunk.cx * CS + lx, wz = chunk.cz * CS + lz;
                         const tile = variantTile(tiles[f.kind], wx, y, wz);
                         const u0 = tile / ATLAS_COLUMNS + UV_PAD;
@@ -889,7 +902,7 @@ class World {
                             normals.push(f.dir[0], f.dir[1], f.dir[2]);
                             uvs.push(u0 + c.uv[0] * uWidth, UV_PAD + c.uv[1] * (1 - 2 * UV_PAD));
                         }
-                        const target = t === ID.LEAVES ? cutoutIndices : indices;
+                        const target = t === ID.LEAVES ? cutoutIndices : (t === ID.WATER ? waterIndices : indices);
                         target.push(ndx, ndx + 1, ndx + 2, ndx + 2, ndx + 1, ndx + 3);
                     }
                 }
@@ -902,10 +915,15 @@ class World {
         geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
         geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
         geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-        geo.setIndex(indices.concat(cutoutIndices));
-        geo.addGroup(0, indices.length, 0);
-        if (cutoutIndices.length) geo.addGroup(indices.length, cutoutIndices.length, 1);
-        const mesh = new THREE.Mesh(geo, [this.material, this.cutoutMaterial]);
+        
+        geo.setIndex(indices.concat(cutoutIndices).concat(waterIndices));
+        
+        let offset = 0;
+        if (indices.length) { geo.addGroup(offset, indices.length, 0); offset += indices.length; }
+        if (cutoutIndices.length) { geo.addGroup(offset, cutoutIndices.length, 1); offset += cutoutIndices.length; }
+        if (waterIndices.length) { geo.addGroup(offset, waterIndices.length, 2); }
+
+        const mesh = new THREE.Mesh(geo, [this.material, this.cutoutMaterial, this.waterMaterial]);
         mesh.position.set(chunk.cx * CS, 0, chunk.cz * CS);
         this.scene.add(mesh);
         chunk.mesh = mesh;
@@ -943,7 +961,7 @@ class World {
     }
 
     update(px, pz, budgets = {}) {
-        const unlimited = budgets.gen === Infinity;     // carga inicial / renascimento: sem limite de tempo
+        const unlimited = budgets.gen === Infinity;
         const t0 = performance.now();
         const genDeadline = t0 + FRAME_BUDGET_MS * 0.45;
         const meshDeadline = t0 + FRAME_BUDGET_MS;
@@ -978,23 +996,20 @@ class World {
 }
 
 // =====================================================================
-// 5B. INVENTÁRIO, DROPS, PARTÍCULAS, FERRAMENTAS, MINERAÇÃO E FORNOS
+// 5B. INVENTÁRIO E FERRAMENTAS
 // =====================================================================
-// Pilha: { id, count, damage? }  (damage = durabilidade já gasta; só ferramentas)
 class Inventory {
-    constructor(size) { this.slots = Array.from({ length: size }, () => null); } // slots 0-8 = hotbar
-
-    // Guarda o item; devolve a quantidade que NÃO coube
+    constructor(size) { this.slots = Array.from({ length: size }, () => null); }
     add(id, count, from = 0, to = this.slots.length, damage = 0) {
         const max = ITEMS[id].maxStack;
-        for (let i = from; i < to && count > 0; i++) {      // 1) completa pilhas existentes
+        for (let i = from; i < to && count > 0; i++) {
             const s = this.slots[i];
             if (s && s.id === id && s.count < max) {
                 const n = Math.min(max - s.count, count);
                 s.count += n; count -= n;
             }
         }
-        for (let i = from; i < to && count > 0; i++) {   // 2) ocupa slots vazios
+        for (let i = from; i < to && count > 0; i++) {
             if (!this.slots[i]) {
                 const n = Math.min(max, count);
                 const st = { id, count: n };
@@ -1005,13 +1020,10 @@ class Inventory {
         }
         return count;
     }
-
     canAdd(id) {
         const max = ITEMS[id].maxStack;
         return this.slots.some(s => !s || (s.id === id && s.count < max));
     }
-
-    // Quantos itens desse tipo ainda cabem
     spaceFor(id) {
         const max = ITEMS[id].maxStack;
         let space = 0;
@@ -1021,7 +1033,6 @@ class Inventory {
         }
         return space;
     }
-
     removeOne(slotIndex) {
         const s = this.slots[slotIndex];
         if (!s) return false;
@@ -1031,7 +1042,6 @@ class Inventory {
     }
 }
 
-// --- Ícones e cores derivados do atlas (nada de arte duplicada) ---
 const ITEM_ICONS = {};
 const BLOCK_COLORS = {};
 
@@ -1045,7 +1055,7 @@ function initItemIcons() {
         ITEM_ICONS[id] = c.toDataURL();
         iconCss += `.ico-${id}{background-image:url('${ITEM_ICONS[id]}')}\n`;
     }
-    const st = document.createElement('style');       // a imagem é decodificada uma vez e reaproveitada
+    const st = document.createElement('style');
     st.textContent = iconCss;
     document.head.appendChild(st);
 }
@@ -1063,7 +1073,6 @@ function computeBlockColors() {
     }
 }
 
-// --- Regras de ferramenta (tudo vem dos dados de BLOCKS e ITEMS) ---
 function toolInfo(stack) {
     const it = stack && ITEMS[stack.id];
     return it && it.tool ? it.tool : null;
@@ -1076,11 +1085,10 @@ function canHarvest(type, stack) {
     return !!t && t.type === b.tool && t.tier >= (b.minTier || 0);
 }
 
-// Tempo (s) para quebrar com o item da mão
 function getBreakTime(type, stack) {
     const b = BLOCKS[type];
     const base = b.hardness * 1.5;
-    if (!canHarvest(type, stack)) return b.hardness * 5;     // sem a ferramenta certa: bem mais lento
+    if (!canHarvest(type, stack)) return b.hardness * 5;
     const t = toolInfo(stack);
     const speed = (t && t.type === b.tool) ? t.speed : 1;
     return base / speed;
@@ -1107,10 +1115,8 @@ function showToast(text) {
     toastTimer = setTimeout(() => { el.style.display = 'none'; }, 2000);
 }
 
-// --- Fornos: um estado por bloco de forno, guardado por coordenada ---
-// f = { inv: Inventory(3) [0 entrada, 1 combustível, 2 saída], burn, burnMax, cook }
-const furnaces = new Map();   // "x,y,z" -> f
-let station = null;           // estação aberta: { type: 'crafting' | 'furnace', furnace? }
+const furnaces = new Map();
+let station = null;
 let furnaceDirty = false;
 
 function updateFurnaces(dt) {
@@ -1120,7 +1126,7 @@ function updateFurnaces(dt) {
         const canSmelt = !!rec && (!s[2] || (s[2].id === rec.result && s[2].count < ITEMS[rec.result].maxStack));
         const open = station && station.furnace === f;
 
-        if (f.burn <= 0 && canSmelt && s[1] && FUEL[s[1].id]) {   // acende consumindo 1 combustível
+        if (f.burn <= 0 && canSmelt && s[1] && FUEL[s[1].id]) {
             f.burn = f.burnMax = FUEL[s[1].id];
             f.inv.removeOne(1);
             if (open) furnaceDirty = true;
@@ -1158,9 +1164,7 @@ function spillFurnace(x, y, z) {
     furnaces.delete(key);
 }
 
-const chests = new Map();     // "x,y,z" -> { inv: Inventory(27) }
-
-// Ao quebrar o baú, todo o conteúdo cai no mundo (nada some nem duplica)
+const chests = new Map();
 function spillChest(x, y, z) {
     const key = `${x},${y},${z}`, c = chests.get(key);
     if (!c) return;
@@ -1186,7 +1190,6 @@ function openStation(type, hit) {
     openInventory({ type, furnace: f });
 }
 
-// --- Partículas de quebra ---
 const particles = [];
 const particleGeo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
 const particleMats = {};
@@ -1215,7 +1218,6 @@ function updateParticles(dt) {
     }
 }
 
-// --- Geometrias de itens: cubo (blocos) ou sprite extrudado em voxels (ferramentas) ---
 function buildCubeGeo(tiles, size) {
     const positions = [], normals = [], uvs = [], indices = [];
     const uWidth = 1 / ATLAS_COLUMNS - 2 * UV_PAD;
@@ -1248,7 +1250,7 @@ function buildSpriteGeo(pix, px, depth) {
             tmp.setRGB(c[0] / 255, c[1] / 255, c[2] / 255, THREE.SRGBColorSpace);
             const gy = 15 - cy;
             for (const f of FACES) {
-                if (f.dir[2] === 0 && filled(cx + f.dir[0], cy - f.dir[1])) continue; // face interna
+                if (f.dir[2] === 0 && filled(cx + f.dir[0], cy - f.dir[1])) continue;
                 const base = pos.length / 3;
                 for (const k of f.corners) {
                     pos.push((cx - 8 + k.pos[0]) * px, (gy - 8 + k.pos[1]) * px, (k.pos[2] - 0.5) * depth);
@@ -1269,7 +1271,6 @@ function buildSpriteGeo(pix, px, depth) {
 
 const spriteMaterial = new THREE.MeshLambertMaterial({ vertexColors: true });
 
-// --- Itens soltos no mundo (drops) ---
 const ITEM_SIZE = 0.28;
 const itemEntities = [];
 const itemGeometryCache = {};
@@ -1286,7 +1287,6 @@ function getItemGeometry(itemId) {
 }
 
 function spawnItemEntity(id, count, pos, vel, delay = 0.5, damage = 0, opts = {}) {
-    // Junta com um drop do mesmo tipo que já esteja por perto (nunca ferramentas)
     if (ITEMS[id].maxStack > 1 && !opts.noMerge) {
         for (const e of itemEntities) {
             if (e.id === id && e.pos.distanceToSquared(pos) < 1.0 && e.count + count <= ITEMS[id].maxStack) {
@@ -1295,7 +1295,7 @@ function spawnItemEntity(id, count, pos, vel, delay = 0.5, damage = 0, opts = {}
             }
         }
     }
-    const mat = ITEMS[id].sprite ? spriteMaterial : (id === ID.LEAVES ? world.cutoutMaterial : world.material);
+    const mat = ITEMS[id].sprite ? spriteMaterial : (id === ID.LEAVES ? world.cutoutMaterial : (id === ID.WATER ? world.waterMaterial : world.material));
     const mesh = new THREE.Mesh(getItemGeometry(id), mat);
     mesh.position.copy(pos);
     scene.add(mesh);
@@ -1303,7 +1303,7 @@ function spawnItemEntity(id, count, pos, vel, delay = 0.5, damage = 0, opts = {}
 }
 
 function removeItemEntity(i) {
-    scene.remove(itemEntities[i].mesh);   // geometria é compartilhada (cache), não descartar
+    scene.remove(itemEntities[i].mesh);
     itemEntities.splice(i, 1);
 }
 
@@ -1313,7 +1313,6 @@ function updateItemEntities(dt) {
 
     for (let i = itemEntities.length - 1; i >= 0; i--) {
         const e = itemEntities[i];
-        // Chunk descarregado: drops comuns somem; itens da morte ficam congelados e invisíveis até você voltar
         const loaded = !!world.getChunk(floorDiv(e.pos.x, CHUNK_SIZE), floorDiv(e.pos.z, CHUNK_SIZE));
         if (!loaded) {
             if (e.ttl > 300) { e.mesh.visible = false; continue; }
@@ -1324,12 +1323,10 @@ function updateItemEntities(dt) {
         e.age += dt;
         if (e.age > e.ttl) { removeItemEntity(i); continue; }
 
-        // Se um bloco foi colocado em cima do item, empurra para cima
         if (world.isSolidForPhysics(Math.floor(e.pos.x), Math.floor(e.pos.y), Math.floor(e.pos.z))) {
             e.pos.y = Math.floor(e.pos.y) + 1 + half;
         }
 
-        // Física simples
         e.vel.y = Math.max(e.vel.y - 22 * dt, -30);
         const nx = e.pos.x + e.vel.x * dt;
         if (world.isSolidForPhysics(Math.floor(nx), Math.floor(e.pos.y), Math.floor(e.pos.z))) e.vel.x = 0; else e.pos.x = nx;
@@ -1347,7 +1344,6 @@ function updateItemEntities(dt) {
         e.vel.x -= e.vel.x * friction;
         e.vel.z -= e.vel.z * friction;
 
-        // Coleta: só se couber no inventário (senão o item fica no mundo)
         if (e.age >= e.delay && inventory.canAdd(e.id)) {
             const dx = _pickupCenter.x - e.pos.x, dy = _pickupCenter.y - e.pos.y, dz = _pickupCenter.z - e.pos.z;
             const d2 = dx * dx + dy * dy + dz * dz;
@@ -1383,7 +1379,6 @@ function dropSelectedItem() {
     updateHotbarUI();
 }
 
-// --- Rachaduras progressivas ---
 const CRACK_STAGES = 10;
 let crackMesh = null, crackTexture = null;
 
@@ -1402,7 +1397,6 @@ function createCrackAssets() {
         }
         branches.push(path);
     }
-    // Intercala os ramos para a rachadura crescer a partir do centro
     const cells = [], seen = new Set();
     for (let k = 0; k < 12; k++) {
         for (const path of branches) {
@@ -1440,7 +1434,6 @@ function createCrackAssets() {
     scene.add(crackMesh);
 }
 
-// --- Mineração ---
 const mining = { active: false, x: 0, y: 0, z: 0, progress: 0, cooldown: 0 };
 
 function resetMining() {
@@ -1455,8 +1448,8 @@ function breakBlock(x, y, z) {
     const held = inventory.slots[selectedSlot];
     const harvest = canHarvest(type, held);
     const drop = BLOCKS[type].drop;
-    if (type === ID.FURNACE) spillFurnace(x, y, z);     // o conteúdo do forno cai no mundo
-    if (type === ID.CHEST) spillChest(x, y, z);         // o conteúdo do baú cai no mundo
+    if (type === ID.FURNACE) spillFurnace(x, y, z);
+    if (type === ID.CHEST) spillChest(x, y, z);
     world.setBlock(x, y, z, 0);
     spawnBreakParticles(x, y, z, type);
     if (harvest && drop && Math.random() < (BLOCKS[type].dropChance ?? 1)) {
@@ -1466,7 +1459,7 @@ function breakBlock(x, y, z) {
             new THREE.Vector3((Math.random() - 0.5) * 2, 3, (Math.random() - 0.5) * 2)
         );
     }
-    damageTool(selectedSlot, 1);      // gasta 1 de durabilidade por bloco quebrado
+    damageTool(selectedSlot, 1);
     addExhaustion(0.005);
 }
 
@@ -1474,7 +1467,7 @@ function updateMining(dt) {
     mining.cooldown = Math.max(0, mining.cooldown - dt);
     if (!leftHeld || !currentHit) { resetMining(); return; }
 
-    if (currentHit.y === 0) {          // fundo do mundo: indestrutível
+    if (currentHit.y === 0) {
         mining.progress = 0;
         crackMesh.visible = false;
         return;
@@ -1484,7 +1477,7 @@ function updateMining(dt) {
     if (!mining.active || mining.x !== currentHit.x || mining.y !== currentHit.y || mining.z !== currentHit.z) {
         mining.active = true;
         mining.x = currentHit.x; mining.y = currentHit.y; mining.z = currentHit.z;
-        mining.progress = 0;           // mudou de alvo: perde o progresso
+        mining.progress = 0;
     }
 
     mining.progress += dt / getBreakTime(currentHit.type, inventory.slots[selectedSlot]);
@@ -1522,11 +1515,16 @@ function initGameplayAssets() {
     createCrackAssets();
     buildInventoryUI();
     buildRecipeList();
+    
+    // Adiciona Areia e Água para facilitar os testes iniciais, se tiver slots vazios
+    if (!inventory.slots[0]) inventory.slots[0] = { id: ID.SAND, count: 64 };
+    if (!inventory.slots[1]) inventory.slots[1] = { id: ID.WATER, count: 64 };
+    
     updateHotbarUI();
 }
 
 // =====================================================================
-// 5C. MÃO EM PRIMEIRA PESSOA (cena própria, renderizada por cima do mundo)
+// 5C. MÃO EM PRIMEIRA PESSOA
 // =====================================================================
 let handScene, handCamera, handPivot, heldAnchor, handAmbient;
 let heldMesh = null, heldId = -1;
@@ -1536,13 +1534,13 @@ const heldGeoCache = {};
 function createHand() {
     handScene = new THREE.Scene();
     handCamera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 5);
-    handAmbient = new THREE.AmbientLight(0xffffff, 0.75);   // a intensidade acompanha o dia (updateSky)
+    handAmbient = new THREE.AmbientLight(0xffffff, 0.75);
     handScene.add(handAmbient);
     const dl = new THREE.DirectionalLight(0xffffff, 0.5);
     dl.position.set(0.5, 1, 0.8);
     handScene.add(dl);
 
-    handPivot = new THREE.Group();                       // origem = ombro; o braço aponta para -Z
+    handPivot = new THREE.Group();
     const sleeve = new THREE.Mesh(
         new THREE.BoxGeometry(0.16, 0.16, 0.40),
         new THREE.MeshLambertMaterial({ map: createNoiseTexture([70, 110, 190], 11) }));
@@ -1551,7 +1549,7 @@ function createHand() {
         new THREE.BoxGeometry(0.13, 0.13, 0.20),
         new THREE.MeshLambertMaterial({ map: createNoiseTexture([214, 166, 125], 12, 8) }));
     hand.position.z = -0.50;
-    heldAnchor = new THREE.Group();                      // ponto de empunhadura, na ponta da mão
+    heldAnchor = new THREE.Group();
     heldAnchor.position.set(0, 0.03, -0.62);
     handPivot.add(sleeve, hand, heldAnchor);
     handScene.add(handPivot);
@@ -1562,7 +1560,7 @@ function refreshHeldItem() {
     const id = s ? s.id : 0;
     if (id === heldId) return;
     heldId = id;
-    handAnim.sw = 0;                                     // animação de troca
+    handAnim.sw = 0;
     if (heldMesh) { heldAnchor.remove(heldMesh); heldMesh = null; }
     heldAnchor.rotation.set(0, 0, 0);
     if (!id) return;
@@ -1572,21 +1570,20 @@ function refreshHeldItem() {
         const key = 'spr' + id;
         if (!heldGeoCache[key]) heldGeoCache[key] = buildSpriteGeo(spritePixels(item.sprite.kind, item.sprite.mat), px, px);
         heldMesh = new THREE.Mesh(heldGeoCache[key], spriteMaterial);
-        // Ferramentas e graveto: pixel (4,12) do sprite = ponto de empunhadura. Maçã/carvão: centrado.
         const hasHandle = !!item.tool || item.sprite.kind === 'stick';
         heldMesh.position.set(hasHandle ? 3.5 * px : 0, hasHandle ? 4.5 * px : 0, 0);
         heldAnchor.rotation.set(...HELD_TOOL_ROT);
     } else {
         const key = 'blk' + id;
         if (!heldGeoCache[key]) heldGeoCache[key] = buildCubeGeo(BLOCKS[item.block].tiles, 0.3);
-        heldMesh = new THREE.Mesh(heldGeoCache[key], id === ID.LEAVES ? world.cutoutMaterial : world.material);
+        const mat = id === ID.LEAVES ? world.cutoutMaterial : (id === ID.WATER ? world.waterMaterial : world.material);
+        heldMesh = new THREE.Mesh(heldGeoCache[key], mat);
         heldMesh.position.set(...HELD_BLOCK_POS);
         heldAnchor.rotation.set(...HELD_BLOCK_ROT);
     }
     heldAnchor.add(heldMesh);
 }
 
-// A pose é recalculada do zero a cada quadro (nada acumula, sem tremores)
 function updateHand(dt) {
     refreshHeldItem();
     const miningNow = (leftHeld && currentHit && currentHit.y !== 0) ? 1 : 0;
@@ -1612,33 +1609,30 @@ function updateHand(dt) {
 }
 
 // =====================================================================
-// 5D. TELA DE INVENTÁRIO + CRAFTING 2x2 / 3x3 + FORNO (tecla E / botão direito)
+// 5D. TELA DE INVENTÁRIO
 // =====================================================================
-
-// --- Operações puras sobre os slots. Só MOVEM itens entre slots e cursor:
-//     nunca criam nem destroem, o que impede duplicação/perda. ---
-const cursorHeld = { stack: null };   // pilha presa ao cursor
-const craftInv = new Inventory(9);    // usa os primeiros craftN*craftN slots
-let craftN = 2;                       // 2 = inventário, 3 = bancada
+const cursorHeld = { stack: null };
+const craftInv = new Inventory(9);
+let craftN = 2;
 
 const stackable = (id) => ITEMS[id].maxStack > 1;
 
 function invLeftClick(inv, i, cur) {
     const s = inv.slots[i], c = cur.stack;
-    if (!c) { if (s) { cur.stack = s; inv.slots[i] = null; } return; }       // pega tudo
-    if (!s) { inv.slots[i] = c; cur.stack = null; return; }                  // coloca tudo
-    if (s.id === c.id && stackable(s.id)) {                                  // junta
+    if (!c) { if (s) { cur.stack = s; inv.slots[i] = null; } return; }
+    if (!s) { inv.slots[i] = c; cur.stack = null; return; }
+    if (s.id === c.id && stackable(s.id)) {
         const n = Math.min(ITEMS[s.id].maxStack - s.count, c.count);
         s.count += n; c.count -= n;
         if (c.count <= 0) cur.stack = null;
         return;
     }
-    inv.slots[i] = c; cur.stack = s;                                         // troca
+    inv.slots[i] = c; cur.stack = s;
 }
 
 function invRightClick(inv, i, cur) {
     const s = inv.slots[i], c = cur.stack;
-    if (!c) {                                                                // pega metade
+    if (!c) {
         if (s) {
             const take = Math.ceil(s.count / 2);
             cur.stack = { id: s.id, count: take };
@@ -1648,7 +1642,7 @@ function invRightClick(inv, i, cur) {
         }
         return;
     }
-    if (!s) {                                                                // coloca 1
+    if (!s) {
         const one = { id: c.id, count: 1 };
         if (c.damage) one.damage = c.damage;
         inv.slots[i] = one;
@@ -1656,17 +1650,16 @@ function invRightClick(inv, i, cur) {
         if (c.count <= 0) cur.stack = null;
         return;
     }
-    if (s.id === c.id && stackable(s.id)) {                                  // soma 1
+    if (s.id === c.id && stackable(s.id)) {
         if (s.count < ITEMS[s.id].maxStack) {
             s.count++; c.count--;
             if (c.count <= 0) cur.stack = null;
         }
         return;
     }
-    inv.slots[i] = c; cur.stack = s;                                         // troca
+    inv.slots[i] = c; cur.stack = s;
 }
 
-// Shift+clique: move o slot de uma região para outra
 function invQuickMove(src, i, dst, from, to) {
     const s = src.slots[i];
     if (!s) return;
@@ -1674,7 +1667,6 @@ function invQuickMove(src, i, dst, from, to) {
     if (left === 0) src.slots[i] = null; else s.count = left;
 }
 
-// Duplo clique: puxa para o cursor todos os itens iguais
 function invCollectSame(inv, cur) {
     const c = cur.stack;
     if (!c || !stackable(c.id)) return;
@@ -1694,7 +1686,6 @@ function invSwapHotbar(inv, i, h) {
     [inv.slots[i], inv.slots[h]] = [inv.slots[h], inv.slots[i]];
 }
 
-// --- Crafting ---
 function craftConsume() {
     for (let i = 0; i < craftN * craftN; i++) if (craftInv.slots[i]) craftInv.removeOne(i);
 }
@@ -1703,7 +1694,7 @@ function handleOutputClick(e) {
     const r = matchRecipe(craftInv);
     if (!r) return;
     const c = cursorHeld.stack;
-    if (e.shiftKey && !c) {                                   // cria o máximo possível direto no inventário
+    if (e.shiftKey && !c) {
         for (let guard = 0; guard < 64; guard++) {
             const rr = matchRecipe(craftInv);
             if (!rr || inventory.spaceFor(rr.id) < rr.count) break;
@@ -1719,14 +1710,12 @@ function handleOutputClick(e) {
         craftConsume();
         c.count += r.count;
     }
-    // qualquer outro caso: não faz nada (nada é consumido nem perdido)
 }
 
-// --- Forno: cliques nos 3 slots (0 entrada, 1 combustível, 2 saída) ---
 function furnaceClick(e, i) {
     const f = station.furnace, c = cursorHeld.stack;
     if (e.button !== 0 && e.button !== 2) return;
-    if (i === 2) {                                           // saída: só retirar
+    if (i === 2) {
         const s = f.inv.slots[2];
         if (!s) return;
         if (e.shiftKey && !c) invQuickMove(f.inv, 2, inventory, 0, 36);
@@ -1738,14 +1727,13 @@ function furnaceClick(e, i) {
         }
         return;
     }
-    if (c && !(i === 0 ? SMELT[c.id] : FUEL[c.id])) return;  // item não aceito nesse slot
+    if (c && !(i === 0 ? SMELT[c.id] : FUEL[c.id])) return;
     if (e.shiftKey && !c) invQuickMove(f.inv, i, inventory, 0, 36);
     else if (e.button === 2) invRightClick(f.inv, i, cursorHeld);
     else invLeftClick(f.inv, i, cursorHeld);
     if (i === 0) f.cook = 0;
 }
 
-// Shift+clique na mochila com o forno aberto: manda para entrada ou combustível
 function quickToFurnace(i) {
     const s = inventory.slots[i];
     if (!s) return;
@@ -1755,9 +1743,8 @@ function quickToFurnace(i) {
     if (dst === 0) station.furnace.cook = 0;
 }
 
-// --- Interface ---
 let inventoryOpen = false;
-let invHover = null;                 // { inv: 'main' | 'craft' | 'out' | 'furnace', i }
+let invHover = null;
 let invLastClick = { time: 0, key: '' };
 const invMouse = { x: 0, y: 0, seen: false };
 let invSlotEls = [], craftSlotEls = [], furnaceSlotEls = [], chestSlotEls = [], outSlotEl = null;
@@ -1868,7 +1855,6 @@ function updateInventoryFloaters() {
     }
 }
 
-// Ajusta o painel conforme a estação aberta (inventário 2x2, bancada 3x3 ou forno)
 function applyInventoryLayout() {
     const isFurnace = !!station && station.type === 'furnace';
     const isChest = !!station && station.type === 'chest';
@@ -1916,7 +1902,6 @@ function onInventoryMouseDown(e) {
     const el = e.target.closest('.islot');
 
     if (!el) {
-        // Clique fora do painel: joga a pilha do cursor no mundo
         if (e.target.closest('#inv-panel')) return;
         const c = cursorHeld.stack;
         if (c) {
@@ -1962,12 +1947,11 @@ function onInventoryMouseDown(e) {
     renderInventory();
 }
 
-// st = null (inventário comum) ou { type: 'crafting' | 'furnace', furnace? }
 function openInventory(st = null) {
     if (!controls.isLocked || inventoryOpen) return;
     station = st;
     craftN = st && st.type === 'crafting' ? 3 : 2;
-    inventoryOpen = true;               // antes do unlock, para o menu de pausa não aparecer
+    inventoryOpen = true;
     invHover = null;
     invMouse.seen = false;
     invLastClick = { time: 0, key: '' };
@@ -1987,7 +1971,6 @@ function closeInventory(relock) {
     if (!inventoryOpen) return;
     inventoryOpen = false;
 
-    // O que estiver no cursor ou na grade de crafting volta para o inventário; se não couber, vai para o mundo
     giveBack(cursorHeld.stack);
     cursorHeld.stack = null;
     for (let i = 0; i < 9; i++) { giveBack(craftInv.slots[i]); craftInv.slots[i] = null; }
@@ -2006,7 +1989,7 @@ function closeInventory(relock) {
         requestLock();
         setTimeout(() => { if (!controls.isLocked) menu.style.display = 'flex'; }, 400);
     } else {
-        menu.style.display = 'flex';    // Esc: abre o menu de pausa
+        menu.style.display = 'flex';
     }
 }
 
@@ -2018,7 +2001,7 @@ function handleInventoryKey(event) {
         const n = parseInt(event.key);
         if (n >= 1 && n <= 9 && invHover.inv === 'main') { invSwapHotbar(inventory, invHover.i, n - 1); renderInventory(); }
         else if (n >= 1 && n <= 9 && invHover.inv === 'chest' && station && station.chest) {
-            const cs = station.chest.inv.slots;                       // troca o slot do baú com o da barra rápida
+            const cs = station.chest.inv.slots;
             [cs[invHover.i], inventory.slots[n - 1]] = [inventory.slots[n - 1], cs[invHover.i]];
             renderInventory();
         }
@@ -2034,11 +2017,9 @@ function handleInventoryKey(event) {
 }
 
 // =====================================================================
-// 5E. CICLO DE DIA E NOITE (PARTE 8)
-//     Uma única variável (worldTime, 0..1) comanda sol, lua, estrelas, cor do céu,
-//     névoa e intensidade das luzes. Nada é pintado nas texturas: a luz da cena muda.
+// 5E. CICLO DE DIA E NOITE
 // =====================================================================
-let worldTime = START_TIME;           // 0 nascer do sol · 0.25 meio-dia · 0.5 pôr do sol · 0.75 meia-noite
+let worldTime = START_TIME;
 let hemiLight, sunLight, sunMesh, moonMesh, starPoints;
 const SKY_DAY = new THREE.Color(SKY_COLOR);
 const SKY_NIGHT = new THREE.Color(0x070b1c);
@@ -2048,7 +2029,7 @@ const LIGHT_WHITE = new THREE.Color(0xffffff);
 const LIGHT_MOON = new THREE.Color(0x8fa6ff);
 const _skyCol = new THREE.Color();
 const _sunDir = new THREE.Vector3();
-const sky = { elevation: 1, day: 1 };   // elevação do sol (-1..1) e fator de luz do dia (0..1), úteis ao debug
+const sky = { elevation: 1, day: 1 };
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const smoothstep = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
@@ -2062,7 +2043,6 @@ function makeSquareMesh(size, color) {
     return m;
 }
 
-// Sol e lua quadrados + campo de estrelas (criados uma vez, só reposicionados a cada quadro)
 function createSky() {
     sunMesh = makeSquareMesh(36, 0xfff2a8);
     moonMesh = makeSquareMesh(26, 0xdfe6f5);
@@ -2071,7 +2051,7 @@ function createSky() {
     const rnd = mulberry32(4242);
     const pos = new Float32Array(400 * 3);
     for (let i = 0; i < 400; i++) {
-        const u = rnd() * 2 - 1, a = rnd() * Math.PI * 2, r = Math.sqrt(1 - u * u);   // ponto uniforme na esfera
+        const u = rnd() * 2 - 1, a = rnd() * Math.PI * 2, r = Math.sqrt(1 - u * u);
         pos[i * 3] = Math.cos(a) * r * SKY_DISTANCE;
         pos[i * 3 + 1] = u * SKY_DISTANCE;
         pos[i * 3 + 2] = Math.sin(a) * r * SKY_DISTANCE;
@@ -2084,38 +2064,39 @@ function createSky() {
     scene.add(starPoints);
 }
 
-// Avança o relógio do mundo (só roda com o jogo ativo, não durante a pausa)
 function updateWorldClock(dt) {
     worldTime = (worldTime + dt / DAY_LENGTH) % 1;
 }
 
 function updateSky() {
     const a = worldTime * Math.PI * 2;
-    _sunDir.set(Math.cos(a), Math.sin(a), 0.3).normalize();      // o sol nasce em +X e se põe em -X
+    _sunDir.set(Math.cos(a), Math.sin(a), 0.3).normalize();
     const e = _sunDir.y;
-    const day = smoothstep(-0.12, 0.28, e);                     // 0 = noite, 1 = dia pleno
-    const warm = clamp01(1 - Math.abs(e) / 0.3) * 0.9;           // laranja só perto do horizonte
+    const day = smoothstep(-0.12, 0.28, e);
+    const warm = clamp01(1 - Math.abs(e) / 0.3) * 0.9;
     sky.elevation = e; sky.day = day;
 
-    // Cor do céu e da névoa: noite -> dia, com um tom quente no amanhecer e no entardecer
     _skyCol.copy(SKY_NIGHT).lerp(SKY_DAY, day).lerp(SKY_DUSK, warm * (1 - Math.abs(day - 0.5) * 0.6));
     scene.background.copy(_skyCol);
     scene.fog.color.copy(_skyCol);
+    
+    // Distância de Fog normal atualizada com a cor do céu
+    const viewDist = RENDER_DISTANCE * CHUNK_SIZE;
+    scene.fog.near = viewDist * 0.55;
+    scene.fog.far = viewDist * 0.95;
 
-    // Luzes do mundo
     hemiLight.intensity = 0.22 + 0.58 * day;
-    if (e >= -0.05) {                                            // luz vem do sol
+    if (e >= -0.05) {
         sunLight.position.copy(_sunDir).multiplyScalar(50);
         sunLight.color.copy(LIGHT_WHITE).lerp(LIGHT_WARM, warm);
         sunLight.intensity = 0.62 * smoothstep(-0.05, 0.2, e);
-    } else {                                                     // luz fraca vinda da lua
+    } else {
         sunLight.position.set(-_sunDir.x * 50, -_sunDir.y * 50, -_sunDir.z * 50);
         sunLight.color.copy(LIGHT_MOON);
         sunLight.intensity = 0.14 * smoothstep(-0.05, -0.25, e);
     }
-    handAmbient.intensity = 0.38 + 0.37 * day;                   // a mão escurece junto com o mundo
+    handAmbient.intensity = 0.38 + 0.37 * day;
 
-    // Sol, lua e estrelas acompanham a câmera (parecem infinitamente distantes)
     const cp = camera.position;
     sunMesh.position.copy(cp).addScaledVector(_sunDir, SKY_DISTANCE);
     sunMesh.lookAt(cp);
@@ -2131,14 +2112,12 @@ function updateSky() {
 }
 
 // =====================================================================
-// 5F. NUVENS VOXEL (PARTE 9)
-//     Uma única malha, reconstruída só quando o padrão avança uma célula (a cada ~5 s)
-//     ou quando o jogador cruza uma célula. Tamanho e cobertura controlados: sempre sobra céu aberto.
+// 5F. NUVENS VOXEL
 // =====================================================================
 let cloudMesh = null, cloudNoise = null;
 const cloudMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.88, fog: false });
 const cloudState = { scroll: 0, key: '', cells: 0 };
-const CLOUD_BRIGHT = { top: 1.0, side: 0.84, bottom: 0.68 };   // sombreado fixo por face (sombra sutil)
+const CLOUD_BRIGHT = { top: 1.0, side: 0.84, bottom: 0.68 };
 const CLOUD_NIGHT = new THREE.Color(0x232a46), CLOUD_DUSK = new THREE.Color(0xffb690);
 const _cloudCol = new THREE.Color();
 
@@ -2146,7 +2125,7 @@ function createClouds() {
     cloudNoise = new Noise2D(SEED + 555);
     cloudMesh = new THREE.Mesh(new THREE.BufferGeometry(), cloudMat);
     cloudMesh.frustumCulled = false;
-    cloudMesh.renderOrder = -0.5;       // depois do céu, antes do mundo transparente
+    cloudMesh.renderOrder = -0.5;
     scene.add(cloudMesh);
 }
 
@@ -2157,7 +2136,7 @@ function buildCloudGeometry(camCx, camCz, ci) {
     for (let j = 0; j < G; j++) {
         for (let i = 0; i < G; i++) {
             const di = i - half, dj = j - half;
-            if (di * di + dj * dj > half * half) continue;                      // recorte circular: sem cantos
+            if (di * di + dj * dj > half * half) continue;
             const n = cloudNoise.fbm((di + camCx - ci) * CLOUD_SCALE, (dj + camCz) * CLOUD_SCALE, 3);
             if (n > CLOUD_THRESHOLD) { filled[i + j * G] = 1; count++; }
         }
@@ -2172,7 +2151,7 @@ function buildCloudGeometry(camCx, camCz, ci) {
             if (!filled[i + j * G]) continue;
             const ox = (i - half) * S, oz = (j - half) * S;
             for (const f of FACES) {
-                if (f.dir[1] === 0 && has(i + f.dir[0], j + f.dir[2])) continue;   // lado encostado em outra nuvem
+                if (f.dir[1] === 0 && has(i + f.dir[0], j + f.dir[2])) continue;
                 const b = f.dir[1] > 0 ? CLOUD_BRIGHT.top : f.dir[1] < 0 ? CLOUD_BRIGHT.bottom : CLOUD_BRIGHT.side;
                 const base = pos.length / 3;
                 for (const c of f.corners) {
@@ -2193,7 +2172,7 @@ function buildCloudGeometry(camCx, camCz, ci) {
 }
 
 function updateClouds(dt) {
-    cloudState.scroll += dt * CLOUD_SPEED / CLOUD_CELL;     // em células; as nuvens andam para +X
+    cloudState.scroll += dt * CLOUD_SPEED / CLOUD_CELL;
     const ci = Math.floor(cloudState.scroll), frac = cloudState.scroll - ci;
     const camCx = Math.floor(camera.position.x / CLOUD_CELL), camCz = Math.floor(camera.position.z / CLOUD_CELL);
     const key = camCx + ',' + camCz + ',' + ci;
@@ -2203,16 +2182,14 @@ function updateClouds(dt) {
         cloudMesh.geometry = buildCloudGeometry(camCx, camCz, ci);
         old.dispose();
     }
-    cloudMesh.position.set((camCx + frac) * CLOUD_CELL, CLOUD_Y, camCz * CLOUD_CELL);   // desliza suave entre as reconstruções
+    cloudMesh.position.set((camCx + frac) * CLOUD_CELL, CLOUD_Y, camCz * CLOUD_CELL);
 }
 
-// Cor das nuvens: branca de dia, alaranjada no entardecer, azul-acinzentada à noite
 function updateCloudTint(day, warm) {
     _cloudCol.copy(CLOUD_NIGHT).lerp(LIGHT_WHITE, day).lerp(CLOUD_DUSK, warm * 0.55);
     cloudMat.color.copy(_cloudCol);
 }
 
-// 0 = 06:00 (nascer do sol), 0.25 = 12:00, 0.5 = 18:00, 0.75 = 00:00
 function worldClockText() {
     const h = (worldTime * 24 + 6) % 24;
     const hh = Math.floor(h), mm = Math.floor((h - hh) * 60);
@@ -2227,17 +2204,21 @@ let targetMesh;
 let currentHit = null;
 const tmpDir = new THREE.Vector3();
 const yawEuler = new THREE.Euler(0, 0, 0, 'YXZ');
-const look = { yaw: 0, pitch: 0, spikes: 0, maxDelta: 0 };   // orientação da câmera + diagnóstico do mouse
-const MAX_EVENT_DELTA = 350;                       // um único evento de mouse acima disso (px) é tratado como pico falso
+const look = { yaw: 0, pitch: 0, spikes: 0, maxDelta: 0 };
+const MAX_EVENT_DELTA = 350;
 const lookEuler = new THREE.Euler(0, 0, 0, 'YXZ');
-const LOOK_SPEED = 0.002;                          // mesma sensibilidade do PointerLockControls
-const MAX_PITCH = Math.PI / 2 - 0.02;              // nunca chega a 90°: evita a singularidade (gimbal lock)
+const LOOK_SPEED = 0.002;
+const MAX_PITCH = Math.PI / 2 - 0.02;
 
 let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
 let jumpHeld = false, isSprinting = false, wantToCrouch = false, isCrouching = false;
 
+// Estado da Água
+let headInWater = false;
+let feetInWater = false;
+
 const player = {
-    pos: new THREE.Vector3(),   // posição dos PÉS
+    pos: new THREE.Vector3(),
     vel: new THREE.Vector3(),
     onGround: false,
     height: H_STAND,
@@ -2249,11 +2230,12 @@ const spawnPoint = new THREE.Vector3();
 let bobTimer = 0;
 
 let selectedSlot = 0;
-const inventory = new Inventory(36);   // slots 0-8 = barra rápida, 9-35 = mochila
+const inventory = new Inventory(36);
 let leftHeld = false;
 
-// Sobrevivência: vida, fome, saturação (reserva que gasta antes da fome) e exaustão (gasto acumulado)
+// Status
 let health = MAX_HEALTH, hunger = MAX_HUNGER, saturation = 5, exhaustion = 0;
+let breath = MAX_BREATH, breathTimer = 0;
 let regenTimer = 0, starveTimer = 0, invuln = 0, hurtFlash = 0;
 let dead = false;
 const eat = { active: false, progress: 0, slot: -1, id: 0 };
@@ -2262,20 +2244,17 @@ const deathEl = document.getElementById('death');
 
 let prevTime = performance.now();
 const perf = { t: 0, frames: 0, sum: 0, worst: 0, avg: 0, worstShown: 0, buildMs: 0, fps: 0, long: 0, lastLong: '—', ctxLost: 0 };
-
-// Resolução de render adaptativa: se o FPS cai abaixo de ~55, reduz a escala aos poucos (e volta a subir quando sobra folga).
-// Se reduzir a resolução não melhora o FPS, o limite não vem da GPU (economia de energia, 30 Hz...) e o modo auto desliga.
 const gfx = { auto: true, max: Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO), min: 0.5, scale: 1, slow: 0, fast: 0, lastFps: null, noGain: 0, pending: null };
 gfx.scale = gfx.max;
 
 function setRenderScale(v) {
     gfx.scale = Math.max(gfx.min, Math.min(gfx.max, v));
-    gfx.pending = gfx.scale;   // aplicado no início do próximo quadro: redimensionar o buffer depois de desenhar limpa a imagem (pisca)
+    gfx.pending = gfx.scale;
 }
 
 function adaptResolution(fpsNow, cpuMs) {
     if (!gfx.auto || document.hidden) return;
-    if (gfx.lastFps !== null) {                       // o último ajuste ajudou?
+    if (gfx.lastFps !== null) {
         gfx.noGain = fpsNow < gfx.lastFps * 1.1 ? gfx.noGain + 1 : 0;
         gfx.lastFps = null;
         if (gfx.noGain >= 3) {
@@ -2285,7 +2264,7 @@ function adaptResolution(fpsNow, cpuMs) {
             return;
         }
     }
-    const gpuBound = cpuMs < 0.6 * 1000 / Math.max(fpsNow, 1);   // CPU sobrando = gargalo na GPU; menos resolução ajuda
+    const gpuBound = cpuMs < 0.6 * 1000 / Math.max(fpsNow, 1);
     if (fpsNow < 55 && gfx.scale > gfx.min && gpuBound) {
         gfx.fast = 0;
         if (++gfx.slow >= 3) { gfx.slow = 0; gfx.lastFps = fpsNow; setRenderScale(gfx.scale - 0.15); }
@@ -2310,14 +2289,31 @@ function cycleQuality() {
 }
 
 // =====================================================================
-// 7. HUD
+// 7. HUD E STATUS DE SOBREVIVÊNCIA
 // =====================================================================
 const uiShown = { h: -1, f: -1 };
+
+function updateBreathUI() {
+    const breathBar = document.getElementById('breath-bar');
+    if (!breathBar) return;
+    breathBar.innerHTML = '';
+    // Esconde a barra se estiver fora da água e de tanque cheio
+    if (breath >= MAX_BREATH && !headInWater) return;
+    
+    for (let i = 0; i < 10; i++) {
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble ' + (breath > i * 2 ? '' : 'empty-stat');
+        breathBar.appendChild(bubble);
+    }
+}
+
 function updateSurvivalUI() {
     const healthBar = document.getElementById('health-bar');
     const hungerBar = document.getElementById('hunger-bar');
     if (!healthBar || !hungerBar) return;
-    if (health === uiShown.h && hunger === uiShown.f) return;   // nada mudou: não recria os ícones
+    updateBreathUI();
+    
+    if (health === uiShown.h && hunger === uiShown.f) return;
     uiShown.h = health; uiShown.f = hunger;
     healthBar.innerHTML = '';
     hungerBar.innerHTML = '';
@@ -2338,7 +2334,7 @@ function updateHotbarUI() {
         const slot = hotbarEls[i] || (hotbarEls[i] = document.getElementById(`slot-${i}`));
         slot.classList.toggle('active', i === selectedSlot);
         const html = `<span class="slot-number">${i + 1}</span>` + stackHtml(inventory.slots[i]);
-        if (html !== hotbarHtml[i]) { slot.innerHTML = html; hotbarHtml[i] = html; }   // só mexe no DOM se mudou
+        if (html !== hotbarHtml[i]) { slot.innerHTML = html; hotbarHtml[i] = html; }
     }
 }
 
@@ -2346,12 +2342,14 @@ function addExhaustion(x) { exhaustion += x; }
 
 function resetStats() {
     health = MAX_HEALTH; hunger = MAX_HUNGER; saturation = 5; exhaustion = 0;
+    breath = MAX_BREATH; breathTimer = 0;
     regenTimer = 0; starveTimer = 0; hurtFlash = 0;
+    updateSurvivalUI();
 }
 
 function takeDamage(amount, source = 'generic') {
     if (dead || amount <= 0) return;
-    if (invuln > 0 && source !== 'starve') return;     // imunidade curta contra dano repetido
+    if (invuln > 0 && source !== 'starve' && source !== 'drown') return;
     health = Math.max(0, health - amount);
     invuln = INVULN_TIME;
     hurtFlash = 1;
@@ -2360,7 +2358,6 @@ function takeDamage(amount, source = 'generic') {
     if (health <= 0) die();
 }
 
-// Morte: o inventário inteiro cai no local, o jogador volta ao spawn com vida e fome cheias
 function die() {
     dead = true;
     cancelEating();
@@ -2415,16 +2412,42 @@ function updateEating(dt) {
     }
 }
 
-// Fome, regeneração e inanição (movimento e ações só acrescentam exaustão)
 function updateSurvival(dt) {
     invuln = Math.max(0, invuln - dt);
-    if (exhaustion >= 4) {                       // cada 4 de exaustão gasta 1 de saturação; sem saturação, 1 de fome
+    
+    // --- Lógica de Fôlego e Afogamento ---
+    if (headInWater) {
+        breathTimer += dt;
+        if (breathTimer >= 1.5) { // 1.5s por cada bolha consumida
+            breathTimer = 0;
+            breath--;
+            if (breath <= 0) {
+                breath = 0;
+                takeDamage(1, 'drown');
+            }
+            updateBreathUI();
+        }
+    } else if (breath < MAX_BREATH) {
+        breathTimer += dt;
+        if (breathTimer >= 0.2) { // Recupera rápido fora d'água
+            breathTimer = 0;
+            breath++;
+            updateBreathUI();
+        }
+    } else {
+        if (breathTimer !== 0) {
+            breathTimer = 0;
+            updateBreathUI();
+        }
+    }
+
+    if (exhaustion >= 4) {
         exhaustion -= 4;
         if (saturation > 0) saturation = Math.max(0, saturation - 1);
         else if (hunger > 0) { hunger--; updateSurvivalUI(); }
     }
     if (hunger >= 18 && health < MAX_HEALTH) {
-        const fast = hunger >= MAX_HUNGER && saturation > 0;   // fome cheia + saturação: cura rápida
+        const fast = hunger >= MAX_HUNGER && saturation > 0;
         regenTimer += dt;
         if (regenTimer >= (fast ? 0.5 : 4)) {
             regenTimer = 0;
@@ -2435,14 +2458,13 @@ function updateSurvival(dt) {
         starveTimer = 0;
     } else {
         regenTimer = 0;
-        if (hunger <= 0) {                       // inanição: 1 de dano a cada 4 s, mas nunca mata (para em 1)
+        if (hunger <= 0) {
             starveTimer += dt;
             if (starveTimer >= 4) { starveTimer = 0; if (health > 1) takeDamage(1, 'starve'); }
         } else starveTimer = 0;
     }
 }
 
-// Debug (F3)
 const debugEl = document.getElementById('debug');
 let debugVisible = false, fpsFrames = 0, fpsTime = 0, fps = 0;
 function updateDebug(rawDt) {
@@ -2457,8 +2479,8 @@ function updateDebug(rawDt) {
         : '—';
     const tt = currentHit ? getBreakTime(currentHit.type, inventory.slots[selectedSlot]).toFixed(2) + 's' : '—';
     debugEl.textContent =
-`Voxel Sandbox — Parte 9
-FPS: ${fps}
+`Voxel Sandbox — Parte 11 (Mares)
+FPS: ${fps} | Água: ${headInWater ? 'Mergulhado' : (feetInWater ? 'Cintura' : 'Não')}
 Nuvens: ${cloudState.cells} células (de ${CLOUD_GRID * CLOUD_GRID}) | altura ${CLOUD_Y}
 Seed: ${SEED}
 XYZ: ${p.x.toFixed(2)} ${p.y.toFixed(2)} ${p.z.toFixed(2)}
@@ -2469,11 +2491,9 @@ Hora do mundo: ${worldClockText()} (tempo ${worldTime.toFixed(3)}) | sol ${sky.e
 Alvo: ${target} | tempo p/ quebrar: ${tt}
 Mineração: ${Math.round(mining.progress * 100)}% | Drops no mundo: ${itemEntities.length} | Fornos: ${furnaces.size} | Baús: ${chests.size}
 Item na mão: ${selectedItemText()}
-Vida ${health} | Fome ${hunger} | Saturação ${saturation.toFixed(1)} | Exaustão ${exhaustion.toFixed(2)}
+Vida ${health} | Fome ${hunger} | Fôlego ${breath} | Saturação ${saturation.toFixed(1)} | Exaustão ${exhaustion.toFixed(2)}
 CPU/quadro: média ${perf.avg.toFixed(1)} ms | pior ${perf.worstShown.toFixed(1)} ms | último save: ${perf.buildMs.toFixed(1)} ms
-Desenho: ${renderer.info.render.calls} chamadas | ${(renderer.info.render.triangles / 1000).toFixed(0)}k triângulos | escala de render ${gfx.scale.toFixed(2)} (${gfx.auto ? 'auto' : 'manual'}) · F4 muda
-Mouse: movimento bruto ${lockInfo.raw === null ? 'desconhecido' : lockInfo.raw ? 'sim' : 'não'} | picos ignorados: ${look.spikes} | maior delta: ${look.maxDelta.toFixed(0)} px
-Quadros longos (>60 ms): ${perf.long} | último: ${perf.lastLong} | contexto GL perdido: ${perf.ctxLost}`;
+Desenho: ${renderer.info.render.calls} chamadas | ${(renderer.info.render.triangles / 1000).toFixed(0)}k triângulos | escala de render ${gfx.scale.toFixed(2)} (${gfx.auto ? 'auto' : 'manual'}) · F4 muda`;
 }
 
 // =====================================================================
@@ -2491,7 +2511,6 @@ function collides(x, y, z, height) {
     return false;
 }
 
-// Move em um eixo em passos pequenos (sem atravessar blocos). Retorna true se bateu.
 function moveAxis(axis, amount) {
     if (amount === 0) return false;
     const steps = Math.max(1, Math.ceil(Math.abs(amount) / 0.25));
@@ -2502,7 +2521,6 @@ function moveAxis(axis, amount) {
     for (let i = 0; i < steps; i++) {
         p[axis] += step;
         if (collides(p.x, p.y, p.z, player.height)) {
-            // Encosta exatamente na face do bloco
             if (step > 0) p[axis] = Math.floor(p[axis] + hi) - hi - 0.001;
             else          p[axis] = Math.floor(p[axis] - lo) + 1 + lo;
             return true;
@@ -2519,7 +2537,7 @@ function intersectsPlayer(bx, by, bz) {
 }
 
 // =====================================================================
-// 9. RAYCAST POR VOXELS (DDA) — lê os dados do mundo, não a malha
+// 9. RAYCAST POR VOXELS (DDA)
 // =====================================================================
 function raycastVoxels(origin, dir, maxDist) {
     let x = Math.floor(origin.x), y = Math.floor(origin.y), z = Math.floor(origin.z);
@@ -2534,7 +2552,9 @@ function raycastVoxels(origin, dir, maxDist) {
 
     for (let i = 0; i < 128 && t <= maxDist; i++) {
         const type = world.getBlock(x, y, z);
-        if (type !== 0) return { x, y, z, nx, ny, nz, type, dist: t };
+        // Permite que o raio ignore blocos de água, possibilitando interagir com blocos submersos
+        if (type !== 0 && type !== ID.WATER) return { x, y, z, nx, ny, nz, type, dist: t };
+        
         if (tmx < tmy && tmx < tmz) { x += sx; t = tmx; tmx += tdx; nx = -sx; ny = 0; nz = 0; }
         else if (tmy < tmz)         { y += sy; t = tmy; tmy += tdy; nx = 0; ny = -sy; nz = 0; }
         else                        { z += sz; t = tmz; tmz += tdz; nx = 0; ny = 0; nz = -sz; }
@@ -2554,12 +2574,21 @@ function updateTarget() {
 }
 
 // =====================================================================
-// 10. FÍSICA / MOVIMENTO DO JOGADOR
+// 10. FÍSICA E MOVIMENTAÇÃO (Com Água)
 // =====================================================================
 function updatePhysics(dt) {
     const p = player.pos;
 
-    // Agachar / levantar (só levanta se houver espaço)
+    // Detectando imersão
+    const headY = Math.floor(p.y + player.eye);
+    const feetY = Math.floor(p.y);
+    const px = Math.floor(p.x);
+    const pz = Math.floor(p.z);
+    
+    headInWater = world.getBlock(px, headY, pz) === ID.WATER;
+    feetInWater = world.getBlock(px, feetY, pz) === ID.WATER;
+    const inWater = headInWater || feetInWater;
+
     if (wantToCrouch && !isCrouching) {
         isCrouching = true;
         player.height = H_CROUCH;
@@ -2568,10 +2597,11 @@ function updatePhysics(dt) {
         player.height = H_STAND;
     }
 
-    const sprintNow = isSprinting && hunger >= SPRINT_MIN_HUNGER;   // com pouca fome não dá para correr
-    const speed = isCrouching ? CROUCH_SPEED : (sprintNow ? SPRINT_SPEED : WALK_SPEED);
+    const sprintNow = isSprinting && hunger >= SPRINT_MIN_HUNGER;
+    // Reduz velocidade geral se estiver na água
+    let speed = isCrouching ? CROUCH_SPEED : (sprintNow ? SPRINT_SPEED : WALK_SPEED);
+    if (inWater) speed *= 0.5;
 
-    // O yaw vem direto do estado de olhar (look.yaw): decompor o quaternion fica instável ao olhar quase na vertical
     const yaw = look.yaw;
     const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
     const rx = Math.cos(yaw),  rz = -Math.sin(yaw);
@@ -2582,28 +2612,38 @@ function updatePhysics(dt) {
     const tx = (rx * ix + fx * iz) * speed;
     const tz = (rz * ix + fz * iz) * speed;
 
-    if (player.onGround || hasInput) {
-        const k = 1 - Math.exp(-(player.onGround ? 14 : 3) * dt);
+    // Atrito/Desaceleração
+    if (player.onGround || hasInput || inWater) {
+        // Atrito maior na água se não tiver no chão (5) para nadar suavemente, chão normal (14), ar (3)
+        const frictionBase = player.onGround ? 14 : (inWater ? 5 : 3);
+        const k = 1 - Math.exp(-frictionBase * dt);
         player.vel.x += (tx - player.vel.x) * k;
         player.vel.z += (tz - player.vel.z) * k;
     }
 
-    // Pulo
-    if (jumpHeld && player.onGround && !isCrouching) {
-        player.vel.y = JUMP_SPEED;
-        player.onGround = false;
-        addExhaustion(sprintNow ? 0.2 : 0.05);
+    // Pulo e Gravidade com Natação
+    if (inWater) {
+        if (jumpHeld) {
+            player.vel.y += 15.0 * dt;
+            if (player.vel.y > 4.0) player.vel.y = 4.0; // Velocidade terminal subindo
+        }
+        player.vel.y -= player.vel.y * 5.0 * dt; // Arrasto na água (boia devagar)
+        player.vel.y -= (GRAVITY * 0.1) * dt;    // Gravidade muito fraca (simula peso d'água)
+    } else {
+        if (jumpHeld && player.onGround && !isCrouching) {
+            player.vel.y = JUMP_SPEED;
+            player.onGround = false;
+            addExhaustion(sprintNow ? 0.2 : 0.05);
+        }
+        player.vel.y = Math.max(player.vel.y - GRAVITY * dt, -60);
     }
-    player.vel.y = Math.max(player.vel.y - GRAVITY * dt, -60);
 
-    // FOV ao correr
-    const targetFOV = (sprintNow && moveForward && !isCrouching) ? 85 : 75;
+    const targetFOV = (sprintNow && moveForward && !isCrouching && !inWater) ? 85 : 75;
     if (Math.abs(camera.fov - targetFOV) > 0.1) {
         camera.fov += (targetFOV - camera.fov) * Math.min(1, 10 * dt);
         camera.updateProjectionMatrix();
     }
 
-    // Movimento por eixo
     if (moveAxis('x', player.vel.x * dt)) player.vel.x = 0;
     if (moveAxis('z', player.vel.z * dt)) player.vel.z = 0;
 
@@ -2611,8 +2651,16 @@ function updatePhysics(dt) {
     const blockedY = moveAxis('y', player.vel.y * dt);
     const dy = p.y - yBefore;
     player.onGround = false;
-    if (dy < 0) player.fallDistance += -dy;
-    else if (dy > 0) player.fallDistance = 0;
+    
+    // Anula o dano de queda ao atingir a água
+    if (inWater) {
+        player.fallDistance = 0;
+    } else if (dy < 0) {
+        player.fallDistance += -dy;
+    } else if (dy > 0) {
+        player.fallDistance = 0;
+    }
+    
     if (blockedY) {
         if (player.vel.y < 0) {
             player.onGround = true;
@@ -2622,17 +2670,16 @@ function updatePhysics(dt) {
         player.vel.y = 0;
     }
 
-    // Câmera na altura dos olhos (suavizada ao agachar)
     const targetEye = isCrouching ? EYE_CROUCH : EYE_STAND;
     player.eye += (targetEye - player.eye) * Math.min(1, 15 * dt);
     camera.position.set(p.x, p.y + player.eye, p.z);
 
-    // Gasto de energia por correr (a fome em si é tratada em updateSurvival)
     const hzSpeed = Math.hypot(player.vel.x, player.vel.z);
-    if (player.onGround && hzSpeed > 0.1 && sprintNow && !isCrouching) addExhaustion(hzSpeed * dt * 0.1);
+    if ((player.onGround || inWater) && hzSpeed > 0.1 && sprintNow && !isCrouching) {
+        addExhaustion(hzSpeed * dt * 0.1);
+    }
 
-    // Fase do balanço (usada por updateHand)
-    if (player.onGround && hzSpeed > 2.0) bobTimer += dt * (hzSpeed * 1.2);
+    if ((player.onGround || inWater) && hzSpeed > 2.0) bobTimer += dt * (hzSpeed * (inWater ? 0.8 : 1.2));
     else bobTimer += (0 - bobTimer) * Math.min(1, 5 * dt);
 }
 
@@ -2663,7 +2710,6 @@ async function dbRun(mode, fn) {
 const packStack = (s) => s ? { id: s.id, count: s.count, damage: s.damage || 0 } : null;
 
 function buildSave() {
-    // Cada chunk editado vira um Uint16Array [índice, tipo, índice, tipo...]; só é refeito se o chunk mudou
     const edits = [];
     for (const [key, m] of world.edits) {
         let arr = world.editCache.get(key);
@@ -2677,7 +2723,7 @@ function buildSave() {
     }
     return {
         v: SAVE_VERSION, seed: SEED, time: Date.now(),
-        worldTime,   // Parte 8: hora do mundo (saves antigos, sem este campo, voltam à hora inicial)
+        worldTime,
         player: { x: player.pos.x, y: player.pos.y, z: player.pos.z, health, hunger, saturation },
         selectedSlot,
         inventory: inventory.slots.map(packStack),
@@ -2701,7 +2747,6 @@ function sanitizeStack(s) {
     return st;
 }
 
-// Baús: pilhas inválidas viram vazias (não derrubam o save inteiro)
 function parseChests(list) {
     const out = new Map();
     if (!Array.isArray(list)) return out;
@@ -2716,7 +2761,6 @@ function parseChests(list) {
     return out;
 }
 
-// Drops no chão: entradas inválidas são ignoradas (não invalidam o save inteiro)
 function parseDrops(list) {
     const out = [];
     if (!Array.isArray(list)) return out;
@@ -2731,7 +2775,6 @@ function parseDrops(list) {
     return out;
 }
 
-// Valida tudo antes de aplicar; devolve null se estiver inválido
 function validateSave(d) {
     try {
         if (!d || d.v !== SAVE_VERSION || d.seed !== SEED) return null;
@@ -2743,7 +2786,7 @@ function validateSave(d) {
         const edits = new Map();
         const maxIdx = CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT;
         for (const [key, list] of d.edits) {
-            const flat = Array.isArray(list[0]) ? list.flat() : list;   // aceita o formato antigo (pares) e o novo (plano)
+            const flat = Array.isArray(list[0]) ? list.flat() : list;
             if (flat.length % 2) throw new Error('lista de edições inválida');
             const m = new Map();
             for (let k = 0; k < flat.length; k += 2) {
@@ -2808,21 +2851,19 @@ function applyLook() {
     camera.quaternion.setFromEuler(lookEuler);
 }
 
-// Olhar com o mouse: o handler (fase de captura) roda antes do PointerLockControls e o impede de girar a câmera de novo
 function onLookMove(e) {
     if (!controls || !controls.isLocked) return;
     e.stopImmediatePropagation();
     const mx = e.movementX || 0, my = e.movementY || 0;
     const big = Math.max(Math.abs(mx), Math.abs(my));
     if (big > look.maxDelta) look.maxDelta = big;
-    if (big > MAX_EVENT_DELTA) { look.spikes++; return; }      // pico falso do pointer lock: ignora este evento
+    if (big > MAX_EVENT_DELTA) { look.spikes++; return; }
     look.yaw -= mx * LOOK_SPEED;
     look.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, look.pitch - my * LOOK_SPEED));
     applyLook();
 }
 
-// Pede o travamento do mouse SEM a aceleração do sistema ("movimento bruto"): evita trancos ao girar rápido
-const lockInfo = { raw: null };    // null = o navegador não informa
+const lockInfo = { raw: null };
 function requestLock() {
     const el = document.body;
     const fallback = () => {
@@ -2835,7 +2876,7 @@ function requestLock() {
     if (pr && pr.then) {
         pr.then(() => { lockInfo.raw = true; })
           .catch(err => {
-              if (err && err.name === 'NotSupportedError') fallback();      // sistema sem movimento bruto: usa o modo normal
+              if (err && err.name === 'NotSupportedError') fallback();
               else console.warn('Aguardando cooldown do navegador...', err);
           });
     }
@@ -2844,13 +2885,12 @@ function requestLock() {
 async function init() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(SKY_COLOR);
-    // Névoa proporcional à distância de renderização: só suaviza a borda dos chunks
     const viewDist = RENDER_DISTANCE * CHUNK_SIZE;
     scene.fog = new THREE.Fog(SKY_COLOR, viewDist * 0.55, viewDist * 0.95);
 
-    hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8);   // intensidade comandada por updateSky
+    hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8);
     scene.add(hemiLight);
-    sunLight = new THREE.DirectionalLight(0xffffff, 0.6);             // sol de dia, lua de noite
+    sunLight = new THREE.DirectionalLight(0xffffff, 0.6);
     sunLight.position.set(10, 20, 10);
     scene.add(sunLight);
 
@@ -2861,7 +2901,6 @@ async function init() {
     createSky();
     createClouds();
 
-    // Contorno do bloco selecionado
     targetMesh = new THREE.LineSegments(
         new THREE.EdgesGeometry(new THREE.BoxGeometry(1.004, 1.004, 1.004)),
         new THREE.LineBasicMaterial({ color: 0x000000 })
@@ -2870,9 +2909,9 @@ async function init() {
     scene.add(targetMesh);
 
     renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: GPU_PREF });
-    renderer.autoClear = false;     // dois passes: mundo e depois a mão
+    renderer.autoClear = false;
     renderer.setPixelRatio(gfx.scale);
-    renderer.info.autoReset = false;   // contamos as duas passagens (mundo + mão) juntas
+    renderer.info.autoReset = false;
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
     renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); perf.ctxLost++; showToast('Contexto WebGL perdido (driver/GPU)'); });
@@ -2885,7 +2924,6 @@ async function init() {
         renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // Mundo + save + carga inicial síncrona ao redor do ponto de partida
     world = new World(scene, SEED);
     const save = await loadGame();
     if (save) {
@@ -2908,13 +2946,12 @@ async function init() {
     const start = save ? save.player : spawnPoint;
     world.update(start.x, start.z, { gen: Infinity, mesh: Infinity });
     player.pos.set(start.x, start.y, start.z);
-    // Se o save apontar para dentro de um bloco, sobe até achar espaço livre
     for (let guard = 0; guard < 70 && collides(player.pos.x, player.pos.y, player.pos.z, player.height); guard++) player.pos.y += 1;
     camera.position.set(player.pos.x, player.pos.y + player.eye, player.pos.z);
+    
     initGameplayAssets();
-    updateSky();   // já começa com a cor e a luz certas para a hora salva
+    updateSky();
 
-    // Controles
     document.addEventListener('mousemove', onLookMove, true);
     controls = new PointerLockControls(camera, document.body);
     const menu = document.getElementById('menu');
@@ -2929,8 +2966,7 @@ async function init() {
         setTimeout(() => { if (!controls.isLocked) menu.style.display = 'flex'; }, 400);
     });
     controls.addEventListener('unlock', () => {
-        if (!inventoryOpen && !dead) menu.style.display = 'flex';   // inventário aberto ou tela de morte: sem menu de pausa
-        // Evita ações presas ao abrir o menu
+        if (!inventoryOpen && !dead) menu.style.display = 'flex';
         moveForward = moveBackward = moveLeft = moveRight = jumpHeld = isSprinting = wantToCrouch = false;
         leftHeld = false;
         resetMining();
@@ -2995,15 +3031,13 @@ async function init() {
 
     document.addEventListener('mousedown', (event) => {
         if (!controls.isLocked) return;
-        if (event.button === 0) { leftHeld = true; return; }   // minerar: tratado em updateMining()
+        if (event.button === 0) { leftHeld = true; return; }
         if (event.button !== 2) return;
         updateTarget();
 
-        // 1) Bancada / forno: abre a interface (agachado = colocar bloco ao lado)
         const st = currentHit && BLOCKS[currentHit.type].station;
         if (st && !wantToCrouch) { openStation(st, currentHit); return; }
 
-        // 2) Comida: segure o botão direito até terminar de comer (soltar cancela)
         const held = inventory.slots[selectedSlot];
         const food = held && ITEMS[held.id].food;
         if (food) {
@@ -3012,14 +3046,17 @@ async function init() {
             return;
         }
 
-        // 3) Colocar bloco na face atingida (consome 1 item; só itens de bloco)
         if (!currentHit) return;
         const type = held ? (ITEMS[held.id].block || 0) : 0;
         const { nx, ny, nz } = currentHit;
         if (type === 0 || (nx === 0 && ny === 0 && nz === 0)) return;
         const px = currentHit.x + nx, py = currentHit.y + ny, pz = currentHit.z + nz;
         if (py < 0 || py >= WORLD_HEIGHT) return;
-        if (world.getBlock(px, py, pz) !== 0) return;
+        
+        // Se a posição para colocar o bloco contiver água, o bloco irá substituí-la normalmente!
+        const blockAtTarget = world.getBlock(px, py, pz);
+        if (blockAtTarget !== 0 && blockAtTarget !== ID.WATER) return; 
+        
         if (intersectsPlayer(px, py, pz)) return;
         if (world.setBlock(px, py, pz, type)) {
             inventory.removeOne(selectedSlot);
@@ -3033,11 +3070,9 @@ async function init() {
         if (event.button === 2) cancelEating();
     });
 
-    // Salvamento automático
     setInterval(() => { if (controls.isLocked) saveGame(true); }, 30000);
     document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(true); });
 
-    // Atalhos de teste: abra com ?debug na URL e use dbg no console (F12)
     if (new URLSearchParams(location.search).has('debug')) {
         window.dbg = {
             damage: (n = 1) => { invuln = 0; takeDamage(n); },
@@ -3046,7 +3081,7 @@ async function init() {
             saturation: (n) => { saturation = n; },
             exhaust: (n) => addExhaustion(n),
             give: (id, n = 1) => { inventory.add(id, n); updateHotbarUI(); },
-            time: (t) => { worldTime = ((t % 1) + 1) % 1; updateSky(); },   // 0 amanhecer · 0.25 meio-dia · 0.5 entardecer · 0.75 meia-noite
+            time: (t) => { worldTime = ((t % 1) + 1) % 1; updateSky(); },
         };
     }
 
@@ -3059,7 +3094,7 @@ function animate() {
     const rawDt = (now - prevTime) / 1000;
     prevTime = now;
     const dt = Math.min(rawDt, 0.05);
-    applyLook();                              // garante a orientação certa a cada quadro, venha o evento de onde vier
+    applyLook();
 
     if (controls.isLocked) {
         updatePhysics(dt);
@@ -3071,15 +3106,24 @@ function animate() {
         updateParticles(dt);
     }
     if (controls.isLocked || inventoryOpen) {
-        updateWorldClock(dt);                     // o tempo corre com o jogo ativo ou com o inventário aberto, nunca na pausa
-        updateFurnaces(dt);                       // fornos continuam queimando com a tela aberta ou fechada
+        updateWorldClock(dt);
+        updateFurnaces(dt);
         if (inventoryOpen && station && station.type === 'furnace') {
             if (furnaceDirty) { furnaceDirty = false; renderInventory(); }
             else updateFurnaceBars();
         }
     }
     updateSky();
-    if (controls.isLocked || inventoryOpen) updateClouds(dt);   // as nuvens param na pausa, como o relógio
+    
+    // Override da visão embaixo d'água
+    if (headInWater) {
+        scene.fog.color.setHex(0x113366);
+        scene.fog.near = 0.1;
+        scene.fog.far = 15;
+        scene.background.setHex(0x113366); 
+    }
+    
+    if (controls.isLocked || inventoryOpen) updateClouds(dt);
     else updateClouds(0);
     updateHand(dt);
     if (hurtFlash > 0) { hurtFlash = Math.max(0, hurtFlash - dt * 2); hurtEl.style.opacity = hurtFlash; }
@@ -3090,14 +3134,13 @@ function animate() {
     renderer.info.reset();
     renderer.clear();
     renderer.render(scene, camera);
-    renderer.clearDepth();                    // a mão nunca atravessa o terreno
+    renderer.clearDepth();
     renderer.render(handScene, handCamera);
 
-    // Tempo de CPU do quadro (lógica + envio de desenho). Se o FPS estiver baixo e isto estiver baixo, o gargalo é a GPU.
     const cpu = performance.now() - now;
     perf.sum += cpu; perf.frames++; perf.t += rawDt;
     if (cpu > perf.worst) perf.worst = cpu;
-    if (rawDt > 0.06) {   // quadro de mais de 60 ms: registra o que aconteceu (CPU baixa + quadro longo = GPU/navegador/sistema)
+    if (rawDt > 0.06) {
         perf.long++;
         perf.lastLong = `${(rawDt * 1000).toFixed(0)} ms (CPU ${cpu.toFixed(0)} ms, chunks gerados ${world.frameGen ?? 0}, malhas ${world.frameMesh ?? 0}, salvando: ${saving ? 'sim' : 'não'})`;
     }
