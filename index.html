@@ -1540,9 +1540,6 @@ function initGameplayAssets() {
     buildInventoryUI();
     buildRecipeList();
     
-    // Adiciona Areia e Água para facilitar os testes iniciais, se tiver slots vazios
-    if (!inventory.slots[0]) inventory.slots[0] = { id: ID.SAND, count: 64 };
-    if (!inventory.slots[1]) inventory.slots[1] = { id: ID.WATER, count: 64 };
     
     updateHotbarUI();
 }
