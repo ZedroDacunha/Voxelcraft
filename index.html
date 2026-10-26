@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Voxel Sandbox - Parte 6: Sobrevivência</title>
+<title>Voxel Sandbox - Parte 7: Baús</title>
 <style>
     body { margin: 0; overflow: hidden; background-color: #87CEEB; font-family: sans-serif; }
     #crosshair { position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; margin-top: -10px; margin-left: -10px; pointer-events: none; }
@@ -16,13 +16,10 @@
     .btn { padding: 10px 20px; font-size: 16px; background: #55aa55; border: none; color: white; cursor: pointer; border-radius: 4px; }
     .btn:hover { background: #66cc66; }
 
-    #hotbar {
-        position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-        display: flex; gap: 4px; background-color: rgba(0, 0, 0, 0.5);
-        padding: 6px; border-radius: 4px; z-index: 5;
-    }
+    #hud-bottom { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; z-index: 5; pointer-events: none; }
+    #hotbar { display: flex; gap: 4px; background-color: rgba(0, 0, 0, 0.5); padding: 6px; border-radius: 4px; }
     .slot {
-        width: 44px; height: 44px; background-color: rgba(255, 255, 255, 0.2);
+        box-sizing: border-box; width: 48px; height: 48px; background-color: rgba(255, 255, 255, 0.2);
         border: 2px solid #555; border-radius: 4px; position: relative;
         display: flex; justify-content: center; align-items: center; transition: transform 0.1s;
     }
@@ -33,10 +30,7 @@
     .dur { position: absolute; left: 5px; right: 5px; bottom: 3px; height: 3px; background: #000; pointer-events: none; }
     .dur div { height: 100%; }
 
-    #survival-hud {
-        position: absolute; bottom: 70px; left: 50%; transform: translateX(-50%);
-        display: flex; justify-content: space-between; width: 320px; z-index: 5; pointer-events: none;
-    }
+    #survival-hud { display: flex; justify-content: space-between; align-items: flex-end; padding: 0 6px; }   /* vida na borda esquerda do 1º slot, fome na borda direita do último */
     .stat-bar { display: flex; gap: 4px; }
     .heart { width: 14px; height: 14px; background: #ff3333; border-radius: 50%; box-shadow: 0 0 2px #000; border: 1px solid #800000; }
     .food { width: 14px; height: 14px; background: #ffaa00; border-radius: 3px; box-shadow: 0 0 2px #000; border: 1px solid #8b4500; }
@@ -49,7 +43,7 @@
     #death p { margin: 0 0 20px; max-width: 460px; font: 14px/1.5 monospace; }
     #hurt { position: absolute; inset: 0; pointer-events: none; z-index: 4; opacity: 0; background: radial-gradient(ellipse at center, rgba(200,0,0,0) 45%, rgba(200,0,0,0.65) 100%); }
 
-    #toast { position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%); z-index: 6; pointer-events: none;
+    #toast { position: absolute; bottom: 125px; left: 50%; transform: translateX(-50%); z-index: 6; pointer-events: none;
         color: #fff; font: bold 14px monospace; text-shadow: 1px 1px 0 #000; background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 4px; display: none; }
 
     #inventory { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.55); z-index: 9; user-select: none; }
@@ -116,6 +110,7 @@
             <div class="prog"><div id="fur-prog"></div></div>
             <div id="fur-out"></div>
         </div>
+        <div id="chest-row" style="display:none; margin-bottom:12px"><div id="inv-chest" class="inv-grid"></div></div>
         <div id="inv-main" class="inv-grid"></div>
         <div class="inv-sep"></div>
         <div id="inv-hotbar" class="inv-grid"></div>
@@ -127,12 +122,17 @@
 </div>
 <div id="menu">
     <h1>Voxel Sandbox</h1>
-    <p>Parte 6 — Sobrevivência: fome com saturação, regeneração, morte e itens que caem</p>
+    <p>Parte 7 — Baús de 27 espaços com salvamento (receita: 8 tábuas em anel, na bancada)</p>
     <button class="btn" id="btn-play">Clique para Jogar</button>
     <p style="font-size: 14px; opacity: 0.8; margin-top: 15px;">[WASD] Mover | [Espaço] Pular | [Shift] Correr | [Ctrl / C] Agachar | [F3] Debug | [F4] Qualidade | Botão esq (segure): minerar | Botão dir: colocar / usar bancada e forno / segurar para comer | [E] Inventário / crafting | [Q] Soltar item</p>
     <p style="font-size: 12px; opacity: 0.6; margin-top: 0;">Dicas: ?seed=123 gera outro mundo · ?reset apaga o save daquela seed · para colocar bloco encostado em bancada/forno, segure Ctrl ou C ao clicar · o jogo salva sozinho a cada 30 s e ao pausar.</p>
 </div>
 
+<div id="hud-bottom">
+<div id="survival-hud">
+    <div class="stat-bar" id="health-bar"></div>
+    <div class="stat-bar" id="hunger-bar"></div>
+</div>
 <div id="hotbar">
     <div class="slot active" id="slot-0"></div>
     <div class="slot" id="slot-1"></div>
@@ -144,10 +144,6 @@
     <div class="slot" id="slot-7"></div>
     <div class="slot" id="slot-8"></div>
 </div>
-
-<div id="survival-hud">
-    <div class="stat-bar" id="health-bar"></div>
-    <div class="stat-bar" id="hunger-bar"></div>
 </div>
 
 <script type="module">
@@ -196,7 +192,7 @@ const HELD_BLOCK_POS = [0.03, 0.07, -0.04];
 // 2. REGISTRO CENTRAL DE BLOCOS E ITENS
 // =====================================================================
 const TILE = { GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, STONE: 3, WOOD: 4, COBBLE: 5, LEAVES: 6, PLANKS: 7,
-               CRAFT_TOP: 8, CRAFT_SIDE: 9, FURNACE_FRONT: 10, FURNACE_TOP: 11 };
+               CRAFT_TOP: 8, CRAFT_SIDE: 9, FURNACE_FRONT: 10, FURNACE_TOP: 11, CHEST_TOP: 12, CHEST_SIDE: 13 };
 const ATLAS_COLUMNS = 32;
 const TILE_PX = 32;
 
@@ -204,7 +200,7 @@ const allFaces = (t) => ({ top: t, side: t, bottom: t });
 
 // IDs fixos (bloco = item de mesmo id; itens que não são blocos começam em 20)
 const ID = { GRASS: 1, STONE: 2, LOG: 3, DIRT: 4, COBBLE: 5, PLANKS: 6, LEAVES: 7,
-             CRAFTING_TABLE: 8, FURNACE: 9,
+             CRAFTING_TABLE: 8, FURNACE: 9, CHEST: 10,
              STICK: 20, APPLE: 30, CHARCOAL: 31 };
 
 // Para adicionar um bloco novo: crie o tile no atlas e uma entrada aqui.
@@ -223,6 +219,8 @@ const BLOCKS = {
          tiles: { top: TILE.CRAFT_TOP, side: TILE.CRAFT_SIDE, bottom: TILE.PLANKS } },
     9: { name: 'Forno',      hardness: 3.5, drop: ID.FURNACE, tool: 'pickaxe', requiresTool: true, minTier: 1, station: 'furnace',
          icon: TILE.FURNACE_FRONT, tiles: { top: TILE.FURNACE_TOP, side: TILE.FURNACE_FRONT, bottom: TILE.COBBLE } },
+    10: { name: 'Baú',     hardness: 2.5, drop: ID.CHEST, tool: 'axe', station: 'chest',
+          tiles: { top: TILE.CHEST_TOP, side: TILE.CHEST_SIDE, bottom: TILE.CHEST_TOP } },
 };
 
 const ITEMS = {};
@@ -286,6 +284,8 @@ defRecipe([[ID.PLANKS, ID.PLANKS], [ID.PLANKS, ID.PLANKS]], ID.CRAFTING_TABLE);
 {
     const C = ID.COBBLE;
     defRecipe([[C, C, C], [C, null, C], [C, C, C]], ID.FURNACE);   // só cabe na bancada 3x3
+    const P = ID.PLANKS;
+    defRecipe([[P, P, P], [P, null, P], [P, P, P]], ID.CHEST);     // idem
 }
 
 function shapesEqual(a, b) {
@@ -450,6 +450,17 @@ function createAtlasTexture() {
                 }
                 const c = ((x < 2 || x > 29 || y < 2 || y > 29) ? 80 : 125) + j(10);
                 return [c, c, c];
+            }
+            case TILE.CHEST_TOP: {
+                const edge = x < 2 || x > 29 || y < 2 || y > 29;
+                if (edge) return [88 + j(5), 56 + j(4), 24 + j(3)];
+                return [150 + j(6), 100 + j(5), 48 + j(4)];
+            }
+            case TILE.CHEST_SIDE: {
+                if (y < 2 || y > 29 || x < 2 || x > 29) return [88 + j(5), 56 + j(4), 24 + j(3)];                 // moldura
+                if (y >= 12 && y <= 13) return [70 + j(4), 45 + j(3), 20 + j(3)];                                   // junção da tampa
+                if (x >= 14 && x <= 17 && y >= 11 && y <= 18) return [205 + j(8), 190 + j(8), 70 + j(8)];          // fecho dourado
+                return [160 + j(6), 108 + j(5), 52 + j(4)];
             }
             case TILE.FURNACE_TOP: {
                 const c = ((x < 3 || x > 28 || y < 3 || y > 28) ? 85 : 110) + j(8);
@@ -1040,8 +1051,28 @@ function spillFurnace(x, y, z) {
     furnaces.delete(key);
 }
 
+const chests = new Map();     // "x,y,z" -> { inv: Inventory(27) }
+
+// Ao quebrar o baú, todo o conteúdo cai no mundo (nada some nem duplica)
+function spillChest(x, y, z) {
+    const key = `${x},${y},${z}`, c = chests.get(key);
+    if (!c) return;
+    for (const st of c.inv.slots) if (st) {
+        spawnItemEntity(st.id, st.count, new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5),
+            new THREE.Vector3((Math.random() - 0.5) * 3, 3 + Math.random() * 2, (Math.random() - 0.5) * 3), 0.5, st.damage || 0);
+    }
+    chests.delete(key);
+}
+
 function openStation(type, hit) {
     if (type === 'crafting') { openInventory({ type }); return; }
+    if (type === 'chest') {
+        const ckey = `${hit.x},${hit.y},${hit.z}`;
+        let c = chests.get(ckey);
+        if (!c) { c = { inv: new Inventory(27) }; chests.set(ckey, c); }
+        openInventory({ type, chest: c });
+        return;
+    }
     const key = `${hit.x},${hit.y},${hit.z}`;
     let f = furnaces.get(key);
     if (!f) { f = { inv: new Inventory(3), burn: 0, burnMax: 0, cook: 0 }; furnaces.set(key, f); }
@@ -1318,6 +1349,7 @@ function breakBlock(x, y, z) {
     const harvest = canHarvest(type, held);
     const drop = BLOCKS[type].drop;
     if (type === ID.FURNACE) spillFurnace(x, y, z);     // o conteúdo do forno cai no mundo
+    if (type === ID.CHEST) spillChest(x, y, z);         // o conteúdo do baú cai no mundo
     world.setBlock(x, y, z, 0);
     spawnBreakParticles(x, y, z, type);
     if (harvest && drop && Math.random() < (BLOCKS[type].dropChance ?? 1)) {
@@ -1620,7 +1652,7 @@ let inventoryOpen = false;
 let invHover = null;                 // { inv: 'main' | 'craft' | 'out' | 'furnace', i }
 let invLastClick = { time: 0, key: '' };
 const invMouse = { x: 0, y: 0, seen: false };
-let invSlotEls = [], craftSlotEls = [], furnaceSlotEls = [], outSlotEl = null;
+let invSlotEls = [], craftSlotEls = [], furnaceSlotEls = [], chestSlotEls = [], outSlotEl = null;
 let craftResult = null;
 
 function stackHtml(s) {
@@ -1669,6 +1701,9 @@ function buildInventoryUI() {
     furnaceSlotEls[1] = make('furnace', 1, document.getElementById('fur-fuel'));
     furnaceSlotEls[2] = make('furnace', 2, document.getElementById('fur-out'));
     furnaceSlotEls[2].classList.add('out');
+    const chestEl = document.getElementById('inv-chest');
+    chestSlotEls = new Array(27);
+    for (let i = 0; i < 27; i++) chestSlotEls[i] = make('chest', i, chestEl);
 
     const overlay = document.getElementById('inventory');
     overlay.addEventListener('mousedown', onInventoryMouseDown);
@@ -1693,6 +1728,7 @@ function hoveredStack() {
     if (!invHover) return null;
     if (invHover.inv === 'main') return inventory.slots[invHover.i];
     if (invHover.inv === 'craft') return craftInv.slots[invHover.i];
+    if (invHover.inv === 'chest') return station && station.chest ? station.chest.inv.slots[invHover.i] : null;
     if (invHover.inv === 'furnace') return station && station.furnace ? station.furnace.inv.slots[invHover.i] : null;
     return craftResult;
 }
@@ -1727,10 +1763,12 @@ function updateInventoryFloaters() {
 // Ajusta o painel conforme a estação aberta (inventário 2x2, bancada 3x3 ou forno)
 function applyInventoryLayout() {
     const isFurnace = !!station && station.type === 'furnace';
-    document.getElementById('craft-row').style.display = isFurnace ? 'none' : 'flex';
+    const isChest = !!station && station.type === 'chest';
+    document.getElementById('craft-row').style.display = (isFurnace || isChest) ? 'none' : 'flex';
     document.getElementById('furnace-row').style.display = isFurnace ? 'flex' : 'none';
+    document.getElementById('chest-row').style.display = isChest ? 'block' : 'none';
     document.getElementById('inv-title').textContent =
-        isFurnace ? 'Forno' : station ? 'Bancada de criação (3×3)' : 'Inventário (criação 2×2)';
+        isFurnace ? 'Forno' : isChest ? 'Baú' : station ? 'Bancada de criação (3×3)' : 'Inventário (criação 2×2)';
     document.getElementById('inv-craft').style.gridTemplateColumns = `repeat(${craftN}, 44px)`;
     craftSlotEls.forEach((el, i) => { el.style.display = i < craftN * craftN ? '' : 'none'; });
 }
@@ -1741,7 +1779,10 @@ function renderInventory() {
         el.innerHTML = stackHtml(inventory.slots[i]);
         el.classList.toggle('sel', i === selectedSlot);
     }
-    if (station && station.type === 'furnace') {
+    if (station && station.type === 'chest') {
+        for (let i = 0; i < 27; i++) chestSlotEls[i].innerHTML = stackHtml(station.chest.inv.slots[i]);
+        craftResult = null;
+    } else if (station && station.type === 'furnace') {
         for (let i = 0; i < 3; i++) furnaceSlotEls[i].innerHTML = stackHtml(station.furnace.inv.slots[i]);
         craftResult = null;
         updateFurnaceBars();
@@ -1793,13 +1834,15 @@ function onInventoryMouseDown(e) {
         return;
     }
 
-    const target = name === 'craft' ? craftInv : inventory;
+    const target = name === 'craft' ? craftInv : name === 'chest' ? station.chest.inv : inventory;
     const key = name + i;
     if (e.button === 0) {
         const now = performance.now();
         if (e.shiftKey && !cursorHeld.stack) {
             if (name === 'main' && station && station.type === 'furnace') quickToFurnace(i);
+            else if (name === 'main' && station && station.type === 'chest') invQuickMove(inventory, i, station.chest.inv, 0, 27);
             else if (name === 'main') invQuickMove(inventory, i, inventory, i < 9 ? 9 : 0, i < 9 ? 36 : 9);
+            else if (name === 'chest') invQuickMove(station.chest.inv, i, inventory, 0, 36);
             else invQuickMove(craftInv, i, inventory, 0, 36);
         }
         else if (cursorHeld.stack && invLastClick.key === key && now - invLastClick.time < 350) invCollectSame(target, cursorHeld);
@@ -1866,8 +1909,13 @@ function handleInventoryKey(event) {
     if (event.code.startsWith('Digit')) {
         const n = parseInt(event.key);
         if (n >= 1 && n <= 9 && invHover.inv === 'main') { invSwapHotbar(inventory, invHover.i, n - 1); renderInventory(); }
+        else if (n >= 1 && n <= 9 && invHover.inv === 'chest' && station && station.chest) {
+            const cs = station.chest.inv.slots;                       // troca o slot do baú com o da barra rápida
+            [cs[invHover.i], inventory.slots[n - 1]] = [inventory.slots[n - 1], cs[invHover.i]];
+            renderInventory();
+        }
     } else if (event.code === 'KeyQ') {
-        const inv = invHover.inv === 'main' ? inventory : craftInv;
+        const inv = invHover.inv === 'main' ? inventory : invHover.inv === 'chest' ? station.chest.inv : craftInv;
         const s = inv.slots[invHover.i];
         if (s) {
             throwStack(s.id, 1, s.damage || 0);
@@ -2115,7 +2163,7 @@ function updateDebug(rawDt) {
         : '—';
     const tt = currentHit ? getBreakTime(currentHit.type, inventory.slots[selectedSlot]).toFixed(2) + 's' : '—';
     debugEl.textContent =
-`Voxel Sandbox — Parte 6
+`Voxel Sandbox — Parte 7
 FPS: ${fps}
 Seed: ${SEED}
 XYZ: ${p.x.toFixed(2)} ${p.y.toFixed(2)} ${p.z.toFixed(2)}
@@ -2123,7 +2171,7 @@ Chunk: ${floorDiv(p.x, CHUNK_SIZE)}, ${floorDiv(p.z, CHUNK_SIZE)}
 Chunks: ${world.chunks.size} | fila geração: ${world.genQueue.length} | fila malha: ${world.dirty.size}
 No chão: ${player.onGround}
 Alvo: ${target} | tempo p/ quebrar: ${tt}
-Mineração: ${Math.round(mining.progress * 100)}% | Drops no mundo: ${itemEntities.length} | Fornos: ${furnaces.size}
+Mineração: ${Math.round(mining.progress * 100)}% | Drops no mundo: ${itemEntities.length} | Fornos: ${furnaces.size} | Baús: ${chests.size}
 Item na mão: ${selectedItemText()}
 Vida ${health} | Fome ${hunger} | Saturação ${saturation.toFixed(1)} | Exaustão ${exhaustion.toFixed(2)}
 CPU/quadro: média ${perf.avg.toFixed(1)} ms | pior ${perf.worstShown.toFixed(1)} ms | último save: ${perf.buildMs.toFixed(1)} ms
@@ -2339,6 +2387,7 @@ function buildSave() {
         drops: itemEntities.slice(0, 500).map(e => ({
             id: e.id, count: e.count, damage: e.damage || 0, x: e.pos.x, y: e.pos.y, z: e.pos.z, age: e.age, ttl: e.ttl,
         })),
+        chests: Array.from(chests, ([k, c]) => [k, c.inv.slots.map(packStack)]),
         furnaces: Array.from(furnaces, ([k, f]) => [k, {
             slots: f.inv.slots.map(packStack), burn: f.burn, burnMax: f.burnMax, cook: f.cook,
         }]),
@@ -2353,6 +2402,21 @@ function sanitizeStack(s) {
     const st = { id: s.id, count: s.count };
     if (it.maxDurability && s.damage > 0 && s.damage < it.maxDurability) st.damage = s.damage;
     return st;
+}
+
+// Baús: pilhas inválidas viram vazias (não derrubam o save inteiro)
+function parseChests(list) {
+    const out = new Map();
+    if (!Array.isArray(list)) return out;
+    for (const entry of list) {
+        if (!Array.isArray(entry)) continue;
+        const [k, slots] = entry;
+        if (typeof k !== 'string' || !/^-?\d+,\d+,-?\d+$/.test(k) || !Array.isArray(slots) || slots.length !== 27) continue;
+        const inv = new Inventory(27);
+        inv.slots = slots.map(st => { try { return sanitizeStack(st); } catch (e) { return null; } });
+        out.set(k, { inv });
+    }
+    return out;
 }
 
 // Drops no chão: entradas inválidas são ignoradas (não invalidam o save inteiro)
@@ -2406,7 +2470,7 @@ function validateSave(d) {
             player: { x: p.x, y: p.y, z: p.z, health: Math.min(MAX_HEALTH, Math.max(1, p.health)), hunger: Math.min(MAX_HUNGER, Math.max(0, p.hunger)),
                       saturation: Math.min(MAX_HUNGER, Math.max(0, Number.isFinite(p.saturation) ? p.saturation : 5)) },
             selectedSlot: d.selectedSlot >= 0 && d.selectedSlot < 9 ? d.selectedSlot | 0 : 0,
-            inventory: inv, edits, furnaces: furn, drops: parseDrops(d.drops),
+            inventory: inv, edits, furnaces: furn, drops: parseDrops(d.drops), chests: parseChests(d.chests),
         };
     } catch (e) { return null; }
 }
@@ -2531,6 +2595,7 @@ async function init() {
         hunger = save.player.hunger;
         saturation = save.player.saturation;
         for (const [k, v] of save.furnaces) furnaces.set(k, v);
+        for (const [k, v] of save.chests) chests.set(k, v);
         for (const e of save.drops) {
             spawnItemEntity(e.id, e.count, new THREE.Vector3(e.x, e.y, e.z), new THREE.Vector3(), 0, e.damage,
                 { age: e.age, ttl: e.ttl, noMerge: true });
