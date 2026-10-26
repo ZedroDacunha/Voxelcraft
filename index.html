@@ -3026,7 +3026,10 @@ function sanitizeStack(s) {
     if (!s) return null;
     if (s.id === ID.WATER) return null; // Remove a água dos saves antigos sem invalidar o mundo
     const it = ITEMS[s.id];
-    if (!it || !Number.isInteger(s.count) || s.count < 1 || s.count > it.maxStack) throw new Error('pilha inválida');
+    if (!it || !Number.isInteger(s.count) || s.count < 1 || s.count > it.maxStack) {
+        console.warn('Pilha inválida descartada durante o carregamento do save:', s);
+        return null;
+    }
     const st = { id: s.id, count: s.count };
     if (it.maxDurability && s.damage > 0 && s.damage < it.maxDurability) st.damage = s.damage;
     return st;
