@@ -89,6 +89,14 @@
     "imports": {
       "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
       "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    },
+    "scopes": {
+      "https://unpkg.com/three@0.160.0/examples/jsm/": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+      },
+      "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+      }
     }
   }
 </script>
@@ -167,8 +175,34 @@
 </div>
 
 <script type="module">
-import * as THREE from 'three';
-import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+async function loadThreeModules() {
+    const providers = [
+        { name: 'unpkg', base: 'https://unpkg.com/three@0.160.0' },
+        { name: 'jsDelivr', base: 'https://cdn.jsdelivr.net/npm/three@0.160.0' },
+    ];
+    let lastError = null;
+    for (const provider of providers) {
+        try {
+            const [THREE, controls] = await Promise.all([
+                import(`${provider.base}/build/three.module.js`),
+                import(`${provider.base}/examples/jsm/controls/PointerLockControls.js`),
+            ]);
+            return { THREE, PointerLockControls: controls.PointerLockControls };
+        } catch (error) {
+            lastError = error;
+            console.warn(`Falha ao carregar Three.js por ${provider.name}; tentando o próximo CDN.`, error);
+        }
+    }
+
+    const loading = document.getElementById('world-loading');
+    loading.hidden = false;
+    document.getElementById('world-loading-title').textContent = 'Não foi possível carregar o jogo';
+    document.getElementById('world-loading-fill').style.width = '0%';
+    document.getElementById('world-loading-detail').textContent = 'As bibliotecas do jogo estão indisponíveis. Verifique sua conexão e recarregue a página.';
+    throw lastError || new Error('Não foi possível carregar o Three.js por nenhum CDN.');
+}
+
+const { THREE, PointerLockControls } = await loadThreeModules();
 
 // =====================================================================
 // 1. CONFIGURAÇÃO
@@ -469,9 +503,12 @@ function trimShape(rows) {
     if (r1 < 0) return null;
     return rows.slice(r0, r1 + 1).map(row => row.slice(c0, c1 + 1));
 }
-function defRecipe(shape, result, count = 1) { RECIPES.push({ shape: trimShape(shape), result, count }); }
+function defRecipe(shape, result, count = 1) { RECIPES.push({ kind: 'shaped', shape: trimShape(shape), result, count }); }
+function defShapeless(ingredients, result, count = 1) {
+    RECIPES.push({ kind: 'shapeless', ingredients: ingredients.slice(), result, count });
+}
 
-defRecipe([[ID.LOG]], ID.PLANKS, 4);
+defShapeless([ID.LOG], ID.PLANKS, 4);
 defRecipe([[ID.CHARCOAL], [ID.STICK]], ID.TORCH, 4);
 defRecipe([[ID.PLANKS], [ID.PLANKS]], ID.STICK, 4);
 for (const m of Object.values(TOOL_MATS)) {
@@ -498,7 +535,15 @@ function matchRecipe(inv) {
     const grid = trimShape(rows);
     if (!grid) return null;
     const mirrored = grid.map(row => row.slice().reverse());
+    const ingredients = s.slice(0, n * n).filter(Boolean).map(stack => stack.id).sort((a, b) => a - b);
     for (const r of RECIPES) {
+        if (r.kind === 'shapeless') {
+            const required = r.ingredients.slice().sort((a, b) => a - b);
+            if (ingredients.length === required.length && ingredients.every((id, i) => id === required[i])) {
+                return { id: r.result, count: r.count };
+            }
+            continue;
+        }
         if (shapesEqual(r.shape, grid) || shapesEqual(r.shape, mirrored)) return { id: r.result, count: r.count };
     }
     return null;
@@ -695,15 +740,60 @@ function createAtlasTexture() {
                 return [178 - shade + j(4), 133 - shade + j(4), 78 - shade + j(3)];
             }
             case TILE.CRAFT_TOP: {
-                const edge = x < 3 || x > 28 || y < 3 || y > 28;
-                if (edge) return [105 + j(4), 68 + j(3), 32 + j(2)];
-                if (x === 10 || x === 21 || y === 10 || y === 21) return [95 + j(3), 62 + j(3), 30 + j(2)];
-                return [178 + j(4), 133 + j(4), 78 + j(3)];
+                // Moldura de madeira escura e grade 3x3 original, com pequenos rebites dourados.
+                if (x < 2 || x > 29 || y < 2 || y > 29) return [70 + j(3), 44 + j(2), 23 + j(2)];
+                if (x < 4 || x > 27 || y < 4 || y > 27) return [111 + j(3), 69 + j(2), 32 + j(2)];
+                const gridLine = x === 10 || x === 11 || x === 20 || x === 21 ||
+                    y === 10 || y === 11 || y === 20 || y === 21;
+                if (gridLine) return [76 + j(3), 48 + j(2), 24 + j(2)];
+                const corner = (x >= 4 && x <= 5 || x >= 26 && x <= 27) &&
+                    (y >= 4 && y <= 5 || y >= 26 && y <= 27);
+                if (corner) return [224 + j(3), 166 + j(3), 72 + j(2)];
+                const cellAccent = ((x + 2 * y) % 13 === 0) && x > 5 && x < 26 && y > 5 && y < 26;
+                if (cellAccent) return [198 + j(3), 111 + j(3), 52 + j(2)];
+                return [180 + j(4), 126 + j(4), 69 + j(3)];
             }
             case TILE.CRAFT_SIDE: {
-                if (y < 5) return [105 + j(4), 68 + j(3), 32 + j(2)];
-                const s = (x % 16 === 0) ? 40 : 0;
-                return [170 - s + j(4), 125 - s + j(4), 72 - s + j(3)];
+                const inRect = (x0, y0, x1, y1) => x >= x0 && x <= x1 && y >= y0 && y <= y1;
+                let wood = [170 + j(4), 125 + j(4), 72 + j(3)];
+                if (x === 0 || x === 31 || y < 4) wood = [91 + j(3), 57 + j(2), 28 + j(2)];
+                else if (y === 12 || y === 22) wood = [124 + j(3), 82 + j(3), 43 + j(2)];
+                else if (x % 16 === 0) wood = [128 + j(3), 87 + j(3), 46 + j(2)];
+
+                // Régua de marceneiro à esquerda.
+                if (inRect(3, 8, 8, 28)) {
+                    if (x === 3 || x === 8 || y === 8 || y === 28) return [63, 39, 21];
+                    if (x === 4 || x === 7) return [207, 157, 83];
+                    if (x === 5 || x === 6) {
+                        if (x === 6 && (y - 9) % 4 === 0) return [91, 57, 28];
+                        return [226, 184, 108];
+                    }
+                }
+
+                // Cinzel ao centro: cabo de madeira, virola escura e lâmina de aço.
+                if (inRect(13, 7, 18, 15)) {
+                    if (x === 13 || x === 18 || y === 7 || y === 15) return [61, 38, 21];
+                    return [184, 126, 64];
+                }
+                if (inRect(12, 14, 19, 16)) return [74, 46, 24];
+                if (inRect(13, 16, 18, 25)) {
+                    if (x === 13 || x === 18 || y === 25) return [58, 43, 34];
+                    return (x === 15 || x === 16) ? [181, 192, 190] : [112, 125, 127];
+                }
+                if (inRect(14, 26, 17, 28)) return [192, 202, 197];
+
+                // Plaina à direita: corpo baixo, lâmina aparente e empunhadura curta.
+                if (inRect(23, 7, 27, 15)) {
+                    if (x === 23 || x === 27 || y === 7 || y === 15) return [64, 39, 20];
+                    return [190, 137, 75];
+                }
+                if (inRect(21, 16, 29, 25)) {
+                    if (x === 21 || x === 29 || y === 16 || y === 25) return [59, 37, 20];
+                    if (y === 17 || y === 18) return [181, 190, 184];
+                    if (x === 24 || x === 25) return [133, 88, 43];
+                    return [176, 124, 66];
+                }
+                return wood;
             }
             case TILE.FURNACE_FRONT: {
                 if (x >= 9 && x <= 22 && y >= 12 && y <= 24) {
@@ -2780,6 +2870,30 @@ function invQuickMove(src, i, dst, from, to) {
     if (left === 0) src.slots[i] = null; else s.count = left;
 }
 
+function invQuickMoveToCraft(i) {
+    const source = inventory.slots[i];
+    if (!source) return;
+    let left = source.count;
+    const end = craftN * craftN;
+    for (let slot = 0; slot < end && left > 0; slot++) {
+        if (craftInv.slots[slot]) continue;
+        craftInv.slots[slot] = { id: source.id, count: 1 };
+        if (source.damage) craftInv.slots[slot].damage = source.damage;
+        left--;
+    }
+    if (left > 0 && stackable(source.id)) {
+        for (let slot = 0; slot < end && left > 0; slot++) {
+            const target = craftInv.slots[slot];
+            if (!target || target.id !== source.id || target.count >= ITEMS[source.id].maxStack) continue;
+            const moved = Math.min(ITEMS[source.id].maxStack - target.count, left);
+            target.count += moved;
+            left -= moved;
+        }
+    }
+    if (left === 0) inventory.slots[i] = null;
+    else source.count = left;
+}
+
 function invCollectSame(inv, cur) {
     const c = cur.stack;
     if (!c || !stackable(c.id)) return;
@@ -2930,6 +3044,7 @@ function buildInventoryUI() {
 function buildRecipeList() {
     const nm = (id) => id ? ITEMS[id].name : '·';
     const lines = RECIPES.map(r => {
+        if (r.kind === 'shapeless') return `${r.ingredients.map(nm).join(' + ')} → ${r.count}× ${ITEMS[r.result].name} [sem forma]`;
         const big = r.shape.length > 2 || r.shape[0].length > 2;
         return r.shape.map(row => row.map(nm).join(' + ')).join(' / ') +
             ` → ${r.count}× ${ITEMS[r.result].name}` + (big ? ' [bancada]' : '');
@@ -3056,7 +3171,7 @@ function onInventoryMouseDown(e) {
         if (e.shiftKey && !cursorHeld.stack) {
             if (name === 'main' && station && station.type === 'furnace') quickToFurnace(i);
             else if (name === 'main' && station && station.type === 'chest') invQuickMove(inventory, i, station.chest.inv, 0, 27);
-            else if (name === 'main') invQuickMove(inventory, i, inventory, i < 9 ? 9 : 0, i < 9 ? 36 : 9);
+            else if (name === 'main') invQuickMoveToCraft(i);
             else if (name === 'chest') invQuickMove(station.chest.inv, i, inventory, 0, 36);
             else invQuickMove(craftInv, i, inventory, 0, 36);
         }
@@ -4417,7 +4532,7 @@ async function init() {
         updateTarget();
 
         const st = currentHit && BLOCKS[currentHit.type].station;
-        if (st && !wantToCrouch) { openStation(st, currentHit); return; }
+        if (st && !event.shiftKey && !wantToCrouch) { openStation(st, currentHit); return; }
 
         const held = inventory.slots[selectedSlot];
         const food = held && ITEMS[held.id].food;
