@@ -3516,6 +3516,7 @@ function takeDamage(amount, source = 'generic') {
 }
 
 function die() {
+    if (inventoryOpen) closeInventory(false);
     dead = true;
     cancelEating();
     const dx = Math.floor(player.pos.x), dy = Math.floor(player.pos.y), dz = Math.floor(player.pos.z);
@@ -3555,7 +3556,7 @@ function die() {
         .catch(error => console.error('Falha ao preparar o respawn:', error));
     deathEl.style.display = 'flex';
     controls.unlock();
-    saveGame(true);
+    saveGame(true, true);
 }
 
 function cancelEating() { eat.active = false; eat.progress = 0; }
@@ -4125,9 +4126,28 @@ async function loadGame() {
     }
 }
 
-let saving = false;
-async function saveGame(quiet) {
-    if (saving || !world) return;
+const SAVE_DEBOUNCE_MS = 5000;
+let saving = false, saveTimer = null, savePending = false;
+
+function saveGame(quiet, immediate = false) {
+    if (!world) return;
+    if (saveTimer !== null) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+    }
+    if (!immediate && quiet) {
+        saveTimer = setTimeout(() => {
+            saveTimer = null;
+            performSaveGame(true);
+        }, SAVE_DEBOUNCE_MS);
+        return;
+    }
+    performSaveGame(quiet);
+}
+
+async function performSaveGame(quiet) {
+    if (!world) return;
+    if (saving) { savePending = true; return; }
     if (saveWriteBlocked || !saveLockOwned) {
         if (!quiet) showToast('Salvamento bloqueado para proteger o mundo aberto em outra aba');
         return;
@@ -4144,7 +4164,13 @@ async function saveGame(quiet) {
             if (!quiet) showToast('Outra aba está usando este mundo; salvamento bloqueado');
         } else if (!quiet) showToast('Jogo salvo');
     } catch (e) { console.warn('Falha ao salvar:', e); if (!quiet) showToast('Falha ao salvar'); }
-    saving = false;
+    finally {
+        saving = false;
+        if (savePending) {
+            savePending = false;
+            saveGame(true, true);
+        }
+    }
 }
 
 // =====================================================================
@@ -4395,7 +4421,8 @@ async function init() {
 
         const held = inventory.slots[selectedSlot];
         const food = held && ITEMS[held.id].food;
-        if (food) {
+        // Comida só é consumida pelo clique direito quando o jogador mira no ar.
+        if (food && !currentHit) {
             if (hunger < MAX_HUNGER) { eat.active = true; eat.progress = 0; eat.slot = selectedSlot; eat.id = held.id; }
             else showToast('Você não está com fome');
             return;
@@ -4435,7 +4462,7 @@ async function init() {
     });
 
     setInterval(() => { if (controls.isLocked) saveGame(true); }, 30000);
-    document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(true); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(true, true); });
 
     if (new URLSearchParams(location.search).has('debug')) {
         window.dbg = {
