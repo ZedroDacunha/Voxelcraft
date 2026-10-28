@@ -1,27 +1,17 @@
+import { BLOCKS, ID, ITEMS } from './world-catalog.js';
+import { LEGACY_MINERAL_ITEM_MAP } from './world-minerals.js';
+import { parseBlockFacings } from './world-block-orientation.js';
+import { chunkKey, floorDiv, idx } from './world-grid.js';
+import {
+    CHUNK_SIZE, DEATH_DROP_TTL, MAX_BREATH, MAX_HEALTH, MAX_HUNGER,
+    PLAYER_INVENTORY_SIZE, START_TIME, WORLD_HEIGHT,
+} from './world-save-settings.js';
+
 export const WORLD_SAVE_VERSION = 1;
 
 // Converte o estado do jogo para o formato persistido e valida saves antes
 // que qualquer dado carregado seja aplicado ao mundo.
-export function createWorldSaveCodec({
-    ID,
-    ITEMS,
-    BLOCKS,
-    LEGACY_MINERAL_ITEM_MAP,
-    Inventory,
-    CHUNK_SIZE,
-    WORLD_HEIGHT,
-    MAX_HEALTH,
-    MAX_HUNGER,
-    MAX_BREATH,
-    START_TIME,
-    DEATH_DROP_TTL,
-    inventorySize,
-    floorDiv,
-    idx,
-    chunkKey,
-    parseBlockFacings,
-    version = WORLD_SAVE_VERSION,
-}) {
+export function createWorldSaveCodec({ version = WORLD_SAVE_VERSION } = {}) {
     const packStack = stack => stack
         ? { id: stack.id, count: stack.count, damage: stack.damage || 0 }
         : null;
@@ -87,12 +77,11 @@ export function createWorldSaveCodec({
             if (!Array.isArray(entry)) continue;
             const [key, slots] = entry;
             if (typeof key !== 'string' || !/^-?\d+,\d+,-?\d+$/.test(key) || !Array.isArray(slots) || slots.length !== 27) continue;
-            const inventory = new Inventory(27);
-            inventory.slots = slots.map(stack => {
+            const cleanSlots = slots.map(stack => {
                 try { return sanitizeStack(stack); }
                 catch { return null; }
             });
-            chests.set(key, { inv: inventory });
+            chests.set(key, { slots: cleanSlots });
         }
         return chests;
     }
@@ -122,7 +111,7 @@ export function createWorldSaveCodec({
             const player = data.player;
             if (![player.x, player.y, player.z, player.health, player.hunger].every(Number.isFinite)) return null;
             if (player.breath !== undefined && !Number.isFinite(player.breath)) return null;
-            if (!Array.isArray(data.inventory) || data.inventory.length !== inventorySize) return null;
+            if (!Array.isArray(data.inventory) || data.inventory.length !== PLAYER_INVENTORY_SIZE) return null;
             const inventory = data.inventory.map(sanitizeStack);
 
             const edits = new Map();
@@ -152,10 +141,9 @@ export function createWorldSaveCodec({
                 if (!/^-?\d+,\d+,-?\d+$/.test(key) || !Array.isArray(furnace.slots) || furnace.slots.length !== 3) {
                     throw new Error('forno inválido');
                 }
-                const inventory = new Inventory(3);
-                inventory.slots = furnace.slots.map(sanitizeStack);
+                const slots = furnace.slots.map(sanitizeStack);
                 furnaces.set(key, {
-                    inv: inventory,
+                    slots,
                     burn: Math.max(0, +furnace.burn || 0),
                     burnMax: Math.max(0, +furnace.burnMax || 0),
                     cook: Math.max(0, +furnace.cook || 0),

@@ -4,18 +4,23 @@ import { clamp01, hash2, mulberry32, Noise2D, smoothstep } from './world-math.js
 import { ATLAS_COLUMNS, BLOCKS, FUEL, ID, ITEMS, matchRecipe, RECIPES, SMELT, TILE, TILE_PX } from './world-catalog.js';
 import { findSpawn, TerrainGenerator } from './world-terrain.js';
 import { createWaterSystemClass } from './world-water.js';
+import { Inventory } from './inventory-model.js';
 import { craftConsume, invCollectSame, invLeftClick, invQuickMove, invQuickMoveToCraft, invRightClick, invSwapHotbar, stackable } from './inventory-logic.js';
 import { stackHtml, updateSlotElement } from './inventory-view.js';
 import { createRecipeBook } from './inventory-recipe-book.js';
 import { createTextureTools } from './world-textures.js';
 import { createWorldSaveCodec, WORLD_SAVE_VERSION } from './world-save-codec.js';
 import { createWorldSaveManager } from './world-save-manager.js';
+import { chunkKey, floorDiv, idx } from './world-grid.js';
+import {
+    CHUNK_SIZE, DEATH_DROP_TTL, MAX_BREATH, MAX_HEALTH, MAX_HUNGER,
+    PLAYER_INVENTORY_SIZE, START_TIME, WORLD_HEIGHT,
+} from './world-save-settings.js';
 import { configureTorchFlicker, configureTorchFlameAnimation, updateWorldLightingEffects } from './world-lighting-effects.js';
 import { FurnaceSmokeSystem } from './world-furnace-effects.js';
-import { LEGACY_MINERAL_ITEM_MAP } from './world-minerals.js';
 import {
     BlockFacingStore, DEFAULT_BLOCK_FACING, facingTowardPlayer, isFrontFace, isHorizontalFacing,
-    parseBlockFacings, tileForBlockFace,
+    tileForBlockFace,
 } from './world-block-orientation.js';
 
 async function loadThreeModules() {
@@ -51,8 +56,6 @@ const { spritePixels, createAtlasTexture, createNoiseTexture } = createTextureTo
 // =====================================================================
 // 1. CONFIGURAÇÃO
 // =====================================================================
-const CHUNK_SIZE = 16;
-const WORLD_HEIGHT = 64;
 const ACTIVE_FURNACE_LIGHT = 13;
 const BLOCK_LIGHT_GAIN = 3.4;
 const BLOCK_LIGHT_MAX = 2.5;
@@ -82,15 +85,12 @@ const EYE_STAND = 1.62, EYE_CROUCH = 1.27;
 const WATER_LEVEL = 26; // Nível base do mar
 
 // Sobrevivência
-const MAX_HEALTH = 20, MAX_HUNGER = 20, MAX_BREATH = 20;
 const SPRINT_MIN_HUNGER = 7;
 const EAT_TIME = 1.6;
 const INVULN_TIME = 0.5;
-const DEATH_DROP_TTL = 600;
 
 // Dia, Noite e Nuvens
 const DAY_LENGTH = 1200;
-const START_TIME = 0.2;
 const CLOUD_CELL = 8;
 const CLOUD_THICK = 3;
 const CLOUD_GRID = 32;
@@ -126,10 +126,6 @@ const WaterSystem = createWaterSystemClass({
 // =====================================================================
 // 4. CONFIGURAÇÃO DE GERAÇÃO E ÍNDICES DE CHUNK
 // =====================================================================
-const idx = (lx, y, lz) => lx + lz * CHUNK_SIZE + y * CHUNK_SIZE * CHUNK_SIZE;
-const chunkKey = (cx, cz) => `${cx},${cz}`;
-
-const floorDiv = (a, b) => Math.floor(a / b);
 const BIOME = Object.freeze({ PLAINS: 0, FOREST: 1, DESERT: 2, ROCKY: 3 });
 const TREE_CHANCE_FOREST = 0.035;
 const TREE_CHANCE_PLAINS = 0.008;
@@ -1180,50 +1176,6 @@ class CreatureSystem {
 // =====================================================================
 // 5B. INVENTÁRIO E FERRAMENTAS
 // =====================================================================
-class Inventory {
-    constructor(size) { this.slots = Array.from({ length: size }, () => null); }
-    add(id, count, from = 0, to = this.slots.length, damage = 0) {
-        const max = ITEMS[id].maxStack;
-        for (let i = from; i < to && count > 0; i++) {
-            const s = this.slots[i];
-            if (s && s.id === id && s.count < max) {
-                const n = Math.min(max - s.count, count);
-                s.count += n; count -= n;
-            }
-        }
-        for (let i = from; i < to && count > 0; i++) {
-            if (!this.slots[i]) {
-                const n = Math.min(max, count);
-                const st = { id, count: n };
-                if (damage > 0) st.damage = damage;
-                this.slots[i] = st;
-                count -= n;
-            }
-        }
-        return count;
-    }
-    canAdd(id) {
-        const max = ITEMS[id].maxStack;
-        return this.slots.some(s => !s || (s.id === id && s.count < max));
-    }
-    spaceFor(id) {
-        const max = ITEMS[id].maxStack;
-        let space = 0;
-        for (const s of this.slots) {
-            if (!s) space += max;
-            else if (s.id === id) space += max - s.count;
-        }
-        return space;
-    }
-    removeOne(slotIndex) {
-        const s = this.slots[slotIndex];
-        if (!s) return false;
-        s.count--;
-        if (s.count <= 0) this.slots[slotIndex] = null;
-        return true;
-    }
-}
-
 const ITEM_ICONS = {};
 const BLOCK_COLORS = {};
 
@@ -2493,7 +2445,7 @@ const spawnPoint = new THREE.Vector3();
 let bobTimer = 0;
 
 let selectedSlot = 0;
-const inventory = new Inventory(36);
+const inventory = new Inventory(PLAYER_INVENTORY_SIZE);
 let leftHeld = false;
 
 // Status
@@ -2992,12 +2944,7 @@ function updatePhysics(dt) {
 // 10B. SALVAMENTO (IndexedDB, um registro por seed)
 // =====================================================================
 const SAVE_KEY = ACTIVE_WORLD.saveKey;
-const saveCodec = createWorldSaveCodec({
-    ID, ITEMS, BLOCKS, LEGACY_MINERAL_ITEM_MAP, Inventory, CHUNK_SIZE, WORLD_HEIGHT,
-    MAX_HEALTH, MAX_HUNGER, MAX_BREATH, START_TIME, DEATH_DROP_TTL,
-    inventorySize: inventory.slots.length,
-    floorDiv, idx, chunkKey, parseBlockFacings, version: WORLD_SAVE_VERSION,
-});
+const saveCodec = createWorldSaveCodec({ version: WORLD_SAVE_VERSION });
 
 function buildSave() {
     return saveCodec.build({
@@ -3174,8 +3121,16 @@ async function init() {
         saturation = save.player.saturation;
         breath = save.player.breath;
         worldTime = save.worldTime;
-        for (const [k, v] of save.furnaces) furnaces.set(k, v);
-        for (const [k, v] of save.chests) chests.set(k, v);
+        for (const [key, furnace] of save.furnaces) {
+            const inv = new Inventory(3);
+            inv.slots = furnace.slots;
+            furnaces.set(key, { ...furnace, inv });
+        }
+        for (const [key, chest] of save.chests) {
+            const inv = new Inventory(27);
+            inv.slots = chest.slots;
+            chests.set(key, { inv });
+        }
         for (const e of save.drops) {
             spawnItemEntity(e.id, e.count, new THREE.Vector3(e.x, e.y, e.z), new THREE.Vector3(), 0, e.damage,
                 { age: e.age, ttl: e.ttl, noMerge: true });
@@ -3207,6 +3162,14 @@ async function init() {
         btnWorlds.textContent = 'Salvando mundo...';
         const saved = await saveManager.flushAndRelease(false);
         if (!saved) {
+            const leaveWithoutSaving = confirm(
+                'Não foi possível salvar este mundo. Se sair agora, as alterações desde o último save serão perdidas. Deseja sair sem salvar?'
+            );
+            if (leaveWithoutSaving) {
+                await saveManager.release();
+                location.reload();
+                return;
+            }
             btnWorlds.disabled = false;
             btnWorlds.textContent = 'Voltar à seleção de mundos';
             return;

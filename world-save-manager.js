@@ -41,6 +41,17 @@ export function createWorldSaveManager({
     let savePending = false;
     let releaseLockAfterSave = false;
     let lastSaveResult = false;
+    let saveFailureActive = false;
+
+    function saveFailureMessage(error) {
+        if (error?.name === 'QuotaExceededError' || error?.code === 22 || error?.code === 1014) {
+            return 'Armazenamento cheio; exporte uma cópia e libere espaço';
+        }
+        if (error?.name === 'SecurityError' || error?.name === 'NotAllowedError') {
+            return 'O navegador bloqueou o armazenamento local do jogo';
+        }
+        return 'Falha ao salvar; o jogo tentará novamente';
+    }
 
     function clearSaveTimer() {
         if (saveTimer === null) return;
@@ -84,7 +95,7 @@ export function createWorldSaveManager({
                     } catch (error) {
                         console.warn('Não foi possível arquivar o save rejeitado; ele será mantido intacto.', error);
                     } finally {
-                        saveWriteBlocked = !lock.isOwned;
+                        saveWriteBlocked = !lock.isOwned || !rejectedSavePreserved;
                     }
                 }
             }
@@ -120,8 +131,16 @@ export function createWorldSaveManager({
                 return recovered;
             };
 
-            return await recoverFrom(importedSaveKeyFor(saveKey), 'a cópia importada', true)
-                || await recoverFrom(backupKey, 'o backup');
+            const imported = await recoverFrom(importedSaveKeyFor(saveKey), 'a cópia importada', true);
+            if (imported) return imported;
+            const backup = await recoverFrom(backupKey, 'o backup');
+            if (backup) return backup;
+            if (data) {
+                onToast(rejectedSavePreserved
+                    ? 'Save inválido preservado; não há backup válido'
+                    : 'Save inválido mantido; salvamento bloqueado');
+            }
+            return null;
         } catch (error) {
             saveWriteBlocked = true;
             console.warn('Falha ao ler ou proteger o save; gravações bloqueadas para evitar perda de dados:', error);
@@ -161,12 +180,16 @@ export function createWorldSaveManager({
             if (!wrote) saveWriteBlocked = true;
             else {
                 primarySaveKnownGood = true;
+                const recovered = saveFailureActive;
+                saveFailureActive = false;
                 if (!quiet) onToast('Jogo salvo');
+                else if (recovered) onToast('Salvamento retomado');
             }
             saved = wrote;
         } catch (error) {
             onError(error);
-            if (!quiet) onToast('Falha ao salvar');
+            if (!saveFailureActive) onToast(saveFailureMessage(error));
+            saveFailureActive = true;
         } finally {
             lastSaveResult = saved;
             saving = false;
