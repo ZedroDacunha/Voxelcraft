@@ -150,11 +150,16 @@ export function createTextureTools(THREE) {
                 return color.map(channel => channel + fine);
             };
             const grassPixel = (px, py, muted = false) => {
-                const patch = hash2(Math.floor(px / 3), Math.floor(py / 3), 2909 + alt * 131);
-                const fleck = hash2(px, py, 6343 + alt * 157);
-                let color = patch < 0.2 ? [78, 143, 48] : patch > 0.78 ? [127, 186, 69] : [101, 167, 57];
-                if (fleck > 0.975) color = [139, 194, 77];
-                else if (fleck < 0.025) color = [73, 134, 47];
+                const patch = hash2(Math.floor(px / 4), Math.floor(py / 3), 2909 + alt * 131);
+                const clump = hash2(Math.floor(px / 2), Math.floor(py / 2), 6343 + alt * 157);
+                const fleck = hash2(px, py, 511 + alt * 191);
+                let color = patch < 0.16 ? [68, 112, 45] : patch > 0.84 ? [105, 148, 60] : [86, 133, 53];
+                if (clump > 0.91) color = [116, 157, 65];
+                else if (clump < 0.08) color = [61, 103, 42];
+                if (fleck > 0.985) color = [127, 166, 74];
+                else if (fleck < 0.015) color = [53, 91, 38];
+                const grain = (hash2(px, py, 927 + alt * 233) - 0.5) * 8;
+                color = color.map(channel => channel + grain);
                 return muted ? color.map(channel => channel * 0.78) : color;
             };
             if (isMineralOreTile(tile)) return createMineralOrePixel(tile, x, y, j);
@@ -198,11 +203,21 @@ export function createTextureTools(THREE) {
                     return [ring || core ? 119 + j(3) : 174 + j(4), ring || core ? 79 + j(3) : 124 + j(4), ring || core ? 42 + j(2) : 66 + j(3)];
                 }
                 case TILE.LEAVES: {
-                    const leafHole = (px, py) => hash2(px, py, 800 + alt) < 0.07;
-                    if (leafHole(x, y) && !leafHole(x - 1, y) && !leafHole(x + 1, y) &&
-                        !leafHole(x, y - 1) && !leafHole(x, y + 1)) return [0, 0, 0, 0];
-                    const n = ((x * 7 + y * 13 + alt * 2) % 5 === 0) ? -28 : ((x + y) % 7 === 0 ? 16 : 0);
-                    return [42 + n * 0.35 + j(4), 126 + n + j(6), 45 + n * 0.4 + j(4)];
+                    const canopy = hash2(Math.floor(x / 4), Math.floor(y / 4), 800 + alt * 97);
+                    const opening = hash2(Math.floor(x / 2), Math.floor(y / 2), 1901 + alt * 131);
+                    const tinyOpening = hash2(x, y, 3119 + alt * 173);
+                    if (opening < (canopy < 0.4 ? 0.22 : 0.13) || (opening < 0.32 && tinyOpening < 0.055)) {
+                        return [0, 0, 0, 0];
+                    }
+
+                    const leaf = hash2(Math.floor(x / 2), Math.floor(y / 2), 4517 + alt * 199);
+                    let color = canopy < 0.24 ? [29, 76, 29] : canopy > 0.84 ? [65, 126, 43] : [43, 103, 36];
+                    if (leaf > 0.86) color = [75, 137, 48];
+                    else if (leaf < 0.12) color = [34, 86, 31];
+                    const glint = hash2(x, y, 7321 + alt * 223);
+                    if (glint > 0.975) color = [91, 151, 54];
+                    const fine = (hash2(x, y, 8161 + alt * 251) - 0.5) * 8;
+                    return color.map(channel => channel + fine);
                 }
                 case TILE.PLANKS: {
                     const board = Math.floor(y / 8);

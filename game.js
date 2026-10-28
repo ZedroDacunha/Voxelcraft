@@ -239,7 +239,7 @@ class World {
         this.sandFallGeometry = buildCubeGeo(BLOCKS[ID.SAND].tiles, 1);
         this.chunkMaterial = new THREE.MeshLambertMaterial({ map: atlas, vertexColors: true });
         this.cutoutMaterial = new THREE.MeshLambertMaterial({
-            map: atlas, alphaTest: 0.5, transparent: false, depthWrite: true, vertexColors: true,
+            map: atlas, alphaTest: 0.5, transparent: false, depthWrite: true, vertexColors: true, side: THREE.DoubleSide,
         });
         
         this.torchFlameMaterial = new THREE.MeshBasicMaterial({ map: createTorchFlameTexture(), transparent: false, alphaTest: 0.5, depthWrite: true, side: THREE.DoubleSide, toneMapped: false });
@@ -295,7 +295,7 @@ class World {
             if (type === 0) { chunk.skyLight[i] = light; continue; }
             if (type === ID.LEAVES) {
                 chunk.skyLight[i] = light;
-                light = Math.max(0, light - 3);
+                light = Math.max(0, light - 1);
                 continue;
             }
             if (WaterSystem.isBlock(type)) {
@@ -387,7 +387,7 @@ class World {
             const targetIndex = idx(nx, y, nz);
             const type = target.data[targetIndex], block = BLOCKS[type];
             if (type !== 0 && block?.solid !== false && type !== ID.LEAVES && !WaterSystem.isBlock(type)) return;
-            const attenuation = type === ID.LEAVES ? (channel === 'skyLight' ? 3 : 2) : WaterSystem.isBlock(type) ? 2 : 1;
+            const attenuation = type === ID.LEAVES ? 2 : WaterSystem.isBlock(type) ? 2 : 1;
             const candidate = sourceLevel - attenuation, targetLight = target[channel];
             if (candidate <= targetLight[targetIndex]) return;
             targetLight[targetIndex] = candidate;
@@ -740,6 +740,7 @@ class World {
         const blockLightAt = (lx, y, lz) => {
             return sampleLight('blockLight', lx, y, lz, 0);
         };
+        const isLayeredLeafFace = dir => dir[0] > 0 || dir[1] > 0 || dir[2] > 0;
         const solid = (lx, y, lz, currentType, dir) => {
             const nx = lx + dir[0], ny = y + dir[1], nz = lz + dir[2];
             const nType = blockAt(nx, ny, nz);
@@ -754,10 +755,19 @@ class World {
                 const neighborHeight = WaterSystem.surfaceHeightFor(nType, blockAt(nx, ny + 1, nz));
                 return currentHeight <= neighborHeight + 0.0001;
             }
+            // Folhas recortadas não devem apagar a face do tronco: ela precisa aparecer nos vãos da textura.
+            if (neighborRender === 'cutout') {
+                if (currentRender !== 'cutout') return false;
+                // Mantém uma face interna por par de folhas para que os vãos revelem outras camadas da copa.
+                return !isLayeredLeafFace(dir);
+            }
             return nType !== 0 && neighborRender !== 'liquid' && neighborRender !== 'torch';
         };
 
-        const occludesAO = type => type !== 0 && BLOCKS[type]?.render !== 'liquid' && BLOCKS[type]?.render !== 'torch';
+        const ambientOcclusionWeight = type => {
+            if (type === 0 || BLOCKS[type]?.render === 'liquid' || BLOCKS[type]?.render === 'torch') return 0;
+            return BLOCKS[type]?.render === 'cutout' ? 0.35 : 1;
+        };
         const ambientOcclusionAt = (lx, y, lz, face, corner, includeAO = true) => {
             let axisA, axisB;
             if (face.dir[0] !== 0) { axisA = 1; axisB = 2; }
@@ -772,10 +782,12 @@ class World {
             const sideAType = includeAO ? blockAt(baseX + ax, baseY + ay, baseZ + az) : 0;
             const sideBType = includeAO ? blockAt(baseX + bx, baseY + by, baseZ + bz) : 0;
             const cornerType = includeAO ? blockAt(baseX + ax + bx, baseY + ay + by, baseZ + az + bz) : 0;
-            const sideA = occludesAO(sideAType) ? 1 : 0;
-            const sideB = occludesAO(sideBType) ? 1 : 0;
-            const cornerOcclusion = occludesAO(cornerType) ? 1 : 0;
-            const level = includeAO ? (sideA && sideB ? 0 : 3 - sideA - sideB - cornerOcclusion) : 3;
+            const sideA = ambientOcclusionWeight(sideAType);
+            const sideB = ambientOcclusionWeight(sideBType);
+            const cornerOcclusion = ambientOcclusionWeight(cornerType);
+            const level = includeAO
+                ? (sideA === 1 && sideB === 1 ? 0 : Math.max(0, 3 - sideA - sideB - cornerOcclusion))
+                : 3;
             const sampleSky = (x, yy, z) => skyLightAt(x, yy, z);
             const sampleBlock = (x, yy, z) => blockLightAt(x, yy, z);
             const sky = (sampleSky(baseX, baseY, baseZ) + sampleSky(baseX + ax, baseY + ay, baseZ + az) +
@@ -834,6 +846,7 @@ class World {
                         for (const f of FACES) {
                         const neighborX = lx + f.dir[0], neighborY = y + f.dir[1], neighborZ = lz + f.dir[2];
                         const neighborType = blockAt(neighborX, neighborY, neighborZ);
+                        const leafLayerFace = renderMode === 'cutout' && BLOCKS[neighborType]?.render === 'cutout' && isLayeredLeafFace(f.dir);
                         if (renderMode !== 'torch' && solid(lx, y, lz, t, f.dir)) continue;
                         const wx = chunk.cx * CS + lx, wz = chunk.cz * CS + lz;
                         const tile = shape ? shape.tiles[f.kind] : variantTile(tiles[f.kind], wx, y, wz);
@@ -869,7 +882,10 @@ class World {
                             const p = vertex * 3, uv = vertex * 2;
                             const localY = shape ? shape.min[1] + c.pos[1] * (shape.max[1] - shape.min[1]) : c.pos[1];
                             const wallOffset = renderMode === 'torch' && block.orientation ? (localY * 0.35 - 0.38) : 0;
-                            positions[p] = lx + (shape ? shape.min[0] + c.pos[0] * (shape.max[0] - shape.min[0]) + orientation[0] * wallOffset : c.pos[0]); positions[p + 1] = py; positions[p + 2] = lz + (shape ? shape.min[2] + c.pos[2] * (shape.max[2] - shape.min[2]) + orientation[1] * wallOffset : c.pos[2]);
+                            const layerInset = leafLayerFace ? 0.008 : 0;
+                            positions[p] = lx + (shape ? shape.min[0] + c.pos[0] * (shape.max[0] - shape.min[0]) + orientation[0] * wallOffset : c.pos[0]) - f.dir[0] * layerInset;
+                            positions[p + 1] = py - f.dir[1] * layerInset;
+                            positions[p + 2] = lz + (shape ? shape.min[2] + c.pos[2] * (shape.max[2] - shape.min[2]) + orientation[1] * wallOffset : c.pos[2]) - f.dir[2] * layerInset;
                             normals[p] = f.dir[0]; normals[p + 1] = f.dir[1]; normals[p + 2] = f.dir[2];
                             uvs[uv] = u0 + c.uv[0] * uWidth;
                             uvs[uv + 1] = UV_PAD + c.uv[1] * (1 - 2 * UV_PAD);
