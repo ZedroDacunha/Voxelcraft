@@ -9,7 +9,8 @@ export const TILE = { GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, STONE: 3, WOOD: 4, C
                WOOD_END: 14, COAL_ORE: 15, IRON_ORE: 16, GOLD_ORE: 17, DIAMOND_ORE: 18,
                GRASS_TOP_ALT: 19, GRASS_SIDE_ALT: 20, DIRT_ALT: 21, STONE_ALT: 22, LEAVES_ALT: 23,
                SAND: 24, WATER: 25, TORCH_FLAME: 26, COPPER_ORE: 27, CHEST_FRONT: 28,
-               FURNACE_FRONT_ON: 29, FURNACE_SIDE: 30, CHEST_FRONT_OPEN: 31 };
+               FURNACE_FRONT_ON: 29, FURNACE_SIDE: 30, CHEST_FRONT_OPEN: 31,
+               WOOD_DOOR_UPPER: 32, WOOD_DOOR_LOWER: 33 };
 export const TILE_PX = 32;
 
 const allFaces = (t) => ({ top: t, side: t, bottom: t });
@@ -24,7 +25,9 @@ export const ID = { GRASS: 1, STONE: 2, LOG: 3, DIRT: 4, COBBLE: 5, PLANKS: 6, L
              RAW_GOLD: MINERAL_IDS.RAW_GOLD,
              SAND: 15, WATER: 16, WATER_FLOW_1: 40, WATER_FLOW_2: 41, WATER_FLOW_3: 42,
              WATER_FLOW_4: 43, WATER_FLOW_5: 44, WATER_FLOW_6: 45, WATER_FLOW_7: 46, WATER_FALL: 47,
-             STICK: 20, TORCH: 60, TORCH_WALL_XP: 61, TORCH_WALL_XN: 62, TORCH_WALL_ZP: 63, TORCH_WALL_ZN: 64, APPLE: 30, CHARCOAL: 31 };
+             STICK: 20, TORCH: 60, TORCH_WALL_XP: 61, TORCH_WALL_XN: 62, TORCH_WALL_ZP: 63, TORCH_WALL_ZN: 64, APPLE: 30, CHARCOAL: 31,
+             WOOD_DOOR: 65, WOOD_DOOR_BOTTOM: 66, WOOD_DOOR_TOP: 67,
+             WOOD_DOOR_BOTTOM_OPEN: 68, WOOD_DOOR_TOP_OPEN: 69 };
 
 export const BLOCKS = {
     [ID.GRASS]: { name: 'Grama',      hardness: 0.6, drop: ID.DIRT,   tool: 'shovel', tiles: { top: TILE.GRASS_TOP, side: TILE.GRASS_SIDE, bottom: TILE.DIRT } },
@@ -40,6 +43,26 @@ export const BLOCKS = {
          icon: TILE.FURNACE_FRONT, tiles: { top: TILE.FURNACE_TOP, side: TILE.FURNACE_SIDE, front: TILE.FURNACE_FRONT, bottom: TILE.COBBLE } },
     [ID.CHEST]: { name: 'Baú',     hardness: 2.5, drop: ID.CHEST, tool: 'axe', station: 'chest', icon: TILE.CHEST_FRONT,
           tiles: { top: TILE.CHEST_TOP, side: TILE.CHEST_SIDE, front: TILE.CHEST_FRONT, bottom: TILE.CHEST_TOP } },
+    [ID.WOOD_DOOR_BOTTOM]: {
+        name: 'Porta de carvalho', hardness: 3, drop: ID.WOOD_DOOR, tool: 'axe', collectible: false,
+        render: 'cutout', solid: true, door: { half: 'bottom', open: false, tile: TILE.WOOD_DOOR_LOWER },
+        tiles: { top: TILE.WOOD_END, side: TILE.WOOD, front: TILE.WOOD_DOOR_LOWER, bottom: TILE.WOOD_END },
+    },
+    [ID.WOOD_DOOR_TOP]: {
+        name: 'Porta de carvalho', hardness: 3, drop: ID.WOOD_DOOR, tool: 'axe', collectible: false,
+        render: 'cutout', solid: true, door: { half: 'top', open: false, tile: TILE.WOOD_DOOR_UPPER },
+        tiles: { top: TILE.WOOD_END, side: TILE.WOOD, front: TILE.WOOD_DOOR_UPPER, bottom: TILE.WOOD_END },
+    },
+    [ID.WOOD_DOOR_BOTTOM_OPEN]: {
+        name: 'Porta de carvalho aberta', hardness: 3, drop: ID.WOOD_DOOR, tool: 'axe', collectible: false,
+        render: 'cutout', solid: false, door: { half: 'bottom', open: true, tile: TILE.WOOD_DOOR_LOWER },
+        tiles: { top: TILE.WOOD_END, side: TILE.WOOD, front: TILE.WOOD_DOOR_LOWER, bottom: TILE.WOOD_END },
+    },
+    [ID.WOOD_DOOR_TOP_OPEN]: {
+        name: 'Porta de carvalho aberta', hardness: 3, drop: ID.WOOD_DOOR, tool: 'axe', collectible: false,
+        render: 'cutout', solid: false, door: { half: 'top', open: true, tile: TILE.WOOD_DOOR_UPPER },
+        tiles: { top: TILE.WOOD_END, side: TILE.WOOD, front: TILE.WOOD_DOOR_UPPER, bottom: TILE.WOOD_END },
+    },
     ...createMineralBlocks(ID, TILE),
     [ID.SAND]: { name: 'Areia', hardness: 0.5, drop: ID.SAND, tool: 'shovel', tiles: allFaces(TILE.SAND) },
     [ID.TORCH]: { name: 'Tocha', hardness: 0.3, drop: ID.TORCH, tool: null, light: 14, render: 'torch', solid: false, tiles: allFaces(TILE.TORCH_FLAME) },
@@ -78,6 +101,10 @@ for (const [id, b] of Object.entries(BLOCKS)) {
 
 let nextTile = Object.keys(TILE).length;
 ITEMS[ID.STICK] = { name: 'Graveto', maxStack: 64, sprite: { kind: 'stick', mat: 'wood' }, iconTile: nextTile++ };
+ITEMS[ID.WOOD_DOOR] = {
+    name: 'Porta de carvalho', maxStack: 64, block: ID.WOOD_DOOR_BOTTOM,
+    sprite: { kind: 'door', mat: 'oak' }, iconTile: nextTile++,
+};
 
 const TOOL_MATS = {
     wood:  { label: 'de Madeira', tier: 1, speed: 2, durability: 59,  base: 21, ingredient: ID.PLANKS },
@@ -158,6 +185,7 @@ for (const m of toolMaterials) {
 defRecipe([[ID.PLANKS, ID.PLANKS], [ID.PLANKS, ID.PLANKS]], ID.CRAFTING_TABLE);
 defRecipe([[ID.COBBLE, ID.COBBLE, ID.COBBLE], [ID.COBBLE, null, ID.COBBLE], [ID.COBBLE, ID.COBBLE, ID.COBBLE]], ID.FURNACE);
 defRecipe([[ID.PLANKS, ID.PLANKS, ID.PLANKS], [ID.PLANKS, null, ID.PLANKS], [ID.PLANKS, ID.PLANKS, ID.PLANKS]], ID.CHEST);
+defRecipe([[ID.PLANKS, ID.PLANKS], [ID.PLANKS, ID.PLANKS], [ID.PLANKS, ID.PLANKS]], ID.WOOD_DOOR, 3);
 
 function shapesEqual(a, b) {
     if (a.length !== b.length || a[0].length !== b[0].length) return false;
