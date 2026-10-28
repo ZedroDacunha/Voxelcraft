@@ -4,7 +4,11 @@ import { ATLAS_COLUMNS, ITEMS, TILE, TILE_PX } from './world-catalog.js';
 // Atlas voxel e sprites determinísticos em canvas.
 export function createTextureTools(THREE) {
     const HANDLE_L = [156, 106, 52], HANDLE_D = [112, 74, 34];
-    const HEAD_COLORS = { wood: { l: [176, 128, 70], d: [130, 90, 45] }, stone: { l: [150, 150, 152], d: [106, 106, 110] } };
+    const HEAD_COLORS = {
+        wood: { l: [176, 128, 70], d: [130, 90, 45] },
+        stone: { l: [150, 150, 152], d: [106, 106, 110] },
+        iron: { l: [210, 218, 220], d: [126, 139, 145] },
+    };
     const spriteCache = {};
     function spritePixels(kind, mat) {
         const key = kind + ':' + mat;
@@ -27,6 +31,20 @@ export function createTextureTools(THREE) {
             return (spriteCache[key] = g);
         }
     
+        if (kind === 'ingot') {
+            const colors = mat === 'iron'
+                ? { light: [218, 225, 226], mid: [159, 173, 178], dark: [100, 116, 122] }
+                : { light: [220, 185, 66], mid: [174, 132, 36], dark: [112, 79, 23] };
+            for (let y = 4; y <= 11; y++) {
+                for (let x = 3; x <= 12; x++) {
+                    const edge = x === 3 || x === 12 || y === 4 || y === 11;
+                    put(x, y, edge ? colors.dark : (y <= 6 ? colors.light : colors.mid));
+                }
+            }
+            put(4, 5, colors.light); put(5, 5, colors.light); put(6, 5, colors.light);
+            return (spriteCache[key] = g);
+        }
+
         if (kind === 'apple' || kind === 'charcoal') {
             for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
                 if (kind === 'apple') {
