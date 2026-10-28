@@ -189,18 +189,32 @@ export function createTextureTools(THREE) {
                     return cobblePixel(x, y, alt);
                 }
                 case TILE.WOOD: {
-                    const fiber = x % 8;
-                    const dark = fiber === 0 || fiber === 1 || ((x * 5 + y * 3) % 37 === 0);
-                    const knot = (x >= 19 && x <= 22 && y >= 13 && y <= 17);
-                    return [dark || knot ? 105 + j(4) : 153 + j(4), dark || knot ? 65 + j(3) : 94 + j(4), dark || knot ? 35 + j(2) : 48 + j(3)];
+                    const column = Math.floor(x / 2);
+                    const stripe = hash2(column, 0, 3623);
+                    const segment = hash2(column, Math.floor(y / 6), 4919);
+                    let color = [119, 101, 67];
+                    if (stripe < 0.18) color = [75, 61, 41];
+                    else if (stripe < 0.38) color = [94, 77, 51];
+                    else if (stripe > 0.91) color = [158, 137, 91];
+                    else if (stripe > 0.76) color = [137, 115, 75];
+                    if (segment > 0.84) color = color.map(channel => channel + 15);
+                    else if (segment < 0.14) color = color.map(channel => channel - 13);
+                    const barkChip = hash2(x, Math.floor(y / 2), 6833);
+                    if (barkChip > 0.985) color = [57, 45, 31];
+                    return color.map(channel => channel + j(2));
                 }
                 case TILE.WOOD_END: {
                     const dx = Math.abs(x - 15.5), dy = Math.abs(y - 15.5);
                     const r = Math.max(dx, dy);
-                    if (r > 14) return [91 + j(3), 57 + j(3), 30 + j(2)];
-                    const ring = Math.floor(r) % 4 === 0;
-                    const core = dx < 2 && dy < 2;
-                    return [ring || core ? 119 + j(3) : 174 + j(4), ring || core ? 79 + j(3) : 124 + j(4), ring || core ? 42 + j(2) : 66 + j(3)];
+                    const depth = 15.5 - r;
+                    if (r > 14.5) return [81 + j(2), 63 + j(2), 39 + j(2)];
+                    const ring = depth > 1 && Math.floor(depth) % 4 === 3;
+                    if (ring) return [127 + j(2), 99 + j(2), 59 + j(2)];
+                    const band = Math.floor(depth / 4) % 2;
+                    const heartwood = dx < 2 && dy < 2;
+                    const color = heartwood ? [197, 161, 99] : band ? [216, 187, 128] : [199, 169, 108];
+                    const grain = (hash2(Math.floor(x / 4), Math.floor(y / 4), 7727) - 0.5) * 5;
+                    return color.map(channel => channel + grain + j(2));
                 }
                 case TILE.LEAVES: {
                     const canopy = hash2(Math.floor(x / 4), Math.floor(y / 4), 800 + alt * 97);
@@ -221,10 +235,23 @@ export function createTextureTools(THREE) {
                 }
                 case TILE.PLANKS: {
                     const board = Math.floor(y / 8);
-                    const seam = (y % 8 === 0);
-                    const vseam = ((x + board * 11) % 16 === 0) && !seam;
-                    const shade = seam ? 65 : vseam ? 35 : (board % 2) * 8;
-                    return [178 - shade + j(4), 133 - shade + j(4), 78 - shade + j(3)];
+                    const row = y % 8;
+                    const offset = (board % 2) * 8;
+                    if (row === 0) return [123 + j(2), 91 + j(2), 51 + j(2)];
+                    if (row === 1) return [177 + j(2), 142 + j(2), 86 + j(2)];
+                    if (row === 7) return [151 + j(2), 116 + j(2), 67 + j(2)];
+
+                    const joint = (x + offset) % 16;
+                    if (joint === 0 && row >= 2 && row <= 6) return [126 + j(2), 94 + j(2), 55 + j(2)];
+                    if (joint === 1 && row >= 2 && row <= 6) return [202 + j(2), 166 + j(2), 106 + j(2)];
+
+                    const grain = hash2(Math.floor((x + offset) / 4), Math.floor(row / 2), 1171 + board * 83);
+                    const streak = hash2(Math.floor((x + offset) / 10), row, 2489 + board * 109);
+                    const base = board % 2 ? [183, 147, 91] : [191, 155, 99];
+                    let variation = (grain - 0.5) * 8 + (streak > 0.88 ? 4 : streak < 0.12 ? -4 : 0);
+                    if (row === 2) variation += 4;
+                    if (row === 6) variation -= 3;
+                    return base.map(channel => channel + variation + j(2));
                 }
                 case TILE.CRAFT_TOP: {
                     // Moldura de madeira escura e grade 3x3 original, com pequenos rebites dourados.
@@ -358,6 +385,25 @@ export function createTextureTools(THREE) {
                         return latchEdge ? [61, 59, 52] : [187, 190, 177];
                     }
                     if (x === 14 && y === 13) return [224, 224, 207];
+                    return wood.map(channel => channel + j(3));
+                }
+                case TILE.CHEST_FRONT_OPEN: {
+                    if (x < 2 || x > 29 || y < 2 || y > 29) return [34 + j(2), 27 + j(2), 19 + j(2)];
+                    if (x < 4 || x > 27 || y > 27) return [70 + j(3), 47 + j(2), 27 + j(2)];
+                    if (y <= 4) {
+                        if (y === 2 || y === 4) return [103 + j(3), 66 + j(2), 31 + j(2)];
+                        if (x >= 14 && x <= 17 && y === 3) return [188, 190, 178];
+                        return [185 + j(4), 122 + j(3), 48 + j(2)];
+                    }
+                    if (y <= 11) {
+                        if (y === 5 || y === 11 || x === 4 || x === 27) return [62 + j(2), 41 + j(2), 24 + j(2)];
+                        if (x >= 14 && x <= 17 && y <= 8) return [156 + j(3), 158 + j(3), 148 + j(3)];
+                        return [25 + j(3), 20 + j(2), 16 + j(2)];
+                    }
+                    if (y === 12 || y === 13) return [49 + j(2), 34 + j(2), 22 + j(2)];
+                    const grain = hash2(Math.floor(x / 3), Math.floor(y / 4), 2903 + alt * 97);
+                    let wood = grain > 0.82 ? [204, 143, 59] : grain < 0.16 ? [151, 97, 40] : [178, 113, 44];
+                    if (x === 8 || x === 23) wood = [128, 81, 38];
                     return wood.map(channel => channel + j(3));
                 }
                 case TILE.FURNACE_TOP: {

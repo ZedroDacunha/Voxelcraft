@@ -7,7 +7,13 @@ import { createWaterSystemClass } from './world-water.js';
 import { craftConsume, invCollectSame, invLeftClick, invQuickMove, invQuickMoveToCraft, invRightClick, invSwapHotbar, stackable } from './inventory-logic.js';
 import { stackHtml, updateSlotElement } from './inventory-view.js';
 import { createTextureTools } from './world-textures.js';
+import { configureTorchFlicker, configureTorchFlameAnimation, updateWorldLightingEffects } from './world-lighting-effects.js';
+import { FurnaceSmokeSystem } from './world-furnace-effects.js';
 import { LEGACY_MINERAL_ITEM_MAP } from './world-minerals.js';
+import {
+    BlockFacingStore, DEFAULT_BLOCK_FACING, facingTowardPlayer, isFrontFace, isHorizontalFacing,
+    parseBlockFacings, tileForBlockFace,
+} from './world-block-orientation.js';
 
 async function loadThreeModules() {
     const providers = [
@@ -44,6 +50,9 @@ const { spritePixels, createAtlasTexture, createNoiseTexture } = createTextureTo
 // =====================================================================
 const CHUNK_SIZE = 16;
 const WORLD_HEIGHT = 64;
+const ACTIVE_FURNACE_LIGHT = 13;
+const BLOCK_LIGHT_GAIN = 3.4;
+const BLOCK_LIGHT_MAX = 2.5;
 const RENDER_DISTANCE = 4;     // em chunks
 const GEN_PER_FRAME = 2;       // chunks gerados por quadro
 const MESH_PER_FRAME = 2;      // malhas reconstruídas por quadro
@@ -195,6 +204,7 @@ const FACES = [
     { kind: 'side',   dir: [ 0, 0, 1], corners: [ { pos: [0,0,1], uv: [0,0] }, { pos: [1,0,1], uv: [1,0] }, { pos: [0,1,1], uv: [0,1] }, { pos: [1,1,1], uv: [1,1] } ] },
 ];
 const UV_PAD = 0.0005;
+const openChests = new Set();
 
 function variantTile(tile, wx, y, wz) {
     if (hash2(wx + y * 13, wz - y * 7, 404) > 0.16) return tile;
@@ -213,6 +223,7 @@ class World {
         this.generator = new TerrainGenerator(seed, TERRAIN_CONFIG);
         this.chunks = new Map();
         this.edits = new Map();
+        this.blockFacings = new BlockFacingStore();
         this.dirty = new Set();
         this.lightDirty = new Set();
         this.lightSourceChunks = new Set();
@@ -243,49 +254,11 @@ class World {
         });
         
         this.torchFlameMaterial = new THREE.MeshBasicMaterial({ map: createTorchFlameTexture(), transparent: false, alphaTest: 0.5, depthWrite: true, side: THREE.DoubleSide, toneMapped: false });
-        this.configureTorchFlameAnimation(this.torchFlameMaterial);
-        this.configureTorchFlicker(this.chunkMaterial);
-        this.configureTorchFlicker(this.cutoutMaterial);
+        this.furnaceSmoke = new FurnaceSmokeSystem(THREE, scene);
+        configureTorchFlameAnimation(this.torchFlameMaterial);
+        configureTorchFlicker(this.chunkMaterial);
+        configureTorchFlicker(this.cutoutMaterial);
         this.water = new WaterSystem(atlas);
-    }
-
-    configureTorchFlicker(material) {
-        material.onBeforeCompile = shader => {
-            shader.uniforms.uTorchTime = { value: 0 };
-            shader.vertexShader = shader.vertexShader.replace(
-                '#include <common>',
-                '#include <common>\nuniform float uTorchTime;\nattribute float torchInfluence;\nvarying float vTorchInfluence;'
-            );
-            shader.vertexShader = shader.vertexShader.replace(
-                '#include <color_vertex>',
-                '#include <color_vertex>\nvTorchInfluence = torchInfluence;'
-            );
-            shader.fragmentShader = shader.fragmentShader.replace(
-                '#include <common>',
-                '#include <common>\nuniform float uTorchTime;\nvarying float vTorchInfluence;'
-            );
-            shader.fragmentShader = shader.fragmentShader.replace(
-                '#include <color_fragment>',
-                '#include <color_fragment>\nfloat torchFlicker = 1.0 + vTorchInfluence * (0.035 * sin(uTorchTime * 8.7) + 0.02 * sin(uTorchTime * 13.1 + 1.2));\ndiffuseColor.rgb *= torchFlicker;'
-            );
-            material.userData.torchFlickerShader = shader;
-        };
-        material.customProgramCacheKey = () => 'voxel-torch-flicker-v1';
-    }
-    configureTorchFlameAnimation(material) {
-        material.onBeforeCompile = shader => {
-            shader.uniforms.uFlameTime = { value: 0 };
-            shader.vertexShader = shader.vertexShader.replace(
-                '#include <common>',
-                '#include <common>\nuniform float uFlameTime;\nattribute float flamePhase;'
-            );
-            shader.vertexShader = shader.vertexShader.replace(
-                '#include <begin_vertex>',
-                '#include <begin_vertex>\nfloat flameTip = uv.y * uv.y;\ntransformed.x += flameTip * (0.018 * sin(uFlameTime * 7.0 + flamePhase + position.x * 9.0 + position.z * 6.0));\ntransformed.z += flameTip * (0.012 * sin(uFlameTime * 5.3 + flamePhase * 1.37 + position.x * 5.0 + position.z * 8.0));'
-            );
-            material.userData.flameAnimationShader = shader;
-        };
-        material.customProgramCacheKey = () => 'voxel-torch-flame-animation-v1';
     }
     rebuildSkyLightColumn(chunk, lx, lz) {
         let light = 15;
@@ -364,6 +337,13 @@ class World {
                 let emission = 0;
                 if (seedEmitters) {
                     emission = BLOCKS[chunk.data[i]]?.light ?? 0;
+                    if (chunk.data[i] === ID.FURNACE) {
+                        const y = Math.floor(i / (CHUNK_SIZE * CHUNK_SIZE));
+                        const lx = i % CHUNK_SIZE;
+                        const lz = Math.floor(i / CHUNK_SIZE) % CHUNK_SIZE;
+                        const x = chunk.cx * CHUNK_SIZE + lx, z = chunk.cz * CHUNK_SIZE + lz;
+                        if (furnaces.get(`${x},${y},${z}`)?.burn > 0) emission = ACTIVE_FURNACE_LIGHT;
+                    }
                     if (emission > lightMap[i]) lightMap[i] = emission;
                     if (emission > 0) hasEmitter = true;
                 }
@@ -487,8 +467,19 @@ class World {
     refreshLightSourceChunk(cx, cz, chunk = this.getChunk(cx, cz)) {
         const key = chunkKey(cx, cz);
         if (!chunk) { this.lightSourceChunks.delete(key); return; }
-        for (const type of chunk.data) {
+        for (let i = 0; i < chunk.data.length; i++) {
+            const type = chunk.data[i];
             if (BLOCKS[type]?.light > 0) { this.lightSourceChunks.add(key); return; }
+            if (type === ID.FURNACE) {
+                const y = Math.floor(i / (CHUNK_SIZE * CHUNK_SIZE));
+                const lx = i % CHUNK_SIZE;
+                const lz = Math.floor(i / CHUNK_SIZE) % CHUNK_SIZE;
+                const x = cx * CHUNK_SIZE + lx, z = cz * CHUNK_SIZE + lz;
+                if (furnaces.get(`${x},${y},${z}`)?.burn > 0) {
+                    this.lightSourceChunks.add(key);
+                    return;
+                }
+            }
         }
         this.lightSourceChunks.delete(key);
     }
@@ -500,6 +491,10 @@ class World {
         return chunk.data[idx(x - chunk.cx * CHUNK_SIZE, y, z - chunk.cz * CHUNK_SIZE)];
     }
 
+    getBlockFacing(x, y, z) {
+        return this.blockFacings.get(x, y, z);
+    }
+
     isSolidForPhysics(x, y, z) {
         if (y < 0) return true;
         if (y >= WORLD_HEIGHT) return false;
@@ -509,7 +504,7 @@ class World {
         return type !== 0 && (BLOCKS[type]?.solid ?? true);
     }
 
-    setBlock(x, y, z, type) {
+    setBlock(x, y, z, type, facing = null) {
         if (y < 0 || y >= WORLD_HEIGHT) return false;
         const cx = floorDiv(x, CHUNK_SIZE), cz = floorDiv(z, CHUNK_SIZE);
         const chunk = this.getChunk(cx, cz);
@@ -519,7 +514,13 @@ class World {
         const oldType = chunk.data[i];
         if (oldType === ID.SAND && type !== ID.SAND) this.cancelFallingSand(x, y, z);
         chunk.data[i] = type;
-        if ((BLOCKS[oldType]?.light ?? 0) !== (BLOCKS[type]?.light ?? 0)) this.refreshLightSourceChunk(cx, cz, chunk);
+        if (BLOCKS[type]?.tiles.front !== undefined) {
+            const nextFacing = isHorizontalFacing(facing) ? facing : this.blockFacings.get(x, y, z);
+            this.blockFacings.set(x, y, z, nextFacing);
+        } else this.blockFacings.delete(x, y, z);
+        if ((BLOCKS[oldType]?.light ?? 0) !== (BLOCKS[type]?.light ?? 0) || oldType === ID.FURNACE || type === ID.FURNACE) {
+            this.refreshLightSourceChunk(cx, cz, chunk);
+        }
         if (type === ID.SAND) this.queueFallingSand(x, y, z);
         if (type !== oldType && (type === 0 || BLOCKS[type]?.solid === false) && y + 1 < WORLD_HEIGHT) {
             this.queueFallingSand(x, y + 1, z);
@@ -667,11 +668,13 @@ class World {
         if (ed) {
             for (const [i, t] of ed) {
                 chunk.data[i] = t;
-                if (BLOCKS[t]?.light > 0) hasEditedLightSource = true;
                 const y = Math.floor(i / (CHUNK_SIZE * CHUNK_SIZE));
                 const lx = i % CHUNK_SIZE;
                 const lz = Math.floor(i / CHUNK_SIZE) % CHUNK_SIZE;
                 const x = chunk.cx * CHUNK_SIZE + lx, z = chunk.cz * CHUNK_SIZE + lz;
+                if (BLOCKS[t]?.light > 0 || (t === ID.FURNACE && furnaces.get(`${x},${y},${z}`)?.burn > 0)) {
+                    hasEditedLightSource = true;
+                }
                 if (t === ID.SAND) this.queueFallingSand(x, y, z);
                 if (t === 0 && y + 1 < WORLD_HEIGHT) this.queueFallingSand(x, y + 1, z);
                 if (t !== 0) {
@@ -794,9 +797,10 @@ class World {
                 sampleSky(baseX + bx, baseY + by, baseZ + bz) + sampleSky(baseX + ax + bx, baseY + ay + by, baseZ + az + bz)) / 60;
             const local = (sampleBlock(baseX, baseY, baseZ) + sampleBlock(baseX + ax, baseY + ay, baseZ + az) +
                 sampleBlock(baseX + bx, baseY + by, baseZ + bz) + sampleBlock(baseX + ax + bx, baseY + ay + by, baseZ + az + bz)) / 60;
-            const illumination = Math.max(0.18 + sky * 0.82, 0.18 + Math.min(2.2, local * 2.4) * 0.82);
+            const localIllumination = Math.min(BLOCK_LIGHT_MAX, local * BLOCK_LIGHT_GAIN);
+            const illumination = Math.max(0.18 + sky * 0.82, 0.18 + localIllumination * 0.82);
             const base = (0.58 + level * 0.14) * illumination;
-            const warmth = Math.min(0.22, local * 0.24);
+            const warmth = Math.min(0.3, local * 0.32);
             return [base * (1 + warmth), base, base * (1 - warmth * 0.85), local];
         };
 
@@ -807,6 +811,7 @@ class World {
         let uvs = new Float32Array(initialVertexCapacity * 2);
         let colors = new Float32Array(initialVertexCapacity * 3);
         let torchInfluence = new Float32Array(initialVertexCapacity);
+        let furnaceFlame = new Float32Array(initialVertexCapacity);
         let indices = new Uint32Array(initialIndexCapacity);
         let cutoutIndices = new Uint32Array(initialIndexCapacity);
         let waterIndices = new Uint32Array(initialIndexCapacity);
@@ -849,10 +854,15 @@ class World {
                         const leafLayerFace = renderMode === 'cutout' && BLOCKS[neighborType]?.render === 'cutout' && isLayeredLeafFace(f.dir);
                         if (renderMode !== 'torch' && solid(lx, y, lz, t, f.dir)) continue;
                         const wx = chunk.cx * CS + lx, wz = chunk.cz * CS + lz;
-                        const isFrontFace = tiles.front !== undefined && f.dir[0] === 0 && f.dir[2] === 1;
-                        let faceTile = isFrontFace ? tiles.front : tiles[f.kind];
-                        if (isFrontFace && t === ID.FURNACE && furnaces.get(`${wx},${y},${wz}`)?.burn > 0) {
+                        const facing = tiles.front !== undefined ? this.getBlockFacing(wx, y, wz) : DEFAULT_BLOCK_FACING;
+                        const frontFace = tiles.front !== undefined && isFrontFace(f.dir, facing);
+                        let faceTile = tileForBlockFace(tiles, f.kind, f.dir, facing);
+                        const furnaceFlameFace = frontFace && t === ID.FURNACE && furnaces.get(`${wx},${y},${wz}`)?.burn > 0;
+                        if (furnaceFlameFace) {
                             faceTile = TILE.FURNACE_FRONT_ON;
+                        }
+                        if (frontFace && t === ID.CHEST && openChests.has(`${wx},${y},${wz}`)) {
+                            faceTile = TILE.CHEST_FRONT_OPEN;
                         }
                         const tile = shape ? shape.tiles[f.kind] : variantTile(faceTile, wx, y, wz);
                         const u0 = tile / ATLAS_COLUMNS + UV_PAD;
@@ -862,6 +872,7 @@ class World {
                         uvs = growTypedArray(uvs, (vertexCount + 4) * 2);
                         colors = growTypedArray(colors, (vertexCount + 4) * 3);
                         torchInfluence = growTypedArray(torchInfluence, vertexCount + 4);
+                        furnaceFlame = growTypedArray(furnaceFlame, vertexCount + 4);
                         let target, targetOffset;
                         if (renderMode === 'cutout' || renderMode === 'torch') {
                             cutoutIndices = growTypedArray(cutoutIndices, cutoutIndexCount + 6);
@@ -897,6 +908,7 @@ class World {
                             const shade = ambientOcclusionAt(lx, y, lz, f, c, renderMode !== 'liquid');
                             colors[p] = shade[0]; colors[p + 1] = shade[1]; colors[p + 2] = shade[2];
                             torchInfluence[vertex] = shade[3];
+                            furnaceFlame[vertex] = furnaceFlameFace ? 1 : 0;
                         }
                         vertexCount += 4;
                         target[targetOffset] = ndx; target[targetOffset + 1] = ndx + 1;
@@ -916,6 +928,7 @@ class World {
         geo.setAttribute('uv', new THREE.BufferAttribute(uvs.subarray(0, vertexCount * 2), 2));
         geo.setAttribute('color', new THREE.BufferAttribute(colors.subarray(0, vertexCount * 3), 3));
         geo.setAttribute('torchInfluence', new THREE.BufferAttribute(torchInfluence.subarray(0, vertexCount), 1));
+        geo.setAttribute('furnaceFlame', new THREE.BufferAttribute(furnaceFlame.subarray(0, vertexCount), 1));
 
         const totalIndexCount = indexCount + cutoutIndexCount + waterIndexCount;
         const mergedIndices = vertexCount > 65535 ? new Uint32Array(totalIndexCount) : new Uint16Array(totalIndexCount);
@@ -987,14 +1000,7 @@ class World {
         const genDeadline = t0 + FRAME_BUDGET_MS * 0.45;
         const meshDeadline = t0 + FRAME_BUDGET_MS;
         const torchTime = t0 * 0.001;
-        const flamePulse = 0.95 + 0.05 * Math.sin(torchTime * 9.4);
-        this.torchFlameMaterial.color.setRGB(flamePulse, flamePulse * 0.96, flamePulse * 0.9);
-        const flameShader = this.torchFlameMaterial.userData.flameAnimationShader;
-        if (flameShader) flameShader.uniforms.uFlameTime.value = torchTime;
-        for (const material of [this.chunkMaterial, this.cutoutMaterial]) {
-            const shader = material.userData.torchFlickerShader;
-            if (shader) shader.uniforms.uTorchTime.value = torchTime;
-        }
+        updateWorldLightingEffects(this.torchFlameMaterial, [this.chunkMaterial, this.cutoutMaterial], torchTime);
         const pcx = floorDiv(px, CHUNK_SIZE), pcz = floorDiv(pz, CHUNK_SIZE);
 
         if (pcx !== this.lastPcx || pcz !== this.lastPcz) {
@@ -1313,7 +1319,11 @@ function updateFurnaces(dt) {
         if (wasBurning !== (f.burn > 0)) {
             const [x, , z] = key.split(',').map(Number);
             const chunk = world?.getChunk(floorDiv(x, CHUNK_SIZE), floorDiv(z, CHUNK_SIZE));
-            if (chunk) world.dirty.add(chunk);
+            if (chunk) {
+                world.refreshLightSourceChunk(chunk.cx, chunk.cz, chunk);
+                world.lightDirty.add(chunk);
+                world.dirty.add(chunk);
+            }
         }
     }
 }
@@ -1337,8 +1347,18 @@ function spillFurnace(x, y, z) {
 }
 
 const chests = new Map();
+function setChestOpen(key, isOpen) {
+    const changed = isOpen ? !openChests.has(key) : openChests.has(key);
+    if (!changed) return;
+    if (isOpen) openChests.add(key); else openChests.delete(key);
+    const [x, , z] = key.split(',').map(Number);
+    const chunk = world?.getChunk(floorDiv(x, CHUNK_SIZE), floorDiv(z, CHUNK_SIZE));
+    if (chunk) world.dirty.add(chunk);
+}
+
 function spillChest(x, y, z) {
     const key = `${x},${y},${z}`, c = chests.get(key);
+    setChestOpen(key, false);
     if (!c) return;
     for (const st of c.inv.slots) if (st) {
         spawnItemEntity(st.id, st.count, new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5),
@@ -1353,7 +1373,8 @@ function openStation(type, hit) {
         const ckey = `${hit.x},${hit.y},${hit.z}`;
         let c = chests.get(ckey);
         if (!c) { c = { inv: new Inventory(27) }; chests.set(ckey, c); }
-        openInventory({ type, chest: c });
+        setChestOpen(ckey, true);
+        openInventory({ type, chest: c, chestKey: ckey });
         return;
     }
     const key = `${hit.x},${hit.y},${hit.z}`;
@@ -1403,11 +1424,11 @@ function updateParticles(dt) {
     }
 }
 
-function buildCubeGeo(tiles, size) {
+function buildCubeGeo(tiles, size, facing = DEFAULT_BLOCK_FACING) {
     const positions = [], normals = [], uvs = [], indices = [];
     const uWidth = 1 / ATLAS_COLUMNS - 2 * UV_PAD;
     for (const f of FACES) {
-        const tile = tiles.front !== undefined && f.dir[0] === 0 && f.dir[2] === 1 ? tiles.front : tiles[f.kind];
+        const tile = tileForBlockFace(tiles, f.kind, f.dir, facing);
         const u0 = tile / ATLAS_COLUMNS + UV_PAD;
         const ndx = positions.length / 3;
         for (const c of f.corners) {
@@ -2120,6 +2141,8 @@ function giveBack(s) {
 function closeInventory(relock) {
     if (!inventoryOpen) return;
     inventoryOpen = false;
+
+    if (station && station.type === 'chest') setChestOpen(station.chestKey, false);
 
     giveBack(cursorHeld.stack);
     cursorHeld.stack = null;
@@ -2999,6 +3022,7 @@ function buildSave() {
     return {
         v: SAVE_VERSION, seed: SEED, time: Date.now(),
         worldTime,
+        blockFacings: world.blockFacings.serialize(WORLD_HEIGHT),
         player: { x: player.pos.x, y: player.pos.y, z: player.pos.z, health, hunger, saturation, breath },
         selectedSlot,
         inventory: inventory.slots.map(packStack),
@@ -3080,6 +3104,13 @@ function validateSave(d) {
             edits.set(String(key), m);
         }
 
+        const blockFacings = parseBlockFacings(d.blockFacings, WORLD_HEIGHT, (x, y, z) => {
+            const cx = floorDiv(x, CHUNK_SIZE), cz = floorDiv(z, CHUNK_SIZE);
+            const localIndex = idx(x - cx * CHUNK_SIZE, y, z - cz * CHUNK_SIZE);
+            const type = edits.get(chunkKey(cx, cz))?.get(localIndex);
+            return BLOCKS[type]?.tiles.front !== undefined;
+        });
+
         const furn = new Map();
         for (const [k, f] of (d.furnaces || [])) {
             if (!/^-?\d+,\d+,-?\d+$/.test(k) || !Array.isArray(f.slots) || f.slots.length !== 3) throw new Error('forno inválido');
@@ -3093,7 +3124,8 @@ function validateSave(d) {
                       saturation: Math.min(MAX_HUNGER, Math.max(0, Number.isFinite(p.saturation) ? p.saturation : 5)),
                       breath: Math.min(MAX_BREATH, Math.max(0, Number.isFinite(p.breath) ? p.breath : MAX_BREATH)) },
             selectedSlot: d.selectedSlot >= 0 && d.selectedSlot < 9 ? d.selectedSlot | 0 : 0,
-            inventory: inv, edits, furnaces: furn, drops: parseDrops(d.drops), chests: parseChests(d.chests),
+            inventory: inv, edits, blockFacings,
+            furnaces: furn, drops: parseDrops(d.drops), chests: parseChests(d.chests),
             worldTime: Number.isFinite(d.worldTime) ? ((d.worldTime % 1) + 1) % 1 : START_TIME,
         };
     } catch (e) { return null; }
@@ -3314,6 +3346,7 @@ async function init() {
     const save = await loadGame();
     if (save) {
         world.edits = save.edits;
+        world.blockFacings = new BlockFacingStore(save.blockFacings);
         inventory.slots = save.inventory;
         selectedSlot = save.selectedSlot;
         health = save.player.health;
@@ -3330,7 +3363,10 @@ async function init() {
     }
     const sp = findSpawn(world.generator, TERRAIN_CONFIG);
     spawnPoint.set(sp.x, sp.y, sp.z);
-    const start = save ? save.player : spawnPoint;
+    const savedPositionIsInWorld = save && save.player.y >= 0 && save.player.y < WORLD_HEIGHT + 4;
+    const recoveredSavedPosition = !!save && !savedPositionIsInWorld;
+    if (recoveredSavedPosition) console.warn('Posição do jogador fora do mundo; mantendo o restante do save e recuperando no ponto inicial.');
+    const start = savedPositionIsInWorld ? save.player : spawnPoint;
     await waitForWorldRegion(start.x, start.z, { driveUpdates: true, onProgress: setWorldLoadProgress });
     player.pos.set(start.x, start.y, start.z);
     for (let guard = 0; guard < 70 && collides(player.pos.x, player.pos.y, player.pos.z, player.height); guard++) player.pos.y += 1;
@@ -3477,7 +3513,10 @@ async function init() {
         if (blockAtTarget !== 0 && !WaterSystem.isBlock(blockAtTarget)) return; 
         
         if (intersectsPlayer(px, py, pz)) return;
-        if (world.setBlock(px, py, pz, placedType)) {
+        const facing = BLOCKS[placedType]?.tiles.front !== undefined
+            ? facingTowardPlayer(px + 0.5, pz + 0.5, player.pos.x, player.pos.z)
+            : null;
+        if (world.setBlock(px, py, pz, placedType, facing)) {
             inventory.removeOne(selectedSlot);
             updateHotbarUI();
             handAnim.punch = 1;
@@ -3507,6 +3546,7 @@ async function init() {
     updateSurvivalUI();
     document.getElementById('btn-play').disabled = false;
     document.getElementById('world-loading').hidden = true;
+    if (recoveredSavedPosition) showToast('Posição recuperada no ponto inicial; seu mundo foi preservado.');
 }
 
 function animate() {
@@ -3533,6 +3573,7 @@ function animate() {
     if (controls.isLocked || inventoryOpen) {
         updateWorldClock(dt);
         updateFurnaces(dt);
+        world.furnaceSmoke.update(dt, furnaces, world, player.pos);
         if (inventoryOpen && station && station.type === 'furnace') {
             if (furnaceDirty) { furnaceDirty = false; renderInventory(); }
             else updateFurnaceBars();
