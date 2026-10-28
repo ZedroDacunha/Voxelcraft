@@ -87,11 +87,13 @@ export function createTextureTools(THREE) {
     
         const head = new Set(), add = (x, y) => head.add(x + ',' + y);
         if (kind === 'pickaxe') {
-            for (let t = -4; t <= 4; t++) {
-                const k = Math.abs(t) >= 3 ? 1 : 0;
-                add(10 + t - k, 6 + t + k);
-                if (Math.abs(t) <= 3) add(11 + t, 5 + t);
-            }
+            // Cabeça clássica de picareta: lâmina larga e quase horizontal,
+            // com a ponta externa descendo junto ao cabo diagonal.
+            for (let x = 6; x <= 13; x++) add(x, 3);
+            for (let x = 5; x <= 13; x++) add(x, 4);
+            for (let x = 6; x <= 12; x++) add(x, 5);
+            add(12, 6); add(13, 6); add(13, 7); add(14, 7);
+            add(13, 8); add(14, 8); add(14, 9);
         } else if (kind === 'axe') {
             for (let x = 9; x <= 12; x++) add(x, 2);
             for (let x = 8; x <= 13; x++) add(x, 3);

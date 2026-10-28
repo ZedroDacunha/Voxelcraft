@@ -1793,6 +1793,7 @@ function refreshHeldItem() {
     if (!id) return;
     const item = ITEMS[id];
     if (item.sprite) {
+        const isPickaxe = item.sprite.kind === 'pickaxe';
         const px = 0.034;
         const key = 'spr' + id;
         if (!heldGeoCache[key]) {
@@ -1806,6 +1807,7 @@ function refreshHeldItem() {
         heldMesh = new THREE.Mesh(heldGeoCache[key], spriteMaterial);
         const hasHandle = !!item.tool || item.sprite.kind === 'stick';
         heldMesh.position.set(hasHandle ? 3.5 * px : 0, hasHandle ? 4.5 * px : 0, 0);
+        // Mantém o sprite de frente para a câmera, como as outras ferramentas.
         heldAnchor.rotation.set(...HELD_TOOL_ROT);
     } else {
         const key = 'blk' + id;
