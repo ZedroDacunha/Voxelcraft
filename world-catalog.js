@@ -1,5 +1,7 @@
 // Blocos, itens, ferramentas, receitas e regras de fundição.
-import { MINERAL_IDS, MINERAL_PROGRESSIONS } from './world-minerals.js';
+import {
+    MINERAL_IDS, MINERAL_PRODUCTS, MINERAL_SMELTING, MINERAL_TIERS, MINERAL_TOOL_MATERIALS,
+} from './world-minerals.js';
 
 export const TILE = { GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, STONE: 3, WOOD: 4, COBBLE: 5, LEAVES: 6, PLANKS: 7,
                CRAFT_TOP: 8, CRAFT_SIDE: 9, FURNACE_FRONT: 10, FURNACE_TOP: 11, CHEST_TOP: 12, CHEST_SIDE: 13,
@@ -14,7 +16,7 @@ export const ID = { GRASS: 1, STONE: 2, LOG: 3, DIRT: 4, COBBLE: 5, PLANKS: 6, L
              CRAFTING_TABLE: 8, FURNACE: 9, CHEST: 10,
              COAL_ORE: MINERAL_IDS.COAL_ORE, IRON_ORE: MINERAL_IDS.IRON_ORE,
              GOLD_ORE: MINERAL_IDS.GOLD_ORE, DIAMOND_ORE: MINERAL_IDS.DIAMOND_ORE,
-             IRON_INGOT: MINERAL_IDS.IRON_INGOT,
+             IRON_INGOT: MINERAL_IDS.IRON_INGOT, GOLD_INGOT: MINERAL_IDS.GOLD_INGOT,
              SAND: 15, WATER: 16, WATER_FLOW_1: 40, WATER_FLOW_2: 41, WATER_FLOW_3: 42,
              WATER_FLOW_4: 43, WATER_FLOW_5: 44, WATER_FLOW_6: 45, WATER_FLOW_7: 46, WATER_FALL: 47,
              STICK: 20, TORCH: 60, TORCH_WALL_XP: 61, TORCH_WALL_XN: 62, TORCH_WALL_ZP: 63, TORCH_WALL_ZN: 64, APPLE: 30, CHARCOAL: 31 };
@@ -35,8 +37,8 @@ export const BLOCKS = {
           tiles: { top: TILE.CHEST_TOP, side: TILE.CHEST_SIDE, bottom: TILE.CHEST_TOP } },
     [ID.COAL_ORE]: { name: 'Minério de carvão',   hardness: 3.0, drop: ID.COAL_ORE,    tool: 'pickaxe', requiresTool: true, minTier: 1, tiles: allFaces(TILE.COAL_ORE) },
     [ID.IRON_ORE]: { name: 'Minério de ferro',    hardness: 3.5, drop: ID.IRON_ORE,    tool: 'pickaxe', requiresTool: true, minTier: 1, tiles: allFaces(TILE.IRON_ORE) },
-    [ID.GOLD_ORE]: { name: 'Minério de ouro',     hardness: 4.0, drop: ID.GOLD_ORE,    tool: 'pickaxe', requiresTool: true, minTier: 2, tiles: allFaces(TILE.GOLD_ORE) },
-    [ID.DIAMOND_ORE]: { name: 'Minério de diamante', hardness: 4.5, drop: ID.DIAMOND_ORE, tool: 'pickaxe', requiresTool: true, minTier: 2, tiles: allFaces(TILE.DIAMOND_ORE) },
+    [ID.GOLD_ORE]: { name: 'Minério de ouro',     hardness: 4.0, drop: ID.GOLD_ORE,    tool: 'pickaxe', requiresTool: true, minTier: MINERAL_TIERS[ID.GOLD_ORE], tiles: allFaces(TILE.GOLD_ORE) },
+    [ID.DIAMOND_ORE]: { name: 'Minério de diamante', hardness: 4.5, drop: ID.DIAMOND_ORE, tool: 'pickaxe', requiresTool: true, minTier: MINERAL_TIERS[ID.DIAMOND_ORE], tiles: allFaces(TILE.DIAMOND_ORE) },
     [ID.SAND]: { name: 'Areia', hardness: 0.5, drop: ID.SAND, tool: 'shovel', tiles: allFaces(TILE.SAND) },
     [ID.TORCH]: { name: 'Tocha', hardness: 0.3, drop: ID.TORCH, tool: null, light: 14, render: 'torch', solid: false, tiles: allFaces(TILE.TORCH_FLAME) },
     [ID.WATER]: { name: 'Água',      hardness: 100, drop: null, tool: null, render: 'liquid', solid: false, collectible: false, tiles: allFaces(TILE.WATER) }, // Água só existe no mundo
@@ -80,25 +82,19 @@ const TOOL_MATS = {
     stone: { label: 'de Pedra',   tier: 2, speed: 4, durability: 131, base: 24, ingredient: ID.COBBLE },
 };
 const TOOL_KINDS = [['pickaxe', 'Picareta'], ['axe', 'Machado'], ['shovel', 'Pá']];
-for (const progression of MINERAL_PROGRESSIONS) {
-    ITEMS[progression.ingot] = {
-        name: `Lingote de ${progression.label.toLowerCase()}`,
+for (const product of MINERAL_PRODUCTS) {
+    ITEMS[product.id] = {
+        name: product.name,
         maxStack: 64,
-        sprite: { kind: 'ingot', mat: progression.key },
+        sprite: product.sprite,
         iconTile: nextTile++,
     };
 }
 
 const toolMaterials = [
     ...Object.entries(TOOL_MATS).map(([key, material]) => ({ key, ...material })),
-    ...MINERAL_PROGRESSIONS.map(({ key, label, ingot, tool }) => ({
-        key,
-        label: `de ${label}`,
-        tier: tool.tier,
-        speed: tool.speed,
-        durability: tool.durability,
-        base: tool.baseId,
-        ingredient: ingot,
+    ...MINERAL_TOOL_MATERIALS.map(({ key, label, tier, speed, durability, baseId, ingredient }) => ({
+        key, label, tier, speed, durability, base: baseId, ingredient,
     })),
 ];
 for (const m of toolMaterials) {
@@ -129,7 +125,7 @@ export const ATLAS_COLUMNS = [
 export const SMELT = {
     [ID.COBBLE]: { result: ID.STONE, time: 10 },
     [ID.LOG]: { result: ID.CHARCOAL, time: 10 },
-    ...Object.fromEntries(MINERAL_PROGRESSIONS.map(({ ore, ingot, smeltTime }) => [ore, { result: ingot, time: smeltTime }])),
+    ...Object.fromEntries(MINERAL_SMELTING.map(({ ore, result, time }) => [ore, { result, time }])),
 };
 export const FUEL = { [ID.PLANKS]: 15, [ID.LOG]: 15, [ID.STICK]: 5, [ID.CHARCOAL]: 80 };
 

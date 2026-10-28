@@ -8,6 +8,8 @@ export function createTextureTools(THREE) {
         wood: { l: [176, 128, 70], d: [130, 90, 45] },
         stone: { l: [150, 150, 152], d: [106, 106, 110] },
         iron: { l: [210, 218, 220], d: [126, 139, 145] },
+        gold: { l: [250, 211, 65], d: [163, 111, 24] },
+        diamond: { l: [95, 224, 215], d: [25, 119, 144] },
     };
     const spriteCache = {};
     function spritePixels(kind, mat) {
@@ -42,6 +44,19 @@ export function createTextureTools(THREE) {
                 }
             }
             put(4, 5, colors.light); put(5, 5, colors.light); put(6, 5, colors.light);
+            return (spriteCache[key] = g);
+        }
+
+        if (kind === 'gem') {
+            const colors = { light: [157, 250, 235], mid: [53, 204, 194], dark: [25, 119, 144] };
+            for (let y = 4; y <= 11; y++) {
+                const inset = y <= 7 ? y - 4 : 11 - y;
+                for (let x = 4 + inset; x <= 11 - inset; x++) {
+                    const edge = x === 4 + inset || x === 11 - inset || y === 4 || y === 11;
+                    put(x, y, edge ? colors.dark : (x + y < 12 ? colors.light : colors.mid));
+                }
+            }
+            put(6, 6, colors.light); put(7, 6, colors.light);
             return (spriteCache[key] = g);
         }
 
