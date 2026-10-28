@@ -7,6 +7,7 @@ import { createWaterSystemClass } from './world-water.js';
 import { craftConsume, invCollectSame, invLeftClick, invQuickMove, invQuickMoveToCraft, invRightClick, invSwapHotbar, stackable } from './inventory-logic.js';
 import { stackHtml, updateSlotElement } from './inventory-view.js';
 import { createTextureTools } from './world-textures.js';
+import { LEGACY_MINERAL_ITEM_MAP } from './world-minerals.js';
 
 async function loadThreeModules() {
     const providers = [
@@ -2986,12 +2987,13 @@ function buildSave() {
 function sanitizeStack(s) {
     if (!s) return null;
     if (s.id === ID.WATER) return null; // Remove a água dos saves antigos sem invalidar o mundo
-    const it = ITEMS[s.id];
+    const id = LEGACY_MINERAL_ITEM_MAP[s.id] ?? s.id;
+    const it = ITEMS[id];
     if (!it || !Number.isInteger(s.count) || s.count < 1 || s.count > it.maxStack) {
         console.warn('Pilha inválida descartada durante o carregamento do save:', s);
         return null;
     }
-    const st = { id: s.id, count: s.count };
+    const st = { id, count: s.count };
     if (it.maxDurability && s.damage > 0 && s.damage < it.maxDurability) st.damage = s.damage;
     return st;
 }
@@ -3014,11 +3016,12 @@ function parseDrops(list) {
     const out = [];
     if (!Array.isArray(list)) return out;
     for (const e of list) {
-        const it = e && ITEMS[e.id];
+        const id = e && (LEGACY_MINERAL_ITEM_MAP[e.id] ?? e.id);
+        const it = e && ITEMS[id];
         if (!it || !Number.isInteger(e.count) || e.count < 1 || e.count > it.maxStack) continue;
         if (![e.x, e.y, e.z].every(Number.isFinite)) continue;
         const dmg = it.maxDurability && e.damage > 0 && e.damage < it.maxDurability ? e.damage : 0;
-        out.push({ id: e.id, count: e.count, damage: dmg, x: e.x, y: e.y, z: e.z,
+        out.push({ id, count: e.count, damage: dmg, x: e.x, y: e.y, z: e.z,
                    age: Math.max(0, +e.age || 0), ttl: Math.min(DEATH_DROP_TTL, Math.max(1, +e.ttl || 300)) });
     }
     return out;

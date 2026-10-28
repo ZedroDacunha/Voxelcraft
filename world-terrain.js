@@ -83,6 +83,7 @@ export class TerrainGenerator {
                         else if (y < 28 && ore < 0.010) type = ID.GOLD_ORE;
                         else if (y < 42 && ore < 0.025) type = ID.IRON_ORE;
                         else if (ore < 0.050) type = ID.COAL_ORE;
+                        else if (y >= 28 && ore < 0.130) type = ID.COPPER_ORE;
                     }
                     if (type === ID.STONE && y >= 6 && y <= h - 4 && this.isCave(wx, y, wz)) type = 0;
                     chunk.data[this.index(lx, y, lz)] = type;

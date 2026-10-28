@@ -7,6 +7,7 @@ export function createTextureTools(THREE) {
     const HEAD_COLORS = {
         wood: { l: [176, 128, 70], d: [130, 90, 45] },
         stone: { l: [150, 150, 152], d: [106, 106, 110] },
+        copper: { l: [207, 126, 82], d: [120, 66, 43] },
         iron: { l: [210, 218, 220], d: [126, 139, 145] },
         gold: { l: [250, 211, 65], d: [163, 111, 24] },
         diamond: { l: [95, 224, 215], d: [25, 119, 144] },
@@ -34,9 +35,12 @@ export function createTextureTools(THREE) {
         }
     
         if (kind === 'ingot') {
-            const colors = mat === 'iron'
-                ? { light: [218, 225, 226], mid: [159, 173, 178], dark: [100, 116, 122] }
-                : { light: [220, 185, 66], mid: [174, 132, 36], dark: [112, 79, 23] };
+            const palettes = {
+                iron: { light: [218, 225, 226], mid: [159, 173, 178], dark: [100, 116, 122] },
+                gold: { light: [240, 202, 68], mid: [184, 138, 38], dark: [112, 79, 23] },
+                copper: { light: [232, 151, 104], mid: [184, 100, 66], dark: [107, 57, 41] },
+            };
+            const colors = palettes[mat] || palettes.iron;
             for (let y = 4; y <= 11; y++) {
                 for (let x = 3; x <= 12; x++) {
                     const edge = x === 3 || x === 12 || y === 4 || y === 11;
@@ -60,12 +64,40 @@ export function createTextureTools(THREE) {
             return (spriteCache[key] = g);
         }
 
-        if (kind === 'apple' || kind === 'charcoal') {
+        if (kind === 'raw') {
+            const palettes = {
+                copper: [[236, 153, 103], [181, 96, 62], [105, 55, 41]],
+                iron: [[226, 215, 195], [169, 142, 111], [105, 89, 77]],
+                gold: [[255, 224, 103], [205, 157, 46], [122, 86, 28]],
+            };
+            const [light, mid, dark] = palettes[mat] || palettes.iron;
+            for (const [cx, cy, rx, ry] of [[6, 8, 3, 3], [10, 6, 2, 2], [10, 10, 3, 2]]) {
+                for (let y = cy - ry; y <= cy + ry; y++) for (let x = cx - rx; x <= cx + rx; x++) {
+                    const edge = Math.abs(x - cx) === rx || Math.abs(y - cy) === ry;
+                    if (((x - cx) ** 2) / (rx * rx) + ((y - cy) ** 2) / (ry * ry) <= 1.35) {
+                        put(x, y, edge ? dark : (x + y < cx + cy ? light : mid));
+                    }
+                }
+            }
+            return (spriteCache[key] = g);
+        }
+
+        if (kind === 'apple' || kind === 'charcoal' || kind === 'coal') {
             for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
                 if (kind === 'apple') {
                     const dx = (x - 7.5) / 4.5, dy = (y - 9.5) / 4.5;
                     if (dx * dx + dy * dy <= 1)
                         put(x, y, ((x === 6 && y === 7) || (x === 5 && y === 8)) ? [240, 110, 100] : (dx + dy > 0.9 ? [150, 25, 30] : [205, 40, 45]));
+                } else if (kind === 'coal') {
+                    const lumps = [[5, 9, 3], [9, 7, 4], [10, 10, 3]];
+                    let shade = null;
+                    for (const [cx, cy, radius] of lumps) {
+                        const dx = x - cx, dy = y - cy;
+                        if (dx * dx + dy * dy <= radius * radius) {
+                            shade = (x + 2 * y) % 5 === 0 ? [91, 91, 99] : [37, 37, 43];
+                        }
+                    }
+                    if (shade) put(x, y, shade);
                 } else {
                     const dx = (x - 7.5) / 5, dy = (y - 9) / 3.6;
                     if (dx * dx + dy * dy <= 1) put(x, y, (x + y) % 3 === 0 ? [75, 75, 82] : [38, 38, 44]);
@@ -124,6 +156,7 @@ export function createTextureTools(THREE) {
             [TILE.IRON_ORE]:    [[151,105,78], [183,132,96], [211,160,120]],
             [TILE.GOLD_ORE]:    [[193,139,24], [231,181,35], [250,215,74]],
             [TILE.DIAMOND_ORE]: [[30,151,157], [48,194,190], [102,229,216]],
+            [TILE.COPPER_ORE]:  [[139,75,48], [189,103,65], [219,140,93]],
         };
         const oreCenters = [[7,7], [22,6], [15,18], [26,25], [5,26]];
         const inOre = (x, y, tile) => {
@@ -164,7 +197,7 @@ export function createTextureTools(THREE) {
                     const c = 119 + j(7) - (seam ? 22 : 0);
                     return [c, c, c + 2];
                 }
-                case TILE.COAL_ORE: case TILE.IRON_ORE: case TILE.GOLD_ORE: case TILE.DIAMOND_ORE: {
+                case TILE.COAL_ORE: case TILE.IRON_ORE: case TILE.GOLD_ORE: case TILE.DIAMOND_ORE: case TILE.COPPER_ORE: {
                     if (inOre(x, y, tile)) {
                         const pal = oreColors[tile];
                         return pal[(x * 3 + y * 5) % pal.length];

@@ -1,22 +1,25 @@
 // Blocos, itens, ferramentas, receitas e regras de fundição.
 import {
-    MINERAL_IDS, MINERAL_PRODUCTS, MINERAL_SMELTING, MINERAL_TIERS, MINERAL_TOOL_MATERIALS,
+    MINERAL_IDS, MINERAL_ORE_DROPS, MINERAL_PRODUCTS, MINERAL_SMELTING, MINERAL_TIERS, MINERAL_TOOL_MATERIALS,
 } from './world-minerals.js';
 
 export const TILE = { GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, STONE: 3, WOOD: 4, COBBLE: 5, LEAVES: 6, PLANKS: 7,
                CRAFT_TOP: 8, CRAFT_SIDE: 9, FURNACE_FRONT: 10, FURNACE_TOP: 11, CHEST_TOP: 12, CHEST_SIDE: 13,
                WOOD_END: 14, COAL_ORE: 15, IRON_ORE: 16, GOLD_ORE: 17, DIAMOND_ORE: 18,
                GRASS_TOP_ALT: 19, GRASS_SIDE_ALT: 20, DIRT_ALT: 21, STONE_ALT: 22, LEAVES_ALT: 23,
-               SAND: 24, WATER: 25, TORCH_FLAME: 26 }; // Tile da chama da tocha
+               SAND: 24, WATER: 25, TORCH_FLAME: 26, COPPER_ORE: 27 };
 export const TILE_PX = 32;
 
 const allFaces = (t) => ({ top: t, side: t, bottom: t });
 
 export const ID = { GRASS: 1, STONE: 2, LOG: 3, DIRT: 4, COBBLE: 5, PLANKS: 6, LEAVES: 7,
              CRAFTING_TABLE: 8, FURNACE: 9, CHEST: 10,
-             COAL_ORE: MINERAL_IDS.COAL_ORE, IRON_ORE: MINERAL_IDS.IRON_ORE,
+             COAL_ORE: MINERAL_IDS.COAL_ORE, COAL: MINERAL_IDS.COAL, IRON_ORE: MINERAL_IDS.IRON_ORE,
              GOLD_ORE: MINERAL_IDS.GOLD_ORE, DIAMOND_ORE: MINERAL_IDS.DIAMOND_ORE,
-             IRON_INGOT: MINERAL_IDS.IRON_INGOT, GOLD_INGOT: MINERAL_IDS.GOLD_INGOT,
+             COPPER_ORE: MINERAL_IDS.COPPER_ORE, IRON_INGOT: MINERAL_IDS.IRON_INGOT,
+             GOLD_INGOT: MINERAL_IDS.GOLD_INGOT, COPPER_INGOT: MINERAL_IDS.COPPER_INGOT,
+             RAW_COPPER: MINERAL_IDS.RAW_COPPER, RAW_IRON: MINERAL_IDS.RAW_IRON,
+             RAW_GOLD: MINERAL_IDS.RAW_GOLD,
              SAND: 15, WATER: 16, WATER_FLOW_1: 40, WATER_FLOW_2: 41, WATER_FLOW_3: 42,
              WATER_FLOW_4: 43, WATER_FLOW_5: 44, WATER_FLOW_6: 45, WATER_FLOW_7: 46, WATER_FALL: 47,
              STICK: 20, TORCH: 60, TORCH_WALL_XP: 61, TORCH_WALL_XN: 62, TORCH_WALL_ZP: 63, TORCH_WALL_ZN: 64, APPLE: 30, CHARCOAL: 31 };
@@ -35,10 +38,11 @@ export const BLOCKS = {
          icon: TILE.FURNACE_FRONT, tiles: { top: TILE.FURNACE_TOP, side: TILE.FURNACE_FRONT, bottom: TILE.COBBLE } },
     [ID.CHEST]: { name: 'Baú',     hardness: 2.5, drop: ID.CHEST, tool: 'axe', station: 'chest',
           tiles: { top: TILE.CHEST_TOP, side: TILE.CHEST_SIDE, bottom: TILE.CHEST_TOP } },
-    [ID.COAL_ORE]: { name: 'Minério de carvão',   hardness: 3.0, drop: ID.COAL_ORE,    tool: 'pickaxe', requiresTool: true, minTier: 1, tiles: allFaces(TILE.COAL_ORE) },
-    [ID.IRON_ORE]: { name: 'Minério de ferro',    hardness: 3.5, drop: ID.IRON_ORE,    tool: 'pickaxe', requiresTool: true, minTier: 1, tiles: allFaces(TILE.IRON_ORE) },
-    [ID.GOLD_ORE]: { name: 'Minério de ouro',     hardness: 4.0, drop: ID.GOLD_ORE,    tool: 'pickaxe', requiresTool: true, minTier: MINERAL_TIERS[ID.GOLD_ORE], tiles: allFaces(TILE.GOLD_ORE) },
+    [ID.COAL_ORE]: { name: 'Minério de carvão',   hardness: 3.0, drop: MINERAL_ORE_DROPS[ID.COAL_ORE], tool: 'pickaxe', requiresTool: true, minTier: 1, tiles: allFaces(TILE.COAL_ORE) },
+    [ID.IRON_ORE]: { name: 'Minério de ferro',    hardness: 3.5, drop: MINERAL_ORE_DROPS[ID.IRON_ORE], tool: 'pickaxe', requiresTool: true, minTier: MINERAL_TIERS[ID.IRON_ORE], tiles: allFaces(TILE.IRON_ORE) },
+    [ID.GOLD_ORE]: { name: 'Minério de ouro',     hardness: 4.0, drop: MINERAL_ORE_DROPS[ID.GOLD_ORE], tool: 'pickaxe', requiresTool: true, minTier: MINERAL_TIERS[ID.GOLD_ORE], tiles: allFaces(TILE.GOLD_ORE) },
     [ID.DIAMOND_ORE]: { name: 'Minério de diamante', hardness: 4.5, drop: ID.DIAMOND_ORE, tool: 'pickaxe', requiresTool: true, minTier: MINERAL_TIERS[ID.DIAMOND_ORE], tiles: allFaces(TILE.DIAMOND_ORE) },
+    [ID.COPPER_ORE]: { name: 'Minério de cobre', hardness: 3.0, drop: MINERAL_ORE_DROPS[ID.COPPER_ORE], tool: 'pickaxe', requiresTool: true, minTier: MINERAL_TIERS[ID.COPPER_ORE], tiles: allFaces(TILE.COPPER_ORE) },
     [ID.SAND]: { name: 'Areia', hardness: 0.5, drop: ID.SAND, tool: 'shovel', tiles: allFaces(TILE.SAND) },
     [ID.TORCH]: { name: 'Tocha', hardness: 0.3, drop: ID.TORCH, tool: null, light: 14, render: 'torch', solid: false, tiles: allFaces(TILE.TORCH_FLAME) },
     [ID.WATER]: { name: 'Água',      hardness: 100, drop: null, tool: null, render: 'liquid', solid: false, collectible: false, tiles: allFaces(TILE.WATER) }, // Água só existe no mundo
@@ -127,7 +131,7 @@ export const SMELT = {
     [ID.LOG]: { result: ID.CHARCOAL, time: 10 },
     ...Object.fromEntries(MINERAL_SMELTING.map(({ ore, result, time }) => [ore, { result, time }])),
 };
-export const FUEL = { [ID.PLANKS]: 15, [ID.LOG]: 15, [ID.STICK]: 5, [ID.CHARCOAL]: 80 };
+export const FUEL = { [ID.PLANKS]: 15, [ID.LOG]: 15, [ID.STICK]: 5, [ID.COAL]: 80, [ID.CHARCOAL]: 80 };
 
 export const RECIPES = [];
 function trimShape(rows) {
@@ -144,13 +148,14 @@ function defShapeless(ingredients, result, count = 1) {
 }
 
 defShapeless([ID.LOG], ID.PLANKS, 4);
+defRecipe([[ID.COAL], [ID.STICK]], ID.TORCH, 4);
 defRecipe([[ID.CHARCOAL], [ID.STICK]], ID.TORCH, 4);
 defRecipe([[ID.PLANKS], [ID.PLANKS]], ID.STICK, 4);
 for (const m of toolMaterials) {
     const M = m.ingredient, S = ID.STICK;
-    defRecipe([[M, M], [null, S]], m.id_pickaxe);
-    defRecipe([[M, M], [M, S]],    m.id_axe);
-    defRecipe([[M], [S]],          m.id_shovel);
+    defRecipe([[M, M, M], [null, S, null], [null, S, null]], m.id_pickaxe);
+    defRecipe([[M, M], [M, S], [null, S]], m.id_axe);
+    defRecipe([[M], [S], [S]], m.id_shovel);
 }
 defRecipe([[ID.PLANKS, ID.PLANKS], [ID.PLANKS, ID.PLANKS]], ID.CRAFTING_TABLE);
 defRecipe([[ID.COBBLE, ID.COBBLE, ID.COBBLE], [ID.COBBLE, null, ID.COBBLE], [ID.COBBLE, ID.COBBLE, ID.COBBLE]], ID.FURNACE);
