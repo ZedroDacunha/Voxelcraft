@@ -282,28 +282,93 @@ export function createTextureTools(THREE) {
                     }
                     return wood;
                 }
-                case TILE.FURNACE_FRONT: {
-                    if (x >= 9 && x <= 22 && y >= 12 && y <= 24) {
-                        if (y >= 21) return [235 + j(8), 125 + j(12), 30 + j(6)];
-                        return [28 + j(3), 28 + j(3), 32 + j(3)];
+                case TILE.FURNACE_FRONT:
+                case TILE.FURNACE_FRONT_ON: {
+                    const lit = tile === TILE.FURNACE_FRONT_ON;
+                    const opening = (y >= 8 && y <= 14) || (y >= 20 && y <= 26);
+                    if (opening && x >= 6 && x <= 25) {
+                        const rim = x === 6 || x === 25 || y === 8 || y === 14 || y === 20 || y === 26;
+                        if (rim) return [37 + j(3), 38 + j(3), 39 + j(3)];
+                        if (!lit) {
+                            const cavity = x < 9 || x > 22 || y === 10 || y === 11 || y === 22 || y === 23;
+                            const c = cavity ? 17 + j(2) : 8 + j(2);
+                            return [c, c + 1, c + 2];
+                        }
+
+                        const fireY = (y >= 20 ? y - 12 : y);
+                        const center = 15 + Math.floor(Math.sin((x + (y >= 20 ? 3 : 0)) * 1.3) * 2);
+                        const flameWidth = fireY < 10 ? 1 : fireY < 12 ? 3 : 6;
+                        if (Math.abs(x - center) <= flameWidth && fireY >= 9 && fireY <= 13) {
+                            if (fireY <= 9) return [255, 235 + j(8), 83 + j(18)];
+                            if (fireY <= 11) return [255, 139 + j(22), 24 + j(10)];
+                            return [236 + j(12), 56 + j(12), 15 + j(8)];
+                        }
+                        const c = 12 + j(3);
+                        return [c, c + 1, c + 2];
                     }
-                    const c = ((x < 2 || x > 29 || y < 2 || y > 29) ? 80 : 125) + j(7);
-                    return [c, c, c];
+
+                    const edge = x < 2 || x > 29 || y < 2 || y > 29;
+                    const seam = x === 4 || x === 27 || y === 4 || y === 27;
+                    if (edge) return [65 + j(3), 67 + j(3), 68 + j(3)];
+                    if (seam) return [89 + j(4), 91 + j(4), 92 + j(4)];
+                    const fleck = hash2(Math.floor(x / 3), Math.floor(y / 3), 3217);
+                    const shade = fleck > 0.8 ? 157 : fleck < 0.18 ? 105 : 130;
+                    return [shade + j(7), shade + j(7), shade + 2 + j(7)];
+                }
+                case TILE.FURNACE_SIDE: {
+                    if (x < 2 || x > 29 || y < 2 || y > 29) return [65 + j(3), 67 + j(3), 68 + j(3)];
+                    if (x < 4 || x > 27 || y < 4 || y > 27) return [91 + j(4), 93 + j(4), 94 + j(4)];
+                    const patch = hash2(Math.floor(x / 4), Math.floor(y / 4), 4829);
+                    const fleck = hash2(x, y, 6029);
+                    let c = patch < 0.2 ? 104 : patch > 0.8 ? 151 : 128;
+                    if (fleck > 0.96) c += 18;
+                    else if (fleck < 0.04) c -= 15;
+                    return [c + j(4), c + j(4), c + 2 + j(4)];
                 }
                 case TILE.CHEST_TOP: {
-                    const edge = x < 2 || x > 29 || y < 2 || y > 29;
-                    if (edge) return [88 + j(4), 56 + j(3), 24 + j(2)];
-                    return [150 + j(4), 100 + j(4), 48 + j(3)];
+                    if (x < 2 || x > 29 || y < 2 || y > 29) return [43 + j(3), 31 + j(2), 20 + j(2)];
+                    if (x < 4 || x > 27 || y < 4 || y > 27) return [89 + j(4), 57 + j(3), 29 + j(2)];
+                    if (y === 6 || y === 7 || y === 24 || y === 25) return [105 + j(3), 68 + j(2), 34 + j(2)];
+                    const grain = hash2(Math.floor(x / 3), Math.floor(y / 2), 761 + alt * 53);
+                    const topWood = grain > 0.8 ? [206, 145, 61] : grain < 0.18 ? [153, 99, 42] : [181, 119, 48];
+                    return topWood.map(channel => channel + j(4));
                 }
                 case TILE.CHEST_SIDE: {
-                    if (y < 2 || y > 29 || x < 2 || x > 29) return [88 + j(4), 56 + j(3), 24 + j(2)];
-                    if (y >= 12 && y <= 13) return [70 + j(3), 45 + j(2), 20 + j(2)];
-                    if (x >= 14 && x <= 17 && y >= 11 && y <= 18) return [205 + j(6), 190 + j(6), 70 + j(5)];
-                    return [160 + j(4), 108 + j(4), 52 + j(3)];
+                    if (x < 2 || x > 29 || y < 2 || y > 29) return [40 + j(3), 30 + j(2), 20 + j(2)];
+                    if (y < 5 || y > 27 || x === 3 || x === 28) return [75 + j(4), 49 + j(3), 27 + j(2)];
+                    if (y >= 9 && y <= 11) return [48 + j(3), 37 + j(2), 25 + j(2)];
+                    const board = Math.floor((x + 3) / 8);
+                    const seam = (x + 3) % 8 < 2;
+                    const variation = hash2(Math.floor(x / 3), Math.floor(y / 4), 1961 + alt * 71);
+                    const sideWood = seam ? [124, 78, 37] : variation > 0.82 ? [203, 142, 59] : [177, 112, 44];
+                    if (board === 2 && y > 13 && y < 20 && x % 7 === 0) return [132 + j(3), 82 + j(2), 39 + j(2)];
+                    return sideWood.map(channel => channel + j(4));
+                }
+                case TILE.CHEST_FRONT: {
+                    if (x < 2 || x > 29 || y < 2 || y > 29) return [34 + j(2), 27 + j(2), 19 + j(2)];
+                    if (y < 5 || y > 27 || x < 4 || x > 27) return [70 + j(3), 47 + j(2), 27 + j(2)];
+                    if (y >= 8 && y <= 10) return [39 + j(2), 31 + j(2), 22 + j(2)];
+                    const grain = hash2(Math.floor(x / 3), Math.floor(y / 4), 2903 + alt * 97);
+                    let wood = grain > 0.82 ? [204, 143, 59] : grain < 0.16 ? [151, 97, 40] : [178, 113, 44];
+                    if (x === 8 || x === 23) wood = [128, 81, 38];
+                    if (y >= 11 && y <= 12 && x >= 13 && x <= 18) return [35 + j(2), 28 + j(2), 20 + j(2)];
+                    if (x >= 13 && x <= 18 && y >= 11 && y <= 20) {
+                        const latchEdge = x === 13 || x === 18 || y === 11 || y === 20;
+                        if (y >= 15 && y <= 19 && x >= 14 && x <= 17) return latchEdge ? [91, 89, 80] : [143, 148, 144];
+                        return latchEdge ? [61, 59, 52] : [187, 190, 177];
+                    }
+                    if (x === 14 && y === 13) return [224, 224, 207];
+                    return wood.map(channel => channel + j(3));
                 }
                 case TILE.FURNACE_TOP: {
-                    const c = ((x < 3 || x > 28 || y < 3 || y > 28) ? 85 : 110) + j(6);
-                    return [c, c, c];
+                    if (x < 2 || x > 29 || y < 2 || y > 29) return [61 + j(3), 63 + j(3), 64 + j(3)];
+                    if (x < 4 || x > 27 || y < 4 || y > 27) return [91 + j(4), 93 + j(4), 94 + j(4)];
+                    const patch = hash2(Math.floor(x / 3), Math.floor(y / 3), 7043);
+                    const fleck = hash2(x, y, 8041);
+                    let c = patch < 0.18 ? 104 : patch > 0.82 ? 154 : 130;
+                    if (fleck > 0.975) c += 24;
+                    else if (fleck < 0.025) c -= 19;
+                    return [c + j(5), c + j(5), c + 2 + j(5)];
                 }
                 case TILE.SAND: {
                     const c = 215 + j(12);

@@ -849,7 +849,12 @@ class World {
                         const leafLayerFace = renderMode === 'cutout' && BLOCKS[neighborType]?.render === 'cutout' && isLayeredLeafFace(f.dir);
                         if (renderMode !== 'torch' && solid(lx, y, lz, t, f.dir)) continue;
                         const wx = chunk.cx * CS + lx, wz = chunk.cz * CS + lz;
-                        const tile = shape ? shape.tiles[f.kind] : variantTile(tiles[f.kind], wx, y, wz);
+                        const isFrontFace = tiles.front !== undefined && f.dir[0] === 0 && f.dir[2] === 1;
+                        let faceTile = isFrontFace ? tiles.front : tiles[f.kind];
+                        if (isFrontFace && t === ID.FURNACE && furnaces.get(`${wx},${y},${wz}`)?.burn > 0) {
+                            faceTile = TILE.FURNACE_FRONT_ON;
+                        }
+                        const tile = shape ? shape.tiles[f.kind] : variantTile(faceTile, wx, y, wz);
                         const u0 = tile / ATLAS_COLUMNS + UV_PAD;
                         const ndx = vertexCount;
                         positions = growTypedArray(positions, (vertexCount + 4) * 3);
@@ -1280,7 +1285,8 @@ let station = null;
 let furnaceDirty = false;
 
 function updateFurnaces(dt) {
-    for (const f of furnaces.values()) {
+    for (const [key, f] of furnaces) {
+        const wasBurning = f.burn > 0;
         const s = f.inv.slots;
         const rec = s[0] && SMELT[s[0].id];
         const canSmelt = !!rec && (!s[2] || (s[2].id === rec.result && s[2].count < ITEMS[rec.result].maxStack));
@@ -1303,6 +1309,12 @@ function updateFurnaces(dt) {
                 }
             } else f.cook = Math.max(0, f.cook - dt * 2);
         } else f.cook = Math.max(0, f.cook - dt * 2);
+
+        if (wasBurning !== (f.burn > 0)) {
+            const [x, , z] = key.split(',').map(Number);
+            const chunk = world?.getChunk(floorDiv(x, CHUNK_SIZE), floorDiv(z, CHUNK_SIZE));
+            if (chunk) world.dirty.add(chunk);
+        }
     }
 }
 
@@ -1395,7 +1407,8 @@ function buildCubeGeo(tiles, size) {
     const positions = [], normals = [], uvs = [], indices = [];
     const uWidth = 1 / ATLAS_COLUMNS - 2 * UV_PAD;
     for (const f of FACES) {
-        const u0 = tiles[f.kind] / ATLAS_COLUMNS + UV_PAD;
+        const tile = tiles.front !== undefined && f.dir[0] === 0 && f.dir[2] === 1 ? tiles.front : tiles[f.kind];
+        const u0 = tile / ATLAS_COLUMNS + UV_PAD;
         const ndx = positions.length / 3;
         for (const c of f.corners) {
             positions.push((c.pos[0] - 0.5) * size, (c.pos[1] - 0.5) * size, (c.pos[2] - 0.5) * size);

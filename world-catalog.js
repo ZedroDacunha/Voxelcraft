@@ -8,7 +8,8 @@ export const TILE = { GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, STONE: 3, WOOD: 4, C
                CRAFT_TOP: 8, CRAFT_SIDE: 9, FURNACE_FRONT: 10, FURNACE_TOP: 11, CHEST_TOP: 12, CHEST_SIDE: 13,
                WOOD_END: 14, COAL_ORE: 15, IRON_ORE: 16, GOLD_ORE: 17, DIAMOND_ORE: 18,
                GRASS_TOP_ALT: 19, GRASS_SIDE_ALT: 20, DIRT_ALT: 21, STONE_ALT: 22, LEAVES_ALT: 23,
-               SAND: 24, WATER: 25, TORCH_FLAME: 26, COPPER_ORE: 27 };
+               SAND: 24, WATER: 25, TORCH_FLAME: 26, COPPER_ORE: 27, CHEST_FRONT: 28,
+               FURNACE_FRONT_ON: 29, FURNACE_SIDE: 30 };
 export const TILE_PX = 32;
 
 const allFaces = (t) => ({ top: t, side: t, bottom: t });
@@ -36,9 +37,9 @@ export const BLOCKS = {
     [ID.CRAFTING_TABLE]: { name: 'Bancada',    hardness: 2.5, drop: ID.CRAFTING_TABLE, tool: 'axe', station: 'crafting',
          tiles: { top: TILE.CRAFT_TOP, side: TILE.CRAFT_SIDE, bottom: TILE.PLANKS } },
     [ID.FURNACE]: { name: 'Forno',      hardness: 3.5, drop: ID.FURNACE, tool: 'pickaxe', requiresTool: true, minTier: 1, station: 'furnace',
-         icon: TILE.FURNACE_FRONT, tiles: { top: TILE.FURNACE_TOP, side: TILE.FURNACE_FRONT, bottom: TILE.COBBLE } },
-    [ID.CHEST]: { name: 'Baú',     hardness: 2.5, drop: ID.CHEST, tool: 'axe', station: 'chest',
-          tiles: { top: TILE.CHEST_TOP, side: TILE.CHEST_SIDE, bottom: TILE.CHEST_TOP } },
+         icon: TILE.FURNACE_FRONT, tiles: { top: TILE.FURNACE_TOP, side: TILE.FURNACE_SIDE, front: TILE.FURNACE_FRONT, bottom: TILE.COBBLE } },
+    [ID.CHEST]: { name: 'Baú',     hardness: 2.5, drop: ID.CHEST, tool: 'axe', station: 'chest', icon: TILE.CHEST_FRONT,
+          tiles: { top: TILE.CHEST_TOP, side: TILE.CHEST_SIDE, front: TILE.CHEST_FRONT, bottom: TILE.CHEST_TOP } },
     ...createMineralBlocks(ID, TILE),
     [ID.SAND]: { name: 'Areia', hardness: 0.5, drop: ID.SAND, tool: 'shovel', tiles: allFaces(TILE.SAND) },
     [ID.TORCH]: { name: 'Tocha', hardness: 0.3, drop: ID.TORCH, tool: null, light: 14, render: 'torch', solid: false, tiles: allFaces(TILE.TORCH_FLAME) },
