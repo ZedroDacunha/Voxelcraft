@@ -16,6 +16,9 @@ const saveCodec = createWorldSaveCodec();
 const titleScreen = document.getElementById('title-screen');
 const menu = document.getElementById('world-menu');
 const list = document.getElementById('world-list');
+const worldListToolbar = document.getElementById('world-list-toolbar');
+const worldSearch = document.getElementById('world-search');
+const worldListCount = document.getElementById('world-list-count');
 const errorBox = document.getElementById('world-menu-error');
 const dialog = document.getElementById('world-dialog');
 const worldOptionsDialog = document.getElementById('world-options-dialog');
@@ -25,6 +28,7 @@ const form = document.getElementById('world-form');
 const nameInput = document.getElementById('world-name');
 const seedInput = document.getElementById('world-seed');
 let editingWorldId = null;
+let worldsCache = [];
 
 async function migrateLegacyWorlds() {
     const keys = await storeRequest('readonly', store => store.getAllKeys());
@@ -190,6 +194,103 @@ function addSaveGroup(label, description) {
     return buttons;
 }
 
+async function refreshStorageProtection(status, button) {
+    const storage = navigator.storage;
+    if (!storage?.persisted || !storage?.persist) {
+        status.textContent = 'Este navegador não oferece proteção persistente para o armazenamento local.';
+        button.disabled = true;
+        return false;
+    }
+
+    try {
+        const isPersistent = await storage.persisted();
+        status.textContent = isPersistent
+            ? 'Proteção ativa: o navegador sinalizou que manterá os saves deste site durante limpezas automáticas.'
+            : 'A proteção ainda não está ativa. O navegador decidirá se pode concedê-la.';
+        button.textContent = isPersistent ? 'Proteção ativa' : 'Proteger saves neste navegador';
+        button.disabled = isPersistent;
+        return isPersistent;
+    } catch {
+        status.textContent = 'Não foi possível consultar a proteção de armazenamento neste momento.';
+        button.disabled = false;
+        return false;
+    }
+}
+
+function formatStorageSize(bytes) {
+    const units = ['bytes', 'KB', 'MB', 'GB'];
+    let value = bytes;
+    let unit = 0;
+    while (value >= 1024 && unit < units.length - 1) {
+        value /= 1024;
+        unit++;
+    }
+    const digits = unit === 0 || value >= 100 ? 0 : value >= 10 ? 1 : 2;
+    return `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: digits }).format(value)} ${units[unit]}`;
+}
+
+async function refreshStorageUsage(status) {
+    status.classList.remove('is-warning');
+    try {
+        const estimate = await navigator.storage?.estimate?.();
+        if (!estimate || !Number.isFinite(estimate.usage)) {
+            status.textContent = 'Estimativa do espaço de armazenamento indisponível.';
+            return;
+        }
+        const usage = estimate.usage;
+        const quota = Number.isFinite(estimate.quota) ? estimate.quota : 0;
+        status.textContent = quota > 0
+            ? `Este site usa aproximadamente ${formatStorageSize(usage)} de ${formatStorageSize(quota)} disponíveis.`
+            : `Este site usa aproximadamente ${formatStorageSize(usage)}.`;
+        if (quota > 0 && usage / quota >= 0.85) {
+            status.textContent += ' O espaço está perto do limite; exporte uma cópia do mundo.';
+            status.classList.add('is-warning');
+        }
+    } catch {
+        status.textContent = 'Não foi possível consultar o espaço de armazenamento agora.';
+    }
+}
+
+function addStorageProtectionOption() {
+    const actions = addSaveGroup(
+        'Proteção dos saves',
+        'Solicite ao navegador que preserve os dados locais deste jogo contra limpeza automática.',
+    );
+    const group = actions.parentElement;
+    const status = document.createElement('p');
+    status.className = 'world-storage-status';
+    status.setAttribute('aria-live', 'polite');
+    status.textContent = 'Verificando suporte do navegador…';
+    group.insertBefore(status, actions);
+    const usageStatus = document.createElement('p');
+    usageStatus.className = 'world-storage-usage';
+    usageStatus.setAttribute('aria-live', 'polite');
+    usageStatus.textContent = 'Consultando espaço usado…';
+    group.insertBefore(usageStatus, actions);
+
+    const button = makeAction('Proteger saves neste navegador', 'export', async () => {
+        button.disabled = true;
+        button.textContent = 'Solicitando…';
+        try {
+            const granted = await navigator.storage.persist();
+            const isPersistent = await refreshStorageProtection(status, button);
+            await refreshStorageUsage(usageStatus);
+            if (granted && isPersistent) showNotice('O navegador ativou a proteção do armazenamento local.');
+            else if (!granted) status.textContent = 'O navegador não concedeu a proteção desta vez. Os saves continuam disponíveis normalmente.';
+            else showError('A solicitação foi aceita, mas o navegador ainda não confirmou a proteção.');
+        } catch {
+            button.disabled = false;
+            button.textContent = 'Tentar novamente';
+            status.textContent = 'O navegador não conseguiu concluir a solicitação. Você pode tentar novamente.';
+            showError('Não foi possível solicitar a proteção dos saves ao navegador.');
+        }
+    });
+    button.disabled = true;
+    actions.append(button);
+    void refreshStorageProtection(status, button);
+    void refreshStorageUsage(usageStatus);
+}
+
 function renderWorldOptions(world) {
     document.getElementById('world-options-title').textContent = world.name;
     document.getElementById('world-options-summary').textContent = `Seed ${world.seed} · Última sessão: ${formatDate(world.lastPlayed)}`;
@@ -219,6 +320,7 @@ function renderWorldOptions(world) {
     }
     const importActions = addSaveGroup('Importar save', 'Selecione um arquivo JSON exportado anteriormente para este mundo.');
     addImportAction(importActions, world);
+    addStorageProtectionOption();
 
     const worldActions = addSaveGroup('Mundo', 'Ajustes básicos deste mundo.');
     worldActions.append(makeAction('Renomear mundo', '', () => {
@@ -237,14 +339,27 @@ function openWorldOptions(world) {
     worldOptionsDialog.showModal();
 }
 
-async function renderWorlds() {
-    showError();
+function normalizeSearchText(value) {
+    return String(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+}
+
+function renderWorldList() {
     list.replaceChildren();
-    const worlds = await getWorlds();
-    if (!worlds.length) {
+    const query = normalizeSearchText(worldSearch.value.trim());
+    const worlds = worldsCache.filter(world => {
+        const searchable = normalizeSearchText(`${world.name} ${world.seed}`);
+        return searchable.includes(query);
+    });
+    worldListCount.textContent = query
+        ? `${worlds.length} de ${worldsCache.length} mundos`
+        : `${worldsCache.length} ${worldsCache.length === 1 ? 'mundo' : 'mundos'}`;
+
+    if (!worldsCache.length || !worlds.length) {
         const empty = document.createElement('div');
         empty.className = 'world-empty';
-        empty.textContent = 'Você ainda não tem mundos. Crie um para começar sua aventura.';
+        empty.textContent = worldsCache.length
+            ? 'Nenhum mundo corresponde à busca. Tente outro nome ou seed.'
+            : 'Você ainda não tem mundos. Crie um para começar sua aventura.';
         list.append(empty);
         return;
     }
@@ -265,6 +380,13 @@ async function renderWorlds() {
         card.append(info, actions);
         list.append(card);
     }
+}
+
+async function renderWorlds() {
+    showError();
+    worldsCache = await getWorlds();
+    worldListToolbar.hidden = worldsCache.length === 0;
+    renderWorldList();
 }
 
 async function launchWorld(world) {
@@ -329,7 +451,9 @@ form.addEventListener('submit', async event => {
             await storeRequest('readwrite', store => store.put(world, META_PREFIX + id));
         }
         dialog.close();
+        worldSearch.value = '';
         await renderWorlds();
+        worldSearch.focus();
     } catch (error) {
         showError(error.message || 'Não foi possível salvar os dados do mundo.');
     }
@@ -376,6 +500,7 @@ document.getElementById('btn-create-world').addEventListener('click', () => open
 document.getElementById('btn-world-cancel').addEventListener('click', () => dialog.close());
 document.getElementById('btn-world-options-close').addEventListener('click', () => worldOptionsDialog.close());
 document.getElementById('btn-world-options-done').addEventListener('click', () => worldOptionsDialog.close());
+worldSearch.addEventListener('input', renderWorldList);
 document.getElementById('btn-open-worlds').addEventListener('click', () => {
     titleScreen.hidden = true;
     menu.hidden = false;

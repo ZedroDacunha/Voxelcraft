@@ -53,6 +53,11 @@
         <p class="world-menu-eyebrow">UM JOGADOR</p>
         <h1 id="world-menu-title">Seus mundos</h1>
         <p class="world-menu-subtitle">Escolha onde continuar ou crie um novo mundo.</p>
+        <div id="world-list-toolbar" class="world-list-toolbar" hidden>
+            <label class="world-search-label" for="world-search">Buscar por nome ou seed</label>
+            <input id="world-search" class="world-search" type="search" autocomplete="off" placeholder="Ex.: Meu mundo ou 12345" aria-controls="world-list">
+            <p id="world-list-count" class="world-list-count" aria-live="polite"></p>
+        </div>
         <div id="world-list" class="world-list" aria-live="polite"></div>
         <button class="btn world-create" id="btn-create-world">＋ Criar mundo</button>
         <p id="world-menu-error" class="world-menu-error" role="alert" hidden></p>
