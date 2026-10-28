@@ -10,7 +10,7 @@ function recipeSection(title, entries) {
     return section;
 }
 
-function recipePreview(recipe) {
+function recipePreviewCells(recipe) {
     const cells = Array.from({ length: 9 }, () => null);
     if (recipe.kind === 'shapeless') {
         recipe.ingredients.slice(0, 9).forEach((id, index) => { cells[index] = id; });
@@ -23,7 +23,11 @@ function recipePreview(recipe) {
             if (id) cells[(r + rowOffset) * 3 + c + columnOffset] = id;
         }));
     }
+    return cells;
+}
 
+function recipePreview(recipe) {
+    const cells = recipePreviewCells(recipe);
     const grid = document.createElement('span');
     grid.className = 'recipe-mini-grid';
     grid.style.gridTemplateColumns = 'repeat(3, 18px)';
@@ -46,7 +50,7 @@ function recipePreview(recipe) {
     output.innerHTML = stackHtml({ id: recipe.result, count: recipe.count });
     output.setAttribute('aria-hidden', 'true');
 
-    return { grid, arrow, output };
+    return { grid, arrow, output, cells };
 }
 
 function craftingEntry(recipe, items, recipeIndex) {
@@ -97,7 +101,7 @@ function textEntry(main, result, detail) {
     return row;
 }
 
-export function createRecipeBook({ root, search, empty, recipes, smelting, fuels, items, onSelectCrafting }) {
+export function createRecipeBook({ root, search, empty, recipes, smelting, fuels, items, onSelectCrafting, getAvailableCount }) {
     const nameOf = id => items[id]?.name ?? '—';
     const crafting = recipes.map((recipe, index) => craftingEntry(recipe, items, index));
     const cooking = Object.entries(smelting).map(([input, recipe]) => textEntry(
@@ -110,7 +114,11 @@ export function createRecipeBook({ root, search, empty, recipes, smelting, fuels
     const feedback = document.createElement('p');
     feedback.className = 'recipe-feedback';
     feedback.hidden = true;
+    const legend = document.createElement('p');
+    legend.className = 'recipe-legend';
+    legend.textContent = 'Células vermelhas indicam ingredientes que estão faltando.';
     root.replaceChildren(
+        legend,
         feedback,
         recipeSection('Criação · clique para preparar', crafting),
         recipeSection('Fundição', cooking),
@@ -118,6 +126,22 @@ export function createRecipeBook({ root, search, empty, recipes, smelting, fuels
     );
 
     const sections = [...root.querySelectorAll('.recipe-section')];
+    const refreshAvailability = () => {
+        for (const entry of root.querySelectorAll('.recipe-entry-craft')) {
+            const recipe = recipes[Number(entry.dataset.recipeIndex)];
+            const cells = recipePreviewCells(recipe);
+            const slots = entry.querySelectorAll('.recipe-mini-slot');
+            const usedByItem = new Map();
+            cells.forEach((id, index) => {
+                const slot = slots[index];
+                if (!slot || !id) return;
+                const used = usedByItem.get(id) ?? 0;
+                const available = Math.max(0, Number(getAvailableCount?.(id)) || 0);
+                slot.classList.toggle('is-missing', used >= available);
+                usedByItem.set(id, used + 1);
+            });
+        }
+    };
     const filter = () => {
         const query = search.value.trim().toLocaleLowerCase('pt-BR');
         let anyVisible = false;
@@ -146,4 +170,6 @@ export function createRecipeBook({ root, search, empty, recipes, smelting, fuels
         feedback.hidden = !feedback.textContent;
     });
     search.addEventListener('input', filter);
+    refreshAvailability();
+    return { refreshAvailability };
 }

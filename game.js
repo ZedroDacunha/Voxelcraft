@@ -1873,6 +1873,7 @@ let invLastClick = { time: 0, key: '' };
 const invMouse = { x: 0, y: 0, seen: false };
 let invSlotEls = [], craftSlotEls = [], furnaceSlotEls = [], chestSlotEls = [], outSlotEl = null;
 let craftResult = null;
+let recipeBook = null;
 
 function throwStack(id, count, damage = 0) {
     camera.getWorldDirection(tmpDir);
@@ -1923,7 +1924,7 @@ function buildInventoryUI() {
 }
 
 function buildRecipeList() {
-    createRecipeBook({
+    recipeBook = createRecipeBook({
         root: document.getElementById('inv-recipes'),
         search: document.getElementById('recipe-search'),
         empty: document.getElementById('recipe-empty'),
@@ -1931,6 +1932,8 @@ function buildRecipeList() {
         smelting: SMELT,
         fuels: FUEL,
         items: ITEMS,
+        getAvailableCount: id => [...inventory.slots, ...craftInv.slots]
+            .reduce((total, stack) => total + (stack?.id === id ? stack.count : 0), 0),
         onSelectCrafting: recipe => {
             const result = invFillRecipe(inventory, craftInv, recipe, craftN);
             if (result.ok) {
@@ -2024,6 +2027,7 @@ function renderInventory() {
     }
     updateInventoryFloaters();
     updateHotbarUI();
+    recipeBook?.refreshAvailability();
 }
 
 function onInventoryMouseMove(e) {
