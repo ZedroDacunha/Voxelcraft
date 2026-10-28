@@ -2,6 +2,36 @@ import { hash2, mulberry32 } from './world-math.js';
 import { ATLAS_COLUMNS, ITEMS, TILE, TILE_PX } from './world-catalog.js';
 import { createMineralOrePixel, createMineralSpritePixels, isMineralOreTile } from './world-mineral-textures.js';
 
+function cobblePixel(x, y, variant) {
+    let closest = Infinity, second = Infinity, nearestSite = null;
+    const cellX = Math.floor(x / 8), cellY = Math.floor(y / 8);
+    for (let gy = cellY - 1; gy <= cellY + 1; gy++) for (let gx = cellX - 1; gx <= cellX + 1; gx++) {
+        const wrappedX = ((gx % 4) + 4) % 4, wrappedY = ((gy % 4) + 4) % 4;
+        const seed = 3701 + wrappedX * 67 + wrappedY * 131 + variant * 977;
+        const siteX = gx * 8 + 4 + (hash2(wrappedX, wrappedY, seed) - 0.5) * 3;
+        const siteY = gy * 8 + 4 + (hash2(wrappedY, wrappedX, seed + 1) - 0.5) * 3;
+        const distance = (x - siteX) ** 2 + (y - siteY) ** 2;
+        if (distance < closest) {
+            second = closest;
+            closest = distance;
+            nearestSite = { x: siteX, y: siteY, seed, wrappedX, wrappedY };
+        } else if (distance < second) second = distance;
+    }
+
+    const { x: siteX, y: siteY, seed, wrappedX, wrappedY } = nearestSite;
+    const edgeNoise = hash2(Math.floor((x - siteX + 12) / 2), Math.floor((y - siteY + 12) / 2), seed + 3);
+    if (Math.sqrt(second) - Math.sqrt(closest) < 0.8 + edgeNoise * 1.9) {
+        const seam = 48 + hash2(Math.floor(x / 2), Math.floor(y / 2), seed + 5) * 28;
+        return [seam, seam + 2, seam + 3];
+    }
+
+    const patch = hash2(Math.floor((x - siteX) / 2), Math.floor((y - siteY) / 2), seed + 7);
+    const grain = hash2(Math.floor((x - siteX) / 2), Math.floor((y - siteY) / 2), seed + 11);
+    const blockShade = 92 + Math.floor(hash2(wrappedX, wrappedY, seed + 13) * 5) * 6;
+    const shade = blockShade + (patch < 0.14 ? -17 : patch > 0.86 ? 19 : 0) + (grain - 0.5) * 11;
+    return [shade, shade + 1, shade + 2];
+}
+
 // Atlas voxel e sprites determinísticos em canvas.
 export function createTextureTools(THREE) {
     const HANDLE_L = [156, 106, 52], HANDLE_D = [112, 74, 34];
@@ -89,9 +119,12 @@ export function createTextureTools(THREE) {
         canvas.height = TILE_PX;
         const ctx = canvas.getContext('2d', { alpha: true });
         ctx.imageSmoothingEnabled = false;
-        const grassEdges = [0, 1].map(v => Array.from({ length: TILE_PX }, (_, x) =>
-            8 + Math.floor(hash2(x, v, 2024) * 7) + v));
-        const cobbleShade = Array.from({ length: 40 }, (_, i) => 104 + hash2(i, 0, 2077) * 32);
+        const grassEdges = [0, 1].map(variant => Array.from({ length: TILE_PX }, (_, x) =>
+            4 + Math.floor(hash2(x, variant, 2024) * 4)));
+        const grassRoots = [0, 1].map(variant => Array.from({ length: TILE_PX }, (_, x) => {
+            const rootChance = hash2(Math.floor(x / 2), 0, 2781 + variant * 91);
+            return rootChance > 0.7 ? 1 + Math.floor(hash2(x, variant, 991) * 3) : 0;
+        }));
         const variantBase = {
             [TILE.GRASS_TOP_ALT]: TILE.GRASS_TOP, [TILE.GRASS_SIDE_ALT]: TILE.GRASS_SIDE,
             [TILE.DIRT_ALT]: TILE.DIRT, [TILE.STONE_ALT]: TILE.STONE, [TILE.LEAVES_ALT]: TILE.LEAVES,
@@ -105,33 +138,49 @@ export function createTextureTools(THREE) {
                 noiseSample++;
                 return (value * 2 - 1) * radius;
             };
+            const soilPixel = (px, py) => {
+                const patch = hash2(Math.floor(px / 3), Math.floor(py / 3), 431 + alt * 73);
+                const fleck = hash2(Math.floor(px / 2), Math.floor(py / 2), 8101 + alt * 109);
+                let color = patch < 0.2 ? [99, 68, 45] : patch > 0.79 ? [145, 103, 67] : [124, 84, 54];
+                if (fleck > 0.985) color = [127, 124, 111];
+                else if (fleck > 0.94) color = [157, 117, 79];
+                else if (fleck < 0.035) color = [105, 75, 53];
+                const fine = (hash2(px, py, 2203 + alt * 137) - 0.5) * 12;
+                return color.map(channel => channel + fine);
+            };
+            const grassPixel = (px, py, muted = false) => {
+                const patch = hash2(Math.floor(px / 3), Math.floor(py / 3), 2909 + alt * 131);
+                const fleck = hash2(px, py, 6343 + alt * 157);
+                let color = patch < 0.2 ? [78, 143, 48] : patch > 0.78 ? [127, 186, 69] : [101, 167, 57];
+                if (fleck > 0.975) color = [139, 194, 77];
+                else if (fleck < 0.025) color = [73, 134, 47];
+                return muted ? color.map(channel => channel * 0.78) : color;
+            };
             if (isMineralOreTile(tile)) return createMineralOrePixel(tile, x, y, j);
             switch (tile) {
                 case TILE.GRASS_TOP: {
-                    const band = (x * 5 + y * 3 + alt) % 7;
-                    return [70 + band * 4 + j(3), 145 + band * 5 + j(4), 62 + band * 3 + j(3)];
+                    return grassPixel(x, y);
                 }
                 case TILE.DIRT: {
-                    const pebble = (x * 11 + y * 7 + alt * 3) % 19 === 0;
-                    return [132 + j(7) - (pebble ? 24 : 0), 73 + j(5) - (pebble ? 12 : 0), 37 + j(4)];
+                    return soilPixel(x, y);
                 }
                 case TILE.GRASS_SIDE: {
                     const edge = grassEdges[alt][x];
-                    if (y < edge) return [72 + j(5), 151 + j(7) + (edge - y) * 2, 62 + j(4)];
-                    const root = y === edge && x % 3 === 0;
-                    return [132 + j(7) - (root ? 18 : 0), 73 + j(5), 37 + j(4)];
+                    if (y < edge) return grassPixel(x, y);
+                    if (grassRoots[alt][x] > 0 && y - edge < grassRoots[alt][x]) return grassPixel(x, y, true);
+                    return soilPixel(x, y);
                 }
                 case TILE.STONE: {
-                    const seam = (x * 13 + y * 7 + alt * 5) % 31 === 0;
-                    const c = 119 + j(7) - (seam ? 22 : 0);
-                    return [c, c, c + 2];
+                    const patch = hash2(Math.floor(x / 3), Math.floor(y / 3), 5021 + alt * 113);
+                    const fleck = hash2(Math.floor(x / 2), Math.floor(y / 2), 641 + alt * 197);
+                    let c = patch < 0.18 ? 105 : patch > 0.83 ? 145 : 124;
+                    if (fleck > 0.975) c += 17;
+                    else if (fleck < 0.025) c -= 15;
+                    c += (hash2(x, y, 1801 + alt * 67) - 0.5) * 8;
+                    return [c, c + 1, c + 2];
                 }
                 case TILE.COBBLE: {
-                    const row = Math.floor(y / 8), off = (row % 2) * 5;
-                    const col = Math.floor((x + off) / 10);
-                    const edge = ((x + off) % 10 === 0) || (y % 8 === 0);
-                    const c = edge ? 70 + j(5) : cobbleShade[(row * 5 + col) % cobbleShade.length] + j(5);
-                    return [c, c, c];
+                    return cobblePixel(x, y, alt);
                 }
                 case TILE.WOOD: {
                     const fiber = x % 8;
