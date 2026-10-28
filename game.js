@@ -16,6 +16,9 @@ import { createWorldSaveIndicator } from './world-save-indicator.js';
 import { createWorldClock } from './world-clock.js';
 import { createWorldClouds, WORLD_CLOUD_CONFIG } from './world-clouds.js';
 import { createWorldSkySystem } from './world-sky.js';
+import { createWorldGraphicsQuality } from './world-graphics-quality.js';
+import { raycastVoxels } from './world-raycast.js';
+import { createBreakParticleSystem } from './world-break-particles.js';
 import { chunkKey, floorDiv, idx } from './world-grid.js';
 import {
     CHUNK_SIZE, DEATH_DROP_TTL, MAX_BREATH, MAX_HEALTH, MAX_HUNGER,
@@ -1307,45 +1310,12 @@ function openStation(type, hit) {
     openInventory({ type, furnace: f });
 }
 
-const particles = [];
-const particleGeo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
-const particleMats = {};
-
 function waterImmersionAt(world, x, y, z, halfHeight) {
     const bx = Math.floor(x), by = Math.floor(y - halfHeight + 0.001), bz = Math.floor(z);
     const type = world.getBlock(bx, by, bz);
     if (!WaterSystem.isBlock(type)) return 0;
     const surface = by + WaterSystem.surfaceHeightFor(type, world.getBlock(bx, by + 1, bz));
     return Math.max(0, Math.min(1, (surface - (y - halfHeight)) / (halfHeight * 2)));
-}
-
-function spawnBreakParticles(x, y, z, type) {
-    if (!particleMats[type]) particleMats[type] = new THREE.MeshBasicMaterial({ color: inventoryAssets.blockColors[type] });
-    for (let i = 0; i < 12 && particles.length < 150; i++) {
-        const mesh = new THREE.Mesh(particleGeo, particleMats[type]);
-        mesh.position.set(x + Math.random(), y + Math.random(), z + Math.random());
-        scene.add(mesh);
-        particles.push({
-            mesh,
-            vel: new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 3 + 1, (Math.random() - 0.5) * 3),
-            life: 0.6 + Math.random() * 0.4,
-        });
-    }
-}
-
-function updateParticles(dt) {
-    for (let i = particles.length - 1; i >= 0; i--) {
-        const p = particles[i];
-        p.life -= dt;
-        if (p.life <= 0) { scene.remove(p.mesh); particles.splice(i, 1); continue; }
-        p.vel.y -= 18 * dt;
-        const immersion = waterImmersionAt(world, p.mesh.position.x, p.mesh.position.y, p.mesh.position.z, 0.05);
-        if (immersion > 0) {
-            p.vel.y += 20 * immersion * dt;
-            p.vel.multiplyScalar(Math.exp(-4.5 * immersion * dt));
-        }
-        p.mesh.position.addScaledVector(p.vel, dt);
-    }
 }
 
 function buildCubeGeo(tiles, size, facing = DEFAULT_BLOCK_FACING) {
@@ -1493,7 +1463,8 @@ function updateItemEntities(dt) {
             const blocked = d > 0.001 && raycastVoxels(
                 e.pos,
                 _pickupRay.set(dx / d, dy / d, dz / d),
-                Math.max(0, d - 0.05)
+                Math.max(0, d - 0.05),
+                WORLD_RAYCAST_ACCESS
             );
             if (!blocked && d2 < 0.36) {
                 const left = inventory.add(e.id, e.count, 0, inventory.slots.length, e.damage);
@@ -1600,7 +1571,7 @@ function breakBlock(x, y, z) {
     const touchesWater = world.water.isAdjacent(world, x, y, z);
     world.setBlock(x, y, z, touchesWater ? ID.WATER : 0);
     if (touchesWater) world.water.activate(world, x, y, z);
-    spawnBreakParticles(x, y, z, type);
+    breakParticles.spawn(x, y, z, type);
     if (harvest && drop && Math.random() < (BLOCKS[type].dropChance ?? 1)) {
         spawnItemEntity(
             drop, 1,
@@ -2200,6 +2171,16 @@ function updateSky() {
 // 6. ESTADO GERAL
 // =====================================================================
 let camera, scene, renderer, controls, world, creatureSystem;
+const breakParticles = createBreakParticleSystem({
+    THREE,
+    getScene: () => scene,
+    getBlockColor: type => inventoryAssets.blockColors[type],
+    getImmersionAt: (x, y, z, halfHeight) => waterImmersionAt(world, x, y, z, halfHeight),
+});
+const WORLD_RAYCAST_ACCESS = {
+    getBlock: (x, y, z) => world.getBlock(x, y, z),
+    isIgnoredBlock: type => WaterSystem.isBlock(type),
+};
 let targetMesh;
 let currentHit = null;
 const tmpDir = new THREE.Vector3();
@@ -2240,49 +2221,12 @@ const deathEl = document.getElementById('death');
 
 let prevTime = performance.now();
 const perf = { t: 0, frames: 0, sum: 0, worst: 0, avg: 0, worstShown: 0, buildMs: 0, fps: 0, long: 0, lastLong: '—', ctxLost: 0 };
-const gfx = { auto: true, max: Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO), min: 0.5, scale: 1, slow: 0, fast: 0, lastFps: null, noGain: 0, pending: null };
-gfx.scale = gfx.max;
-
-function setRenderScale(v) {
-    gfx.scale = Math.max(gfx.min, Math.min(gfx.max, v));
-    gfx.pending = gfx.scale;
-}
-
-function adaptResolution(fpsNow, cpuMs) {
-    if (!gfx.auto || document.hidden) return;
-    if (gfx.lastFps !== null) {
-        gfx.noGain = fpsNow < gfx.lastFps * 1.1 ? gfx.noGain + 1 : 0;
-        gfx.lastFps = null;
-        if (gfx.noGain >= 3) {
-            gfx.auto = false;
-            setRenderScale(gfx.max);
-            showToast('FPS não melhora com menos resolução: veja economia de energia / aceleração de hardware');
-            return;
-        }
-    }
-    const gpuBound = cpuMs < 0.6 * 1000 / Math.max(fpsNow, 1);
-    if (fpsNow < 55 && gfx.scale > gfx.min && gpuBound) {
-        gfx.fast = 0;
-        if (++gfx.slow >= 3) { gfx.slow = 0; gfx.lastFps = fpsNow; setRenderScale(gfx.scale - 0.15); }
-    } else if (fpsNow >= 58 && gfx.scale < gfx.max) {
-        gfx.slow = 0;
-        if (++gfx.fast >= 8) { gfx.fast = 0; setRenderScale(gfx.scale + 0.1); }
-    } else { gfx.slow = 0; gfx.fast = 0; }
-}
-
-const QUALITY_MODES = ['auto', 'max', 1, 0.75, 0.5];
-let qualityIdx = 0;
-function cycleQuality() {
-    qualityIdx = (qualityIdx + 1) % QUALITY_MODES.length;
-    const m = QUALITY_MODES[qualityIdx];
-    gfx.noGain = 0; gfx.lastFps = null; gfx.slow = 0; gfx.fast = 0;
-    if (m === 'auto') { gfx.auto = true; setRenderScale(gfx.max); showToast('Qualidade: automática'); }
-    else {
-        gfx.auto = false;
-        setRenderScale(m === 'max' ? gfx.max : m);
-        showToast('Qualidade: ' + (m === 'max' ? 'máxima' : Math.round(m * 100) + '%'));
-    }
-}
+const gfx = createWorldGraphicsQuality({
+    max: Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO),
+    min: 0.5,
+    notify: showToast,
+});
+const cycleQuality = () => gfx.cycle();
 
 // =====================================================================
 // 7. HUD E STATUS DE SOBREVIVÊNCIA
@@ -2562,32 +2506,9 @@ function intersectsPlayer(bx, by, bz) {
 // =====================================================================
 // 9. RAYCAST POR VOXELS (DDA)
 // =====================================================================
-function raycastVoxels(origin, dir, maxDist) {
-    let x = Math.floor(origin.x), y = Math.floor(origin.y), z = Math.floor(origin.z);
-    const sx = dir.x > 0 ? 1 : -1, sy = dir.y > 0 ? 1 : -1, sz = dir.z > 0 ? 1 : -1;
-    const tdx = dir.x !== 0 ? Math.abs(1 / dir.x) : Infinity;
-    const tdy = dir.y !== 0 ? Math.abs(1 / dir.y) : Infinity;
-    const tdz = dir.z !== 0 ? Math.abs(1 / dir.z) : Infinity;
-    let tmx = dir.x !== 0 ? (dir.x > 0 ? x + 1 - origin.x : origin.x - x) * tdx : Infinity;
-    let tmy = dir.y !== 0 ? (dir.y > 0 ? y + 1 - origin.y : origin.y - y) * tdy : Infinity;
-    let tmz = dir.z !== 0 ? (dir.z > 0 ? z + 1 - origin.z : origin.z - z) * tdz : Infinity;
-    let nx = 0, ny = 0, nz = 0, t = 0;
-
-    for (let i = 0; i < 128 && t <= maxDist; i++) {
-        const type = world.getBlock(x, y, z);
-        // Permite que o raio ignore blocos de água, possibilitando interagir com blocos submersos
-        if (type !== 0 && !WaterSystem.isBlock(type)) return { x, y, z, nx, ny, nz, type, dist: t };
-        
-        if (tmx < tmy && tmx < tmz) { x += sx; t = tmx; tmx += tdx; nx = -sx; ny = 0; nz = 0; }
-        else if (tmy < tmz)         { y += sy; t = tmy; tmy += tdy; nx = 0; ny = -sy; nz = 0; }
-        else                        { z += sz; t = tmz; tmz += tdz; nx = 0; ny = 0; nz = -sz; }
-    }
-    return null;
-}
-
 function updateTarget() {
     camera.getWorldDirection(tmpDir);
-    currentHit = raycastVoxels(camera.position, tmpDir, REACH);
+    currentHit = raycastVoxels(camera.position, tmpDir, REACH, WORLD_RAYCAST_ACCESS);
     if (currentHit) {
         targetMesh.position.set(currentHit.x + 0.5, currentHit.y + 0.5, currentHit.z + 0.5);
         targetMesh.visible = true;
@@ -3128,7 +3049,7 @@ function animate() {
         updateEating(dt);
         updateSurvival(dt);
         updateItemEntities(dt);
-        updateParticles(dt);
+        breakParticles.update(dt);
     }
     world.water.updateSubmersion(world, player);
     world.water.update(world, dt, now);
@@ -3159,7 +3080,8 @@ function animate() {
     world.update(player.pos.x, player.pos.z);
     updateDebug(rawDt);
 
-    if (gfx.pending !== null) { renderer.setPixelRatio(gfx.pending); gfx.pending = null; }
+    const pendingScale = gfx.consumePending();
+    if (pendingScale !== null) renderer.setPixelRatio(pendingScale);
     renderer.info.reset();
     renderer.clear();
     renderer.render(scene, camera);
@@ -3176,7 +3098,7 @@ function animate() {
     if (perf.t >= 1) {
         perf.avg = perf.sum / perf.frames; perf.worstShown = perf.worst;
         perf.fps = perf.frames / perf.t;
-        adaptResolution(perf.fps, perf.avg);
+        gfx.adapt(perf.fps, perf.avg, document.hidden);
         perf.t = 0; perf.frames = 0; perf.sum = 0; perf.worst = 0;
     }
 }
