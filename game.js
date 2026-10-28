@@ -4,6 +4,8 @@ import { clamp01, hash2, mulberry32, Noise2D, smoothstep } from './world-math.js
 import { ATLAS_COLUMNS, BLOCKS, FUEL, ID, ITEMS, matchRecipe, RECIPES, SMELT, TILE, TILE_PX } from './world-catalog.js';
 import { findSpawn, TerrainGenerator } from './world-terrain.js';
 import { createWaterSystemClass } from './world-water.js';
+import { craftConsume, invCollectSame, invLeftClick, invQuickMove, invQuickMoveToCraft, invRightClick, invSwapHotbar, stackable } from './inventory-logic.js';
+import { stackHtml, updateSlotElement } from './inventory-view.js';
 
 async function loadThreeModules() {
     const providers = [
@@ -2136,105 +2138,6 @@ const cursorHeld = { stack: null };
 const craftInv = new Inventory(9);
 let craftN = 2;
 
-const stackable = (id) => ITEMS[id].maxStack > 1;
-
-function invLeftClick(inv, i, cur) {
-    const s = inv.slots[i], c = cur.stack;
-    if (!c) { if (s) { cur.stack = s; inv.slots[i] = null; } return; }
-    if (!s) { inv.slots[i] = c; cur.stack = null; return; }
-    if (s.id === c.id && stackable(s.id)) {
-        const n = Math.min(ITEMS[s.id].maxStack - s.count, c.count);
-        s.count += n; c.count -= n;
-        if (c.count <= 0) cur.stack = null;
-        return;
-    }
-    inv.slots[i] = c; cur.stack = s;
-}
-
-function invRightClick(inv, i, cur) {
-    const s = inv.slots[i], c = cur.stack;
-    if (!c) {
-        if (s) {
-            const take = Math.ceil(s.count / 2);
-            cur.stack = { id: s.id, count: take };
-            if (s.damage) cur.stack.damage = s.damage;
-            s.count -= take;
-            if (s.count <= 0) inv.slots[i] = null;
-        }
-        return;
-    }
-    if (!s) {
-        const one = { id: c.id, count: 1 };
-        if (c.damage) one.damage = c.damage;
-        inv.slots[i] = one;
-        c.count--;
-        if (c.count <= 0) cur.stack = null;
-        return;
-    }
-    if (s.id === c.id && stackable(s.id)) {
-        if (s.count < ITEMS[s.id].maxStack) {
-            s.count++; c.count--;
-            if (c.count <= 0) cur.stack = null;
-        }
-        return;
-    }
-    inv.slots[i] = c; cur.stack = s;
-}
-
-function invQuickMove(src, i, dst, from, to) {
-    const s = src.slots[i];
-    if (!s) return;
-    const left = dst.add(s.id, s.count, from, to, s.damage || 0);
-    if (left === 0) src.slots[i] = null; else s.count = left;
-}
-
-function invQuickMoveToCraft(i) {
-    const source = inventory.slots[i];
-    if (!source) return;
-    let left = source.count;
-    const end = craftN * craftN;
-    for (let slot = 0; slot < end && left > 0; slot++) {
-        if (craftInv.slots[slot]) continue;
-        craftInv.slots[slot] = { id: source.id, count: 1 };
-        if (source.damage) craftInv.slots[slot].damage = source.damage;
-        left--;
-    }
-    if (left > 0 && stackable(source.id)) {
-        for (let slot = 0; slot < end && left > 0; slot++) {
-            const target = craftInv.slots[slot];
-            if (!target || target.id !== source.id || target.count >= ITEMS[source.id].maxStack) continue;
-            const moved = Math.min(ITEMS[source.id].maxStack - target.count, left);
-            target.count += moved;
-            left -= moved;
-        }
-    }
-    if (left === 0) inventory.slots[i] = null;
-    else source.count = left;
-}
-
-function invCollectSame(inv, cur) {
-    const c = cur.stack;
-    if (!c || !stackable(c.id)) return;
-    const max = ITEMS[c.id].maxStack;
-    for (let i = 0; i < inv.slots.length && c.count < max; i++) {
-        const s = inv.slots[i];
-        if (s && s.id === c.id) {
-            const n = Math.min(max - c.count, s.count);
-            c.count += n; s.count -= n;
-            if (s.count <= 0) inv.slots[i] = null;
-        }
-    }
-}
-
-function invSwapHotbar(inv, i, h) {
-    if (i === h) return;
-    [inv.slots[i], inv.slots[h]] = [inv.slots[h], inv.slots[i]];
-}
-
-function craftConsume() {
-    for (let i = 0; i < craftN * craftN; i++) if (craftInv.slots[i]) craftInv.removeOne(i);
-}
-
 function handleOutputClick(e) {
     const r = matchRecipe(craftInv, craftN);
     if (!r) return;
@@ -2243,16 +2146,16 @@ function handleOutputClick(e) {
         for (let guard = 0; guard < 64; guard++) {
             const rr = matchRecipe(craftInv, craftN);
             if (!rr || inventory.spaceFor(rr.id) < rr.count) break;
-            craftConsume();
+            craftConsume(craftInv, craftN);
             inventory.add(rr.id, rr.count);
         }
         return;
     }
     if (!c) {
-        craftConsume();
+        craftConsume(craftInv, craftN);
         cursorHeld.stack = { id: r.id, count: r.count };
     } else if (c.id === r.id && stackable(c.id) && c.count + r.count <= ITEMS[c.id].maxStack) {
-        craftConsume();
+        craftConsume(craftInv, craftN);
         c.count += r.count;
     }
 }
@@ -2295,26 +2198,6 @@ let invLastClick = { time: 0, key: '' };
 const invMouse = { x: 0, y: 0, seen: false };
 let invSlotEls = [], craftSlotEls = [], furnaceSlotEls = [], chestSlotEls = [], outSlotEl = null;
 let craftResult = null;
-const slotHtmlCache = new WeakMap();
-
-function stackHtml(s) {
-    if (!s) return '';
-    let html = `<div class="slot-icon ico-${s.id}"></div>`;
-    if (s.count > 1) html += `<span class="slot-count">${s.count}</span>`;
-    const it = ITEMS[s.id];
-    if (it.maxDurability && s.damage > 0) {
-        const f = Math.max(0, 1 - s.damage / it.maxDurability);
-        html += `<div class="dur"><div style="width:${(f * 100).toFixed(0)}%;background:hsl(${(f * 120).toFixed(0)},80%,45%)"></div></div>`;
-    }
-    return html;
-}
-
-function updateSlotElement(el, stack) {
-    const html = stackHtml(stack);
-    if (slotHtmlCache.get(el) === html) return;
-    el.innerHTML = html;
-    slotHtmlCache.set(el, html);
-}
 
 function throwStack(id, count, damage = 0) {
     camera.getWorldDirection(tmpDir);
@@ -2489,7 +2372,7 @@ function onInventoryMouseDown(e) {
         if (e.shiftKey && !cursorHeld.stack) {
             if (name === 'main' && station && station.type === 'furnace') quickToFurnace(i);
             else if (name === 'main' && station && station.type === 'chest') invQuickMove(inventory, i, station.chest.inv, 0, 27);
-            else if (name === 'main') invQuickMoveToCraft(i);
+            else if (name === 'main') invQuickMoveToCraft(inventory, craftInv, i, craftN);
             else if (name === 'chest') invQuickMove(station.chest.inv, i, inventory, 0, 36);
             else invQuickMove(craftInv, i, inventory, 0, 36);
         }
