@@ -1,5 +1,6 @@
 import { openDatabase, storeRequest, STORE_NAME } from './world-storage.js';
-import { rejectedSaveKeyFor, saveBackupKeyFor } from './world-save-recovery.js';
+import { WORLD_SAVE_VERSION } from './world-save-codec.js';
+import { importedSaveKeyFor, rejectedSaveKeyFor, saveBackupKeyFor } from './world-save-recovery.js';
 
 import('./menu-background.js').catch(error => {
     console.warn('Panorama animado indisponível; usando o cenário estático.', error);
@@ -47,8 +48,19 @@ async function getWorlds() {
         if (typeof key !== 'string' || !key.startsWith(META_PREFIX)) continue;
         const world = await storeRequest('readonly', store => store.get(key));
         if (world && typeof world.id === 'string' && Number.isFinite(world.seed) && typeof world.saveKey === 'string') {
-            const save = await storeRequest('readonly', store => store.get(world.saveKey));
-            worlds.push({ ...world, lastPlayed: Number.isFinite(save?.time) ? save.time : world.createdAt });
+            const [save, backupKey, rejectedKey, importedKey] = await Promise.all([
+                storeRequest('readonly', store => store.get(world.saveKey)),
+                storeRequest('readonly', store => store.getKey(saveBackupKeyFor(world.saveKey))),
+                storeRequest('readonly', store => store.getKey(rejectedSaveKeyFor(world.saveKey))),
+                storeRequest('readonly', store => store.getKey(importedSaveKeyFor(world.saveKey))),
+            ]);
+            worlds.push({
+                ...world,
+                lastPlayed: Number.isFinite(save?.time) ? save.time : world.createdAt,
+                hasBackup: backupKey !== undefined,
+                hasRejectedSave: rejectedKey !== undefined,
+                hasImportedSave: importedKey !== undefined,
+            });
         }
     }
     return worlds.sort((a, b) => (b.lastPlayed || 0) - (a.lastPlayed || 0));
@@ -73,6 +85,92 @@ function makeAction(label, className, onClick) {
     return button;
 }
 
+async function exportSaveCopy(world, kind) {
+    const key = kind === 'backup' ? saveBackupKeyFor(world.saveKey) : rejectedSaveKeyFor(world.saveKey);
+    try {
+        const save = await storeRequest('readonly', store => store.get(key));
+        if (!save) throw new Error('Esta cópia de segurança não está mais disponível.');
+        const file = {
+            format: 'voxel-sandbox-save-copy',
+            exportedAt: new Date().toISOString(),
+            world: { id: world.id, name: world.name, seed: world.seed },
+            kind,
+            save,
+        };
+        const safeName = world.name.replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-').trim() || 'mundo';
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const json = JSON.stringify(file, (field, value) => value instanceof Uint16Array
+            ? { __type: 'Uint16Array', values: Array.from(value) }
+            : value, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${safeName}-${kind}-${timestamp}.json`;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+        showError(error.message || 'Não foi possível exportar esta cópia do save.');
+    }
+}
+
+async function importSaveCopy(world, file) {
+    if (file.size > 64 * 1024 * 1024) throw new Error('O arquivo ultrapassa o limite de 64 MB.');
+    const archive = JSON.parse(await file.text(), (field, value) => {
+        if (value?.__type !== 'Uint16Array') return value;
+        if (!Array.isArray(value.values) || value.values.length > 32768 ||
+            value.values.some(item => !Number.isInteger(item) || item < 0 || item > 65535)) {
+            throw new Error('O arquivo contém edições de terreno inválidas.');
+        }
+        return new Uint16Array(value.values);
+    });
+    const save = archive?.save;
+    if (archive?.format !== 'voxel-sandbox-save-copy' || !['backup', 'rejected'].includes(archive.kind) ||
+        archive.world?.seed !== world.seed || save?.v !== WORLD_SAVE_VERSION || save.seed !== world.seed) {
+        throw new Error('O arquivo não é uma cópia compatível deste mundo.');
+    }
+
+    let worldIsOpen = false;
+    await storeRequest('readwrite', store => {
+        const request = store.get(`${world.saveKey}-writer-lock`);
+        request.onsuccess = () => {
+            const lock = request.result;
+            if (lock && Number.isFinite(lock.heartbeat) && Date.now() - lock.heartbeat <= LOCK_TTL) {
+                worldIsOpen = true;
+                return;
+            }
+            store.put(save, importedSaveKeyFor(world.saveKey));
+        };
+        return request;
+    });
+    if (worldIsOpen) throw new Error('Feche este mundo em outra aba antes de importar uma cópia.');
+}
+
+function addImportAction(actions, world) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.hidden = true;
+    input.setAttribute('aria-label', `Selecionar cópia JSON para ${world.name}`);
+    const button = makeAction(world.hasImportedSave ? 'Trocar cópia importada' : 'Importar cópia JSON', 'export', () => input.click());
+    input.addEventListener('change', async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        try {
+            if (world.hasImportedSave && !confirm('Substituir a cópia importada que está aguardando recuperação?')) return;
+            await importSaveCopy(world, file);
+            await renderWorlds();
+        } catch (error) {
+            showError(error.message || 'Não foi possível importar esta cópia do save.');
+        } finally {
+            input.value = '';
+        }
+    });
+    actions.append(button, input);
+}
+
 async function renderWorlds() {
     showError();
     list.replaceChildren();
@@ -94,11 +192,20 @@ async function renderWorlds() {
         const details = document.createElement('p');
         details.textContent = `Seed ${world.seed} · Última sessão: ${formatDate(world.lastPlayed)}`;
         info.append(title, details);
+        if (world.hasImportedSave) {
+            const recoveryStatus = document.createElement('p');
+            recoveryStatus.className = 'world-recovery-status';
+            recoveryStatus.textContent = 'Cópia importada; será usada se o save principal estiver inválido ou ausente';
+            info.append(recoveryStatus);
+        }
 
         const actions = document.createElement('div');
         actions.className = 'world-card-actions';
         actions.append(makeAction('Jogar', 'play', () => launchWorld(world)));
         actions.append(makeAction('Renomear', '', () => openWorldDialog(world)));
+        addImportAction(actions, world);
+        if (world.hasBackup) actions.append(makeAction('Baixar backup', 'export', () => exportSaveCopy(world, 'backup')));
+        if (world.hasRejectedSave) actions.append(makeAction('Baixar save rejeitado', 'export', () => exportSaveCopy(world, 'rejected')));
         actions.append(makeAction('Excluir', 'delete', () => deleteWorld(world)));
         card.append(info, actions);
         list.append(card);
@@ -189,6 +296,7 @@ async function deleteWorld(world) {
                 store.delete(world.saveKey);
                 store.delete(saveBackupKeyFor(world.saveKey));
                 store.delete(rejectedSaveKeyFor(world.saveKey));
+                store.delete(importedSaveKeyFor(world.saveKey));
                 store.delete(lockKey);
                 store.delete(META_PREFIX + world.id);
                 removed = true;

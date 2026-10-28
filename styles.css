@@ -34,6 +34,7 @@
         border: 1px solid #3d4d5f; border-radius: 10px; background: #202c3a; }
     .world-card h2 { overflow: hidden; margin: 0 0 5px; font-size: 17px; text-overflow: ellipsis; white-space: nowrap; }
     .world-card p { margin: 0; color: #aebccc; font: 12px/1.5 monospace; }
+    .world-card .world-recovery-status { margin-top: 5px; color: #f0d56f; }
     .world-card-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
     .world-action { padding: 8px 11px; border: 1px solid #65768a; border-radius: 6px; color: #fff; background: #3c4e62; cursor: pointer; }
     .world-action:hover { background: #526981; }

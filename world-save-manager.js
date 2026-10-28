@@ -1,0 +1,225 @@
+import { createWorldSaveLock } from './world-save-lock.js';
+import {
+    importedSaveKeyFor, preserveRejectedSave, rejectedSaveKeyFor, saveBackupKeyFor,
+} from './world-save-recovery.js';
+
+const SAVE_DEBOUNCE_MS = 5000;
+
+// Coordena o ciclo completo do save; o jogo fornece apenas callbacks para
+// construir o estado vivo e apresentar mensagens ao jogador.
+export function createWorldSaveManager({
+    openDatabase,
+    storeRequest,
+    saveKey,
+    tabId,
+    seed,
+    codec,
+    buildSave,
+    hasWorld,
+    onToast = () => {},
+    onBuildDuration = () => {},
+    onError = error => console.warn('Falha no salvamento do mundo:', error),
+}) {
+    const backupKey = saveBackupKeyFor(saveKey);
+    const rejectedKey = rejectedSaveKeyFor(saveKey);
+    const lock = createWorldSaveLock({
+        openDatabase,
+        saveKey,
+        backupKey,
+        tabId,
+        onLost: () => {
+            saveWriteBlocked = true;
+            onToast('Outra aba assumiu o save; salvamento bloqueado aqui');
+        },
+        onError,
+    });
+
+    let saveWriteBlocked = false;
+    let primarySaveKnownGood = false;
+    let saving = false;
+    let saveTimer = null;
+    let savePending = false;
+    let releaseLockAfterSave = false;
+    let lastSaveResult = false;
+
+    function clearSaveTimer() {
+        if (saveTimer === null) return;
+        clearTimeout(saveTimer);
+        saveTimer = null;
+    }
+
+    async function load({ reset = false } = {}) {
+        try {
+            const ownsSave = await lock.acquire();
+            if (!ownsSave) {
+                saveWriteBlocked = true;
+                console.warn('Este mundo já está aberto em outra aba; o salvamento foi desativado aqui.');
+                onToast('Mundo aberto em outra aba; salvamento desativado neste jogo');
+            }
+            if (reset) {
+                if (!ownsSave) return null;
+                await storeRequest('readwrite', store => {
+                    store.delete(saveKey);
+                    store.delete(backupKey);
+                    store.delete(rejectedKey);
+                    store.delete(importedSaveKeyFor(saveKey));
+                });
+                primarySaveKnownGood = false;
+                return null;
+            }
+
+            const data = await storeRequest('readonly', store => store.get(saveKey));
+            const valid = codec.validate(data, seed);
+            primarySaveKnownGood = Boolean(valid);
+            let rejectedSavePreserved = !data;
+
+            if (data && !valid) {
+                console.warn('Save inválido ou de outra versão: preservando o arquivo rejeitado antes de recuperar.');
+                if (ownsSave) {
+                    saveWriteBlocked = true;
+                    try {
+                        await preserveRejectedSave(storeRequest, saveKey, data);
+                        rejectedSavePreserved = true;
+                        console.warn('Save rejeitado preservado:', rejectedKey);
+                    } catch (error) {
+                        console.warn('Não foi possível arquivar o save rejeitado; ele será mantido intacto.', error);
+                    } finally {
+                        saveWriteBlocked = !lock.isOwned;
+                    }
+                }
+            }
+
+            if (valid) return valid;
+
+            const recoverFrom = async (key, label, consume = false) => {
+                const raw = await storeRequest('readonly', store => store.get(key));
+                const recovered = codec.validate(raw, seed);
+                if (!recovered) return null;
+
+                if (ownsSave && lock.isOwned && rejectedSavePreserved) {
+                    try {
+                        const restored = await lock.write(raw, { deleteKey: consume ? key : undefined });
+                        if (restored) {
+                            primarySaveKnownGood = true;
+                            saveWriteBlocked = false;
+                            onToast(`Progresso recuperado de ${label}`);
+                            console.info(`Save principal restaurado de ${label}:`, key);
+                        } else {
+                            saveWriteBlocked = true;
+                            onToast(`${label} carregada; salvamento bloqueado para proteger o mundo`);
+                        }
+                    } catch (error) {
+                        saveWriteBlocked = true;
+                        onToast(`${label} carregada, mas não foi possível restaurá-la no disco`);
+                        console.warn(`Cópia válida carregada sem substituir o save principal (${label}):`, error);
+                    }
+                } else {
+                    if (ownsSave) saveWriteBlocked = true;
+                    onToast(`${label} carregada em modo protegido`);
+                }
+                return recovered;
+            };
+
+            return await recoverFrom(importedSaveKeyFor(saveKey), 'a cópia importada', true)
+                || await recoverFrom(backupKey, 'o backup');
+        } catch (error) {
+            saveWriteBlocked = true;
+            console.warn('Falha ao ler ou proteger o save; gravações bloqueadas para evitar perda de dados:', error);
+            return null;
+        }
+    }
+
+    function requestSave(quiet, immediate = false) {
+        if (!hasWorld()) return;
+        clearSaveTimer();
+        if (!immediate && quiet) {
+            saveTimer = setTimeout(() => {
+                saveTimer = null;
+                performSave(true);
+            }, SAVE_DEBOUNCE_MS);
+            return;
+        }
+        performSave(quiet);
+    }
+
+    async function performSave(quiet) {
+        if (!hasWorld()) return false;
+        if (saving) { savePending = true; return false; }
+        if (saveWriteBlocked || !lock.isOwned) {
+            lastSaveResult = false;
+            if (!quiet) onToast('Salvamento bloqueado para proteger o mundo aberto em outra aba');
+            return false;
+        }
+
+        saving = true;
+        let saved = false;
+        try {
+            const startedAt = performance.now();
+            const data = buildSave();
+            onBuildDuration(performance.now() - startedAt);
+            const wrote = await lock.write(data, { preservePrevious: primarySaveKnownGood });
+            if (!wrote) saveWriteBlocked = true;
+            else {
+                primarySaveKnownGood = true;
+                if (!quiet) onToast('Jogo salvo');
+            }
+            saved = wrote;
+        } catch (error) {
+            onError(error);
+            if (!quiet) onToast('Falha ao salvar');
+        } finally {
+            lastSaveResult = saved;
+            saving = false;
+            if (savePending) {
+                savePending = false;
+                if (releaseLockAfterSave && (saveWriteBlocked || !lock.isOwned)) {
+                    releaseLockAfterSave = false;
+                    void lock.release();
+                } else requestSave(true, true);
+            } else if (releaseLockAfterSave) {
+                releaseLockAfterSave = false;
+                void lock.release();
+            }
+        }
+        return saved;
+    }
+
+    async function flushAndRelease(quiet = true) {
+        clearSaveTimer();
+        if (saving) {
+            savePending = true;
+            while (saving || savePending) await new Promise(resolve => setTimeout(resolve, 25));
+            if (!lastSaveResult) return false;
+            await lock.release();
+            return true;
+        }
+        const saved = await performSave(quiet);
+        if (saved) await lock.release();
+        return saved;
+    }
+
+    function flushAndReleaseOnPageHide() {
+        clearSaveTimer();
+        if (!hasWorld() || saveWriteBlocked || !lock.isOwned) {
+            void lock.release();
+            return;
+        }
+        releaseLockAfterSave = true;
+        if (saving) {
+            savePending = true;
+            return;
+        }
+        void performSave(true);
+    }
+
+    window.addEventListener('pagehide', flushAndReleaseOnPageHide);
+
+    return {
+        load,
+        requestSave,
+        saveNow: performSave,
+        flushAndRelease,
+        release: () => lock.release(),
+        get isSaving() { return saving; },
+    };
+}

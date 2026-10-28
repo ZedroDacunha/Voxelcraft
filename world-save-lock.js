@@ -98,7 +98,7 @@ export function createWorldSaveLock({
         return owned;
     }
 
-    async function write(data, { preservePrevious = false } = {}) {
+    async function write(data, { preservePrevious = false, deleteKey } = {}) {
         if (!owned) return false;
         return transact((store, lease) => {
             if (lease?.id !== tabId) return false;
@@ -107,11 +107,13 @@ export function createWorldSaveLock({
                 previous.onsuccess = () => {
                     if (previous.result !== undefined) store.put(previous.result, backupKey);
                     store.put(data, saveKey);
+                    if (deleteKey) store.delete(deleteKey);
                     store.put({ id: tabId, heartbeat: Date.now() }, lockKey);
                 };
                 return true;
             }
             store.put(data, saveKey);
+            if (deleteKey) store.delete(deleteKey);
             store.put({ id: tabId, heartbeat: Date.now() }, lockKey);
             return true;
         }).then(wrote => {

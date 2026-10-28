@@ -9,8 +9,7 @@ import { stackHtml, updateSlotElement } from './inventory-view.js';
 import { createRecipeBook } from './inventory-recipe-book.js';
 import { createTextureTools } from './world-textures.js';
 import { createWorldSaveCodec, WORLD_SAVE_VERSION } from './world-save-codec.js';
-import { createWorldSaveLock } from './world-save-lock.js';
-import { preserveRejectedSave, rejectedSaveKeyFor, saveBackupKeyFor } from './world-save-recovery.js';
+import { createWorldSaveManager } from './world-save-manager.js';
 import { configureTorchFlicker, configureTorchFlameAnimation, updateWorldLightingEffects } from './world-lighting-effects.js';
 import { FurnaceSmokeSystem } from './world-furnace-effects.js';
 import { LEGACY_MINERAL_ITEM_MAP } from './world-minerals.js';
@@ -2993,9 +2992,6 @@ function updatePhysics(dt) {
 // 10B. SALVAMENTO (IndexedDB, um registro por seed)
 // =====================================================================
 const SAVE_KEY = ACTIVE_WORLD.saveKey;
-const SAVE_BACKUP_KEY = saveBackupKeyFor(SAVE_KEY);
-const SAVE_REJECTED_KEY = rejectedSaveKeyFor(SAVE_KEY);
-const SAVE_TAB_ID = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const saveCodec = createWorldSaveCodec({
     ID, ITEMS, BLOCKS, LEGACY_MINERAL_ITEM_MAP, Inventory, CHUNK_SIZE, WORLD_HEIGHT,
     MAX_HEALTH, MAX_HUNGER, MAX_BREATH, START_TIME, DEATH_DROP_TTL,
@@ -3017,104 +3013,26 @@ function buildSave() {
     });
 }
 
-let saveWriteBlocked = false;
-let primarySaveKnownGood = false;
-const saveLock = createWorldSaveLock({
+const saveManager = createWorldSaveManager({
     openDatabase: dbOpen,
+    storeRequest: dbRun,
     saveKey: SAVE_KEY,
-    backupKey: SAVE_BACKUP_KEY,
-    tabId: SAVE_TAB_ID,
-    onLost: () => {
-        saveWriteBlocked = true;
-        showToast('Outra aba assumiu o save; salvamento bloqueado aqui');
-    },
-    onError: error => console.warn('Falha no bloqueio do save:', error),
+    tabId: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    seed: SEED,
+    codec: saveCodec,
+    buildSave,
+    hasWorld: () => Boolean(world),
+    onToast: showToast,
+    onBuildDuration: duration => { perf.buildMs = duration; },
+    onError: error => console.warn('Falha ao salvar:', error),
 });
 
-window.addEventListener('pagehide', () => { void saveLock.release(); });
-
-async function loadGame() {
-    try {
-        const ownsSave = await saveLock.acquire();
-        if (!ownsSave) {
-            saveWriteBlocked = true;
-            console.warn('Este mundo já está aberto em outra aba; o salvamento foi desativado aqui.');
-            showToast('Mundo aberto em outra aba; salvamento desativado neste jogo');
-        }
-        if (new URLSearchParams(location.search).has('reset')) {
-            if (!ownsSave) return null;
-            await dbRun('readwrite', s => s.delete(SAVE_KEY));
-            return null;
-        }
-        const data = await dbRun('readonly', s => s.get(SAVE_KEY));
-        const ok = saveCodec.validate(data, SEED);
-        primarySaveKnownGood = Boolean(ok);
-        if (data && !ok) {
-            console.warn('Save inválido ou de outra versão: preservando o arquivo rejeitado.');
-            if (ownsSave) {
-                saveWriteBlocked = true;
-                await preserveRejectedSave(dbRun, SAVE_KEY, data);
-                saveWriteBlocked = false;
-                console.warn('Save rejeitado preservado:', SAVE_REJECTED_KEY);
-            }
-        }
-        return ok;
-    } catch (e) {
-        saveWriteBlocked = true;
-        console.warn('Falha ao ler ou proteger o save; gravações bloqueadas para evitar perda de dados:', e);
-        return null;
-    }
-}
-
-const SAVE_DEBOUNCE_MS = 5000;
-let saving = false, saveTimer = null, savePending = false;
-
 function saveGame(quiet, immediate = false) {
-    if (!world) return;
-    if (saveTimer !== null) {
-        clearTimeout(saveTimer);
-        saveTimer = null;
-    }
-    if (!immediate && quiet) {
-        saveTimer = setTimeout(() => {
-            saveTimer = null;
-            performSaveGame(true);
-        }, SAVE_DEBOUNCE_MS);
-        return;
-    }
-    performSaveGame(quiet);
+    saveManager.requestSave(quiet, immediate);
 }
 
-async function performSaveGame(quiet) {
-    if (!world) return false;
-    if (saving) { savePending = true; return; }
-    if (saveWriteBlocked || !saveLock.isOwned) {
-        if (!quiet) showToast('Salvamento bloqueado para proteger o mundo aberto em outra aba');
-        return false;
-    }
-    saving = true;
-    let saved = false;
-    try {
-        const t0 = performance.now();
-        const data = buildSave();
-        perf.buildMs = performance.now() - t0;
-        const wrote = await saveLock.write(data, { preservePrevious: primarySaveKnownGood });
-        if (!wrote) {
-            saveWriteBlocked = true;
-        } else {
-            primarySaveKnownGood = true;
-            if (!quiet) showToast('Jogo salvo');
-        }
-        saved = wrote;
-    } catch (e) { console.warn('Falha ao salvar:', e); if (!quiet) showToast('Falha ao salvar'); }
-    finally {
-        saving = false;
-        if (savePending) {
-            savePending = false;
-            saveGame(true, true);
-        }
-    }
-    return saved;
+function loadGame() {
+    return saveManager.load({ reset: new URLSearchParams(location.search).has('reset') });
 }
 
 // =====================================================================
@@ -3287,15 +3205,12 @@ async function init() {
     btnWorlds.addEventListener('click', async () => {
         btnWorlds.disabled = true;
         btnWorlds.textContent = 'Salvando mundo...';
-        if (saveTimer !== null) { clearTimeout(saveTimer); saveTimer = null; }
-        while (saving) await new Promise(resolve => setTimeout(resolve, 25));
-        const saved = await performSaveGame(false);
+        const saved = await saveManager.flushAndRelease(false);
         if (!saved) {
             btnWorlds.disabled = false;
             btnWorlds.textContent = 'Voltar à seleção de mundos';
             return;
         }
-        await saveLock.release();
         location.reload();
     });
     controls.addEventListener('lock', () => { menu.style.display = 'none'; });
@@ -3510,7 +3425,7 @@ function animate() {
     if (cpu > perf.worst) perf.worst = cpu;
     if (rawDt > 0.06) {
         perf.long++;
-        perf.lastLong = `${(rawDt * 1000).toFixed(0)} ms (CPU ${cpu.toFixed(0)} ms, chunks gerados ${world.frameGen ?? 0}, malhas ${world.frameMesh ?? 0}, malha ${world.lastMeshMs?.toFixed(1) ?? '0'} ms, luz ${world.lastLightMs?.toFixed(1) ?? '0'} ms, salvando: ${saving ? 'sim' : 'não'})`;
+        perf.lastLong = `${(rawDt * 1000).toFixed(0)} ms (CPU ${cpu.toFixed(0)} ms, chunks gerados ${world.frameGen ?? 0}, malhas ${world.frameMesh ?? 0}, malha ${world.lastMeshMs?.toFixed(1) ?? '0'} ms, luz ${world.lastLightMs?.toFixed(1) ?? '0'} ms, salvando: ${saveManager.isSaving ? 'sim' : 'não'})`;
     }
     if (perf.t >= 1) {
         perf.avg = perf.sum / perf.frames; perf.worstShown = perf.worst;

@@ -1,5 +1,6 @@
 export const saveBackupKeyFor = saveKey => `${saveKey}-backup`;
 export const rejectedSaveKeyFor = saveKey => `${saveKey}-rejected`;
+export const importedSaveKeyFor = saveKey => `${saveKey}-imported`;
 
 // Guarda o primeiro save rejeitado sem substituir o último backup válido.
 export async function preserveRejectedSave(storeRequest, saveKey, data) {
