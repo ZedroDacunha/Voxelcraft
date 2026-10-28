@@ -3,6 +3,7 @@
 export function createWorldSaveLock({
     openDatabase,
     saveKey,
+    backupKey,
     tabId,
     ttl = 30000,
     heartbeatMs = 5000,
@@ -97,10 +98,19 @@ export function createWorldSaveLock({
         return owned;
     }
 
-    async function write(data) {
+    async function write(data, { preservePrevious = false } = {}) {
         if (!owned) return false;
         return transact((store, lease) => {
             if (lease?.id !== tabId) return false;
+            if (preservePrevious && backupKey) {
+                const previous = store.get(saveKey);
+                previous.onsuccess = () => {
+                    if (previous.result !== undefined) store.put(previous.result, backupKey);
+                    store.put(data, saveKey);
+                    store.put({ id: tabId, heartbeat: Date.now() }, lockKey);
+                };
+                return true;
+            }
             store.put(data, saveKey);
             store.put({ id: tabId, heartbeat: Date.now() }, lockKey);
             return true;

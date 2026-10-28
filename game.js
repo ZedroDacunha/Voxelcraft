@@ -8,7 +8,9 @@ import { craftConsume, invCollectSame, invLeftClick, invQuickMove, invQuickMoveT
 import { stackHtml, updateSlotElement } from './inventory-view.js';
 import { createRecipeBook } from './inventory-recipe-book.js';
 import { createTextureTools } from './world-textures.js';
+import { createWorldSaveCodec, WORLD_SAVE_VERSION } from './world-save-codec.js';
 import { createWorldSaveLock } from './world-save-lock.js';
+import { preserveRejectedSave, rejectedSaveKeyFor, saveBackupKeyFor } from './world-save-recovery.js';
 import { configureTorchFlicker, configureTorchFlameAnimation, updateWorldLightingEffects } from './world-lighting-effects.js';
 import { FurnaceSmokeSystem } from './world-furnace-effects.js';
 import { LEGACY_MINERAL_ITEM_MAP } from './world-minerals.js';
@@ -2991,140 +2993,36 @@ function updatePhysics(dt) {
 // 10B. SALVAMENTO (IndexedDB, um registro por seed)
 // =====================================================================
 const SAVE_KEY = ACTIVE_WORLD.saveKey;
-const SAVE_BACKUP_KEY = SAVE_KEY + '-backup';
-const SAVE_VERSION = 1;
+const SAVE_BACKUP_KEY = saveBackupKeyFor(SAVE_KEY);
+const SAVE_REJECTED_KEY = rejectedSaveKeyFor(SAVE_KEY);
 const SAVE_TAB_ID = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-const packStack = (s) => s ? { id: s.id, count: s.count, damage: s.damage || 0 } : null;
+const saveCodec = createWorldSaveCodec({
+    ID, ITEMS, BLOCKS, LEGACY_MINERAL_ITEM_MAP, Inventory, CHUNK_SIZE, WORLD_HEIGHT,
+    MAX_HEALTH, MAX_HUNGER, MAX_BREATH, START_TIME, DEATH_DROP_TTL,
+    inventorySize: inventory.slots.length,
+    floorDiv, idx, chunkKey, parseBlockFacings, version: WORLD_SAVE_VERSION,
+});
 
 function buildSave() {
-    const edits = [];
-    for (const [key, m] of world.edits) {
-        let arr = world.editCache.get(key);
-        if (!arr) {
-            arr = new Uint16Array(m.size * 2);
-            let k = 0;
-            for (const [i, t] of m) { arr[k++] = i; arr[k++] = t; }
-            world.editCache.set(key, arr);
-        }
-        edits.push([key, arr]);
-    }
-    return {
-        v: SAVE_VERSION, seed: SEED, time: Date.now(),
+    return saveCodec.build({
+        seed: SEED,
         worldTime,
-        blockFacings: world.blockFacings.serialize(WORLD_HEIGHT),
+        world,
         player: { x: player.pos.x, y: player.pos.y, z: player.pos.z, health, hunger, saturation, breath },
         selectedSlot,
-        inventory: inventory.slots.map(packStack),
-        drops: itemEntities.filter(e => e.age < e.ttl).map(e => ({
-            id: e.id, count: e.count, damage: e.damage || 0, x: e.pos.x, y: e.pos.y, z: e.pos.z, age: e.age, ttl: e.ttl,
-        })),
-        chests: Array.from(chests, ([k, c]) => [k, c.inv.slots.map(packStack)]),
-        furnaces: Array.from(furnaces, ([k, f]) => [k, {
-            slots: f.inv.slots.map(packStack), burn: f.burn, burnMax: f.burnMax, cook: f.cook,
-        }]),
-        edits,
-    };
-}
-
-function sanitizeStack(s) {
-    if (!s) return null;
-    if (s.id === ID.WATER) return null; // Remove a água dos saves antigos sem invalidar o mundo
-    const id = LEGACY_MINERAL_ITEM_MAP[s.id] ?? s.id;
-    const it = ITEMS[id];
-    if (!it || !Number.isInteger(s.count) || s.count < 1 || s.count > it.maxStack) {
-        console.warn('Pilha inválida descartada durante o carregamento do save:', s);
-        return null;
-    }
-    const st = { id, count: s.count };
-    if (it.maxDurability && s.damage > 0 && s.damage < it.maxDurability) st.damage = s.damage;
-    return st;
-}
-
-function parseChests(list) {
-    const out = new Map();
-    if (!Array.isArray(list)) return out;
-    for (const entry of list) {
-        if (!Array.isArray(entry)) continue;
-        const [k, slots] = entry;
-        if (typeof k !== 'string' || !/^-?\d+,\d+,-?\d+$/.test(k) || !Array.isArray(slots) || slots.length !== 27) continue;
-        const inv = new Inventory(27);
-        inv.slots = slots.map(st => { try { return sanitizeStack(st); } catch (e) { return null; } });
-        out.set(k, { inv });
-    }
-    return out;
-}
-
-function parseDrops(list) {
-    const out = [];
-    if (!Array.isArray(list)) return out;
-    for (const e of list) {
-        const id = e && (LEGACY_MINERAL_ITEM_MAP[e.id] ?? e.id);
-        const it = e && ITEMS[id];
-        if (!it || !Number.isInteger(e.count) || e.count < 1 || e.count > it.maxStack) continue;
-        if (![e.x, e.y, e.z].every(Number.isFinite)) continue;
-        const dmg = it.maxDurability && e.damage > 0 && e.damage < it.maxDurability ? e.damage : 0;
-        out.push({ id, count: e.count, damage: dmg, x: e.x, y: e.y, z: e.z,
-                   age: Math.max(0, +e.age || 0), ttl: Math.min(DEATH_DROP_TTL, Math.max(1, +e.ttl || 300)) });
-    }
-    return out;
-}
-
-function validateSave(d) {
-    try {
-        if (!d || d.v !== SAVE_VERSION || d.seed !== SEED) return null;
-        const p = d.player;
-        if (![p.x, p.y, p.z, p.health, p.hunger].every(Number.isFinite)) return null;
-        if (p.breath !== undefined && !Number.isFinite(p.breath)) return null;
-        if (!Array.isArray(d.inventory) || d.inventory.length !== inventory.slots.length) return null;
-        const inv = d.inventory.map(sanitizeStack);
-
-        const edits = new Map();
-        const maxIdx = CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT;
-        for (const [key, list] of d.edits) {
-            const flat = Array.isArray(list[0]) ? list.flat() : list;
-            if (flat.length % 2) throw new Error('lista de edições inválida');
-            const m = new Map();
-            for (let k = 0; k < flat.length; k += 2) {
-                const i = flat[k], t = flat[k + 1];
-                if (!Number.isInteger(i) || i < 0 || i >= maxIdx) throw new Error('índice inválido');
-                if (t !== 0 && !BLOCKS[t]) throw new Error('bloco inválido');
-                m.set(i, t);
-            }
-            edits.set(String(key), m);
-        }
-
-        const blockFacings = parseBlockFacings(d.blockFacings, WORLD_HEIGHT, (x, y, z) => {
-            const cx = floorDiv(x, CHUNK_SIZE), cz = floorDiv(z, CHUNK_SIZE);
-            const localIndex = idx(x - cx * CHUNK_SIZE, y, z - cz * CHUNK_SIZE);
-            const type = edits.get(chunkKey(cx, cz))?.get(localIndex);
-            return BLOCKS[type]?.tiles.front !== undefined;
-        });
-
-        const furn = new Map();
-        for (const [k, f] of (d.furnaces || [])) {
-            if (!/^-?\d+,\d+,-?\d+$/.test(k) || !Array.isArray(f.slots) || f.slots.length !== 3) throw new Error('forno inválido');
-            const finv = new Inventory(3);
-            finv.slots = f.slots.map(sanitizeStack);
-            furn.set(k, { inv: finv, burn: Math.max(0, +f.burn || 0), burnMax: Math.max(0, +f.burnMax || 0), cook: Math.max(0, +f.cook || 0) });
-        }
-
-        return {
-            player: { x: p.x, y: p.y, z: p.z, health: Math.min(MAX_HEALTH, Math.max(1, p.health)), hunger: Math.min(MAX_HUNGER, Math.max(0, p.hunger)),
-                      saturation: Math.min(MAX_HUNGER, Math.max(0, Number.isFinite(p.saturation) ? p.saturation : 5)),
-                      breath: Math.min(MAX_BREATH, Math.max(0, Number.isFinite(p.breath) ? p.breath : MAX_BREATH)) },
-            selectedSlot: d.selectedSlot >= 0 && d.selectedSlot < 9 ? d.selectedSlot | 0 : 0,
-            inventory: inv, edits, blockFacings,
-            furnaces: furn, drops: parseDrops(d.drops), chests: parseChests(d.chests),
-            worldTime: Number.isFinite(d.worldTime) ? ((d.worldTime % 1) + 1) % 1 : START_TIME,
-        };
-    } catch (e) { return null; }
+        inventory: inventory.slots,
+        drops: itemEntities,
+        chests,
+        furnaces,
+    });
 }
 
 let saveWriteBlocked = false;
+let primarySaveKnownGood = false;
 const saveLock = createWorldSaveLock({
     openDatabase: dbOpen,
     saveKey: SAVE_KEY,
+    backupKey: SAVE_BACKUP_KEY,
     tabId: SAVE_TAB_ID,
     onLost: () => {
         saveWriteBlocked = true;
@@ -3149,14 +3047,15 @@ async function loadGame() {
             return null;
         }
         const data = await dbRun('readonly', s => s.get(SAVE_KEY));
-        const ok = validateSave(data);
+        const ok = saveCodec.validate(data, SEED);
+        primarySaveKnownGood = Boolean(ok);
         if (data && !ok) {
-            console.warn('Save inválido ou de outra versão: criando backup antes de continuar.');
+            console.warn('Save inválido ou de outra versão: preservando o arquivo rejeitado.');
             if (ownsSave) {
                 saveWriteBlocked = true;
-                await dbRun('readwrite', s => s.put(data, SAVE_BACKUP_KEY));
+                await preserveRejectedSave(dbRun, SAVE_KEY, data);
                 saveWriteBlocked = false;
-                console.warn('Backup do save anterior criado:', SAVE_BACKUP_KEY);
+                console.warn('Save rejeitado preservado:', SAVE_REJECTED_KEY);
             }
         }
         return ok;
@@ -3199,10 +3098,13 @@ async function performSaveGame(quiet) {
         const t0 = performance.now();
         const data = buildSave();
         perf.buildMs = performance.now() - t0;
-        const wrote = await saveLock.write(data);
+        const wrote = await saveLock.write(data, { preservePrevious: primarySaveKnownGood });
         if (!wrote) {
             saveWriteBlocked = true;
-        } else if (!quiet) showToast('Jogo salvo');
+        } else {
+            primarySaveKnownGood = true;
+            if (!quiet) showToast('Jogo salvo');
+        }
         saved = wrote;
     } catch (e) { console.warn('Falha ao salvar:', e); if (!quiet) showToast('Falha ao salvar'); }
     finally {

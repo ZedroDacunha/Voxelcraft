@@ -1,4 +1,5 @@
 import { openDatabase, storeRequest, STORE_NAME } from './world-storage.js';
+import { rejectedSaveKeyFor, saveBackupKeyFor } from './world-save-recovery.js';
 
 import('./menu-background.js').catch(error => {
     console.warn('Panorama animado indisponível; usando o cenário estático.', error);
@@ -186,7 +187,8 @@ async function deleteWorld(world) {
                 const lock = request.result;
                 if (lock && Number.isFinite(lock.heartbeat) && Date.now() - lock.heartbeat <= LOCK_TTL) return;
                 store.delete(world.saveKey);
-                store.delete(`${world.saveKey}-backup`);
+                store.delete(saveBackupKeyFor(world.saveKey));
+                store.delete(rejectedSaveKeyFor(world.saveKey));
                 store.delete(lockKey);
                 store.delete(META_PREFIX + world.id);
                 removed = true;
