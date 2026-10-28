@@ -225,6 +225,10 @@ function renderWorldOptions(world) {
         worldOptionsDialog.close();
         openWorldDialog(world);
     }));
+
+    const dangerActions = addSaveGroup('Área de risco', 'Excluir remove o mundo e todos os seus saves deste navegador.', []);
+    dangerActions.parentElement.classList.add('is-danger');
+    dangerActions.append(makeAction('Excluir mundo', 'delete', () => deleteWorld(world)));
 }
 
 function openWorldOptions(world) {
@@ -258,7 +262,6 @@ async function renderWorlds() {
         actions.className = 'world-card-actions';
         actions.append(makeAction('Jogar', 'play', () => launchWorld(world)));
         actions.append(makeAction('Opções do mundo', '', () => openWorldOptions(world)));
-        actions.append(makeAction('Excluir', 'delete', () => deleteWorld(world)));
         card.append(info, actions);
         list.append(card);
     }
@@ -360,7 +363,10 @@ async function deleteWorld(world) {
             showError('Este mundo está aberto em outra aba. Feche essa sessão antes de excluir.');
             return;
         }
+        worldOptionsDialog.close();
         await renderWorlds();
+        document.getElementById('btn-create-world').focus();
+        showNotice(`Mundo “${world.name}” excluído.`);
     } catch (error) {
         showError(error.message || 'Não foi possível excluir o mundo.');
     }
