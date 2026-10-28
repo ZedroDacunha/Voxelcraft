@@ -15,6 +15,12 @@ export function hash2(x, z, s) {
     return (h >>> 0) / 4294967296;
 }
 
+export function clamp01(value) { return Math.max(0, Math.min(1, value)); }
+export function smoothstep(edge0, edge1, value) {
+    const t = clamp01((value - edge0) / (edge1 - edge0));
+    return t * t * (3 - 2 * t);
+}
+
 export class Noise2D {
     constructor(seed) {
         const rnd = mulberry32(seed);

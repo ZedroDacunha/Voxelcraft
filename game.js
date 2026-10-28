@@ -1,7 +1,9 @@
 
 import { openDatabase as dbOpen, storeRequest as dbRun } from './world-storage.js';
-import { hash2, mulberry32, Noise2D } from './world-math.js';
+import { clamp01, hash2, mulberry32, Noise2D, smoothstep } from './world-math.js';
 import { ATLAS_COLUMNS, BLOCKS, FUEL, ID, ITEMS, matchRecipe, RECIPES, SMELT, TILE, TILE_PX } from './world-catalog.js';
+import { findSpawn, TerrainGenerator } from './world-terrain.js';
+import { createWaterSystemClass } from './world-water.js';
 
 async function loadThreeModules() {
     const providers = [
@@ -90,139 +92,11 @@ const HELD_BLOCK_POS = [0.03, 0.07, -0.04];
 // =====================================================================
 // 2. SISTEMA DE ÁGUA (catálogo em world-catalog.js)
 // =====================================================================
-class WaterSystem {
-    static get surfaceHeight() { return 0.88; }
-    static isBlock(type) { return BLOCKS[type]?.render === 'liquid'; }
-    static flowBlockForLevel(level) {
-        const clamped = Math.max(1, Math.min(7, Math.round(level)));
-        return ID.WATER_FLOW_1 + clamped - 1;
-    }
-    static surfaceHeightFor(type, aboveType) {
-        const block = BLOCKS[type];
-        if (block?.falling) return 1;
-        if (block?.flowing) return block.waterLevel;
-        return aboveType === 0 ? WaterSystem.surfaceHeight : 1;
-    }
+const WaterSystem = createWaterSystemClass({
+    THREE, BLOCKS, ID, WORLD_HEIGHT, onSubmersionChange: () => updateBreathUI(),
+});
 
-    constructor(atlas) {
-        this.material = new THREE.MeshLambertMaterial({
-            map: atlas, transparent: true, opacity: 0.75, depthWrite: false, side: THREE.DoubleSide, vertexColors: true
-        });
-        this.headInWater = false;
-        this.feetInWater = false;
-        this.flowQueue = [];
-        this.queuedCells = new Set();
-        this.flowTimer = 0;
-    }
 
-    isAdjacent(world, x, y, z) {
-        return WaterSystem.isBlock(world.getBlock(x + 1, y, z)) ||
-            WaterSystem.isBlock(world.getBlock(x - 1, y, z)) ||
-            WaterSystem.isBlock(world.getBlock(x, y + 1, z)) ||
-            WaterSystem.isBlock(world.getBlock(x, y - 1, z)) ||
-            WaterSystem.isBlock(world.getBlock(x, y, z + 1)) ||
-            WaterSystem.isBlock(world.getBlock(x, y, z - 1));
-    }
-
-    updateSubmersion(world, player) {
-        const wasHeadInWater = this.headInWater;
-        const px = Math.floor(player.pos.x);
-        const pz = Math.floor(player.pos.z);
-        const headY = Math.floor(player.pos.y + player.eye);
-        const feetY = Math.floor(player.pos.y);
-        this.headInWater = WaterSystem.isBlock(world.getBlock(px, headY, pz));
-        this.feetInWater = WaterSystem.isBlock(world.getBlock(px, feetY, pz));
-        if (this.headInWater !== wasHeadInWater) updateBreathUI();
-    }
-
-    enqueue(x, y, z) {
-        if (y < 0 || y >= WORLD_HEIGHT || this.flowQueue.length >= 4096) return;
-        const key = `${x},${y},${z}`;
-        if (this.queuedCells.has(key)) return;
-        this.queuedCells.add(key);
-        this.flowQueue.push({ x, y, z, key });
-    }
-
-    activate(world, x, y, z) {
-        const cells = [[0,0,0], [1,0,0], [-1,0,0], [0,1,0], [0,-1,0], [0,0,1], [0,0,-1]];
-        for (const [dx, dy, dz] of cells) {
-            const px = x + dx, py = y + dy, pz = z + dz;
-            if (WaterSystem.isBlock(world.getBlock(px, py, pz))) this.enqueue(px, py, pz);
-        }
-    }
-
-    hasNearbySource(world, start, maxSteps = 7) {
-        const queue = [{ x: start.x, y: start.y, z: start.z, steps: 0 }];
-        const visited = new Set([`${start.x},${start.y},${start.z}`]);
-        const directions = [[1,0,0], [-1,0,0], [0,1,0], [0,-1,0], [0,0,1], [0,0,-1]];
-        for (let i = 0; i < queue.length; i++) {
-            const cell = queue[i];
-            const block = BLOCKS[world.getBlock(cell.x, cell.y, cell.z)];
-            if (block?.waterSource) return true;
-            if (cell.steps >= maxSteps) continue;
-            for (const [dx, dy, dz] of directions) {
-                const x = cell.x + dx, y = cell.y + dy, z = cell.z + dz;
-                if (y < 0 || y >= WORLD_HEIGHT) continue;
-                const key = `${x},${y},${z}`;
-                const nextSteps = cell.steps + (dy === 0 ? 1 : 0);
-                if (visited.has(key) || nextSteps > maxSteps || !WaterSystem.isBlock(world.getBlock(x, y, z))) continue;
-                visited.add(key);
-                queue.push({ x, y, z, steps: nextSteps });
-            }
-        }
-        return false;
-    }
-
-    updateFlow(world, dt) {
-        this.flowTimer += dt;
-        if (this.flowTimer < 0.18) return;
-        this.flowTimer = 0;
-
-        const directions = [[1,0], [-1,0], [0,1], [0,-1]];
-        for (let step = 0; step < 8 && this.flowQueue.length; step++) {
-            const cell = this.flowQueue.shift();
-            this.queuedCells.delete(cell.key);
-            const type = world.getBlock(cell.x, cell.y, cell.z);
-            const block = BLOCKS[type];
-            if (!block || block.render !== 'liquid') continue;
-
-            // Fontes permanecem; água de fluxo sem fonte próxima evapora.
-            if (!block.waterSource && !this.hasNearbySource(world, cell, 7)) {
-                if (world.setBlock(cell.x, cell.y, cell.z, 0)) {
-                    for (const [dx, dy, dz] of [[1,0,0], [-1,0,0], [0,1,0], [0,-1,0], [0,0,1], [0,0,-1]]) {
-                        this.enqueue(cell.x + dx, cell.y + dy, cell.z + dz);
-                    }
-                }
-                continue;
-            }
-
-            const level = block.waterSource || block.falling ? 8 : block.flowLevel;
-            const belowY = cell.y - 1;
-            if (belowY > 0 && world.getBlock(cell.x, belowY, cell.z) === 0) {
-                if (world.setBlock(cell.x, belowY, cell.z, ID.WATER_FALL)) {
-                    this.enqueue(cell.x, belowY, cell.z);
-                    continue;
-                }
-            }
-            if (level <= 1) continue;
-
-            const nextType = WaterSystem.flowBlockForLevel(level - 1);
-            for (const [dx, dz] of directions) {
-                const x = cell.x + dx, z = cell.z + dz;
-                const adjacentType = world.getBlock(x, cell.y, z);
-                const adjacent = BLOCKS[adjacentType];
-                if (adjacentType !== 0 && !(adjacent?.flowing && adjacent.flowLevel < level - 1)) continue;
-                if (world.setBlock(x, cell.y, z, nextType)) this.enqueue(x, cell.y, z);
-            }
-        }
-    }
-
-    update(world, dt, now) {
-        const pulse = Math.sin(now * 0.0017);
-        this.material.color.setRGB(0.96 + pulse * 0.025, 0.98 + pulse * 0.02, 1);
-        this.updateFlow(world, dt);
-    }
-}
 
 // =====================================================================
 // 3. TEXTURAS (ATLAS ÚNICO 32x32 POR TILE, DETERMINÍSTICO)
@@ -547,7 +421,7 @@ function createNoiseTexture(rgb, seed, jitter = 12) {
 }
 
 // =====================================================================
-// 4. RUÍDO COM SEED E GERADOR DE TERRENO
+// 4. CONFIGURAÇÃO DE GERAÇÃO E ÍNDICES DE CHUNK
 // =====================================================================
 const idx = (lx, y, lz) => lx + lz * CHUNK_SIZE + y * CHUNK_SIZE * CHUNK_SIZE;
 const chunkKey = (cx, cz) => `${cx},${cz}`;
@@ -556,171 +430,10 @@ const floorDiv = (a, b) => Math.floor(a / b);
 const BIOME = Object.freeze({ PLAINS: 0, FOREST: 1, DESERT: 2, ROCKY: 3 });
 const TREE_CHANCE_FOREST = 0.035;
 const TREE_CHANCE_PLAINS = 0.008;
+const TERRAIN_CONFIG = Object.freeze({
+    CHUNK_SIZE, WORLD_HEIGHT, WATER_LEVEL, ID, BIOME, TREE_CHANCE_FOREST, TREE_CHANCE_PLAINS,
+});
 
-class TerrainGenerator {
-
-    constructor(seed) {
-        this.seed = seed;
-        this.continents = new Noise2D(seed);
-        this.hills = new Noise2D(seed + 1013);
-        this.temperature = new Noise2D(seed + 2131);
-        this.moisture = new Noise2D(seed + 3769);
-        this.caves = new Noise2D(seed + 5021);
-        this.caveBranches = new Noise2D(seed + 6073);
-        this.rivers = new Noise2D(seed + 7109);
-    }
-    isCave(wx, y, wz) {
-        const tunnel = this.caves.noise((wx + y * 0.7) * 0.045, (wz - y * 0.38) * 0.045);
-        const branch = this.caveBranches.noise((wx - y * 0.42) * 0.045, (wz + y * 0.65) * 0.045);
-        return Math.abs(tunnel) < 0.06 && Math.abs(branch) < 0.06;
-    }
-    biomeAt(wx, wz) {
-        const temperature = this.temperature.fbm(wx * 0.002, wz * 0.002, 2);
-        const moisture = this.moisture.fbm(wx * 0.0024, wz * 0.0024, 2);
-        if (temperature > 0.12 && moisture < -0.05) return BIOME.DESERT;
-        if (temperature < -0.14) return BIOME.ROCKY;
-        if (moisture > 0.10) return BIOME.FOREST;
-        return BIOME.PLAINS;
-    }
-    baseHeightAt(wx, wz) {
-        const c = this.continents.fbm(wx * 0.006, wz * 0.006, 4);
-        const h = this.hills.fbm(wx * 0.03, wz * 0.03, 3);
-        const plateau = smoothstep(0.1, 0.8, c) * 14;
-        return Math.max(3, Math.min(WORLD_HEIGHT - 4, 27 + c * 9 + h * 4 + plateau));
-    }
-    riverStrengthAt(wx, wz) {
-        const distance = Math.abs(this.rivers.noise(wx * 0.015, wz * 0.015));
-        return 1 - smoothstep(0.018, 0.04, distance);
-    }
-    heightFrom(baseHeight, riverStrength) {
-        const naturalTop = Math.floor(baseHeight);
-        const riverbed = Math.max(3, Math.min(naturalTop - 1, Math.max(WATER_LEVEL - 1, naturalTop - 3)));
-        const height = baseHeight - (baseHeight - riverbed) * riverStrength;
-        return Math.max(3, Math.min(WORLD_HEIGHT - 4, Math.floor(height)));
-    }
-    heightAt(wx, wz) {
-        return this.heightFrom(this.baseHeightAt(wx, wz), this.riverStrengthAt(wx, wz));
-    }
-    fill(chunk) {
-        const ox = chunk.cx * CHUNK_SIZE, oz = chunk.cz * CHUNK_SIZE;
-        const heights = new Int16Array(CHUNK_SIZE * CHUNK_SIZE);
-        const biomes = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
-        for (let lx = 0; lx < CHUNK_SIZE; lx++) {
-            for (let lz = 0; lz < CHUNK_SIZE; lz++) {
-                const wx = ox + lx, wz = oz + lz;
-                const baseHeight = this.baseHeightAt(wx, wz);
-                const riverStrength = this.riverStrengthAt(wx, wz);
-                const h = this.heightFrom(baseHeight, riverStrength);
-                const column = lx + lz * CHUNK_SIZE;
-                const biome = this.biomeAt(wx, wz);
-                heights[column] = h;
-                biomes[column] = biome;
-                
-                // Terreno sólido
-                for (let y = 0; y <= h; y++) {
-                    let type;
-                    if (y === 0) type = ID.STONE;
-                    else if (y === h) {
-                        type = (h <= WATER_LEVEL + 1 || biome === BIOME.DESERT) ? ID.SAND :
-                            (biome === BIOME.ROCKY ? ID.STONE : ID.GRASS);
-                    }
-                    else if (y >= h - 3) {
-                        type = (h <= WATER_LEVEL + 1 || biome === BIOME.DESERT) ? ID.SAND :
-                            (biome === BIOME.ROCKY ? ID.STONE : ID.DIRT);
-                    }
-                    else {
-                        type = ID.STONE;
-                        const ore = hash2(ox + lx + y * 31, oz + lz - y * 17, this.seed + 91);
-                        if (y < 18 && ore < 0.004) type = ID.DIAMOND_ORE;
-                        else if (y < 28 && ore < 0.010) type = ID.GOLD_ORE;
-                        else if (y < 42 && ore < 0.025) type = ID.IRON_ORE;
-                        else if (ore < 0.050) type = ID.COAL_ORE;
-                    }
-                    if (type === ID.STONE && y >= 6 && y <= h - 4 && this.isCave(wx, y, wz)) type = 0;
-                    chunk.data[idx(lx, y, lz)] = type;
-                }
-                
-                const riverWaterTop = riverStrength > 0.72 ? Math.max(WATER_LEVEL, Math.floor(baseHeight) - 2) : WATER_LEVEL;
-                if (h < riverWaterTop) {
-                    for (let y = h + 1; y <= riverWaterTop; y++) {
-                        const isShallowChannel = riverStrength > 0.72 && riverWaterTop > WATER_LEVEL && y === riverWaterTop;
-                        const channelLevel = 7;
-                        chunk.data[idx(lx, y, lz)] = isShallowChannel
-                            ? WaterSystem.flowBlockForLevel(channelLevel)
-                            : ID.WATER;
-                    }
-                }
-
-                if (h > chunk.maxY) chunk.maxY = h;
-                if (riverWaterTop > chunk.maxY) chunk.maxY = riverWaterTop;
-            }
-        }
-        this.plantTrees(chunk, heights, biomes, ox, oz);
-    }
-    plantTrees(chunk, heights, biomes, ox, oz) {
-        const set = (lx, y, lz, t) => {
-            if (y < 0 || y >= WORLD_HEIGHT) return;
-            const i = idx(lx, y, lz);
-            if (chunk.data[i] === 0) { chunk.data[i] = t; if (y > chunk.maxY) chunk.maxY = y; }
-        };
-        for (let lx = 2; lx <= 13; lx++) {
-            for (let lz = 2; lz <= 13; lz++) {
-                const wx = ox + lx, wz = oz + lz;
-                if (Math.abs(wx) < 4 && Math.abs(wz) < 4) continue;
-                const column = lx + lz * CHUNK_SIZE;
-                const biome = biomes[column];
-                if (biome === BIOME.DESERT || biome === BIOME.ROCKY) continue;
-                const treeChance = biome === BIOME.FOREST ? TREE_CHANCE_FOREST : TREE_CHANCE_PLAINS;
-                if (hash2(wx, wz, this.seed) > treeChance) continue;
-                const h = heights[column];
-                
-                if (h <= WATER_LEVEL + 1) continue; // Sem árvores debaixo d'água ou nas praias
-                if (chunk.data[idx(lx, h + 1, lz)] === ID.WATER) continue;
-                
-                const th = 4 + Math.floor(hash2(wx, wz, this.seed + 7) * 3);
-                if (h + th + 2 >= WORLD_HEIGHT) continue;
-                for (let k = 1; k <= th; k++) set(lx, h + k, lz, ID.LOG);
-                for (let dy = th - 2; dy <= th + 1; dy++) {
-                    const r = dy >= th ? 1 : 2;
-                    for (let dx = -r; dx <= r; dx++) {
-                        for (let dz = -r; dz <= r; dz++) {
-                            if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
-                            if (dy === th + 1 && Math.abs(dx) + Math.abs(dz) > 1) continue;
-                            set(lx + dx, h + dy, lz + dz, ID.LEAVES);
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-function findSpawn(gen) {
-        const STEP = 4, MAX_R = 512;
-        const minH = WATER_LEVEL + 2;
-
-        const noTreeNear = (x, z) => {
-            for (let dx = -3; dx <= 3; dx++)
-                for (let dz = -3; dz <= 3; dz++)
-                    if (hash2(x + dx, z + dz, gen.seed) <= TREE_CHANCE_FOREST) return false;
-            return true;
-        };
-
-        for (let r = 0; r <= MAX_R; r += STEP) {
-            for (let dx = -r; dx <= r; dx += STEP) {
-                for (let dz = -r; dz <= r; dz += STEP) {
-                    if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
-                    const h = gen.heightAt(dx, dz);
-                    if (h >= minH && noTreeNear(dx, dz)) return { x: dx + 0.5, y: h + 1, z: dz + 0.5 };
-                }
-            }
-        }
-        return { x: 0.5, y: Math.max(gen.heightAt(0, 0), WATER_LEVEL) + 1, z: 0.5 };
-}
-
-// =====================================================================
-// 5. CHUNKS, MALHA COM FACES VISÍVEIS E MUNDO
-// =====================================================================
 class Chunk {
     constructor(cx, cz) {
         this.cx = cx;
@@ -814,7 +527,7 @@ class World {
     constructor(scene, seed) {
         this.scene = scene;
         this.seed = seed;
-        this.generator = new TerrainGenerator(seed);
+        this.generator = new TerrainGenerator(seed, TERRAIN_CONFIG);
         this.chunks = new Map();
         this.edits = new Map();
         this.dirty = new Set();
@@ -1016,20 +729,14 @@ class World {
         const workerSource = [
             `const CHUNK_SIZE = ${CHUNK_SIZE};`,
             `const WORLD_HEIGHT = ${WORLD_HEIGHT};`,
-            `const WATER_LEVEL = ${WATER_LEVEL};`,
-            `const ID = ${JSON.stringify(ID)};`,
-            `const BIOME = ${JSON.stringify(BIOME)};`,
-            `const TREE_CHANCE_FOREST = ${TREE_CHANCE_FOREST};`,
-            `const TREE_CHANCE_PLAINS = ${TREE_CHANCE_PLAINS};`,
+            `const TERRAIN_CONFIG = ${JSON.stringify(TERRAIN_CONFIG)};`,
             `const clamp01 = ${clamp01.toString()};`,
             `const smoothstep = ${smoothstep.toString()};`,
-            `const idx = ${idx.toString()};`,
             mulberry32.toString(), hash2.toString(), Noise2D.toString(),
-            `const WaterSystem = { flowBlockForLevel(level) { const clamped = Math.max(1, Math.min(7, Math.round(level))); return ID.WATER_FLOW_1 + clamped - 1; } };`,
             TerrainGenerator.toString(),
             `let workerGenerator = null; let workerSeed = null;`,
             `self.onmessage = ({ data }) => {`,
-            `  if (!workerGenerator || workerSeed !== data.seed) { workerGenerator = new TerrainGenerator(data.seed); workerSeed = data.seed; }`,
+            `  if (!workerGenerator || workerSeed !== data.seed) { workerGenerator = new TerrainGenerator(data.seed, TERRAIN_CONFIG); workerSeed = data.seed; }`,
             `  const chunk = { cx: data.cx, cz: data.cz, data: new Uint8Array(CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT), maxY: 0 };`,
             `  workerGenerator.fill(chunk);`,
             `  self.postMessage({ jobId: data.jobId, cx: data.cx, cz: data.cz, maxY: chunk.maxY, data: chunk.data.buffer }, [chunk.data.buffer]);`,
@@ -2881,9 +2588,6 @@ const _skyCol = new THREE.Color();
 const _sunDir = new THREE.Vector3();
 const sky = { elevation: 1, day: 1 };
 
-const clamp01 = (v) => Math.max(0, Math.min(1, v));
-const smoothstep = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
-
 function makeSquareMesh(size, color) {
     const m = new THREE.Mesh(
         new THREE.PlaneGeometry(size, size),
@@ -4029,7 +3733,7 @@ async function init() {
                 { age: e.age, ttl: e.ttl, noMerge: true });
         }
     }
-    const sp = findSpawn(world.generator);
+    const sp = findSpawn(world.generator, TERRAIN_CONFIG);
     spawnPoint.set(sp.x, sp.y, sp.z);
     const start = save ? save.player : spawnPoint;
     await waitForWorldRegion(start.x, start.z, { driveUpdates: true, onProgress: setWorldLoadProgress });
