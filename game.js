@@ -18,6 +18,7 @@ import {
 } from './world-save-settings.js';
 import { configureTorchFlicker, configureTorchFlameAnimation, updateWorldLightingEffects } from './world-lighting-effects.js';
 import { FurnaceSmokeSystem } from './world-furnace-effects.js';
+import { canHarvest, damageTool as damageToolStack, getBreakTime } from './world-tool-rules.js';
 import {
     BlockFacingStore, DEFAULT_BLOCK_FACING, facingTowardPlayer, isFrontFace, isHorizontalFacing,
     tileForBlockFace,
@@ -1207,35 +1208,12 @@ function computeBlockColors() {
     }
 }
 
-function toolInfo(stack) {
-    const it = stack && ITEMS[stack.id];
-    return it && it.tool ? it.tool : null;
-}
-
-function canHarvest(type, stack) {
-    const b = BLOCKS[type];
-    if (!b.requiresTool) return true;
-    const t = toolInfo(stack);
-    return !!t && t.type === b.tool && t.tier >= (b.minTier || 0);
-}
-
-function getBreakTime(type, stack) {
-    const b = BLOCKS[type];
-    const base = b.hardness * 1.5;
-    if (!canHarvest(type, stack)) return b.hardness * 5;
-    const t = toolInfo(stack);
-    const speed = (t && t.type === b.tool) ? t.speed : 1;
-    return base / speed;
-}
-
 function damageTool(slotIndex, amount = 1) {
-    const s = inventory.slots[slotIndex];
-    const it = s && ITEMS[s.id];
-    if (!it || !it.maxDurability) return;
-    s.damage = (s.damage || 0) + amount;
-    if (s.damage >= it.maxDurability) {
+    const result = damageToolStack(inventory.slots[slotIndex], amount);
+    if (!result) return;
+    if (result.broken) {
         inventory.slots[slotIndex] = null;
-        showToast(`${it.name} quebrou!`);
+        showToast(`${result.name} quebrou!`);
     }
     updateHotbarUI();
 }
