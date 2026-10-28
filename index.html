@@ -94,7 +94,21 @@
 </div>
 <div id="inventory">
     <div id="inv-panel">
-        <div class="inv-title" id="inv-title">Inventário</div>
+        <div class="inv-titlebar">
+            <div class="inv-title" id="inv-title">Inventário</div>
+            <button id="recipe-book-toggle" class="recipe-book-toggle" type="button" aria-expanded="false" aria-controls="recipe-book">
+                <span class="recipe-book-icon" aria-hidden="true"></span> Receitas
+            </button>
+        </div>
+        <section id="recipe-book" class="recipe-book" aria-label="Livro de receitas" hidden>
+            <div class="recipe-book-head">
+                <div><small>GUIA DE SOBREVIVÊNCIA</small><h2>Livro de receitas</h2></div>
+                <button id="recipe-book-close" class="recipe-book-close" type="button" aria-label="Fechar livro de receitas">×</button>
+            </div>
+            <input id="recipe-search" class="recipe-search" type="search" placeholder="Buscar receita ou item" autocomplete="off">
+            <div id="inv-recipes" class="recipe-book-list"></div>
+            <p id="recipe-empty" class="recipe-empty" hidden>Nenhuma receita encontrada.</p>
+        </section>
         <div class="craft-row" id="craft-row">
             <div id="inv-craft" class="inv-grid craft-grid"></div>
             <div class="craft-arrow">➜</div>
@@ -114,7 +128,6 @@
         <div class="inv-sep"></div>
         <div id="inv-hotbar" class="inv-grid"></div>
         <div class="inv-help">Esq: pegar/colocar · Dir: metade / 1 item · Shift+clique: mover rápido (ou criar tudo) · Duplo clique: juntar pilhas · 1-9: trocar com a barra · Q: soltar 1 · Clique fora: jogar no mundo · E / Esc: fechar e voltar ao jogo</div>
-        <div id="inv-recipes"></div>
     </div>
     <div id="inv-cursor"></div>
     <div id="inv-tooltip"></div>

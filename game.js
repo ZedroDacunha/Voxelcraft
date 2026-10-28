@@ -6,6 +6,7 @@ import { findSpawn, TerrainGenerator } from './world-terrain.js';
 import { createWaterSystemClass } from './world-water.js';
 import { craftConsume, invCollectSame, invLeftClick, invQuickMove, invQuickMoveToCraft, invRightClick, invSwapHotbar, stackable } from './inventory-logic.js';
 import { stackHtml, updateSlotElement } from './inventory-view.js';
+import { createRecipeBook } from './inventory-recipe-book.js';
 import { createTextureTools } from './world-textures.js';
 import { configureTorchFlicker, configureTorchFlameAnimation, updateWorldLightingEffects } from './world-lighting-effects.js';
 import { FurnaceSmokeSystem } from './world-furnace-effects.js';
@@ -1968,24 +1969,34 @@ function buildInventoryUI() {
     chestSlotEls = new Array(27);
     for (let i = 0; i < 27; i++) chestSlotEls[i] = make('chest', i, chestEl);
 
+    document.getElementById('recipe-book-toggle').addEventListener('click', () => {
+        setRecipeBookOpen(document.getElementById('recipe-book').hidden === true);
+    });
+    document.getElementById('recipe-book-close').addEventListener('click', () => setRecipeBookOpen(false));
+
     const overlay = document.getElementById('inventory');
     overlay.addEventListener('mousedown', onInventoryMouseDown);
     overlay.addEventListener('mousemove', onInventoryMouseMove);
 }
 
 function buildRecipeList() {
-    const nm = (id) => id ? ITEMS[id].name : '·';
-    const lines = RECIPES.map(r => {
-        if (r.kind === 'shapeless') return `${r.ingredients.map(nm).join(' + ')} → ${r.count}× ${ITEMS[r.result].name} [sem forma]`;
-        const big = r.shape.length > 2 || r.shape[0].length > 2;
-        return r.shape.map(row => row.map(nm).join(' + ')).join(' / ') +
-            ` → ${r.count}× ${ITEMS[r.result].name}` + (big ? ' [bancada]' : '');
+    createRecipeBook({
+        root: document.getElementById('inv-recipes'),
+        search: document.getElementById('recipe-search'),
+        empty: document.getElementById('recipe-empty'),
+        recipes: RECIPES,
+        smelting: SMELT,
+        fuels: FUEL,
+        items: ITEMS,
     });
-    const sm = Object.entries(SMELT).map(([id, r]) => `${ITEMS[id].name} → ${ITEMS[r.result].name} (${r.time}s)`);
-    const fu = Object.entries(FUEL).map(([id, t]) => `${ITEMS[id].name} ${t}s`);
-    document.getElementById('inv-recipes').innerHTML =
-        '<b>Receitas (vale espelhado):</b><br>' + lines.join('<br>') +
-        '<br><b>Forno:</b><br>' + sm.join('<br>') + '<br><b>Combustíveis:</b> ' + fu.join(', ');
+}
+
+function setRecipeBookOpen(isOpen) {
+    const panel = document.getElementById('recipe-book');
+    const toggle = document.getElementById('recipe-book-toggle');
+    panel.hidden = !isOpen;
+    toggle.setAttribute('aria-expanded', String(isOpen));
+    if (isOpen) document.getElementById('recipe-search').focus();
 }
 
 function hoveredStack() {
@@ -2066,6 +2077,7 @@ function onInventoryMouseMove(e) {
 }
 
 function onInventoryMouseDown(e) {
+    if (e.target.closest('button, input, textarea, select')) return;
     e.preventDefault();
     invMouse.x = e.clientX; invMouse.y = e.clientY; invMouse.seen = true;
     const el = e.target.closest('.islot');
@@ -2118,6 +2130,7 @@ function onInventoryMouseDown(e) {
 
 function openInventory(st = null) {
     if (!controls.isLocked || inventoryOpen) return;
+    setRecipeBookOpen(false);
     station = st;
     craftN = st && st.type === 'crafting' ? 3 : 2;
     inventoryOpen = true;
@@ -2141,6 +2154,7 @@ function giveBack(s) {
 function closeInventory(relock) {
     if (!inventoryOpen) return;
     inventoryOpen = false;
+    setRecipeBookOpen(false);
 
     if (station && station.type === 'chest') setChestOpen(station.chestKey, false);
 
@@ -2167,6 +2181,10 @@ function closeInventory(relock) {
 }
 
 function handleInventoryKey(event) {
+    if (event.target.closest('input, textarea, select') && event.code !== 'Escape') return;
+    if (event.code === 'Escape' && !document.getElementById('recipe-book').hidden) {
+        event.preventDefault(); event.stopPropagation(); setRecipeBookOpen(false); return;
+    }
     if (event.code === 'KeyE') { event.preventDefault(); if (!event.repeat) closeInventory(true); return; }
     if (event.code === 'Escape') { event.preventDefault(); event.stopPropagation(); closeInventory(true); return; }
     if (!invHover || invHover.inv === 'out' || invHover.inv === 'furnace' || cursorHeld.stack) return;
