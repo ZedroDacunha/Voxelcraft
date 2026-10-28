@@ -27,8 +27,8 @@ function cobblePixel(x, y, variant) {
 
     const patch = hash2(Math.floor((x - siteX) / 2), Math.floor((y - siteY) / 2), seed + 7);
     const grain = hash2(Math.floor((x - siteX) / 2), Math.floor((y - siteY) / 2), seed + 11);
-    const blockShade = 92 + Math.floor(hash2(wrappedX, wrappedY, seed + 13) * 5) * 6;
-    const shade = blockShade + (patch < 0.14 ? -17 : patch > 0.86 ? 19 : 0) + (grain - 0.5) * 11;
+    const blockShade = 106 + Math.floor(hash2(wrappedX, wrappedY, seed + 13) * 5) * 4;
+    const shade = blockShade + (patch < 0.14 ? -15 : patch > 0.86 ? 17 : 0) + (grain - 0.5) * 11;
     return [shade, shade + 1, shade + 2];
 }
 
@@ -139,13 +139,14 @@ export function createTextureTools(THREE) {
                 return (value * 2 - 1) * radius;
             };
             const soilPixel = (px, py) => {
-                const patch = hash2(Math.floor(px / 3), Math.floor(py / 3), 431 + alt * 73);
+                const patch = hash2(Math.floor(px / 4), Math.floor(py / 4), 431 + alt * 73);
                 const fleck = hash2(Math.floor(px / 2), Math.floor(py / 2), 8101 + alt * 109);
-                let color = patch < 0.2 ? [99, 68, 45] : patch > 0.79 ? [145, 103, 67] : [124, 84, 54];
-                if (fleck > 0.985) color = [127, 124, 111];
-                else if (fleck > 0.94) color = [157, 117, 79];
-                else if (fleck < 0.035) color = [105, 75, 53];
-                const fine = (hash2(px, py, 2203 + alt * 137) - 0.5) * 12;
+                let color = patch < 0.18 ? [103, 70, 46] : patch > 0.81 ? [151, 105, 68] : [128, 87, 56];
+                if (fleck > 0.975) color = [194, 144, 96];
+                else if (fleck > 0.84) color = [166, 113, 73];
+                else if (fleck < 0.08) color = [88, 61, 42];
+                else if (fleck < 0.11) color = [129, 123, 108];
+                const fine = (hash2(px, py, 2203 + alt * 137) - 0.5) * 10;
                 return color.map(channel => channel + fine);
             };
             const grassPixel = (px, py, muted = false) => {
@@ -171,12 +172,12 @@ export function createTextureTools(THREE) {
                     return soilPixel(x, y);
                 }
                 case TILE.STONE: {
-                    const patch = hash2(Math.floor(x / 3), Math.floor(y / 3), 5021 + alt * 113);
-                    const fleck = hash2(Math.floor(x / 2), Math.floor(y / 2), 641 + alt * 197);
-                    let c = patch < 0.18 ? 105 : patch > 0.83 ? 145 : 124;
-                    if (fleck > 0.975) c += 17;
-                    else if (fleck < 0.025) c -= 15;
-                    c += (hash2(x, y, 1801 + alt * 67) - 0.5) * 8;
+                    const stratum = hash2(Math.floor(x / 4), Math.floor(y / 2), 5021 + alt * 113);
+                    const grain = hash2(Math.floor(x / 2), Math.floor(y / 2), 641 + alt * 197);
+                    const fleck = hash2(x, y, 1801 + alt * 67);
+                    let c = 124 + (stratum - 0.5) * 18 + (grain - 0.5) * 12;
+                    if (fleck > 0.975) c += 12;
+                    else if (fleck < 0.025) c -= 12;
                     return [c, c + 1, c + 2];
                 }
                 case TILE.COBBLE: {
