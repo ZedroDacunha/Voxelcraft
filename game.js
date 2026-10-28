@@ -103,6 +103,14 @@ const HAND_BASE = { x: 0.42, y: -0.50, z: -0.25 };
 const HELD_TOOL_ROT = [0.3, -0.55, 0.0];
 const HELD_BLOCK_ROT = [0.25, 0.7, 0.0];
 const HELD_BLOCK_POS = [0.03, 0.07, -0.04];
+const HELD = {
+    // Local to handPivot: origin remains at the existing grip location.
+    position: { x: 0, y: 0, z: -0.50 },
+    rotation: { x: 10, y: -30, z: 90 },
+    scale: 0.85,
+};
+const HELD_TOOL_KINDS = new Set(['pickaxe', 'axe', 'shovel']);
+const HELD_DEBUG = false;
 
 // =====================================================================
 // 2. SISTEMA DE ÁGUA (catálogo em world-catalog.js)
@@ -1751,6 +1759,7 @@ function initGameplayAssets() {
 // =====================================================================
 let handScene, handCamera, handPivot, heldAnchor, handAmbient;
 let heldMesh = null, heldFlameMesh = null, heldTorchLight = null, heldId = -1;
+let handSleeve = null, handBlock = null;
 const handAnim = { mining: 0, phase: 0, punch: 0, sw: 1, eat: 0 };
 const heldGeoCache = {};
 
@@ -1767,18 +1776,42 @@ function createHand() {
     handScene.add(dl);
 
     handPivot = new THREE.Group();
-    const sleeve = new THREE.Mesh(
+    handSleeve = new THREE.Mesh(
         new THREE.BoxGeometry(0.16, 0.16, 0.40),
         new THREE.MeshLambertMaterial({ map: createNoiseTexture([70, 110, 190], 11) }));
-    sleeve.position.z = -0.20;
-    const hand = new THREE.Mesh(
+    handSleeve.position.z = -0.20;
+    handBlock = new THREE.Mesh(
         new THREE.BoxGeometry(0.13, 0.13, 0.20),
         new THREE.MeshLambertMaterial({ map: createNoiseTexture([214, 166, 125], 12, 8) }));
-    hand.position.z = -0.50;
+    handBlock.position.z = -0.50;
     heldAnchor = new THREE.Group();
     heldAnchor.position.set(0, 0.03, -0.62);
-    handPivot.add(sleeve, hand, heldAnchor);
-    handScene.add(handPivot);
+    handPivot.add(handSleeve, handBlock, heldAnchor);
+    handScene.add(handCamera);
+    handCamera.add(handPivot);
+    window.addEventListener('keydown', adjustHeldTransform);
+}
+
+function adjustHeldTransform(event) {
+    if (!HELD_DEBUG || !controls?.isLocked || heldId < 0 || !HELD_TOOL_KINDS.has(ITEMS[heldId]?.sprite?.kind)) return;
+    let changed = false;
+    const step = event.shiftKey ? 0.1 : 0.02;
+    const angle = event.shiftKey ? 5 : 2;
+    switch (event.code) {
+        case 'ArrowLeft': HELD.position.x -= step; changed = true; break;
+        case 'ArrowRight': HELD.position.x += step; changed = true; break;
+        case 'ArrowUp': HELD.position.y += step; changed = true; break;
+        case 'ArrowDown': HELD.position.y -= step; changed = true; break;
+        case 'KeyQ': HELD.rotation.y -= angle; changed = true; break;
+        case 'KeyE': HELD.rotation.y += angle; changed = true; break;
+        case 'KeyR': HELD.rotation.z -= angle; changed = true; break;
+        case 'KeyF': HELD.rotation.z += angle; changed = true; break;
+        case 'KeyZ': HELD.scale = Math.max(0.1, HELD.scale - 0.02); changed = true; break;
+        case 'KeyX': HELD.scale += 0.02; changed = true; break;
+        default: return;
+    }
+    event.preventDefault();
+    if (changed) console.log('HELD =', JSON.stringify(HELD, null, 2));
 }
 
 function refreshHeldItem() {
@@ -1790,10 +1823,23 @@ function refreshHeldItem() {
     if (heldMesh) { heldAnchor.remove(heldMesh); heldMesh = null; }
     if (heldFlameMesh) { heldAnchor.remove(heldFlameMesh); heldFlameMesh = null; }
     heldAnchor.rotation.set(0, 0, 0);
+    handBlock.position.set(0, 0, -0.50);
+    handSleeve.position.set(0, 0, -0.20);
+    handBlock.scale.set(1, 1, 1);
+    handSleeve.scale.set(1, 1, 1);
+    heldAnchor.position.set(0, 0.03, -0.62);
+    heldAnchor.scale.setScalar(1);
     if (!id) return;
     const item = ITEMS[id];
     if (item.sprite) {
-        const isPickaxe = item.sprite.kind === 'pickaxe';
+        if (HELD_TOOL_KINDS.has(item.sprite.kind)) {
+            heldAnchor.position.set(HELD.position.x, HELD.position.y, HELD.position.z);
+            heldAnchor.rotation.set(
+                THREE.MathUtils.degToRad(HELD.rotation.x),
+                THREE.MathUtils.degToRad(HELD.rotation.y),
+                THREE.MathUtils.degToRad(HELD.rotation.z));
+            heldAnchor.scale.setScalar(HELD.scale);
+        }
         const px = 0.034;
         const key = 'spr' + id;
         if (!heldGeoCache[key]) {
@@ -1807,8 +1853,7 @@ function refreshHeldItem() {
         heldMesh = new THREE.Mesh(heldGeoCache[key], spriteMaterial);
         const hasHandle = !!item.tool || item.sprite.kind === 'stick';
         heldMesh.position.set(hasHandle ? 3.5 * px : 0, hasHandle ? 4.5 * px : 0, 0);
-        // Mantém o sprite de frente para a câmera, como as outras ferramentas.
-        heldAnchor.rotation.set(...HELD_TOOL_ROT);
+        if (!HELD_TOOL_KINDS.has(item.sprite.kind)) heldAnchor.rotation.set(...HELD_TOOL_ROT);
     } else {
         const key = 'blk' + id;
         if (!heldGeoCache[key]) heldGeoCache[key] = buildCubeGeo(BLOCKS[item.block].tiles, 0.3);
@@ -1840,6 +1885,15 @@ function updateHand(dt) {
     const p = Math.sin((1 - handAnim.punch) * Math.PI);
     const swing = Math.max(m, p);
     const dip = (1 - handAnim.sw) * (1 - handAnim.sw) * 0.5;
+    const heldToolKind = ITEMS[heldId]?.sprite?.kind;
+    if (HELD_TOOL_KINDS.has(heldToolKind)) {
+        heldAnchor.position.set(HELD.position.x, HELD.position.y, HELD.position.z);
+        heldAnchor.rotation.set(
+            THREE.MathUtils.degToRad(HELD.rotation.x),
+            THREE.MathUtils.degToRad(HELD.rotation.y),
+            THREE.MathUtils.degToRad(HELD.rotation.z));
+        heldAnchor.scale.setScalar(HELD.scale);
+    }
 
     handAnim.eat += ((eat.active ? 1 : 0) - handAnim.eat) * Math.min(1, 10 * dt);
     const ea = handAnim.eat;
@@ -1849,7 +1903,9 @@ function updateHand(dt) {
         HAND_BASE.x + Math.cos(bobTimer) * 0.012 - 0.22 * ea,
         HAND_BASE.y + Math.sin(bobTimer * 2) * 0.010 - dip - 0.05 * swing + 0.20 * ea + wob,
         HAND_BASE.z - 0.12 * swing + 0.08 * ea);
-    handPivot.rotation.set(0.35 - 0.9 * swing + 0.35 * ea, 0.25 - 0.3 * ea, 0);
+    handPivot.rotation.set(
+        0.35 - 0.9 * swing + 0.35 * ea, 0.25 - 0.3 * ea, 0);
+    handPivot.scale.setScalar(1);
 }
 
 function updateHeldTorchLight() {

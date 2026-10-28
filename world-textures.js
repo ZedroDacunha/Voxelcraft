@@ -87,18 +87,22 @@ export function createTextureTools(THREE) {
     
         const head = new Set(), add = (x, y) => head.add(x + ',' + y);
         if (kind === 'pickaxe') {
-            // Cabeça clássica de picareta: lâmina larga e quase horizontal,
-            // com a ponta externa descendo junto ao cabo diagonal.
-            for (let x = 6; x <= 13; x++) add(x, 3);
-            for (let x = 5; x <= 13; x++) add(x, 4);
-            for (let x = 6; x <= 12; x++) add(x, 5);
-            add(12, 6); add(13, 6); add(13, 7); add(14, 7);
-            add(13, 8); add(14, 8); add(14, 9);
+            // Silhueta 16x16 clássica: lâmina horizontal, ponta descendente
+            // à direita e encaixe unido ao cabo diagonal em (10, 6).
+            for (let x = 7; x <= 11; x++) add(x, 2);
+            for (let x = 5; x <= 12; x++) add(x, 3);
+            for (let x = 4; x <= 12; x++) add(x, 4);
+            for (let x = 7; x <= 11; x++) add(x, 5);
+            add(10, 6); add(11, 6);
+            add(12, 4); add(12, 5); add(13, 5); add(13, 6); add(13, 7); add(14, 7); add(14, 8);
         } else if (kind === 'axe') {
-            for (let x = 9; x <= 12; x++) add(x, 2);
-            for (let x = 8; x <= 13; x++) add(x, 3);
-            for (let x = 8; x <= 12; x++) add(x, 4);
-            for (let x = 9; x <= 11; x++) add(x, 5);
+            // Broad asymmetric blade to the left, socket joining the diagonal handle.
+            for (let x = 8; x <= 10; x++) add(x, 2);
+            for (let x = 6; x <= 11; x++) add(x, 3);
+            for (let x = 4; x <= 11; x++) add(x, 4);
+            for (let x = 5; x <= 10; x++) add(x, 5);
+            for (let x = 8; x <= 11; x++) add(x, 6);
+            add(10, 7); add(11, 7);
         } else if (kind === 'shovel') {
             for (let x = 10; x <= 12; x++) add(x, 2);
             for (let x = 9; x <= 13; x++) { add(x, 3); add(x, 4); }
