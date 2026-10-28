@@ -1,5 +1,6 @@
 import { hash2, mulberry32 } from './world-math.js';
 import { ATLAS_COLUMNS, ITEMS, TILE, TILE_PX } from './world-catalog.js';
+import { createMineralOrePixel, createMineralSpritePixels, isMineralOreTile } from './world-mineral-textures.js';
 
 // Atlas voxel e sprites determinísticos em canvas.
 export function createTextureTools(THREE) {
@@ -16,6 +17,8 @@ export function createTextureTools(THREE) {
     function spritePixels(kind, mat) {
         const key = kind + ':' + mat;
         if (spriteCache[key]) return spriteCache[key];
+        const mineralSprite = createMineralSpritePixels(kind, mat);
+        if (mineralSprite) return (spriteCache[key] = mineralSprite);
         const g = Array.from({ length: 16 }, () => Array(16).fill(null));
         const put = (x, y, c) => { if (x >= 0 && x < 16 && y >= 0 && y < 16) g[y][x] = c; };
     
@@ -34,70 +37,12 @@ export function createTextureTools(THREE) {
             return (spriteCache[key] = g);
         }
     
-        if (kind === 'ingot') {
-            const palettes = {
-                iron: { light: [218, 225, 226], mid: [159, 173, 178], dark: [100, 116, 122] },
-                gold: { light: [240, 202, 68], mid: [184, 138, 38], dark: [112, 79, 23] },
-                copper: { light: [232, 151, 104], mid: [184, 100, 66], dark: [107, 57, 41] },
-            };
-            const colors = palettes[mat] || palettes.iron;
-            for (let y = 4; y <= 11; y++) {
-                for (let x = 3; x <= 12; x++) {
-                    const edge = x === 3 || x === 12 || y === 4 || y === 11;
-                    put(x, y, edge ? colors.dark : (y <= 6 ? colors.light : colors.mid));
-                }
-            }
-            put(4, 5, colors.light); put(5, 5, colors.light); put(6, 5, colors.light);
-            return (spriteCache[key] = g);
-        }
-
-        if (kind === 'gem') {
-            const colors = { light: [157, 250, 235], mid: [53, 204, 194], dark: [25, 119, 144] };
-            for (let y = 4; y <= 11; y++) {
-                const inset = y <= 7 ? y - 4 : 11 - y;
-                for (let x = 4 + inset; x <= 11 - inset; x++) {
-                    const edge = x === 4 + inset || x === 11 - inset || y === 4 || y === 11;
-                    put(x, y, edge ? colors.dark : (x + y < 12 ? colors.light : colors.mid));
-                }
-            }
-            put(6, 6, colors.light); put(7, 6, colors.light);
-            return (spriteCache[key] = g);
-        }
-
-        if (kind === 'raw') {
-            const palettes = {
-                copper: [[236, 153, 103], [181, 96, 62], [105, 55, 41]],
-                iron: [[226, 215, 195], [169, 142, 111], [105, 89, 77]],
-                gold: [[255, 224, 103], [205, 157, 46], [122, 86, 28]],
-            };
-            const [light, mid, dark] = palettes[mat] || palettes.iron;
-            for (const [cx, cy, rx, ry] of [[6, 8, 3, 3], [10, 6, 2, 2], [10, 10, 3, 2]]) {
-                for (let y = cy - ry; y <= cy + ry; y++) for (let x = cx - rx; x <= cx + rx; x++) {
-                    const edge = Math.abs(x - cx) === rx || Math.abs(y - cy) === ry;
-                    if (((x - cx) ** 2) / (rx * rx) + ((y - cy) ** 2) / (ry * ry) <= 1.35) {
-                        put(x, y, edge ? dark : (x + y < cx + cy ? light : mid));
-                    }
-                }
-            }
-            return (spriteCache[key] = g);
-        }
-
-        if (kind === 'apple' || kind === 'charcoal' || kind === 'coal') {
+        if (kind === 'apple' || kind === 'charcoal') {
             for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
                 if (kind === 'apple') {
                     const dx = (x - 7.5) / 4.5, dy = (y - 9.5) / 4.5;
                     if (dx * dx + dy * dy <= 1)
                         put(x, y, ((x === 6 && y === 7) || (x === 5 && y === 8)) ? [240, 110, 100] : (dx + dy > 0.9 ? [150, 25, 30] : [205, 40, 45]));
-                } else if (kind === 'coal') {
-                    const lumps = [[5, 9, 3], [9, 7, 4], [10, 10, 3]];
-                    let shade = null;
-                    for (const [cx, cy, radius] of lumps) {
-                        const dx = x - cx, dy = y - cy;
-                        if (dx * dx + dy * dy <= radius * radius) {
-                            shade = (x + 2 * y) % 5 === 0 ? [91, 91, 99] : [37, 37, 43];
-                        }
-                    }
-                    if (shade) put(x, y, shade);
                 } else {
                     const dx = (x - 7.5) / 5, dy = (y - 9) / 3.6;
                     if (dx * dx + dy * dy <= 1) put(x, y, (x + y) % 3 === 0 ? [75, 75, 82] : [38, 38, 44]);
@@ -151,23 +96,6 @@ export function createTextureTools(THREE) {
             [TILE.GRASS_TOP_ALT]: TILE.GRASS_TOP, [TILE.GRASS_SIDE_ALT]: TILE.GRASS_SIDE,
             [TILE.DIRT_ALT]: TILE.DIRT, [TILE.STONE_ALT]: TILE.STONE, [TILE.LEAVES_ALT]: TILE.LEAVES,
         };
-        const oreColors = {
-            [TILE.COAL_ORE]:    [[35,35,40], [52,52,58], [70,70,76]],
-            [TILE.IRON_ORE]:    [[151,105,78], [183,132,96], [211,160,120]],
-            [TILE.GOLD_ORE]:    [[193,139,24], [231,181,35], [250,215,74]],
-            [TILE.DIAMOND_ORE]: [[30,151,157], [48,194,190], [102,229,216]],
-            [TILE.COPPER_ORE]:  [[139,75,48], [189,103,65], [219,140,93]],
-        };
-        const oreCenters = [[7,7], [22,6], [15,18], [26,25], [5,26]];
-        const inOre = (x, y, tile) => {
-            const shift = tile - TILE.COAL_ORE;
-            return oreCenters.some(([cx, cy], i) => {
-                const dx = Math.abs(x - ((cx + shift * 3) % 29 + 1));
-                const dy = Math.abs(y - cy);
-                return dx + dy <= (i % 2 ? 2 : 3) && !(dx === 3 && dy === 0);
-            });
-        };
-    
         const pixel = (sourceTile, x, y) => {
             const tile = variantBase[sourceTile] ?? sourceTile;
             const alt = sourceTile !== tile ? 1 : 0;
@@ -177,6 +105,7 @@ export function createTextureTools(THREE) {
                 noiseSample++;
                 return (value * 2 - 1) * radius;
             };
+            if (isMineralOreTile(tile)) return createMineralOrePixel(tile, x, y, j);
             switch (tile) {
                 case TILE.GRASS_TOP: {
                     const band = (x * 5 + y * 3 + alt) % 7;
@@ -195,14 +124,6 @@ export function createTextureTools(THREE) {
                 case TILE.STONE: {
                     const seam = (x * 13 + y * 7 + alt * 5) % 31 === 0;
                     const c = 119 + j(7) - (seam ? 22 : 0);
-                    return [c, c, c + 2];
-                }
-                case TILE.COAL_ORE: case TILE.IRON_ORE: case TILE.GOLD_ORE: case TILE.DIAMOND_ORE: case TILE.COPPER_ORE: {
-                    if (inOre(x, y, tile)) {
-                        const pal = oreColors[tile];
-                        return pal[(x * 3 + y * 5) % pal.length];
-                    }
-                    const c = 116 + j(6) - (((x * 13 + y * 7) % 31 === 0) ? 18 : 0);
                     return [c, c, c + 2];
                 }
                 case TILE.COBBLE: {
