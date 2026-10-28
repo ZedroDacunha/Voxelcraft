@@ -51,9 +51,59 @@ export class TerrainGenerator {
     heightAt(wx, wz) {
         return this.heightFrom(this.baseHeightAt(wx, wz), this.riverStrengthAt(wx, wz));
     }
+    createCoalVeinMask(chunk) {
+        const { CHUNK_SIZE, WORLD_HEIGHT, WATER_LEVEL } = this.config;
+        const ox = chunk.cx * CHUNK_SIZE, oz = chunk.cz * CHUNK_SIZE;
+        const mask = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT);
+        const cellXZ = 8, cellY = 7, reachXZ = 3, reachY = 2;
+        const minGX = Math.floor((ox - reachXZ) / cellXZ);
+        const maxGX = Math.floor((ox + CHUNK_SIZE - 1 + reachXZ) / cellXZ);
+        const minGZ = Math.floor((oz - reachXZ) / cellXZ);
+        const maxGZ = Math.floor((oz + CHUNK_SIZE - 1 + reachXZ) / cellXZ);
+        const minGY = Math.floor(-reachY / cellY);
+        const maxGY = Math.floor((WORLD_HEIGHT - 1 + reachY) / cellY);
+        const localIndex = (x, y, z) => x + z * CHUNK_SIZE + y * CHUNK_SIZE * CHUNK_SIZE;
+
+        for (let gx = minGX; gx <= maxGX; gx++) {
+            for (let gz = minGZ; gz <= maxGZ; gz++) {
+                for (let gy = minGY; gy <= maxGY; gy++) {
+                    const cellSeed = gx * 92821 + gz * 68917 + gy * 28387;
+                    const anchorSeed = this.seed + 18041;
+                    const centerX = gx * cellXZ + hash2(cellSeed, gz + gy * 193, anchorSeed + 1) * cellXZ;
+                    const centerY = gy * cellY + hash2(gx + gy * 317, gz + cellSeed, anchorSeed + 2) * cellY;
+                    const centerZ = gz * cellXZ + hash2(gz + gy * 419, gx + cellSeed, anchorSeed + 3) * cellXZ;
+                    const chance = centerY >= WATER_LEVEL ? 0.38 : 0.22;
+                    if (hash2(cellSeed, gy * 571 + gz, anchorSeed) >= chance) continue;
+
+                    const radiusX = 1.8 + hash2(cellSeed + 11, gz, anchorSeed + 4) * 0.9;
+                    const radiusY = 1.0 + hash2(gx, cellSeed + 17, anchorSeed + 5) * 0.6;
+                    const radiusZ = 1.8 + hash2(gz, cellSeed + 23, anchorSeed + 6) * 0.9;
+                    const minX = Math.max(0, Math.floor(centerX - radiusX - ox));
+                    const maxX = Math.min(CHUNK_SIZE - 1, Math.ceil(centerX + radiusX - ox));
+                    const minY = Math.max(1, Math.floor(centerY - radiusY));
+                    const maxY = Math.min(WORLD_HEIGHT - 1, Math.ceil(centerY + radiusY));
+                    const minZ = Math.max(0, Math.floor(centerZ - radiusZ - oz));
+                    const maxZ = Math.min(CHUNK_SIZE - 1, Math.ceil(centerZ + radiusZ - oz));
+
+                    for (let y = minY; y <= maxY; y++) {
+                        const dy = (y + 0.5 - centerY) / radiusY;
+                        for (let z = minZ; z <= maxZ; z++) {
+                            const dz = (oz + z + 0.5 - centerZ) / radiusZ;
+                            for (let x = minX; x <= maxX; x++) {
+                                const dx = (ox + x + 0.5 - centerX) / radiusX;
+                                if (dx * dx + dy * dy + dz * dz <= 1) mask[localIndex(x, y, z)] = 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return mask;
+    }
     fill(chunk) {
         const { CHUNK_SIZE, WORLD_HEIGHT, WATER_LEVEL, ID, BIOME } = this.config;
         const ox = chunk.cx * CHUNK_SIZE, oz = chunk.cz * CHUNK_SIZE;
+        const coalVeins = this.createCoalVeinMask(chunk);
         const heights = new Int16Array(CHUNK_SIZE * CHUNK_SIZE);
         const biomes = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
         for (let lx = 0; lx < CHUNK_SIZE; lx++) {
@@ -82,7 +132,7 @@ export class TerrainGenerator {
                         if (y < 18 && ore < 0.004) type = ID.DIAMOND_ORE;
                         else if (y < 28 && ore < 0.010) type = ID.GOLD_ORE;
                         else if (y < 42 && ore < 0.025) type = ID.IRON_ORE;
-                        else if (ore < 0.050) type = ID.COAL_ORE;
+                        else if (coalVeins[this.index(lx, y, lz)]) type = ID.COAL_ORE;
                         else if (y >= 28 && ore < 0.130) type = ID.COPPER_ORE;
                     }
                     if (type === ID.STONE && y >= 6 && y <= h - 4 && this.isCave(wx, y, wz)) type = 0;
