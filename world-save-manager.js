@@ -17,6 +17,7 @@ export function createWorldSaveManager({
     buildSave,
     hasWorld,
     onToast = () => {},
+    onSaveState = () => {},
     onBuildDuration = () => {},
     onError = error => console.warn('Falha no salvamento do mundo:', error),
 }) {
@@ -29,6 +30,7 @@ export function createWorldSaveManager({
         tabId,
         onLost: () => {
             saveWriteBlocked = true;
+            onSaveState('blocked', 'Outra aba está usando este mundo');
             onToast('Outra aba assumiu o save; salvamento bloqueado aqui');
         },
         onError,
@@ -64,6 +66,7 @@ export function createWorldSaveManager({
             const ownsSave = await lock.acquire();
             if (!ownsSave) {
                 saveWriteBlocked = true;
+                onSaveState('blocked', 'Mundo aberto em outra aba');
                 console.warn('Este mundo já está aberto em outra aba; o salvamento foi desativado aqui.');
                 onToast('Mundo aberto em outra aba; salvamento desativado neste jogo');
             }
@@ -143,6 +146,7 @@ export function createWorldSaveManager({
             return null;
         } catch (error) {
             saveWriteBlocked = true;
+            onSaveState('error', 'Não foi possível proteger o save');
             console.warn('Falha ao ler ou proteger o save; gravações bloqueadas para evitar perda de dados:', error);
             return null;
         }
@@ -152,6 +156,7 @@ export function createWorldSaveManager({
         if (!hasWorld()) return;
         clearSaveTimer();
         if (!immediate && quiet) {
+            onSaveState('pending', 'Alterações aguardando salvamento');
             saveTimer = setTimeout(() => {
                 saveTimer = null;
                 performSave(true);
@@ -163,14 +168,16 @@ export function createWorldSaveManager({
 
     async function performSave(quiet) {
         if (!hasWorld()) return false;
-        if (saving) { savePending = true; return false; }
+        if (saving) { savePending = true; onSaveState('pending', 'Novas alterações aguardando salvamento'); return false; }
         if (saveWriteBlocked || !lock.isOwned) {
             lastSaveResult = false;
+            onSaveState('blocked', 'Salvamento bloqueado para proteger o mundo');
             if (!quiet) onToast('Salvamento bloqueado para proteger o mundo aberto em outra aba');
             return false;
         }
 
         saving = true;
+        onSaveState('saving', 'Salvando mundo…');
         let saved = false;
         try {
             const startedAt = performance.now();
@@ -184,10 +191,13 @@ export function createWorldSaveManager({
                 saveFailureActive = false;
                 if (!quiet) onToast('Jogo salvo');
                 else if (recovered) onToast('Salvamento retomado');
+                onSaveState('saved', 'Mundo salvo');
             }
+            if (!wrote) onSaveState('blocked', 'Salvamento bloqueado para proteger o mundo');
             saved = wrote;
         } catch (error) {
             onError(error);
+            onSaveState('error', saveFailureMessage(error));
             if (!saveFailureActive) onToast(saveFailureMessage(error));
             saveFailureActive = true;
         } finally {

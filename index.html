@@ -107,6 +107,20 @@
 </dialog>
 <div id="crosshair"></div>
 <div id="debug"></div>
+<div id="save-indicator" data-state="idle" role="status" aria-live="polite" hidden title="">
+    <svg class="save-indicator-mark" viewBox="0 0 16 16" aria-hidden="true" shape-rendering="crispEdges">
+        <path d="M2 0h10l4 4v11l-1 1H1l-1-1V2l2-2z" fill="#172027"/>
+        <path d="M2 1h9v4H2z" fill="#347b9b"/>
+        <path d="M3 1h6v1H3zM3 3h4v1H3z" fill="#8ed9e7"/>
+        <path d="M11 1h1v4h-1z" fill="#253640"/>
+        <path d="M2 6h12v9H2z" fill="#9ba7a7"/>
+        <path d="M3 7h10v2H3z" fill="#e1e2d6"/>
+        <path d="M4 10h8v4H4z" fill="#202a2c"/>
+        <path d="M5 11h6v2H5z" fill="#78b78b"/>
+        <path d="M6 11h4v1H6z" fill="#c2e7bd"/>
+    </svg>
+    <span id="save-indicator-text" class="visually-hidden"></span>
+</div>
 <div id="toast"></div>
 <div id="hurt"></div>
 <div id="death">

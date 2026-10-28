@@ -1,5 +1,6 @@
 import { openDatabase, storeRequest, STORE_NAME } from './world-storage.js';
 import { createWorldSaveCodec } from './world-save-codec.js';
+import { MAX_SAVE_COPY_BYTES } from './world-save-settings.js';
 import {
     importedSaveKeyFor, parseSaveCopy, readSaveCopy, rejectedSaveKeyFor,
     restoreSaveCopy, saveBackupKeyFor, serializeSaveCopy, stageImportedSaveCopy,
@@ -101,6 +102,13 @@ function showNotice(message) {
     worldOptionsFeedback.hidden = false;
 }
 
+function showProgress(message) {
+    errorBox.hidden = true;
+    worldOptionsFeedback.classList.remove('is-success');
+    worldOptionsFeedback.textContent = message;
+    worldOptionsFeedback.hidden = false;
+}
+
 function makeAction(label, className, onClick) {
     const button = document.createElement('button');
     button.type = 'button';
@@ -110,23 +118,48 @@ function makeAction(label, className, onClick) {
     return button;
 }
 
-async function exportSaveCopy(world, kind) {
+async function exportSaveCopy(world, kind, button) {
+    const buttonLabel = button?.textContent;
+    if (button) {
+        button.disabled = true;
+        button.textContent = 'Preparando arquivo…';
+    }
+    if (worldOptionsDialog.open) showProgress('Preparando a cópia do save para download…');
+    let objectUrl = null;
     try {
         const save = await readSaveCopy(storeRequest, world, kind);
         const safeName = world.name.replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-').trim() || 'mundo';
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const blob = new Blob([serializeSaveCopy(world, kind, save)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
+        if (blob.size > MAX_SAVE_COPY_BYTES) {
+            throw new Error('Esta cópia ultrapassa 64 MB e não pode ser importada pelo jogo.');
+        }
+        const downloadUrl = URL.createObjectURL(blob);
+        objectUrl = downloadUrl;
         const link = document.createElement('a');
-        link.href = url;
+        link.href = downloadUrl;
         link.download = `${safeName}-${kind}-${timestamp}.json`;
         document.body.append(link);
         link.click();
         link.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+        objectUrl = null;
+        if (worldOptionsDialog.open) showNotice('Download da cópia iniciado.');
     } catch (error) {
         showError(error.message || 'Não foi possível exportar esta cópia do save.');
+    } finally {
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        if (button?.isConnected) {
+            button.disabled = false;
+            button.textContent = buttonLabel;
+        }
     }
+}
+
+function makeExportAction(label, world, kind) {
+    let button;
+    button = makeAction(label, 'export', () => exportSaveCopy(world, kind, button));
+    return button;
 }
 
 async function importSaveCopy(world, file) {
@@ -166,6 +199,9 @@ function addImportAction(actions, world) {
         if (!file) return;
         try {
             if (world.hasImportedSave && !confirm('Substituir a cópia importada que está aguardando recuperação?')) return;
+            button.disabled = true;
+            button.textContent = 'Validando arquivo…';
+            showProgress('Lendo e validando a cópia do save…');
             await importSaveCopy(world, file);
             world.hasImportedSave = true;
             await renderWorlds();
@@ -174,6 +210,8 @@ function addImportAction(actions, world) {
         } catch (error) {
             showError(error.message || 'Não foi possível importar esta cópia do save.');
         } finally {
+            button.disabled = false;
+            button.textContent = world.hasImportedSave ? 'Trocar cópia importada' : 'Importar cópia JSON';
             input.value = '';
         }
     });
@@ -298,13 +336,13 @@ function renderWorldOptions(world) {
 
     if (world.hasSave) {
         const actions = addSaveGroup('Save atual', 'Faça uma cópia do progresso salvo neste mundo.');
-        actions.append(makeAction('Baixar save atual', 'export', () => exportSaveCopy(world, 'current')));
+        actions.append(makeExportAction('Baixar save atual', world, 'current'));
     }
     if (world.hasBackup) {
         const actions = addSaveGroup('Backup automático', 'O backup anterior pode recuperar um progresso mais antigo.');
         actions.append(
             makeAction('Restaurar backup', 'export', () => restoreWorldCopy(world, 'backup')),
-            makeAction('Baixar backup', 'export', () => exportSaveCopy(world, 'backup')),
+            makeExportAction('Baixar backup', world, 'backup'),
         );
     }
     if (world.hasImportedSave) {
@@ -315,7 +353,7 @@ function renderWorldOptions(world) {
         const actions = addSaveGroup('Save recuperável', 'Um save inválido foi preservado para tentativa de recuperação.');
         actions.append(
             makeAction('Restaurar save rejeitado', 'export', () => restoreWorldCopy(world, 'rejected')),
-            makeAction('Baixar save rejeitado', 'export', () => exportSaveCopy(world, 'rejected')),
+            makeExportAction('Baixar save rejeitado', world, 'rejected'),
         );
     }
     const importActions = addSaveGroup('Importar save', 'Selecione um arquivo JSON exportado anteriormente para este mundo.');

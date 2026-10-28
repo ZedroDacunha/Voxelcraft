@@ -1198,6 +1198,25 @@ function showToast(text) {
     toastTimer = setTimeout(() => { el.style.display = 'none'; }, 2000);
 }
 
+let saveIndicatorTimer = 0;
+function setSaveIndicator(state, message) {
+    const indicator = document.getElementById('save-indicator');
+    document.getElementById('save-indicator-text').textContent = message;
+    indicator.dataset.state = state;
+    indicator.title = message;
+    clearTimeout(saveIndicatorTimer);
+    if (state === 'pending' || state === 'saving') {
+        indicator.hidden = true;
+        return;
+    }
+    indicator.hidden = false;
+    if (state === 'saved') {
+        saveIndicatorTimer = setTimeout(() => {
+            if (indicator.dataset.state === 'saved') indicator.hidden = true;
+        }, 1800);
+    }
+}
+
 const furnaces = new Map();
 let station = null;
 let furnaceDirty = false;
@@ -2918,6 +2937,7 @@ const saveManager = createWorldSaveManager({
     buildSave,
     hasWorld: () => Boolean(world),
     onToast: showToast,
+    onSaveState: setSaveIndicator,
     onBuildDuration: duration => { perf.buildMs = duration; },
     onError: error => console.warn('Falha ao salvar:', error),
 });
@@ -3175,6 +3195,7 @@ async function init() {
                 event.preventDefault();
                 debugVisible = !debugVisible;
                 debugEl.style.display = debugVisible ? 'block' : 'none';
+                document.body.classList.toggle('debug-visible', debugVisible);
                 break;
         }
         if (event.code.startsWith('Digit')) {

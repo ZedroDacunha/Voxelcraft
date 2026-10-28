@@ -1,4 +1,5 @@
 import { WORLD_SAVE_VERSION } from './world-save-codec.js';
+import { MAX_SAVE_COPY_BYTES } from './world-save-settings.js';
 
 export const saveBackupKeyFor = saveKey => `${saveKey}-backup`;
 export const rejectedSaveKeyFor = saveKey => `${saveKey}-rejected`;
@@ -29,15 +30,31 @@ export function serializeSaveCopy(world, kind, save) {
 }
 
 export async function parseSaveCopy(file, expectedSeed) {
-    if (file.size > 64 * 1024 * 1024) throw new Error('O arquivo ultrapassa o limite de 64 MB.');
-    const archive = JSON.parse(await file.text(), (field, value) => {
-        if (value?.__type !== 'Uint16Array') return value;
-        if (!Array.isArray(value.values) || value.values.length > 32768 ||
-            value.values.some(item => !Number.isInteger(item) || item < 0 || item > 65535)) {
-            throw new Error('O arquivo contém edições de terreno inválidas.');
-        }
-        return new Uint16Array(value.values);
-    });
+    if (!file || !Number.isFinite(file.size)) throw new Error('Não foi possível ler o arquivo selecionado.');
+    if (file.size === 0) throw new Error('O arquivo selecionado está vazio.');
+    if (file.size > MAX_SAVE_COPY_BYTES) throw new Error('O arquivo ultrapassa o limite de 64 MB.');
+
+    let source;
+    try {
+        source = await file.text();
+    } catch {
+        throw new Error('Não foi possível ler o arquivo selecionado.');
+    }
+
+    let archive;
+    try {
+        archive = JSON.parse(source, (field, value) => {
+            if (value?.__type !== 'Uint16Array') return value;
+            if (!Array.isArray(value.values) || value.values.length > 32768 ||
+                value.values.some(item => !Number.isInteger(item) || item < 0 || item > 65535)) {
+                throw new Error('O arquivo contém edições de terreno inválidas.');
+            }
+            return new Uint16Array(value.values);
+        });
+    } catch (error) {
+        if (error instanceof SyntaxError) throw new Error('O arquivo selecionado não contém um JSON válido.');
+        throw error;
+    }
     const save = archive?.save;
     if (archive?.format !== 'voxel-sandbox-save-copy' || !['current', 'backup', 'rejected'].includes(archive.kind) ||
         archive.world?.seed !== expectedSeed || save?.v !== WORLD_SAVE_VERSION || save.seed !== expectedSeed) {
