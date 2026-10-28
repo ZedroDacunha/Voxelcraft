@@ -66,9 +66,11 @@ async function getWorlds() {
                 storeRequest('readonly', store => store.getKey(rejectedSaveKeyFor(world.saveKey))),
                 storeRequest('readonly', store => store.getKey(importedSaveKeyFor(world.saveKey))),
             ]);
+            const lastSavedAt = Number.isFinite(save?.time) ? save.time : null;
             worlds.push({
                 ...world,
-                lastPlayed: Number.isFinite(save?.time) ? save.time : world.createdAt,
+                lastSavedAt,
+                sortTimestamp: lastSavedAt ?? (Number.isFinite(world.createdAt) ? world.createdAt : 0),
                 hasSave: save !== undefined,
                 hasBackup: backupKey !== undefined,
                 hasRejectedSave: rejectedKey !== undefined,
@@ -76,12 +78,24 @@ async function getWorlds() {
             });
         }
     }
-    return worlds.sort((a, b) => (b.lastPlayed || 0) - (a.lastPlayed || 0));
+    return worlds.sort((a, b) => b.sortTimestamp - a.sortTimestamp);
 }
 
 function formatDate(value) {
     if (!Number.isFinite(value)) return 'Ainda não iniciado';
     return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium', timeStyle: 'short' }).format(value);
+}
+
+function formatWorldActivity(world) {
+    if (world.hasSave) {
+        return Number.isFinite(world.lastSavedAt)
+            ? `Último save: ${formatDate(world.lastSavedAt)}`
+            : 'Save atual sem data válida · confira as opções';
+    }
+    if (world.hasBackup || world.hasImportedSave || world.hasRejectedSave) {
+        return 'Save atual indisponível · há uma cópia de recuperação';
+    }
+    return `Ainda não iniciado · criado em ${formatDate(world.createdAt)}`;
 }
 
 function showError(message = '') {
@@ -331,7 +345,7 @@ function addStorageProtectionOption() {
 
 function renderWorldOptions(world) {
     document.getElementById('world-options-title').textContent = world.name;
-    document.getElementById('world-options-summary').textContent = `Seed ${world.seed} · Última sessão: ${formatDate(world.lastPlayed)}`;
+    document.getElementById('world-options-summary').textContent = `Seed ${world.seed} · ${formatWorldActivity(world)}`;
     worldSaveActions.replaceChildren();
 
     if (world.hasSave) {
@@ -409,7 +423,7 @@ function renderWorldList() {
         const title = document.createElement('h2');
         title.textContent = world.name;
         const details = document.createElement('p');
-        details.textContent = `Seed ${world.seed} · Última sessão: ${formatDate(world.lastPlayed)}`;
+        details.textContent = `Seed ${world.seed} · ${formatWorldActivity(world)}`;
         info.append(title, details);
         const actions = document.createElement('div');
         actions.className = 'world-card-actions';

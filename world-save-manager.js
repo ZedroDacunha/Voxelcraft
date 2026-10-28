@@ -4,6 +4,7 @@ import {
 } from './world-save-recovery.js';
 
 const SAVE_DEBOUNCE_MS = 5000;
+const SAVE_RETRY_DELAYS_MS = [2000, 5000, 12000, 30000];
 
 // Coordena o ciclo completo do save; o jogo fornece apenas callbacks para
 // construir o estado vivo e apresentar mensagens ao jogador.
@@ -30,6 +31,7 @@ export function createWorldSaveManager({
         tabId,
         onLost: () => {
             saveWriteBlocked = true;
+            clearSaveRetry();
             onSaveState('blocked', 'Outra aba está usando este mundo');
             onToast('Outra aba assumiu o save; salvamento bloqueado aqui');
         },
@@ -40,6 +42,8 @@ export function createWorldSaveManager({
     let primarySaveKnownGood = false;
     let saving = false;
     let saveTimer = null;
+    let saveRetryTimer = null;
+    let saveRetryAttempt = 0;
     let savePending = false;
     let releaseLockAfterSave = false;
     let lastSaveResult = false;
@@ -59,6 +63,30 @@ export function createWorldSaveManager({
         if (saveTimer === null) return;
         clearTimeout(saveTimer);
         saveTimer = null;
+    }
+
+    function clearSaveRetry(resetAttempt = false) {
+        if (saveRetryTimer !== null) clearTimeout(saveRetryTimer);
+        saveRetryTimer = null;
+        if (resetAttempt) saveRetryAttempt = 0;
+    }
+
+    function isPermanentSaveFailure(error) {
+        return error?.name === 'QuotaExceededError' || error?.code === 22 || error?.code === 1014 ||
+            error?.name === 'SecurityError' || error?.name === 'NotAllowedError';
+    }
+
+    function scheduleSaveRetry(error) {
+        if (isPermanentSaveFailure(error) || !hasWorld() || saveWriteBlocked || !lock.isOwned || releaseLockAfterSave) return;
+        if (saveRetryTimer !== null) return;
+        const delayIndex = Math.min(saveRetryAttempt, SAVE_RETRY_DELAYS_MS.length - 1);
+        const delay = SAVE_RETRY_DELAYS_MS[delayIndex];
+        saveRetryAttempt++;
+        saveRetryTimer = setTimeout(() => {
+            saveRetryTimer = null;
+            if (saving) savePending = true;
+            else void performSave(true);
+        }, delay);
     }
 
     async function load({ reset = false } = {}) {
@@ -155,6 +183,7 @@ export function createWorldSaveManager({
     function requestSave(quiet, immediate = false) {
         if (!hasWorld()) return;
         clearSaveTimer();
+        clearSaveRetry(true);
         if (!immediate && quiet) {
             onSaveState('pending', 'Alterações aguardando salvamento');
             saveTimer = setTimeout(() => {
@@ -179,6 +208,7 @@ export function createWorldSaveManager({
         saving = true;
         onSaveState('saving', 'Salvando mundo…');
         let saved = false;
+        let retryError = null;
         try {
             const startedAt = performance.now();
             const data = buildSave();
@@ -189,6 +219,7 @@ export function createWorldSaveManager({
                 primarySaveKnownGood = true;
                 const recovered = saveFailureActive;
                 saveFailureActive = false;
+                clearSaveRetry(true);
                 if (!quiet) onToast('Jogo salvo');
                 else if (recovered) onToast('Salvamento retomado');
                 onSaveState('saved', 'Mundo salvo');
@@ -200,6 +231,7 @@ export function createWorldSaveManager({
             onSaveState('error', saveFailureMessage(error));
             if (!saveFailureActive) onToast(saveFailureMessage(error));
             saveFailureActive = true;
+            retryError = error;
         } finally {
             lastSaveResult = saved;
             saving = false;
@@ -212,6 +244,8 @@ export function createWorldSaveManager({
             } else if (releaseLockAfterSave) {
                 releaseLockAfterSave = false;
                 void lock.release();
+            } else if (retryError) {
+                scheduleSaveRetry(retryError);
             }
         }
         return saved;
@@ -219,6 +253,7 @@ export function createWorldSaveManager({
 
     async function flushAndRelease(quiet = true) {
         clearSaveTimer();
+        clearSaveRetry();
         if (saving) {
             savePending = true;
             while (saving || savePending) await new Promise(resolve => setTimeout(resolve, 25));
@@ -233,6 +268,7 @@ export function createWorldSaveManager({
 
     function flushAndReleaseOnPageHide() {
         clearSaveTimer();
+        clearSaveRetry();
         if (!hasWorld() || saveWriteBlocked || !lock.isOwned) {
             void lock.release();
             return;
@@ -252,7 +288,7 @@ export function createWorldSaveManager({
         requestSave,
         saveNow: performSave,
         flushAndRelease,
-        release: () => lock.release(),
+        release: () => { clearSaveRetry(true); return lock.release(); },
         get isSaving() { return saving; },
     };
 }
