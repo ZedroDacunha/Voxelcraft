@@ -1,8 +1,13 @@
 import { openDatabase, storeRequest, STORE_NAME } from './world-storage.js';
 
+import('./menu-background.js').catch(error => {
+    console.warn('Panorama animado indisponível; usando o cenário estático.', error);
+});
+
 const META_PREFIX = 'world-meta:';
 const LOCK_TTL = 30000;
 
+const titleScreen = document.getElementById('title-screen');
 const menu = document.getElementById('world-menu');
 const list = document.getElementById('world-list');
 const errorBox = document.getElementById('world-menu-error');
@@ -201,6 +206,22 @@ async function deleteWorld(world) {
 
 document.getElementById('btn-create-world').addEventListener('click', () => openWorldDialog());
 document.getElementById('btn-world-cancel').addEventListener('click', () => dialog.close());
+document.getElementById('btn-open-worlds').addEventListener('click', () => {
+    titleScreen.hidden = true;
+    menu.hidden = false;
+    document.getElementById('btn-create-world').focus();
+});
+document.getElementById('btn-back-title').addEventListener('click', () => {
+    menu.hidden = true;
+    titleScreen.hidden = false;
+    document.getElementById('btn-open-worlds').focus();
+});
+document.getElementById('btn-open-options').addEventListener('click', () => {
+    document.getElementById('options-dialog').showModal();
+});
+document.getElementById('btn-quit-game').addEventListener('click', () => {
+    document.getElementById('quit-hint').hidden = false;
+});
 dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
 
 renderWorlds().catch(error => {

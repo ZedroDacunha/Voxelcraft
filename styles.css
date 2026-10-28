@@ -88,3 +88,70 @@
         position: absolute; top: 8px; left: 8px; z-index: 5; display: none; pointer-events: none;
         color: #fff; font: 12px/1.4 monospace; background: rgba(0,0,0,0.55); padding: 6px 8px; white-space: pre; border-radius: 4px;
     }
+
+    /* Tela inicial em blocos, inspirada na composição clássica dos jogos voxel. */
+    #title-screen { position: fixed; inset: 0; z-index: 40; overflow: hidden; display: grid; grid-template-rows: auto 1fr auto;
+        box-sizing: border-box; padding: clamp(14px, 2vw, 26px); color: #fff; font-family: Arial, sans-serif; isolation: isolate; }
+    #title-screen[hidden] { display: none; }
+    #title-screen::before, #title-screen::after { content: ''; position: absolute; inset: 0; pointer-events: none; }
+    #title-screen::before { z-index: -2; background: #8fc8e7 url('./menu-panorama.svg') center / cover no-repeat; image-rendering: pixelated; }
+    #title-screen::after { z-index: 0; background: linear-gradient(180deg, rgba(11, 22, 34, .16) 0%, rgba(13, 23, 28, .08) 38%, rgba(8, 15, 13, .36) 100%),
+        radial-gradient(ellipse at center, transparent 38%, rgba(8, 15, 20, .2) 100%); }
+    #menu-world { position: absolute; inset: 0; z-index: -1; display: block; width: 100%; height: 100%; pointer-events: none; }
+    .title-screen-top, .title-screen-footer { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between;
+        color: rgba(255,255,255,.86); font: 700 11px/1 monospace; letter-spacing: .12em; text-shadow: 1px 2px 2px #182218; }
+    .title-screen-top { justify-content: flex-start; gap: 8px; }
+    .menu-mark { display: grid; place-items: center; width: 22px; height: 22px; border: 2px solid #fff; background: #54723e;
+        box-shadow: 2px 2px 0 #26351f; font: 900 14px/1 monospace; }
+    .title-screen-center { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 14px 0 24px; }
+    .title-screen-logo { position: relative; display: flex; flex-direction: column; align-items: center; margin: 0 0 clamp(28px, 5vh, 48px);
+        transform: rotate(-2deg); filter: drop-shadow(3px 5px 0 rgba(0,0,0,.75)); }
+    .title-logo-main { color: #f1eee1; font: 1000 clamp(54px, 10vw, 112px)/.82 Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
+        letter-spacing: -.045em; -webkit-text-stroke: 2px #24221d; text-shadow: 3px 3px 0 #898577, 6px 6px 0 #292823; }
+    .title-logo-sub { margin-top: 8px; color: #d7d2bf; font: 900 clamp(14px, 2.3vw, 23px)/1 monospace; letter-spacing: .42em; text-shadow: 2px 2px 0 #292823; }
+    .title-logo-splash { position: absolute; right: clamp(-90px, -11vw, -48px); bottom: 10%; color: #fff34c; font: 900 clamp(12px, 1.8vw, 20px)/1 cursive;
+        white-space: nowrap; text-shadow: 2px 2px 0 #4d4819; transform: rotate(-13deg); }
+    .title-screen-actions { display: grid; gap: 8px; width: min(360px, calc(100vw - 40px)); }
+    .classic-btn { position: relative; min-height: 34px; box-sizing: border-box; padding: 6px 16px; border: 2px solid #171717; border-radius: 0;
+        color: #fff; background: linear-gradient(#858585 0%, #777 47%, #696969 50%, #777 100%);
+        box-shadow: inset 2px 2px 0 #ffffff4d, inset -2px -2px 0 #0004, 2px 3px 0 #0008;
+        font: 15px/1.1 Arial, sans-serif; text-align: center; text-shadow: 1px 2px 0 #292929; cursor: pointer;
+        transition: background-color 80ms linear, filter 80ms linear; }
+    .classic-btn:hover:not(:disabled), .classic-btn:focus-visible { border-color: #fff; background: linear-gradient(#a0a0a0 0%, #909090 47%, #828282 50%, #929292 100%); outline: none; }
+    .classic-btn:active:not(:disabled) { background: linear-gradient(#626262, #777); box-shadow: inset 2px 2px 2px #0008; transform: translateY(1px); }
+    .classic-btn:focus-visible { outline: 1px solid #fff; outline-offset: 1px; }
+    .classic-btn:disabled { color: #b9b9b9; cursor: not-allowed; text-shadow: 1px 1px 0 #333; }
+    .classic-btn-wide { width: 100%; }
+    .title-screen-secondary { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 5px; }
+    .title-screen-secondary .classic-btn { min-height: 32px; font-size: 14px; }
+    .quit-hint { margin: 0; padding: 6px 9px; color: white; background: #111b; text-align: center; font: 12px monospace; text-shadow: 1px 1px #000; }
+    .title-screen-footer { align-items: flex-end; font-size: 10px; letter-spacing: .03em; }
+    .world-menu-back { margin-bottom: 26px; }
+    .world-menu-card { border: 2px solid #282820; border-radius: 0; background: rgba(23, 25, 22, .9); box-shadow: 4px 5px 0 #0008; }
+    .world-menu-eyebrow { color: #d6d0a4; }
+    .world-menu-subtitle { color: #d0d0d0; }
+    .world-card { border-radius: 0; border-color: #4c4c43; background: #30332edb; }
+    .world-empty { border-radius: 0; }
+    .world-create { border: 2px solid #171717; border-radius: 0; background: linear-gradient(#858585 0%, #777 47%, #696969 50%, #777 100%);
+        box-shadow: inset 2px 2px 0 #ffffff4d, inset -2px -2px 0 #0004, 2px 3px 0 #0008; text-shadow: 1px 2px 0 #292929; }
+    .world-create:hover { border-color: #fff; background: linear-gradient(#a0a0a0 0%, #909090 47%, #828282 50%, #929292 100%); }
+    .world-action { border-radius: 0; background: linear-gradient(#777, #555); box-shadow: inset 2px 2px 0 #ffffff38, inset -2px -2px 0 #0004, 1px 2px 0 #0008; }
+    .world-action:hover { border-color: #fff; background: linear-gradient(#999, #666); }
+    .world-action.play { border-color: #171717; background: linear-gradient(#858585 0%, #777 47%, #696969 50%, #777 100%); }
+    .world-action.play:hover { border-color: #fff; background: linear-gradient(#a0a0a0 0%, #909090 47%, #828282 50%, #929292 100%); }
+    .world-dialog, .options-dialog { border-radius: 0; }
+    .options-dialog p { color: #d0d0d0; line-height: 1.55; }
+    .options-dialog kbd { padding: 2px 5px; border: 1px solid #747474; background: #343434; color: #fff; font: 12px monospace; }
+    @media (max-width: 520px) {
+        .title-screen-footer span:last-child { display: none; }
+        .title-screen-logo { margin-bottom: 34px; }
+        .title-logo-main { -webkit-text-stroke-width: 1px; }
+        .world-menu-card { padding: 22px 16px; }
+    }
+    @media (max-height: 540px) {
+        #title-screen { padding-block: 10px; }
+        .title-screen-logo { margin-bottom: 18px; }
+        .title-logo-main { font-size: clamp(42px, 12vh, 72px); }
+        .title-screen-actions { gap: 5px; width: min(320px, calc(100vw - 40px)); }
+        .classic-btn-wide { min-height: 32px; }
+    }

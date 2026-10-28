@@ -24,16 +24,50 @@
 </script>
 </head>
 <body>
-<main id="world-menu" aria-labelledby="world-menu-title">
+<main id="title-screen" aria-labelledby="title-screen-logo">
+    <canvas id="menu-world" aria-hidden="true"></canvas>
+    <div class="title-screen-top"><span class="menu-mark">V</span><span>MENU DO JOGO</span></div>
+    <section class="title-screen-center">
+        <div class="title-screen-logo" id="title-screen-logo" aria-label="Voxel Sandbox">
+            <span class="title-logo-main">VOXEL</span>
+            <span class="title-logo-sub">SANDBOX</span>
+            <span class="title-logo-splash">um mundo de blocos!</span>
+        </div>
+        <div class="title-screen-actions">
+            <button class="classic-btn classic-btn-wide" id="btn-open-worlds">Um jogador</button>
+            <div class="title-screen-secondary">
+                <button class="classic-btn" id="btn-open-options">Opções...</button>
+                <button class="classic-btn" id="btn-quit-game">Sair do jogo</button>
+            </div>
+            <p id="quit-hint" class="quit-hint" hidden>Para sair, feche esta aba do navegador.</p>
+        </div>
+    </section>
+    <footer class="title-screen-footer">
+        <span>Voxel Sandbox · Edição de sobrevivência</span>
+        <span>Uma aventura em blocos</span>
+    </footer>
+</main>
+<section id="world-menu" aria-labelledby="world-menu-title" hidden>
     <section class="world-menu-card">
-        <p class="world-menu-eyebrow">SANDBOX VOXEL</p>
+        <button class="classic-btn world-menu-back" id="btn-back-title" aria-label="Voltar ao menu principal">‹ Menu principal</button>
+        <p class="world-menu-eyebrow">UM JOGADOR</p>
         <h1 id="world-menu-title">Seus mundos</h1>
         <p class="world-menu-subtitle">Escolha onde continuar ou crie um novo mundo.</p>
         <div id="world-list" class="world-list" aria-live="polite"></div>
         <button class="btn world-create" id="btn-create-world">＋ Criar mundo</button>
         <p id="world-menu-error" class="world-menu-error" role="alert" hidden></p>
     </section>
-</main>
+</section>
+<dialog id="options-dialog" class="world-dialog options-dialog">
+    <form method="dialog">
+        <p class="world-menu-eyebrow">CONFIGURAÇÃO</p>
+        <h2>Opções</h2>
+        <p>Controles: <kbd>W A S D</kbd> mover · <kbd>Espaço</kbd> pular · <kbd>Shift</kbd> correr</p>
+        <p><kbd>F4</kbd> alterna a qualidade gráfica durante o jogo.</p>
+        <p>Mouse: olhar ao redor · botão esquerdo: minerar · botão direito: usar ou colocar blocos.</p>
+        <div class="world-dialog-actions"><button class="classic-btn" value="close">Concluído</button></div>
+    </form>
+</dialog>
 <dialog id="world-dialog" class="world-dialog">
     <form id="world-form">
         <h2 id="world-dialog-title">Criar mundo</h2>
