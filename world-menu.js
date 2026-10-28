@@ -2,7 +2,7 @@ import { openDatabase, storeRequest, STORE_NAME } from './world-storage.js';
 import { createWorldSaveCodec } from './world-save-codec.js';
 import {
     importedSaveKeyFor, parseSaveCopy, readSaveCopy, rejectedSaveKeyFor,
-    saveBackupKeyFor, serializeSaveCopy, stageImportedSaveCopy,
+    restoreSaveCopy, saveBackupKeyFor, serializeSaveCopy, stageImportedSaveCopy,
 } from './world-save-recovery.js';
 
 import('./menu-background.js').catch(error => {
@@ -18,6 +18,9 @@ const menu = document.getElementById('world-menu');
 const list = document.getElementById('world-list');
 const errorBox = document.getElementById('world-menu-error');
 const dialog = document.getElementById('world-dialog');
+const worldOptionsDialog = document.getElementById('world-options-dialog');
+const worldOptionsFeedback = document.getElementById('world-options-feedback');
+const worldSaveActions = document.getElementById('world-save-actions');
 const form = document.getElementById('world-form');
 const nameInput = document.getElementById('world-name');
 const seedInput = document.getElementById('world-seed');
@@ -77,8 +80,21 @@ function formatDate(value) {
 }
 
 function showError(message = '') {
+    errorBox.classList.remove('is-success');
     errorBox.textContent = message;
     errorBox.hidden = !message;
+    worldOptionsFeedback.classList.remove('is-success');
+    worldOptionsFeedback.textContent = message;
+    worldOptionsFeedback.hidden = !message;
+}
+
+function showNotice(message) {
+    errorBox.classList.add('is-success');
+    errorBox.textContent = message;
+    errorBox.hidden = false;
+    worldOptionsFeedback.classList.add('is-success');
+    worldOptionsFeedback.textContent = message;
+    worldOptionsFeedback.hidden = false;
 }
 
 function makeAction(label, className, onClick) {
@@ -117,6 +133,23 @@ async function importSaveCopy(world, file) {
     await stageImportedSaveCopy(storeRequest, world, save, LOCK_TTL);
 }
 
+async function restoreWorldCopy(world, kind) {
+    const copyName = kind === 'backup' ? 'o backup rotativo'
+        : kind === 'imported' ? 'a cópia importada' : 'o save rejeitado';
+    const confirmed = confirm(
+        `Restaurar ${copyName} de “${world.name}”? O save atual será preservado como backup ou arquivo rejeitado. Deseja continuar?`
+    );
+    if (!confirmed) return;
+    try {
+        await restoreSaveCopy(storeRequest, world, kind, saveCodec, LOCK_TTL);
+        worldOptionsDialog.close();
+        await renderWorlds();
+        showNotice(`Cópia restaurada em “${world.name}”.`);
+    } catch (error) {
+        showError(error.message || 'Não foi possível restaurar esta cópia do save.');
+    }
+}
+
 function addImportAction(actions, world) {
     const input = document.createElement('input');
     input.type = 'file';
@@ -130,7 +163,10 @@ function addImportAction(actions, world) {
         try {
             if (world.hasImportedSave && !confirm('Substituir a cópia importada que está aguardando recuperação?')) return;
             await importSaveCopy(world, file);
+            world.hasImportedSave = true;
             await renderWorlds();
+            renderWorldOptions(world);
+            showNotice(`Cópia importada para “${world.name}”.`);
         } catch (error) {
             showError(error.message || 'Não foi possível importar esta cópia do save.');
         } finally {
@@ -138,6 +174,63 @@ function addImportAction(actions, world) {
         }
     });
     actions.append(button, input);
+}
+
+function addSaveGroup(label, description) {
+    const group = document.createElement('section');
+    group.className = 'world-save-group';
+    const heading = document.createElement('h3');
+    heading.textContent = label;
+    const detail = document.createElement('p');
+    detail.textContent = description;
+    const buttons = document.createElement('div');
+    buttons.className = 'world-save-group-actions';
+    group.append(heading, detail, buttons);
+    worldSaveActions.append(group);
+    return buttons;
+}
+
+function renderWorldOptions(world) {
+    document.getElementById('world-options-title').textContent = world.name;
+    document.getElementById('world-options-summary').textContent = `Seed ${world.seed} · Última sessão: ${formatDate(world.lastPlayed)}`;
+    worldSaveActions.replaceChildren();
+
+    if (world.hasSave) {
+        const actions = addSaveGroup('Save atual', 'Faça uma cópia do progresso salvo neste mundo.');
+        actions.append(makeAction('Baixar save atual', 'export', () => exportSaveCopy(world, 'current')));
+    }
+    if (world.hasBackup) {
+        const actions = addSaveGroup('Backup automático', 'O backup anterior pode recuperar um progresso mais antigo.');
+        actions.append(
+            makeAction('Restaurar backup', 'export', () => restoreWorldCopy(world, 'backup')),
+            makeAction('Baixar backup', 'export', () => exportSaveCopy(world, 'backup')),
+        );
+    }
+    if (world.hasImportedSave) {
+        const actions = addSaveGroup('Cópia importada', 'Uma cópia JSON está guardada e pode substituir o save atual.');
+        actions.append(makeAction('Usar cópia importada', 'export', () => restoreWorldCopy(world, 'imported')));
+    }
+    if (world.hasRejectedSave) {
+        const actions = addSaveGroup('Save recuperável', 'Um save inválido foi preservado para tentativa de recuperação.');
+        actions.append(
+            makeAction('Restaurar save rejeitado', 'export', () => restoreWorldCopy(world, 'rejected')),
+            makeAction('Baixar save rejeitado', 'export', () => exportSaveCopy(world, 'rejected')),
+        );
+    }
+    const importActions = addSaveGroup('Importar save', 'Selecione um arquivo JSON exportado anteriormente para este mundo.');
+    addImportAction(importActions, world);
+
+    const worldActions = addSaveGroup('Mundo', 'Ajustes básicos deste mundo.');
+    worldActions.append(makeAction('Renomear mundo', '', () => {
+        worldOptionsDialog.close();
+        openWorldDialog(world);
+    }));
+}
+
+function openWorldOptions(world) {
+    showError();
+    renderWorldOptions(world);
+    worldOptionsDialog.showModal();
 }
 
 async function renderWorlds() {
@@ -161,21 +254,10 @@ async function renderWorlds() {
         const details = document.createElement('p');
         details.textContent = `Seed ${world.seed} · Última sessão: ${formatDate(world.lastPlayed)}`;
         info.append(title, details);
-        if (world.hasImportedSave) {
-            const recoveryStatus = document.createElement('p');
-            recoveryStatus.className = 'world-recovery-status';
-            recoveryStatus.textContent = 'Cópia importada; será usada se o save principal estiver inválido ou ausente';
-            info.append(recoveryStatus);
-        }
-
         const actions = document.createElement('div');
         actions.className = 'world-card-actions';
         actions.append(makeAction('Jogar', 'play', () => launchWorld(world)));
-        actions.append(makeAction('Renomear', '', () => openWorldDialog(world)));
-        addImportAction(actions, world);
-        if (world.hasSave) actions.append(makeAction('Baixar save atual', 'export', () => exportSaveCopy(world, 'current')));
-        if (world.hasBackup) actions.append(makeAction('Baixar backup', 'export', () => exportSaveCopy(world, 'backup')));
-        if (world.hasRejectedSave) actions.append(makeAction('Baixar save rejeitado', 'export', () => exportSaveCopy(world, 'rejected')));
+        actions.append(makeAction('Opções do mundo', '', () => openWorldOptions(world)));
         actions.append(makeAction('Excluir', 'delete', () => deleteWorld(world)));
         card.append(info, actions);
         list.append(card);
@@ -286,6 +368,8 @@ async function deleteWorld(world) {
 
 document.getElementById('btn-create-world').addEventListener('click', () => openWorldDialog());
 document.getElementById('btn-world-cancel').addEventListener('click', () => dialog.close());
+document.getElementById('btn-world-options-close').addEventListener('click', () => worldOptionsDialog.close());
+document.getElementById('btn-world-options-done').addEventListener('click', () => worldOptionsDialog.close());
 document.getElementById('btn-open-worlds').addEventListener('click', () => {
     titleScreen.hidden = true;
     menu.hidden = false;
@@ -303,6 +387,7 @@ document.getElementById('btn-quit-game').addEventListener('click', () => {
     document.getElementById('quit-hint').hidden = false;
 });
 dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
+worldOptionsDialog.addEventListener('click', event => { if (event.target === worldOptionsDialog) worldOptionsDialog.close(); });
 
 renderWorlds().catch(error => {
     console.error('Falha ao carregar a lista de mundos:', error);

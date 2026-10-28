@@ -63,6 +63,56 @@ export async function stageImportedSaveCopy(storeRequest, world, save, lockTtl =
     if (worldIsOpen) throw new Error('Feche este mundo em outra aba antes de importar uma cópia.');
 }
 
+export async function restoreSaveCopy(storeRequest, world, kind, codec, lockTtl = 30000) {
+    const sourceKey = kind === 'backup'
+        ? saveBackupKeyFor(world.saveKey)
+        : kind === 'rejected' ? rejectedSaveKeyFor(world.saveKey)
+            : kind === 'imported' ? importedSaveKeyFor(world.saveKey) : null;
+    if (!sourceKey) throw new Error('Tipo de cópia do save inválido.');
+
+    let worldIsOpen = false;
+    let sourceIsInvalid = false;
+    let restored = false;
+    await storeRequest('readwrite', store => {
+        const lockRequest = store.get(`${world.saveKey}-writer-lock`);
+        const currentRequest = store.get(world.saveKey);
+        const sourceRequest = store.get(sourceKey);
+        const rejectedRequest = store.get(rejectedSaveKeyFor(world.saveKey));
+        const requests = [lockRequest, currentRequest, sourceRequest, rejectedRequest];
+        let completed = 0;
+
+        const prepareRestore = () => {
+            completed++;
+            if (completed !== requests.length) return;
+
+            const lock = lockRequest.result;
+            worldIsOpen = Boolean(lock && Number.isFinite(lock.heartbeat) && Date.now() - lock.heartbeat <= lockTtl);
+            if (worldIsOpen) return;
+
+            const source = sourceRequest.result;
+            if (!codec.validate(source, world.seed)) {
+                sourceIsInvalid = true;
+                return;
+            }
+
+            const current = currentRequest.result;
+            if (current !== undefined) {
+                if (codec.validate(current, world.seed)) store.put(current, saveBackupKeyFor(world.saveKey));
+                else if (rejectedRequest.result === undefined) store.put(current, rejectedSaveKeyFor(world.saveKey));
+            }
+            store.put(source, world.saveKey);
+            if (kind === 'imported') store.delete(sourceKey);
+            restored = true;
+        };
+
+        for (const request of requests) request.onsuccess = prepareRestore;
+        return sourceRequest;
+    });
+
+    if (worldIsOpen) throw new Error('Feche este mundo em outra aba antes de restaurar uma cópia.');
+    if (sourceIsInvalid || !restored) throw new Error('Esta cópia não é válida para o mundo selecionado.');
+}
+
 // Guarda o primeiro save rejeitado sem substituir o último backup válido.
 export async function preserveRejectedSave(storeRequest, saveKey, data) {
     const rejectedKey = rejectedSaveKeyFor(saveKey);

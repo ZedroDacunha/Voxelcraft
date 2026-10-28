@@ -8,6 +8,7 @@ import { Inventory } from './inventory-model.js';
 import { craftConsume, invCollectSame, invLeftClick, invQuickMove, invQuickMoveToCraft, invRightClick, invSwapHotbar, stackable } from './inventory-logic.js';
 import { stackHtml, updateSlotElement } from './inventory-view.js';
 import { createRecipeBook } from './inventory-recipe-book.js';
+import { createInventoryAssets } from './inventory-assets.js';
 import { createTextureTools } from './world-textures.js';
 import { createWorldSaveCodec, WORLD_SAVE_VERSION } from './world-save-codec.js';
 import { createWorldSaveManager } from './world-save-manager.js';
@@ -53,6 +54,7 @@ async function loadThreeModules() {
 
 const { THREE, PointerLockControls } = await loadThreeModules();
 const { spritePixels, createAtlasTexture, createNoiseTexture } = createTextureTools(THREE);
+const inventoryAssets = createInventoryAssets(THREE);
 
 // =====================================================================
 // 1. CONFIGURAÇÃO
@@ -1177,37 +1179,6 @@ class CreatureSystem {
 // =====================================================================
 // 5B. INVENTÁRIO E FERRAMENTAS
 // =====================================================================
-const ITEM_ICONS = {};
-const BLOCK_COLORS = {};
-
-function initItemIcons() {
-    const atlas = world.material.map.image;
-    let iconCss = '';
-    for (const [id, item] of Object.entries(ITEMS)) {
-        const c = document.createElement('canvas');
-        c.width = c.height = TILE_PX;
-        c.getContext('2d').drawImage(atlas, item.iconTile * TILE_PX, 0, TILE_PX, TILE_PX, 0, 0, TILE_PX, TILE_PX);
-        ITEM_ICONS[id] = c.toDataURL();
-        iconCss += `.ico-${id}{background-image:url('${ITEM_ICONS[id]}')}\n`;
-    }
-    const st = document.createElement('style');
-    st.textContent = iconCss;
-    document.head.appendChild(st);
-}
-
-function computeBlockColors() {
-    const ctx = world.material.map.image.getContext('2d');
-    for (const [id, b] of Object.entries(BLOCKS)) {
-        const d = ctx.getImageData(b.tiles.side * TILE_PX, 0, TILE_PX, TILE_PX).data;
-        let r = 0, g = 0, bl = 0, n = 0;
-        for (let i = 0; i < d.length; i += 4) {
-            if (d[i + 3] < 128) continue;
-            r += d[i]; g += d[i + 1]; bl += d[i + 2]; n++;
-        }
-        BLOCK_COLORS[id] = new THREE.Color().setRGB(r / n / 255, g / n / 255, bl / n / 255, THREE.SRGBColorSpace);
-    }
-}
-
 function damageTool(slotIndex, amount = 1) {
     const result = damageToolStack(inventory.slots[slotIndex], amount);
     if (!result) return;
@@ -1337,7 +1308,7 @@ function waterImmersionAt(world, x, y, z, halfHeight) {
 }
 
 function spawnBreakParticles(x, y, z, type) {
-    if (!particleMats[type]) particleMats[type] = new THREE.MeshBasicMaterial({ color: BLOCK_COLORS[type] });
+    if (!particleMats[type]) particleMats[type] = new THREE.MeshBasicMaterial({ color: inventoryAssets.blockColors[type] });
     for (let i = 0; i < 12 && particles.length < 150; i++) {
         const mesh = new THREE.Mesh(particleGeo, particleMats[type]);
         mesh.position.set(x + Math.random(), y + Math.random(), z + Math.random());
@@ -1676,8 +1647,7 @@ function selectSlot(n) {
 }
 
 function initGameplayAssets() {
-    initItemIcons();
-    computeBlockColors();
+    inventoryAssets.initialize(world.material.map.image);
     createCrackAssets();
     buildInventoryUI();
     buildRecipeList();

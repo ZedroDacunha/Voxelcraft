@@ -83,6 +83,23 @@
         </div>
     </form>
 </dialog>
+<dialog id="world-options-dialog" class="world-dialog world-options-dialog" aria-labelledby="world-options-title">
+    <div class="world-options-content">
+        <header class="world-options-header">
+            <div>
+                <p class="world-menu-eyebrow">CONFIGURAÇÕES DO SAVE</p>
+                <h2 id="world-options-title">Opções do mundo</h2>
+                <p id="world-options-summary" class="world-options-summary"></p>
+            </div>
+            <button class="world-options-close" id="btn-world-options-close" type="button" aria-label="Fechar opções do mundo">×</button>
+        </header>
+        <p id="world-options-feedback" class="world-options-feedback" role="status" hidden></p>
+        <div id="world-save-actions" class="world-save-actions"></div>
+        <div class="world-dialog-actions">
+            <button class="world-action" type="button" id="btn-world-options-done">Concluído</button>
+        </div>
+    </div>
+</dialog>
 <div id="crosshair"></div>
 <div id="debug"></div>
 <div id="toast"></div>
