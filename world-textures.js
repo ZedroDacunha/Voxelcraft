@@ -34,7 +34,6 @@ function cobblePixel(x, y, variant) {
 
 // Atlas voxel e sprites determinísticos em canvas.
 export function createTextureTools(THREE) {
-    const HANDLE_L = [156, 106, 52], HANDLE_D = [112, 74, 34];
     const HEAD_COLORS = {
         wood: { l: [176, 128, 70], d: [130, 90, 45] },
         stone: { l: [150, 150, 152], d: [106, 106, 110] },
@@ -44,6 +43,92 @@ export function createTextureTools(THREE) {
         diamond: { l: [95, 224, 215], d: [25, 119, 144] },
     };
     const spriteCache = {};
+    const stickPixels = [
+        '.............md.',
+        '............mwm.',
+        '...........mwd..',
+        '..........mwm...',
+        '.........mwd....',
+        '........mw......',
+        '.......mw.......',
+        '......mww.......',
+        '.....mwd........',
+        '....mw..........',
+        '....mw..........',
+        '...mwd..........',
+        '.dmw............',
+        'mww.............',
+        '.dd.............',
+        '................',
+    ];
+    const stickColors = {
+        d: [41, 28, 12],
+        m: [73, 53, 11],
+        w: [139, 103, 35],
+    };
+    const pickaxeHandlePixels = [
+        '................',
+        '................',
+        '................',
+        '................',
+        '................',
+        '.........mw.....',
+        '........mww.....',
+        '.......mwd......',
+        '......mw........',
+        '......mw........',
+        '.....mwd........',
+        '...dmw..........',
+        '..mww...........',
+        '...dd...........',
+        '................',
+        '................',
+    ];
+    const pickaxeHeadPixels = [
+        '................',
+        '................',
+        '......ooooo.....',
+        '.....ollllo.....',
+        '......ommmmo....',
+        '.........oommo..',
+        '...........ommo.',
+        '............omo.',
+        '............omo.',
+        '............omo.',
+        '............omo.',
+        '............oo..',
+        '.............o..',
+        '................',
+        '................',
+        '................',
+    ];
+    const shovelHeadPixels = [
+        '................',
+        '................',
+        '...........ooo..',
+        '..........olllo.',
+        '.........ollllo.',
+        '........ollllo..',
+        '..........mmmo..',
+        '..........omo...',
+        '................',
+        '................',
+        '................',
+        '................',
+        '................',
+        '................',
+        '................',
+        '................',
+    ];
+    const metalHeadColors = (mat) => {
+        const hc = HEAD_COLORS[mat];
+        return {
+            o: hc.d.map(channel => Math.round(channel * 0.36)),
+            l: hc.l.map(channel => Math.min(255, Math.round(channel * 1.1))),
+            m: hc.l.map((channel, i) => Math.round(channel * 0.58 + hc.d[i] * 0.42)),
+            d: hc.d.map((channel, i) => Math.round(channel * 0.78 + hc.l[i] * 0.22)),
+        };
+    };
     function spritePixels(kind, mat) {
         const key = kind + ':' + mat;
         if (spriteCache[key]) return spriteCache[key];
@@ -82,38 +167,88 @@ export function createTextureTools(THREE) {
             return (spriteCache[key] = g);
         }
     
-        const hLen = kind === 'stick' ? 13 : kind === 'shovel' ? 10 : 10;
-        for (let x = 3; x <= hLen; x++) { put(x, 16 - x, HANDLE_L); put(x + 1, 16 - x, HANDLE_D); }
+        if (kind === 'stick') {
+            for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+                const color = stickColors[stickPixels[y][x]];
+                if (color) put(x, y, color);
+            }
+            return (spriteCache[key] = g);
+        }
+
+        if (kind === 'pickaxe') {
+            // Cabo em mapa separado para permitir ajustar a haste e a cabeça
+            // sem que uma parte altere a silhueta da outra.
+            for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+                const color = stickColors[pickaxeHandlePixels[y][x]];
+                if (color) put(x, y, color);
+            }
+            const colors = metalHeadColors(mat);
+            for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+                const color = colors[pickaxeHeadPixels[y][x]];
+                if (color) put(x, y, color);
+            }
+            return (spriteCache[key] = g);
+        }
+
+        if (kind === 'shovel') {
+            // A pá mantém o cabo diagonal do graveto; só a cabeça muda para a
+            // silhueta compacta e arredondada da referência.
+            for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+                const color = stickColors[pickaxeHandlePixels[y][x]];
+                if (color) put(x, y, color);
+            }
+            const colors = metalHeadColors(mat);
+            for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+                const color = colors[shovelHeadPixels[y][x]];
+                if (color) put(x, y, color);
+            }
+            return (spriteCache[key] = g);
+        }
+
+        if (kind === 'axe') {
+            // Copia o trecho diagonal do próprio graveto; a cabeça é desenhada
+            // depois e cobre a ponta, mantendo o encaixe de cada ferramenta.
+            const offsetX = kind === 'axe' ? 0 : 2;
+            const offsetY = kind === 'axe' ? 0 : -1;
+            for (let y = 6; y <= 14; y++) for (let x = 0; x < 16; x++) {
+                const color = stickColors[stickPixels[y][x]];
+                if (color) put(x + offsetX, y + offsetY, color);
+            }
+        }
     
         const head = new Set(), add = (x, y) => head.add(x + ',' + y);
-        if (kind === 'pickaxe') {
-            // Silhueta 16x16 clássica: lâmina horizontal, ponta descendente
-            // à direita e encaixe unido ao cabo diagonal em (10, 6).
-            for (let x = 7; x <= 11; x++) add(x, 2);
-            for (let x = 5; x <= 12; x++) add(x, 3);
-            for (let x = 4; x <= 12; x++) add(x, 4);
-            for (let x = 7; x <= 11; x++) add(x, 5);
-            add(10, 6); add(11, 6);
-            add(12, 4); add(12, 5); add(13, 5); add(13, 6); add(13, 7); add(14, 7); add(14, 8);
-        } else if (kind === 'axe') {
-            // Broad asymmetric blade to the left, socket joining the diagonal handle.
-            for (let x = 8; x <= 10; x++) add(x, 2);
+        if (kind === 'axe') {
+            // Silhueta compacta em degraus do machado clássico. O gume abre
+            // para a esquerda e a cabeça afunila até o encaixe do cabo.
+            for (let x = 8; x <= 9; x++) add(x, 1);
+            for (let x = 7; x <= 10; x++) add(x, 2);
             for (let x = 6; x <= 11; x++) add(x, 3);
-            for (let x = 4; x <= 11; x++) add(x, 4);
-            for (let x = 5; x <= 10; x++) add(x, 5);
-            for (let x = 8; x <= 11; x++) add(x, 6);
-            add(10, 7); add(11, 7);
-        } else if (kind === 'shovel') {
-            for (let x = 10; x <= 12; x++) add(x, 2);
-            for (let x = 9; x <= 13; x++) { add(x, 3); add(x, 4); }
-            for (let x = 10; x <= 12; x++) add(x, 5);
+            for (let x = 5; x <= 12; x++) add(x, 4);
+            for (let x = 5; x <= 13; x++) add(x, 5);
+            for (let x = 6; x <= 13; x++) add(x, 6);
+            for (let x = 8; x <= 12; x++) add(x, 7);
+            for (let x = 9; x <= 11; x++) add(x, 8);
         }
         if (head.size) {
             const hc = HEAD_COLORS[mat];
             for (const k of head) {
                 const [x, y] = k.split(',').map(Number);
-                const dark = !head.has((x + 1) + ',' + y) || !head.has(x + ',' + (y + 1));
-                put(x, y, dark ? hc.d : hc.l);
+                if (kind === 'axe') {
+                    const edge = !head.has((x - 1) + ',' + y) || !head.has((x + 1) + ',' + y) ||
+                        !head.has(x + ',' + (y - 1)) || !head.has(x + ',' + (y + 1));
+                    const shade = (amount) => hc.l.map((channel, i) => Math.round(channel * amount + hc.d[i] * (1 - amount)));
+                    const outline = hc.d.map(channel => Math.round(channel * 0.55));
+                    const bevel = x <= 7 && y >= 3 && y <= 6;
+                    const socket = x >= 10 && y >= 6;
+                    if (edge) put(x, y, outline);
+                    else if (bevel) put(x, y, hc.l);
+                    else if (socket || y >= 7) put(x, y, hc.d);
+                    else if (y <= 2) put(x, y, shade(0.78));
+                    else put(x, y, shade(0.48));
+                } else {
+                    const dark = !head.has((x + 1) + ',' + y) || !head.has(x + ',' + (y + 1));
+                    put(x, y, dark ? hc.d : hc.l);
+                }
             }
         }
         return (spriteCache[key] = g);

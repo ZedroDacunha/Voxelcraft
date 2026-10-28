@@ -8,6 +8,7 @@ import { craftConsume, invCollectSame, invLeftClick, invQuickMove, invQuickMoveT
 import { stackHtml, updateSlotElement } from './inventory-view.js';
 import { createRecipeBook } from './inventory-recipe-book.js';
 import { createTextureTools } from './world-textures.js';
+import { createWorldSaveLock } from './world-save-lock.js';
 import { configureTorchFlicker, configureTorchFlameAnimation, updateWorldLightingEffects } from './world-lighting-effects.js';
 import { FurnaceSmokeSystem } from './world-furnace-effects.js';
 import { LEGACY_MINERAL_ITEM_MAP } from './world-minerals.js';
@@ -2991,95 +2992,8 @@ function updatePhysics(dt) {
 // =====================================================================
 const SAVE_KEY = ACTIVE_WORLD.saveKey;
 const SAVE_BACKUP_KEY = SAVE_KEY + '-backup';
-const SAVE_LOCK_KEY = SAVE_KEY + '-writer-lock';
 const SAVE_VERSION = 1;
-const SAVE_LOCK_TTL = 30000;
 const SAVE_TAB_ID = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-let saveLockOwned = false, saveLockHeartbeat = null;
-
-async function writeSaveIfOwner(data) {
-    const db = await dbOpen();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction('worlds', 'readwrite');
-        const store = tx.objectStore('worlds');
-        let wrote = false;
-        const request = store.get(SAVE_LOCK_KEY);
-        request.onsuccess = () => {
-            if (request.result?.id !== SAVE_TAB_ID) return;
-            wrote = true;
-            store.put(data, SAVE_KEY);
-            store.put({ id: SAVE_TAB_ID, heartbeat: Date.now() }, SAVE_LOCK_KEY);
-        };
-        tx.oncomplete = () => { db.close(); resolve(wrote); };
-        tx.onerror = tx.onabort = () => { db.close(); reject(tx.error || new Error('Falha ao gravar o save.')); };
-    });
-}
-
-async function acquireSaveLock() {
-    const db = await dbOpen();
-    const acquired = await new Promise((resolve, reject) => {
-        const tx = db.transaction('worlds', 'readwrite');
-        const store = tx.objectStore('worlds');
-        let ownsLock = false;
-        const request = store.get(SAVE_LOCK_KEY);
-        request.onsuccess = () => {
-            const lease = request.result;
-            const expired = !lease || !Number.isFinite(lease.heartbeat) || Date.now() - lease.heartbeat > SAVE_LOCK_TTL;
-            if (expired || lease.id === SAVE_TAB_ID) {
-                ownsLock = true;
-                store.put({ id: SAVE_TAB_ID, heartbeat: Date.now() }, SAVE_LOCK_KEY);
-            }
-        };
-        tx.oncomplete = () => { db.close(); resolve(ownsLock); };
-        tx.onerror = tx.onabort = () => { db.close(); reject(tx.error || new Error('Não foi possível obter o bloqueio do save.')); };
-    });
-
-    saveLockOwned = acquired;
-    if (!acquired) return false;
-    saveLockHeartbeat = setInterval(async () => {
-        try {
-            const lease = await dbRun('readwrite', store => {
-                const request = store.get(SAVE_LOCK_KEY);
-                request.onsuccess = () => {
-                    if (request.result?.id === SAVE_TAB_ID) {
-                        store.put({ id: SAVE_TAB_ID, heartbeat: Date.now() }, SAVE_LOCK_KEY);
-                    }
-                };
-                return request;
-            });
-            if (lease?.id !== SAVE_TAB_ID) {
-                saveLockOwned = false;
-                saveWriteBlocked = true;
-                clearInterval(saveLockHeartbeat);
-                saveLockHeartbeat = null;
-                showToast('Outra aba assumiu o save; salvamento bloqueado aqui');
-            }
-        } catch (error) {
-            saveLockOwned = false;
-            saveWriteBlocked = true;
-            clearInterval(saveLockHeartbeat);
-            saveLockHeartbeat = null;
-            console.warn('Não foi possível renovar o bloqueio do save:', error);
-        }
-    }, 5000);
-    return true;
-}
-
-function releaseSaveLock() {
-    if (!saveLockOwned) return Promise.resolve();
-    saveLockOwned = false;
-    if (saveLockHeartbeat) clearInterval(saveLockHeartbeat);
-    saveLockHeartbeat = null;
-    return dbRun('readwrite', store => {
-        const request = store.get(SAVE_LOCK_KEY);
-        request.onsuccess = () => {
-            if (request.result?.id === SAVE_TAB_ID) store.delete(SAVE_LOCK_KEY);
-        };
-        return request;
-    }).catch(error => console.warn('Não foi possível liberar o bloqueio do save:', error));
-}
-
-window.addEventListener('pagehide', releaseSaveLock);
 
 const packStack = (s) => s ? { id: s.id, count: s.count, damage: s.damage || 0 } : null;
 
@@ -3208,10 +3122,22 @@ function validateSave(d) {
 }
 
 let saveWriteBlocked = false;
+const saveLock = createWorldSaveLock({
+    openDatabase: dbOpen,
+    saveKey: SAVE_KEY,
+    tabId: SAVE_TAB_ID,
+    onLost: () => {
+        saveWriteBlocked = true;
+        showToast('Outra aba assumiu o save; salvamento bloqueado aqui');
+    },
+    onError: error => console.warn('Falha no bloqueio do save:', error),
+});
+
+window.addEventListener('pagehide', () => { void saveLock.release(); });
 
 async function loadGame() {
     try {
-        const ownsSave = await acquireSaveLock();
+        const ownsSave = await saveLock.acquire();
         if (!ownsSave) {
             saveWriteBlocked = true;
             console.warn('Este mundo já está aberto em outra aba; o salvamento foi desativado aqui.');
@@ -3263,7 +3189,7 @@ function saveGame(quiet, immediate = false) {
 async function performSaveGame(quiet) {
     if (!world) return false;
     if (saving) { savePending = true; return; }
-    if (saveWriteBlocked || !saveLockOwned) {
+    if (saveWriteBlocked || !saveLock.isOwned) {
         if (!quiet) showToast('Salvamento bloqueado para proteger o mundo aberto em outra aba');
         return false;
     }
@@ -3273,11 +3199,9 @@ async function performSaveGame(quiet) {
         const t0 = performance.now();
         const data = buildSave();
         perf.buildMs = performance.now() - t0;
-        const wrote = await writeSaveIfOwner(data);
+        const wrote = await saveLock.write(data);
         if (!wrote) {
-            saveLockOwned = false;
             saveWriteBlocked = true;
-            if (!quiet) showToast('Outra aba está usando este mundo; salvamento bloqueado');
         } else if (!quiet) showToast('Jogo salvo');
         saved = wrote;
     } catch (e) { console.warn('Falha ao salvar:', e); if (!quiet) showToast('Falha ao salvar'); }
@@ -3469,7 +3393,7 @@ async function init() {
             btnWorlds.textContent = 'Voltar à seleção de mundos';
             return;
         }
-        await releaseSaveLock();
+        await saveLock.release();
         location.reload();
     });
     controls.addEventListener('lock', () => { menu.style.display = 'none'; });
