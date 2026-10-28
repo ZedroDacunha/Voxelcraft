@@ -5,7 +5,7 @@ import { ATLAS_COLUMNS, BLOCKS, FUEL, ID, ITEMS, matchRecipe, RECIPES, SMELT, TI
 import { findSpawn, TerrainGenerator } from './world-terrain.js';
 import { createWaterSystemClass } from './world-water.js';
 import { Inventory } from './inventory-model.js';
-import { craftConsume, invCollectSame, invLeftClick, invQuickMove, invQuickMoveToCraft, invRightClick, invSwapHotbar, stackable } from './inventory-logic.js';
+import { craftConsume, invCollectSame, invFillRecipe, invLeftClick, invQuickMove, invQuickMoveToCraft, invRightClick, invSwapHotbar, stackable } from './inventory-logic.js';
 import { stackHtml, updateSlotElement } from './inventory-view.js';
 import { createRecipeBook } from './inventory-recipe-book.js';
 import { createInventoryAssets } from './inventory-assets.js';
@@ -1931,6 +1931,19 @@ function buildRecipeList() {
         smelting: SMELT,
         fuels: FUEL,
         items: ITEMS,
+        onSelectCrafting: recipe => {
+            const result = invFillRecipe(inventory, craftInv, recipe, craftN);
+            if (result.ok) {
+                renderInventory();
+                return { ok: true, message: 'Ingredientes colocados na grade de criação.' };
+            }
+            const messages = {
+                'requires-table': 'Esta receita precisa de uma bancada 3×3.',
+                'inventory-full': 'Libere espaço para guardar os itens que já estão na grade.',
+                'missing-items': 'Faltam ingredientes no inventário.',
+            };
+            return { ok: false, message: messages[result.reason] ?? 'Não foi possível preparar esta receita.' };
+        },
     });
 }
 
@@ -1986,6 +1999,7 @@ function applyInventoryLayout() {
     document.getElementById('chest-row').style.display = isChest ? 'block' : 'none';
     document.getElementById('inv-title').textContent =
         isFurnace ? 'Forno' : isChest ? 'Baú' : station ? 'Bancada de criação (3×3)' : 'Inventário (criação 2×2)';
+    document.getElementById('recipe-book-toggle').hidden = isFurnace || isChest;
     document.getElementById('inv-craft').style.gridTemplateColumns = `repeat(${craftN}, 44px)`;
     craftSlotEls.forEach((el, i) => { el.style.display = i < craftN * craftN ? '' : 'none'; });
 }

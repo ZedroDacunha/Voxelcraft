@@ -100,3 +100,74 @@ export function craftConsume(craftInv, craftN) {
         if (craftInv.slots[index]) craftInv.removeOne(index);
     }
 }
+
+export function invFillRecipe(inventory, craftInv, recipe, craftN) {
+    const nextInventory = inventory.slots.map(stack => stack ? { ...stack } : null);
+    const nextCraft = Array.from({ length: craftInv.slots.length }, () => null);
+    const required = [];
+
+    if (recipe.kind === 'shapeless') {
+        if (recipe.ingredients.length > craftN * craftN) return { ok: false, reason: 'requires-table' };
+        recipe.ingredients.forEach((id, index) => required.push({ id, index }));
+    } else {
+        const height = recipe.shape.length;
+        const width = recipe.shape[0]?.length ?? 0;
+        if (height > craftN || width > craftN) return { ok: false, reason: 'requires-table' };
+        const rowOffset = Math.floor((craftN - height) / 2);
+        const columnOffset = Math.floor((craftN - width) / 2);
+        recipe.shape.forEach((row, r) => row.forEach((id, c) => {
+            if (id) required.push({ id, index: (r + rowOffset) * craftN + c + columnOffset });
+        }));
+    }
+
+    const addStack = stack => {
+        let left = stack.count;
+        const max = ITEMS[stack.id].maxStack;
+        for (let i = 0; i < nextInventory.length && left > 0; i++) {
+            const target = nextInventory[i];
+            if (!target || target.id !== stack.id || target.count >= max) continue;
+            const moved = Math.min(max - target.count, left);
+            target.count += moved;
+            left -= moved;
+        }
+        for (let i = 0; i < nextInventory.length && left > 0; i++) {
+            if (nextInventory[i]) continue;
+            const moved = Math.min(max, left);
+            nextInventory[i] = { id: stack.id, count: moved };
+            if (stack.damage) nextInventory[i].damage = stack.damage;
+            left -= moved;
+        }
+        return left;
+    };
+
+    const requiredByIndex = new Map(required.map(ingredient => [ingredient.index, ingredient]));
+    for (let index = 0; index < craftInv.slots.length; index++) {
+        const stack = craftInv.slots[index];
+        if (!stack) continue;
+        const target = requiredByIndex.get(index);
+        if (target?.id === stack.id) {
+            nextCraft[index] = { ...stack, count: 1 };
+            const excess = stack.count - 1;
+            if (excess > 0 && addStack({ ...stack, count: excess }) > 0) {
+                return { ok: false, reason: 'inventory-full' };
+            }
+        } else if (addStack(stack) > 0) {
+            return { ok: false, reason: 'inventory-full' };
+        }
+    }
+
+    for (const ingredient of required) {
+        if (nextCraft[ingredient.index]) continue;
+        const sourceIndex = nextInventory.findIndex(stack => stack?.id === ingredient.id && stack.count > 0);
+        if (sourceIndex < 0) return { ok: false, reason: 'missing-items' };
+        const source = nextInventory[sourceIndex];
+        nextCraft[ingredient.index] = { id: source.id, count: 1 };
+        if (source.damage) nextCraft[ingredient.index].damage = source.damage;
+        source.count--;
+        if (source.count <= 0) nextInventory[sourceIndex] = null;
+    }
+
+    inventory.slots = nextInventory;
+    craftInv.slots = nextCraft;
+    return { ok: true };
+}
