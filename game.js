@@ -12,6 +12,10 @@ import { createInventoryAssets } from './inventory-assets.js';
 import { createTextureTools } from './world-textures.js';
 import { createWorldSaveCodec, WORLD_SAVE_VERSION } from './world-save-codec.js';
 import { createWorldSaveManager } from './world-save-manager.js';
+import { createWorldSaveIndicator } from './world-save-indicator.js';
+import { createWorldClock } from './world-clock.js';
+import { createWorldClouds, WORLD_CLOUD_CONFIG } from './world-clouds.js';
+import { createWorldSkySystem } from './world-sky.js';
 import { chunkKey, floorDiv, idx } from './world-grid.js';
 import {
     CHUNK_SIZE, DEATH_DROP_TTL, MAX_BREATH, MAX_HEALTH, MAX_HUNGER,
@@ -94,14 +98,6 @@ const INVULN_TIME = 0.5;
 
 // Dia, Noite e Nuvens
 const DAY_LENGTH = 1200;
-const CLOUD_CELL = 8;
-const CLOUD_THICK = 3;
-const CLOUD_GRID = 32;
-const CLOUD_Y = 80;
-const CLOUD_SPEED = 1.6;
-const CLOUD_SCALE = 0.13;
-const CLOUD_THRESHOLD = 0.12;
-const SKY_DISTANCE = 250;
 
 // Mão em primeira pessoa
 const HAND_BASE = { x: 0.42, y: -0.50, z: -0.25 };
@@ -213,6 +209,17 @@ const FACES = [
     { kind: 'side',   dir: [ 0, 0,-1], corners: [ { pos: [1,0,0], uv: [0,0] }, { pos: [0,0,0], uv: [1,0] }, { pos: [1,1,0], uv: [0,1] }, { pos: [0,1,0], uv: [1,1] } ] },
     { kind: 'side',   dir: [ 0, 0, 1], corners: [ { pos: [0,0,1], uv: [0,0] }, { pos: [1,0,1], uv: [1,0] }, { pos: [0,1,1], uv: [0,1] }, { pos: [1,1,1], uv: [1,1] } ] },
 ];
+const worldClouds = createWorldClouds({ THREE, Noise2D, faces: FACES });
+const worldSky = createWorldSkySystem({
+    THREE,
+    clamp01,
+    smoothstep,
+    mulberry32,
+    clouds: worldClouds,
+    skyColor: SKY_COLOR,
+    renderDistance: RENDER_DISTANCE,
+    chunkSize: CHUNK_SIZE,
+});
 const UV_PAD = 0.0005;
 const openChests = new Set();
 
@@ -1198,24 +1205,10 @@ function showToast(text) {
     toastTimer = setTimeout(() => { el.style.display = 'none'; }, 2000);
 }
 
-let saveIndicatorTimer = 0;
-function setSaveIndicator(state, message) {
-    const indicator = document.getElementById('save-indicator');
-    document.getElementById('save-indicator-text').textContent = message;
-    indicator.dataset.state = state;
-    indicator.title = message;
-    clearTimeout(saveIndicatorTimer);
-    if (state === 'pending' || state === 'saving') {
-        indicator.hidden = true;
-        return;
-    }
-    indicator.hidden = false;
-    if (state === 'saved') {
-        saveIndicatorTimer = setTimeout(() => {
-            if (indicator.dataset.state === 'saved') indicator.hidden = true;
-        }, 1800);
-    }
-}
+const setSaveIndicator = createWorldSaveIndicator(
+    document.getElementById('save-indicator'),
+    document.getElementById('save-indicator-text'),
+);
 
 const furnaces = new Map();
 let station = null;
@@ -2189,199 +2182,20 @@ function handleInventoryKey(event) {
 // =====================================================================
 // 5E. CICLO DE DIA E NOITE
 // =====================================================================
-let worldTime = START_TIME;
-let hemiLight, sunLight, sunMesh, moonMesh, starPoints;
-const SKY_DAY = new THREE.Color(SKY_COLOR);
-const SKY_NIGHT = new THREE.Color(0x070b1c);
-const SKY_DUSK = new THREE.Color(0xf08a4b);
-const LIGHT_WARM = new THREE.Color(0xffb070);
-const LIGHT_WHITE = new THREE.Color(0xffffff);
-const LIGHT_MOON = new THREE.Color(0x8fa6ff);
-const _skyCol = new THREE.Color();
-const _sunDir = new THREE.Vector3();
-const sky = { elevation: 1, day: 1 };
-
-function makeSquareMesh(size, color) {
-    const m = new THREE.Mesh(
-        new THREE.PlaneGeometry(size, size),
-        new THREE.MeshBasicMaterial({ color, fog: false, depthWrite: false, side: THREE.DoubleSide }));
-    m.renderOrder = -1;
-    m.frustumCulled = false;
-    return m;
-}
-
-function createSky() {
-    sunMesh = makeSquareMesh(36, 0xfff2a8);
-    moonMesh = makeSquareMesh(26, 0xdfe6f5);
-    scene.add(sunMesh, moonMesh);
-
-    const rnd = mulberry32(4242);
-    const pos = new Float32Array(400 * 3);
-    for (let i = 0; i < 400; i++) {
-        const u = rnd() * 2 - 1, a = rnd() * Math.PI * 2, r = Math.sqrt(1 - u * u);
-        pos[i * 3] = Math.cos(a) * r * SKY_DISTANCE;
-        pos[i * 3 + 1] = u * SKY_DISTANCE;
-        pos[i * 3 + 2] = Math.sin(a) * r * SKY_DISTANCE;
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    starPoints = new THREE.Points(geo, new THREE.PointsMaterial({
-        color: 0xffffff, size: 2, sizeAttenuation: false, fog: false, transparent: true, opacity: 0, depthWrite: false }));
-    starPoints.frustumCulled = false;
-    scene.add(starPoints);
-}
+const worldClock = createWorldClock({ dayLength: DAY_LENGTH, initialTime: START_TIME });
+let hemiLight, sunLight;
 
 function updateWorldClock(dt) {
-    worldTime = (worldTime + dt / DAY_LENGTH) % 1;
+    worldClock.advance(dt);
 }
 
 function updateSky() {
-    const a = worldTime * Math.PI * 2;
-    _sunDir.set(Math.cos(a), Math.sin(a), 0.3).normalize();
-    const e = _sunDir.y;
-    const day = smoothstep(-0.12, 0.28, e);
-    const warm = clamp01(1 - Math.abs(e) / 0.3) * 0.9;
-    sky.elevation = e; sky.day = day;
-
-    _skyCol.copy(SKY_NIGHT).lerp(SKY_DAY, day).lerp(SKY_DUSK, warm * (1 - Math.abs(day - 0.5) * 0.6));
-    scene.background.copy(_skyCol);
-    scene.fog.color.copy(_skyCol);
-    
-    // Distância de Fog normal atualizada com a cor do céu
-    const viewDist = RENDER_DISTANCE * CHUNK_SIZE;
-    scene.fog.near = viewDist * 0.55;
-    scene.fog.far = viewDist * 0.95;
-
-    hemiLight.intensity = 0.22 + 0.58 * day;
-    if (e >= -0.05) {
-        sunLight.position.copy(_sunDir).multiplyScalar(50);
-        sunLight.color.copy(LIGHT_WHITE).lerp(LIGHT_WARM, warm);
-        sunLight.intensity = 0.62 * smoothstep(-0.05, 0.2, e);
-    } else {
-        sunLight.position.set(-_sunDir.x * 50, -_sunDir.y * 50, -_sunDir.z * 50);
-        sunLight.color.copy(LIGHT_MOON);
-        sunLight.intensity = 0.14 * smoothstep(-0.05, -0.25, e);
-    }
-    handAmbient.intensity = 0.38 + 0.37 * day;
-
-    const cp = camera.position;
-    sunMesh.position.copy(cp).addScaledVector(_sunDir, SKY_DISTANCE);
-    sunMesh.lookAt(cp);
-    moonMesh.position.copy(cp).addScaledVector(_sunDir, -SKY_DISTANCE);
-    moonMesh.lookAt(cp);
-    sunMesh.visible = e > -0.2;
-    moonMesh.visible = e < 0.2;
-    starPoints.position.copy(cp);
-    starPoints.rotation.z = a;
-    starPoints.material.opacity = clamp01((0.35 - day) / 0.35) * 0.9;
-    starPoints.visible = starPoints.material.opacity > 0.01;
-    updateCloudTint(day, warm);
+    worldSky.update({ scene, camera, hemiLight, sunLight, handAmbient, worldTime: worldClock.time });
 }
 
 // =====================================================================
 // 5F. NUVENS VOXEL
 // =====================================================================
-let cloudMesh = null, cloudNoise = null;
-const cloudMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.88, fog: false });
-const cloudState = { scroll: 0, key: '', cells: 0 };
-const cloudNoiseCache = new Map();
-const CLOUD_NOISE_CACHE_LIMIT = 8192;
-const CLOUD_BRIGHT = { top: 1.0, side: 0.84, bottom: 0.68 };
-const CLOUD_NIGHT = new THREE.Color(0x232a46), CLOUD_DUSK = new THREE.Color(0xffb690);
-const _cloudCol = new THREE.Color();
-
-function createClouds() {
-    cloudNoise = new Noise2D(SEED + 555);
-    cloudNoiseCache.clear();
-    cloudMesh = new THREE.Mesh(new THREE.BufferGeometry(), cloudMat);
-    cloudMesh.frustumCulled = false;
-    cloudMesh.renderOrder = -0.5;
-    scene.add(cloudMesh);
-}
-
-function cloudDensityAt(x, z) {
-    const key = `${x},${z}`;
-    if (cloudNoiseCache.has(key)) {
-        const density = cloudNoiseCache.get(key);
-        cloudNoiseCache.delete(key);
-        cloudNoiseCache.set(key, density);
-        return density;
-    }
-    const density = cloudNoise.fbm(x * CLOUD_SCALE, z * CLOUD_SCALE, 3);
-    cloudNoiseCache.set(key, density);
-    if (cloudNoiseCache.size > CLOUD_NOISE_CACHE_LIMIT) {
-        cloudNoiseCache.delete(cloudNoiseCache.keys().next().value);
-    }
-    return density;
-}
-
-function buildCloudGeometry(camCx, camCz, ci) {
-    const G = CLOUD_GRID, half = G / 2;
-    const filled = new Uint8Array(G * G);
-    let count = 0;
-    for (let j = 0; j < G; j++) {
-        for (let i = 0; i < G; i++) {
-            const di = i - half, dj = j - half;
-            if (di * di + dj * dj > half * half) continue;
-            const n = cloudDensityAt(di + camCx - ci, dj + camCz);
-            if (n > CLOUD_THRESHOLD) { filled[i + j * G] = 1; count++; }
-        }
-    }
-    cloudState.cells = count;
-    const has = (i, j) => i >= 0 && j >= 0 && i < G && j < G && filled[i + j * G] === 1;
-
-    const pos = [], nor = [], col = [], ind = [];
-    const S = CLOUD_CELL, H = CLOUD_THICK;
-    for (let j = 0; j < G; j++) {
-        for (let i = 0; i < G; i++) {
-            if (!filled[i + j * G]) continue;
-            const ox = (i - half) * S, oz = (j - half) * S;
-            for (const f of FACES) {
-                if (f.dir[1] === 0 && has(i + f.dir[0], j + f.dir[2])) continue;
-                const b = f.dir[1] > 0 ? CLOUD_BRIGHT.top : f.dir[1] < 0 ? CLOUD_BRIGHT.bottom : CLOUD_BRIGHT.side;
-                const base = pos.length / 3;
-                for (const c of f.corners) {
-                    pos.push(ox + c.pos[0] * S, c.pos[1] * H, oz + c.pos[2] * S);
-                    nor.push(f.dir[0], f.dir[1], f.dir[2]);
-                    col.push(b, b, b);
-                }
-                ind.push(base, base + 1, base + 2, base + 2, base + 1, base + 3);
-            }
-        }
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-    geo.setIndex(ind);
-    return geo;
-}
-
-function updateClouds(dt) {
-    cloudState.scroll += dt * CLOUD_SPEED / CLOUD_CELL;
-    const ci = Math.floor(cloudState.scroll), frac = cloudState.scroll - ci;
-    const camCx = Math.floor(camera.position.x / CLOUD_CELL), camCz = Math.floor(camera.position.z / CLOUD_CELL);
-    const key = camCx + ',' + camCz + ',' + ci;
-    if (key !== cloudState.key) {
-        cloudState.key = key;
-        const old = cloudMesh.geometry;
-        cloudMesh.geometry = buildCloudGeometry(camCx, camCz, ci);
-        old.dispose();
-    }
-    cloudMesh.position.set((camCx + frac) * CLOUD_CELL, CLOUD_Y, camCz * CLOUD_CELL);
-}
-
-function updateCloudTint(day, warm) {
-    _cloudCol.copy(CLOUD_NIGHT).lerp(LIGHT_WHITE, day).lerp(CLOUD_DUSK, warm * 0.55);
-    cloudMat.color.copy(_cloudCol);
-}
-
-function worldClockText() {
-    const h = (worldTime * 24 + 6) % 24;
-    const hh = Math.floor(h), mm = Math.floor((h - hh) * 60);
-    return String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
-}
-
 // =====================================================================
 // 6. ESTADO GERAL
 // =====================================================================
@@ -2689,13 +2503,13 @@ function updateDebug(rawDt) {
     debugEl.textContent =
 `Voxel Sandbox — Parte 11 (Mares)
 FPS: ${fps} | Água: ${world.water.headInWater ? 'Mergulhado' : (world.water.feetInWater ? 'Cintura' : 'Não')}
-Nuvens: ${cloudState.cells} células (de ${CLOUD_GRID * CLOUD_GRID}) | altura ${CLOUD_Y}
+Nuvens: ${worldClouds.cells} células (de ${WORLD_CLOUD_CONFIG.gridSize * WORLD_CLOUD_CONFIG.gridSize}) | altura ${WORLD_CLOUD_CONFIG.height}
 Seed: ${SEED}
 XYZ: ${p.x.toFixed(2)} ${p.y.toFixed(2)} ${p.z.toFixed(2)}
 Chunk: ${floorDiv(p.x, CHUNK_SIZE)}, ${floorDiv(p.z, CHUNK_SIZE)}
 Chunks: ${world.chunks.size} | fila geração: ${world.genQueue.length} | fila malha: ${world.dirty.size}
 No chão: ${player.onGround}
-Hora do mundo: ${worldClockText()} (tempo ${worldTime.toFixed(3)}) | sol ${sky.elevation.toFixed(2)} | luz do dia ${sky.day.toFixed(2)}
+Hora do mundo: ${worldClock.format()} (tempo ${worldClock.time.toFixed(3)}) | sol ${worldSky.elevation.toFixed(2)} | luz do dia ${worldSky.day.toFixed(2)}
 Alvo: ${target} | tempo p/ quebrar: ${tt}
 Mineração: ${Math.round(mining.progress * 100)}% | Drops no mundo: ${itemEntities.length} | Fornos: ${furnaces.size} | Baús: ${chests.size}
 Item na mão: ${selectedItemText()}
@@ -2916,7 +2730,7 @@ const saveCodec = createWorldSaveCodec({ version: WORLD_SAVE_VERSION });
 function buildSave() {
     return saveCodec.build({
         seed: SEED,
-        worldTime,
+        worldTime: worldClock.time,
         world,
         player: { x: player.pos.x, y: player.pos.y, z: player.pos.z, health, hunger, saturation, breath },
         selectedSlot,
@@ -3050,8 +2864,8 @@ async function init() {
     scene.add(camera);
 
     createHand();
-    createSky();
-    createClouds();
+    worldSky.create(scene);
+    worldClouds.create(scene, SEED);
 
     targetMesh = new THREE.LineSegments(
         new THREE.EdgesGeometry(new THREE.BoxGeometry(1.004, 1.004, 1.004)),
@@ -3088,7 +2902,7 @@ async function init() {
         hunger = save.player.hunger;
         saturation = save.player.saturation;
         breath = save.player.breath;
-        worldTime = save.worldTime;
+        worldClock.time = save.worldTime;
         for (const [key, furnace] of save.furnaces) {
             const inv = new Inventory(3);
             inv.slots = furnace.slots;
@@ -3288,7 +3102,7 @@ async function init() {
             saturation: (n) => { saturation = n; },
             exhaust: (n) => addExhaustion(n),
             give: (id, n = 1) => { inventory.add(id, n); updateHotbarUI(); },
-            time: (t) => { worldTime = ((t % 1) + 1) % 1; updateSky(); },
+            time: (t) => { worldClock.time = t; updateSky(); },
         };
     }
 
@@ -3338,8 +3152,8 @@ function animate() {
         scene.background.setHex(0x113366); 
     }
     
-    if (controls.isLocked || inventoryOpen) updateClouds(dt);
-    else updateClouds(0);
+    if (controls.isLocked || inventoryOpen) worldClouds.update(dt, camera);
+    else worldClouds.update(0, camera);
     updateHand(dt);
     if (hurtFlash > 0) { hurtFlash = Math.max(0, hurtFlash - dt * 2); hurtEl.style.opacity = hurtFlash; }
     world.update(player.pos.x, player.pos.z);
