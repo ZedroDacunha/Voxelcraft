@@ -23,8 +23,10 @@ export const ID = { GRASS: 1, STONE: 2, LOG: 3, DIRT: 4, COBBLE: 5, PLANKS: 6, L
              GOLD_INGOT: MINERAL_IDS.GOLD_INGOT, COPPER_INGOT: MINERAL_IDS.COPPER_INGOT,
              RAW_COPPER: MINERAL_IDS.RAW_COPPER, RAW_IRON: MINERAL_IDS.RAW_IRON,
              RAW_GOLD: MINERAL_IDS.RAW_GOLD,
+             WHEAT_SEEDS: 85,
              SAND: 15, WATER: 16, WATER_FLOW_1: 40, WATER_FLOW_2: 41, WATER_FLOW_3: 42,
              WATER_FLOW_4: 43, WATER_FLOW_5: 44, WATER_FLOW_6: 45, WATER_FLOW_7: 46, WATER_FALL: 47,
+             TALL_GRASS: 84,
              STICK: 20, TORCH: 60, TORCH_WALL_XP: 61, TORCH_WALL_XN: 62, TORCH_WALL_ZP: 63, TORCH_WALL_ZN: 64, APPLE: 30, CHARCOAL: 31,
              WOOD_DOOR: 65, WOOD_DOOR_BOTTOM: 66, WOOD_DOOR_TOP: 67,
              WOOD_DOOR_BOTTOM_OPEN: 68, WOOD_DOOR_TOP_OPEN: 69 };
@@ -65,6 +67,8 @@ export const BLOCKS = {
     },
     ...createMineralBlocks(ID, TILE),
     [ID.SAND]: { name: 'Areia', hardness: 0.5, drop: ID.SAND, tool: 'shovel', tiles: allFaces(TILE.SAND) },
+    [ID.TALL_GRASS]: { name: 'Grama alta', hardness: 0, drop: null, collectible: false, tool: null,
+        render: 'instanced', solid: false, opaque: false, tiles: allFaces(TILE.GRASS_TOP) },
     [ID.TORCH]: { name: 'Tocha', hardness: 0.3, drop: ID.TORCH, tool: null, light: 14, render: 'torch', solid: false, tiles: allFaces(TILE.TORCH_FLAME) },
     [ID.WATER]: { name: 'Água',      hardness: 100, drop: null, tool: null, render: 'liquid', solid: false, collectible: false, tiles: allFaces(TILE.WATER) }, // Água só existe no mundo
 };
@@ -119,6 +123,10 @@ ITEMS[ID.STICK] = { name: 'Graveto', maxStack: 64, sprite: { kind: 'stick', mat:
 ITEMS[ID.WOOD_DOOR] = {
     name: 'Porta de carvalho', maxStack: 64, block: ID.WOOD_DOOR_BOTTOM,
     sprite: { kind: 'door', mat: 'oak' }, iconTile: nextTile++,
+};
+ITEMS[ID.WHEAT_SEEDS] = {
+    name: 'Sementes de trigo', maxStack: 64,
+    sprite: { kind: 'wheat-seeds', mat: 'wheat' }, iconTile: nextTile++,
 };
 
 const TOOL_MATS = {

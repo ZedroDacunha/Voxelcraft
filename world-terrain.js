@@ -296,6 +296,23 @@ export class TerrainGenerator {
             }
         }
         this.plantTrees(chunk, heights, biomes, ox, oz);
+        this.plantTallGrass(chunk, heights, biomes, ox, oz);
+    }
+    plantTallGrass(chunk, heights, biomes, ox, oz) {
+        const { CHUNK_SIZE, WORLD_HEIGHT, WATER_LEVEL, ID, BIOME } = this.config;
+        for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+            for (let lz = 0; lz < CHUNK_SIZE; lz++) {
+                const column = lx + lz * CHUNK_SIZE;
+                const y = heights[column];
+                if (biomes[column] === BIOME.DESERT || biomes[column] === BIOME.ROCKY || y <= WATER_LEVEL + 1) continue;
+                const plantY = y + 1;
+                if (plantY >= WORLD_HEIGHT || chunk.data[this.index(lx, plantY, lz)] !== 0) continue;
+                const wx = ox + lx, wz = oz + lz;
+                if (hash2(wx, wz, this.seed + 901) >= 0.13) continue;
+                chunk.data[this.index(lx, plantY, lz)] = ID.TALL_GRASS;
+                if (plantY > chunk.maxY) chunk.maxY = plantY;
+            }
+        }
     }
     plantTrees(chunk, heights, biomes, ox, oz) {
         const { CHUNK_SIZE, WORLD_HEIGHT, WATER_LEVEL, ID, BIOME, TREE_CHANCE_FOREST, TREE_CHANCE_PLAINS } = this.config;

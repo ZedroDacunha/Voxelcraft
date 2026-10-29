@@ -166,6 +166,33 @@ export function createTextureTools(THREE) {
             if (kind === 'apple') { put(8, 4, [110, 70, 30]); put(8, 5, [110, 70, 30]); put(9, 4, [60, 150, 50]); put(10, 4, [60, 150, 50]); }
             return (spriteCache[key] = g);
         }
+
+        if (kind === 'wheat-seeds') {
+            const seedPixels = [
+                '................',
+                '................',
+                '........h.......',
+                '.......hmd......',
+                '........md......',
+                '......hmd.......',
+                '.....hmd........',
+                '......md........',
+                '.....hmd........',
+                '......md........',
+                '.......md.......',
+                '........d.......',
+                '................',
+                '................',
+                '................',
+                '................',
+            ];
+            const seedColors = { h: [246, 220, 139], m: [203, 164, 79], d: [133, 99, 43] };
+            for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+                const color = seedColors[seedPixels[y][x]];
+                if (color) put(x, y, color);
+            }
+            return (spriteCache[key] = g);
+        }
     
         if (kind === 'stick') {
             for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {

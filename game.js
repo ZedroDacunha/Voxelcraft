@@ -19,6 +19,7 @@ import { createWorldSkySystem } from './world-sky.js';
 import { createWorldGraphicsQuality } from './world-graphics-quality.js';
 import { raycastVoxels } from './world-raycast.js';
 import { createBreakParticleSystem } from './world-break-particles.js';
+import { InstancedBlockManager, testInstancedMesh } from './world-instanced-manager.js';
 import { chunkKey, floorDiv, idx } from './world-grid.js';
 import {
     CHUNK_SIZE, DEATH_DROP_TTL, MAX_BREATH, MAX_HEALTH, MAX_HUNGER,
@@ -168,6 +169,31 @@ function createTorchFlameTexture() {
     return texture;
 }
 
+function createTallGrassGeometry(variant = 1) {
+    // As imagens são arquivos separados e já estão cortadas até o contorno do tufo.
+    const variants = [
+        { height: 0.28, aspect: 299 / 198 },
+        { height: 0.52, aspect: 386 / 368 },
+        { height: 0.78, aspect: 315 / 454 },
+    ];
+    const selected = variants[variant] ?? variants[1];
+    const halfWidth = selected.height * selected.aspect / 2, height = selected.height;
+    const rootOffset = -0.025;
+    const positions = [
+        -halfWidth, rootOffset, -halfWidth, halfWidth, rootOffset, halfWidth,
+        halfWidth, height + rootOffset, halfWidth, -halfWidth, height + rootOffset, -halfWidth,
+        halfWidth, rootOffset, -halfWidth, -halfWidth, rootOffset, halfWidth,
+        -halfWidth, height + rootOffset, halfWidth, halfWidth, height + rootOffset, -halfWidth,
+    ];
+    const uvs = [0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1];
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geometry.setIndex([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7]);
+    geometry.computeVertexNormals();
+    return geometry;
+}
+
 function buildTorchFlameGeometry(centers) {
     const positions = [], uvs = [], phases = [], indices = [], half = 0.16, bottom = 0.66, height = 0.36;
     for (const [x, y, z, phase] of centers) for (let plane = 0; plane < 2; plane++) {
@@ -237,9 +263,11 @@ function variantTile(tile, wx, y, wz) {
 }
 
 class World {
-    constructor(scene, seed) {
+    constructor(scene, seed, decorations = null) {
         this.scene = scene;
         this.seed = seed;
+        this.decorations = decorations;
+        this.decorationsByChunk = new Map();
         this.generator = new TerrainGenerator(seed, TERRAIN_CONFIG);
         this.chunks = new Map();
         this.edits = new Map();
@@ -714,6 +742,7 @@ class World {
 
     meshChunk(chunk) {
         this.dirty.delete(chunk);
+        this.refreshChunkDecorations(chunk);
         if (chunk.flameMesh) { this.scene.remove(chunk.flameMesh); chunk.flameMesh.geometry.dispose(); chunk.flameMesh = null; }
         if (chunk.mesh) {
             this.scene.remove(chunk.mesh);
@@ -784,7 +813,7 @@ class World {
                 // Mantém uma face interna por par de folhas para que os vãos revelem outras camadas da copa.
                 return !isLayeredLeafFace(dir);
             }
-            return nType !== 0 && neighborRender !== 'liquid' && neighborRender !== 'torch';
+            return nType !== 0 && BLOCKS[nType]?.opaque !== false;
         };
 
         const ambientOcclusionWeight = type => {
@@ -854,6 +883,7 @@ class World {
                     if (t === 0) continue;
                     if (t === ID.SAND && this.animatedSandTargets.has(`${chunk.cx * CS + lx},${y},${chunk.cz * CS + lz}`)) continue;
                     const block = BLOCKS[t];
+                    if (block.render === 'instanced') continue;
                     const tiles = block.tiles;
                     const renderMode = block.render;
                     const aboveType = y + 1 < WORLD_HEIGHT ? data[lx + lz * CS + (y + 1) * CS2] : 0;
@@ -969,6 +999,53 @@ class World {
         }
     }
 
+    refreshChunkDecorations(chunk) {
+        if (!this.decorations) return;
+        const key = chunkKey(chunk.cx, chunk.cz);
+        for (const { type, id } of this.decorationsByChunk.get(key) ?? []) {
+            this.decorations.removeInstance(type, id);
+        }
+
+        const instanceIds = [];
+        const ox = chunk.cx * CHUNK_SIZE, oz = chunk.cz * CHUNK_SIZE;
+        for (let y = 0; y <= chunk.maxY; y++) {
+            for (let lz = 0; lz < CHUNK_SIZE; lz++) {
+                for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+                    if (chunk.data[idx(lx, y, lz)] !== ID.TALL_GRASS) continue;
+                    const wx = ox + lx, wz = oz + lz;
+                    let supportY = y - 1;
+                    const hasSolidSupport = level => {
+                        const type = level >= 0 ? chunk.data[idx(lx, level, lz)] : 0;
+                        return type !== 0 && (BLOCKS[type]?.solid ?? true);
+                    };
+                    while (supportY >= 0 && y - supportY <= 3 && !hasSolidSupport(supportY)) supportY--;
+                    if (supportY < 0 || y - supportY > 3) {
+                        // Sem piso próximo, a planta é inválida e não deve ficar suspensa.
+                        this.setBlock(wx, y, wz, 0);
+                        continue;
+                    }
+                    const groundedY = supportY + 1;
+                    if (groundedY !== y) {
+                        // Corrige posições antigas que ficaram até dois blocos acima do piso.
+                        const targetType = chunk.data[idx(lx, groundedY, lz)];
+                        this.setBlock(wx, y, wz, 0);
+                        if (targetType === 0) this.setBlock(wx, groundedY, wz, ID.TALL_GRASS);
+                        continue;
+                    }
+                    const rotation = hash2(wz, wx, this.seed + 907) * Math.PI * 2;
+                    const scale = 0.45 + hash2(wx, wz, this.seed + 919) * 0.85;
+                    const variant = Math.min(2, Math.floor(hash2(wx, wz, this.seed + 929) * 3));
+                    const type = `tall-grass-${variant}`;
+                    const id = this.decorations.addInstance(
+                        type, [wx + 0.5, y, wz + 0.5], [0, rotation, 0], scale,
+                    );
+                    instanceIds.push({ type, id });
+                }
+            }
+        }
+        this.decorationsByChunk.set(key, instanceIds);
+    }
+
     rebuildGenQueue(pcx, pcz) {
         const R = RENDER_DISTANCE + 1;
         const list = [];
@@ -995,6 +1072,10 @@ class World {
                     this.scene.remove(c.mesh);
                     c.mesh.geometry.dispose();
                 }
+                for (const { type, id } of this.decorationsByChunk.get(key) ?? []) {
+                    this.decorations?.removeInstance(type, id);
+                }
+                this.decorationsByChunk.delete(key);
                 this.dirty.delete(c);
                 this.lightDirty.delete(c);
                 this.lightSourceChunks.delete(key);
@@ -1381,9 +1462,12 @@ const _pickupRay = new THREE.Vector3();
 function getItemGeometry(itemId) {
     if (itemGeometryCache[itemId]) return itemGeometryCache[itemId];
     const item = ITEMS[itemId];
+    const block = item.block != null ? BLOCKS[item.block] : null;
     const geo = item.sprite
         ? buildSpriteGeo(spritePixels(item.sprite.kind, item.sprite.mat), ITEM_SIZE * 1.6 / 16, ITEM_SIZE * 0.25)
-        : buildCubeGeo(BLOCKS[item.block].tiles, ITEM_SIZE);
+        : block?.render === 'instanced'
+            ? createTallGrassGeometry().scale(0.4, 0.4, 0.4)
+            : buildCubeGeo(block.tiles, ITEM_SIZE);
     itemGeometryCache[itemId] = geo;
     return geo;
 }
@@ -1399,8 +1483,9 @@ function spawnItemEntity(id, count, pos, vel, delay = 0.5, damage = 0, opts = {}
     }
     const block = ITEMS[id].block != null ? BLOCKS[ITEMS[id].block] : null;
     const mat = ITEMS[id].sprite ? spriteMaterial :
-        (block?.render === 'cutout' ? world.cutoutMaterial :
-            (block?.render === 'liquid' ? world.water.material : world.material));
+        (block?.render === 'instanced' ? tallGrassMaterial :
+            (block?.render === 'cutout' ? world.cutoutMaterial :
+                (block?.render === 'liquid' ? world.water.material : world.material)));
     const mesh = new THREE.Mesh(getItemGeometry(id), mat);
     mesh.position.copy(pos);
     scene.add(mesh);
@@ -1565,14 +1650,15 @@ function breakBlock(x, y, z) {
     if (!type) return;
     const held = inventory.slots[selectedSlot];
     const harvest = canHarvest(type, held);
-    const drop = BLOCKS[type].drop;
+    const drop = type === ID.TALL_GRASS ? ID.WHEAT_SEEDS : BLOCKS[type].drop;
+    const dropChance = type === ID.TALL_GRASS ? 0.12 : (BLOCKS[type].dropChance ?? 1);
     if (type === ID.FURNACE) spillFurnace(x, y, z);
     if (type === ID.CHEST) spillChest(x, y, z);
     const touchesWater = world.water.isAdjacent(world, x, y, z);
     world.setBlock(x, y, z, touchesWater ? ID.WATER : 0);
     if (touchesWater) world.water.activate(world, x, y, z);
     breakParticles.spawn(x, y, z, type);
-    if (harvest && drop && Math.random() < (BLOCKS[type].dropChance ?? 1)) {
+    if (harvest && drop && Math.random() < dropChance) {
         spawnItemEntity(
             drop, 1,
             new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5),
@@ -1593,6 +1679,13 @@ function updateMining(dt) {
         return;
     }
     if (mining.cooldown > 0) return;
+
+    if (currentHit.type === ID.TALL_GRASS) {
+        breakBlock(currentHit.x, currentHit.y, currentHit.z);
+        resetMining();
+        leftHeld = false;
+        return;
+    }
 
     if (!mining.active || mining.x !== currentHit.x || mining.y !== currentHit.y || mining.z !== currentHit.z) {
         mining.active = true;
@@ -1741,10 +1834,15 @@ function refreshHeldItem() {
         if (!HELD_TOOL_KINDS.has(item.sprite.kind)) heldAnchor.rotation.set(...HELD_TOOL_ROT);
     } else {
         const key = 'blk' + id;
-        if (!heldGeoCache[key]) heldGeoCache[key] = buildCubeGeo(BLOCKS[item.block].tiles, 0.3);
         const block = BLOCKS[item.block];
-        const mat = block?.render === 'cutout' ? world.cutoutMaterial :
-            (block?.render === 'liquid' ? world.water.material : world.material);
+        if (!heldGeoCache[key]) {
+            heldGeoCache[key] = block?.render === 'instanced'
+                ? createTallGrassGeometry().scale(0.4, 0.4, 0.4)
+                : buildCubeGeo(block.tiles, 0.3);
+        }
+        const mat = block?.render === 'instanced' ? tallGrassMaterial :
+            (block?.render === 'cutout' ? world.cutoutMaterial :
+                (block?.render === 'liquid' ? world.water.material : world.material));
         heldMesh = new THREE.Mesh(heldGeoCache[key], mat);
         heldMesh.position.set(...HELD_BLOCK_POS);
         heldAnchor.rotation.set(...HELD_BLOCK_ROT);
@@ -2188,7 +2286,7 @@ function updateSky() {
 // =====================================================================
 // 6. ESTADO GERAL
 // =====================================================================
-let camera, scene, renderer, controls, world, creatureSystem;
+let camera, scene, renderer, controls, world, creatureSystem, tallGrassMaterial, tallGrassMaterials = [];
 const breakParticles = createBreakParticleSystem({
     THREE,
     getScene: () => scene,
@@ -2829,7 +2927,32 @@ async function init() {
         renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    world = new World(scene, SEED);
+    const decorations = new InstancedBlockManager(THREE, scene, { maxCapacity: 2000 });
+    const grassTextureFiles = [
+        './assets/tall-grass-short.png',
+        './assets/tall-grass-medium.png',
+        './assets/tall-grass-tall.png',
+    ];
+    const grassTextures = await Promise.all(grassTextureFiles.map(file =>
+        new THREE.TextureLoader().loadAsync(new URL(file, import.meta.url).href),
+    ));
+    tallGrassMaterials = grassTextures.map(texture => {
+        texture.magFilter = THREE.NearestFilter;
+        texture.minFilter = THREE.NearestFilter;
+        texture.generateMipmaps = false;
+        if ('colorSpace' in texture && THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
+        return new THREE.MeshLambertMaterial({
+            map: texture, alphaTest: 0.35, transparent: false,
+            depthWrite: true, side: THREE.DoubleSide,
+        });
+    });
+    tallGrassMaterial = tallGrassMaterials[1];
+    for (let variant = 0; variant < 3; variant++) {
+        decorations.registerType(`tall-grass-${variant}`, createTallGrassGeometry(variant), tallGrassMaterials[variant], { maxCapacity: 2000 });
+    }
+    window.testInstancedMesh = () => testInstancedMesh(THREE, renderer);
+
+    world = new World(scene, SEED, decorations);
     creatureSystem = new CreatureSystem(world);
     const save = await loadGame();
     if (save) {
@@ -3012,7 +3135,7 @@ async function init() {
         
         // Se a posição para colocar o bloco contiver água, o bloco irá substituí-la normalmente!
         const blockAtTarget = world.getBlock(px, py, pz);
-        if (blockAtTarget !== 0 && !WaterSystem.isBlock(blockAtTarget)) return; 
+        if (blockAtTarget !== 0 && !WaterSystem.isBlock(blockAtTarget) && BLOCKS[blockAtTarget]?.solid !== false) return;
         
         if (intersectsPlayer(px, py, pz)) return;
         const facing = BLOCKS[placedType]?.tiles.front !== undefined
