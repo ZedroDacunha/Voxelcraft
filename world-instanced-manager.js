@@ -107,6 +107,25 @@ export class InstancedBlockManager {
         return this.#getType(type).count;
     }
 
+    hasType(type) {
+        return this.types.has(type);
+    }
+
+    computeBounds(type) {
+        const state = this.#getType(type);
+        state.mesh.computeBoundingSphere();
+        state.mesh.frustumCulled = true;
+    }
+
+    unregisterType(type) {
+        const state = this.#getType(type);
+        if (state.count !== 0) return false;
+        this.scene.remove(state.mesh);
+        state.mesh.dispose?.();
+        this.types.delete(type);
+        return true;
+    }
+
     dispose() {
         for (const state of this.types.values()) {
             this.scene.remove(state.mesh);
@@ -124,7 +143,7 @@ export class InstancedBlockManager {
     #createMesh(geometry, material, capacity) {
         const mesh = new this.THREE.InstancedMesh(geometry, material, capacity);
         mesh.instanceMatrix.setUsage(this.THREE.DynamicDrawUsage);
-        // Instances can move after their initial creation; disable stale bounds culling.
+        // Call computeBounds after a batch of instance changes to refresh culling bounds.
         mesh.frustumCulled = false;
         return mesh;
     }

@@ -263,10 +263,12 @@ function variantTile(tile, wx, y, wz) {
 }
 
 class World {
-    constructor(scene, seed, decorations = null) {
+    constructor(scene, seed, decorations = null, decorationGeometries = [], decorationMaterials = []) {
         this.scene = scene;
         this.seed = seed;
         this.decorations = decorations;
+        this.decorationGeometries = decorationGeometries;
+        this.decorationMaterials = decorationMaterials;
         this.decorationsByChunk = new Map();
         this.generator = new TerrainGenerator(seed, TERRAIN_CONFIG);
         this.chunks = new Map();
@@ -1007,6 +1009,7 @@ class World {
         }
 
         const instanceIds = [];
+        const batchX = floorDiv(chunk.cx, 4), batchZ = floorDiv(chunk.cz, 4);
         const ox = chunk.cx * CHUNK_SIZE, oz = chunk.cz * CHUNK_SIZE;
         for (let y = 0; y <= chunk.maxY; y++) {
             for (let lz = 0; lz < CHUNK_SIZE; lz++) {
@@ -1035,13 +1038,21 @@ class World {
                     const rotation = hash2(wz, wx, this.seed + 907) * Math.PI * 2;
                     const scale = 0.45 + hash2(wx, wz, this.seed + 919) * 0.85;
                     const variant = Math.min(2, Math.floor(hash2(wx, wz, this.seed + 929) * 3));
-                    const type = `tall-grass-${variant}`;
+                    const type = `tall-grass-${variant}@${batchX},${batchZ}`;
+                    if (!this.decorations.hasType(type)) {
+                        this.decorations.registerType(type, this.decorationGeometries[variant], this.decorationMaterials[variant], { maxCapacity: 256 });
+                    }
                     const id = this.decorations.addInstance(
                         type, [wx + 0.5, y, wz + 0.5], [0, rotation, 0], scale,
                     );
                     instanceIds.push({ type, id });
                 }
             }
+        }
+        const batchTypes = new Set(instanceIds.map(({ type }) => type));
+        for (const { type } of this.decorationsByChunk.get(key) ?? []) batchTypes.add(type);
+        for (const type of batchTypes) {
+            if (this.decorations.hasType(type)) this.decorations.computeBounds(type);
         }
         this.decorationsByChunk.set(key, instanceIds);
     }
@@ -1074,6 +1085,7 @@ class World {
                 }
                 for (const { type, id } of this.decorationsByChunk.get(key) ?? []) {
                     this.decorations?.removeInstance(type, id);
+                    if (this.decorations?.getCount(type) === 0) this.decorations.unregisterType(type);
                 }
                 this.decorationsByChunk.delete(key);
                 this.dirty.delete(c);
@@ -2933,7 +2945,7 @@ async function init() {
         './assets/tall-grass-medium-v2.png',
         './assets/tall-grass-tall-v2.png',
     ];
-    const grassTextureVersion = '20261029-4';
+    const grassTextureVersion = '20261029-5';
     const grassTextures = await Promise.all(grassTextureFiles.map(file =>
         new THREE.TextureLoader().loadAsync(new URL(`${file}?v=${grassTextureVersion}`, import.meta.url).href),
     ));
@@ -2949,12 +2961,10 @@ async function init() {
         });
     });
     tallGrassMaterial = tallGrassMaterials[1];
-    for (let variant = 0; variant < 3; variant++) {
-        decorations.registerType(`tall-grass-${variant}`, createTallGrassGeometry(variant), tallGrassMaterials[variant], { maxCapacity: 2000 });
-    }
+    const grassGeometries = Array.from({ length: 3 }, (_, variant) => createTallGrassGeometry(variant));
     window.testInstancedMesh = () => testInstancedMesh(THREE, renderer);
 
-    world = new World(scene, SEED, decorations);
+    world = new World(scene, SEED, decorations, grassGeometries, tallGrassMaterials);
     creatureSystem = new CreatureSystem(world);
     const save = await loadGame();
     if (save) {

@@ -96,7 +96,7 @@ async function launchWorld(world) {
     const loading = document.getElementById('world-loading');
     loading.hidden = false;
     try {
-        await import('./game.js?v=20261029-4');
+        await import('./game.js?v=20261029-5');
     } catch (error) {
         console.error('Não foi possível iniciar o jogo:', error);
         menu.hidden = false;

@@ -3,32 +3,30 @@ type: bug-report
 status: resolvido
 component:
   - "[[Texturas de grama]]"
-  - "[[Carregamento de recursos]]"
+  - "[[Cache de assets]]"
 tags:
-  - bug-report
+  - bug
+  - grama
   - cache
-  - threejs
-  - texturas
+  - assets
 ---
 
-# Jogo continuava exibindo textura antiga da grama
+# Textura de grama não atualizava após trocar os PNGs
 
 ## 📌 Contexto e Sintomas
 
-Os PNGs da grama foram substituídos no projeto, mas a imagem no jogo parecia não mudar.
+As imagens das texturas de grama foram substituídas no projeto, mas o navegador continuava mostrando a versão anterior mesmo depois de atualizar a página.
 
 ## 🔍 Causa Raiz
 
-O menu carrega `game.js` por `import()` dinâmico, que o navegador mantém carregado uma única vez por aba. Criar outro mundo na mesma sessão não executava novamente a versão atualizada do módulo. Além disso, substituir PNG mantendo os mesmos nomes não distinguia inequivocamente os novos assets de arquivos já armazenados.
+Os PNGs mantiveram os mesmos caminhos e a versão de cache das URLs continuava em `20261029-4`. Assim, o navegador podia reutilizar respostas antigas. O módulo do jogo também é carregado com `import()` dinâmico, que pode permanecer na memória da aba.
 
 ## 🛠️ Solução Aplicada (Antes e Depois)
 
-**Antes:** a versão estava nas URLs dos módulos e das texturas, mas as imagens continuavam com os caminhos originais.
+**Antes:** a entrada do menu, o módulo do jogo e as texturas de grama usavam `20261029-4`.
 
-**Depois:** renomeei os três arquivos para `tall-grass-*-v2.png`, atualizei os caminhos em `game.js` e versionei a entrada do menu, o `import()` do jogo e as URLs das imagens (`v=20261029-4`). A validação confirmou os três PNGs com alpha transparente. É necessário recarregar a página para descarregar o módulo antigo que já esteja na memória da aba.
-
-Verificação realizada: sintaxe do código, `git diff --check`, dimensões dos assets e alpha transparente. A atualização visual ainda precisa ser confirmada no navegador após recarregar e abrir um mundo.
+**Depois:** avancei as versões da entrada do menu, do módulo do jogo e das URLs dos PNGs para `20261029-5`, forçando o navegador a buscar os recursos atualizados.
 
 ## 🤖 Regra de Evolução para a IA
 
-> Quando atualizar código carregado por `import()` dinâmico e assets, invalide o cache da entrada, do módulo e das imagens — use nomes novos para os arquivos; criar outro mundo na mesma aba não recarrega módulos JavaScript.
+> Sempre que substituir um asset mantendo seu caminho, avance a versão de cache em todas as referências relevantes, incluindo a entrada HTML, imports dinâmicos de módulos e URL do próprio asset.
