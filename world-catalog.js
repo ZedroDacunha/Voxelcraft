@@ -86,6 +86,7 @@ BLOCKS[ID.WATER_FALL] = {
 
 for (const block of Object.values(BLOCKS)) {
     block.render ??= 'opaque';
+    block.opaque ??= block.render === 'opaque';
     block.solid ??= true;
     block.collectible ??= block.drop != null;
 }
@@ -93,6 +94,20 @@ for (const [id, orientation] of [
     [ID.TORCH_WALL_XP, [1, 0]], [ID.TORCH_WALL_XN, [-1, 0]],
     [ID.TORCH_WALL_ZP, [0, 1]], [ID.TORCH_WALL_ZN, [0, -1]],
 ]) BLOCKS[id] = { ...BLOCKS[ID.TORCH], collectible: false, orientation };
+
+export const BlockCatalog = Object.fromEntries([
+    [0, { id: 0, name: 'Ar', opaque: false }],
+    ...Object.entries(BLOCKS).map(([id, block]) => [Number(id), {
+        id: Number(id),
+        name: block.name,
+        opaque: Boolean(block.opaque),
+    }]),
+]);
+BlockCatalog.isOpaque = function isOpaque(blockId) {
+    if (blockId == null || blockId === 0) return false;
+    return BlockCatalog[blockId]?.opaque === true;
+};
+
 export const ITEMS = {};
 for (const [id, b] of Object.entries(BLOCKS)) {
     if (!b.collectible) continue;

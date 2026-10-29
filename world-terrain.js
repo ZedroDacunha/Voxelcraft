@@ -1,5 +1,198 @@
 import { hash2, Noise2D, smoothstep } from './world-math.js';
 import { OreGenerator } from './world-ore-generation.js';
+import { BlockCatalog, ID } from './world-catalog.js';
+
+function validateGrid(grid) {
+    const { width, height, depth } = grid;
+    if (![width, height, depth].every(Number.isInteger) ||
+        width < 0 || height < 0 || depth < 0 || typeof grid.getBlock !== 'function') {
+        throw new TypeError('grid precisa de width, height, depth inteiros e getBlock(x, y, z).');
+    }
+    return [width, height, depth];
+}
+
+export function buildChunkGreedyGeometry(grid) {
+    const dims = validateGrid(grid);
+    const positions = [], normals = [], uvs = [], indices = [];
+    let vertexIndex = 0;
+
+    // A base (u, v) é escolhida para que u × v aponte para +d.
+    for (let d = 0; d < 3; d++) {
+        const u = (d + 1) % 3;
+        const v = (d + 2) % 3;
+        const maskWidth = dims[u];
+        const maskHeight = dims[v];
+        const mask = new Uint32Array(maskWidth * maskHeight);
+
+        for (const sign of [-1, 1]) {
+            for (let slice = 0; slice < dims[d]; slice++) {
+                mask.fill(0);
+
+                // Cria a máscara de faces visíveis para esta fatia orientada.
+                for (let j = 0; j < maskHeight; j++) {
+                    for (let i = 0; i < maskWidth; i++) {
+                        const cell = [0, 0, 0];
+                        cell[d] = slice;
+                        cell[u] = i;
+                        cell[v] = j;
+                        const blockId = grid.getBlock(cell[0], cell[1], cell[2]);
+                        if (!(blockId > 0)) continue;
+
+                        const neighbor = [...cell];
+                        neighbor[d] += sign;
+                        const neighborInside = neighbor.every((coordinate, axis) =>
+                            coordinate >= 0 && coordinate < dims[axis]);
+                        const neighborId = neighborInside
+                            ? grid.getBlock(neighbor[0], neighbor[1], neighbor[2])
+                            : 0;
+                        if (!BlockCatalog.isOpaque(neighborId)) mask[j * maskWidth + i] = blockId;
+                    }
+                }
+
+                // Funde primeiro na largura e depois aumenta o retângulo por linhas.
+                for (let j = 0; j < maskHeight; j++) {
+                    for (let i = 0; i < maskWidth;) {
+                        const blockId = mask[j * maskWidth + i];
+                        if (blockId === 0) { i++; continue; }
+
+                        let w = 1;
+                        while (i + w < maskWidth && mask[j * maskWidth + i + w] === blockId) w++;
+
+                        let h = 1;
+                        let canGrow = true;
+                        while (j + h < maskHeight && canGrow) {
+                            for (let k = 0; k < w; k++) {
+                                if (mask[(j + h) * maskWidth + i + k] !== blockId) {
+                                    canGrow = false;
+                                    break;
+                                }
+                            }
+                            if (canGrow) h++;
+                        }
+
+                        const base = [0, 0, 0];
+                        base[d] = slice + (sign > 0 ? 1 : 0);
+                        base[u] = i;
+                        base[v] = j;
+                        const du = [0, 0, 0];
+                        const dv = [0, 0, 0];
+                        du[u] = w;
+                        dv[v] = h;
+                        const corners = [
+                            base,
+                            [base[0] + du[0], base[1] + du[1], base[2] + du[2]],
+                            [base[0] + du[0] + dv[0], base[1] + du[1] + dv[1], base[2] + du[2] + dv[2]],
+                            [base[0] + dv[0], base[1] + dv[1], base[2] + dv[2]],
+                        ];
+                        const faceVertex = vertexIndex;
+                        for (let corner = 0; corner < 4; corner++) {
+                            positions.push(...corners[corner]);
+                            const normal = [0, 0, 0];
+                            normal[d] = sign;
+                            normals.push(...normal);
+                        }
+                        uvs.push(0, 0, w, 0, w, h, 0, h);
+
+                        if (sign > 0) {
+                            indices.push(faceVertex, faceVertex + 1, faceVertex + 2,
+                                faceVertex, faceVertex + 2, faceVertex + 3);
+                        } else {
+                            indices.push(faceVertex, faceVertex + 2, faceVertex + 1,
+                                faceVertex, faceVertex + 3, faceVertex + 2);
+                        }
+                        vertexIndex += 4;
+
+                        for (let dy = 0; dy < h; dy++) {
+                            for (let dx = 0; dx < w; dx++) mask[(j + dy) * maskWidth + i + dx] = 0;
+                        }
+                        i += w;
+                    }
+                }
+            }
+        }
+    }
+
+    return { positions, normals, uvs, indices };
+}
+
+export const buildChunkGeometry = buildChunkGreedyGeometry;
+
+export function testOcclusionCulling() {
+    const opacityChecks = [
+        BlockCatalog.isOpaque(ID.GRASS) === true,
+        BlockCatalog.isOpaque(ID.DIRT) === true,
+        BlockCatalog.isOpaque(ID.STONE) === true,
+        BlockCatalog.isOpaque(ID.WATER) === false,
+        BlockCatalog.isOpaque(0) === false,
+        BlockCatalog.isOpaque(null) === false,
+        BlockCatalog.isOpaque(undefined) === false,
+        BlockCatalog.isOpaque(-1) === false,
+    ];
+    const grid = {
+        width: 3, height: 3, depth: 3,
+        getBlock(x, y, z) {
+            return x >= 0 && x < 3 && y >= 0 && y < 3 && z >= 0 && z < 3 ? ID.STONE : 0;
+        },
+    };
+    const geometry = buildChunkGeometry(grid);
+    const result = {
+        passed: opacityChecks.every(Boolean) && geometry.positions.length / 3 === 24,
+        opacityChecksPassed: opacityChecks.every(Boolean),
+        vertices: geometry.positions.length / 3,
+        expectedVertices: 24,
+        faces: geometry.indices.length / 6,
+        expectedFaces: 6,
+    };
+    if (!result.passed) throw new Error(`Falha em testOcclusionCulling: ${JSON.stringify(result)}`);
+    return result;
+}
+
+export function testGreedyMeshing() {
+    const grid = {
+        width: 10, height: 1, depth: 10,
+        getBlock(x, y, z) {
+            return x >= 0 && x < 10 && y === 0 && z >= 0 && z < 10 ? ID.STONE : 0;
+        },
+    };
+    const geometry = buildChunkGreedyGeometry(grid);
+    let mergedFaceVertices = 0;
+    for (let vertex = 0; vertex < geometry.normals.length / 3; vertex++) {
+        if (geometry.normals[vertex * 3 + 1] === 1) mergedFaceVertices++;
+    }
+    let mergedFaceTriangles = 0;
+    for (let index = 0; index < geometry.indices.length; index += 3) {
+        const vertex = geometry.indices[index];
+        if (geometry.normals[vertex * 3 + 1] === 1) mergedFaceTriangles++;
+    }
+
+    const uvs = [];
+    for (let vertex = 0; vertex < geometry.normals.length / 3; vertex++) {
+        if (geometry.normals[vertex * 3 + 1] === 1) {
+            uvs.push(geometry.uvs[vertex * 2], geometry.uvs[vertex * 2 + 1]);
+        }
+    }
+    const maxU = Math.max(...uvs.filter((_, index) => index % 2 === 0));
+    const maxV = Math.max(...uvs.filter((_, index) => index % 2 === 1));
+    const naiveFaceVertices = 10 * 10 * 4;
+    const result = {
+        passed: mergedFaceVertices === 4 && mergedFaceTriangles === 2 && maxU === 10 && maxV === 10,
+        mergedFaceVertices,
+        expectedMergedFaceVertices: 4,
+        mergedFaceTriangles,
+        expectedMergedFaceTriangles: 2,
+        naiveFaceVertices,
+        uvRepeat: [maxU, maxV],
+        totalMeshVertices: geometry.positions.length / 3,
+        totalMeshTriangles: geometry.indices.length / 3,
+    };
+    if (!result.passed) throw new Error(`Falha em testGreedyMeshing: ${JSON.stringify(result)}`);
+    return result;
+}
+
+if (typeof window !== 'undefined') {
+    window.testOcclusionCulling = testOcclusionCulling;
+    window.testGreedyMeshing = testGreedyMeshing;
+}
 
 export class TerrainGenerator {
     constructor(seed, config) {
