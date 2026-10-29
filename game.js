@@ -2929,17 +2929,19 @@ async function init() {
 
     const decorations = new InstancedBlockManager(THREE, scene, { maxCapacity: 2000 });
     const grassTextureFiles = [
-        './assets/tall-grass-short.png',
-        './assets/tall-grass-medium.png',
-        './assets/tall-grass-tall.png',
+        './assets/tall-grass-short-v2.png',
+        './assets/tall-grass-medium-v2.png',
+        './assets/tall-grass-tall-v2.png',
     ];
+    const grassTextureVersion = '20261029-4';
     const grassTextures = await Promise.all(grassTextureFiles.map(file =>
-        new THREE.TextureLoader().loadAsync(new URL(file, import.meta.url).href),
+        new THREE.TextureLoader().loadAsync(new URL(`${file}?v=${grassTextureVersion}`, import.meta.url).href),
     ));
     tallGrassMaterials = grassTextures.map(texture => {
         texture.magFilter = THREE.NearestFilter;
         texture.minFilter = THREE.NearestFilter;
         texture.generateMipmaps = false;
+        texture.needsUpdate = true;
         if ('colorSpace' in texture && THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
         return new THREE.MeshLambertMaterial({
             map: texture, alphaTest: 0.35, transparent: false,
