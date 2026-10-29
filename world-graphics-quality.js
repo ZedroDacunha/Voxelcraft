@@ -26,8 +26,7 @@ export function createWorldGraphicsQuality({ max, min = 0.5, notify = () => {} }
             state.lastFps = null;
             if (state.noGain >= 3) {
                 state.auto = false;
-                setScale(state.max);
-                notify('FPS não melhora com menos resolução: veja economia de energia / aceleração de hardware');
+                notify('Escala mantida: FPS não melhorou com menos resolução; verifique aceleração gráfica');
                 return;
             }
         }
@@ -35,7 +34,7 @@ export function createWorldGraphicsQuality({ max, min = 0.5, notify = () => {} }
         const gpuBound = cpuMs < 0.6 * 1000 / Math.max(fpsNow, 1);
         if (fpsNow < 55 && state.scale > state.min && gpuBound) {
             state.fast = 0;
-            if (++state.slow >= 3) {
+            if (++state.slow >= 2) {
                 state.slow = 0;
                 state.lastFps = fpsNow;
                 setScale(state.scale - 0.15);
