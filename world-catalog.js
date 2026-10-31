@@ -28,8 +28,10 @@ export const ID = { GRASS: 1, STONE: 2, LOG: 3, DIRT: 4, COBBLE: 5, PLANKS: 6, L
              WATER_FLOW_4: 43, WATER_FLOW_5: 44, WATER_FLOW_6: 45, WATER_FLOW_7: 46, WATER_FALL: 47,
              TALL_GRASS: 84,
              STICK: 20, TORCH: 60, TORCH_WALL_XP: 61, TORCH_WALL_XN: 62, TORCH_WALL_ZP: 63, TORCH_WALL_ZN: 64, APPLE: 30, CHARCOAL: 31,
-             WOOD_DOOR: 65, WOOD_DOOR_BOTTOM: 66, WOOD_DOOR_TOP: 67,
-             WOOD_DOOR_BOTTOM_OPEN: 68, WOOD_DOOR_TOP_OPEN: 69 };
+             // 65-73 pertencem às ferramentas de ouro/diamante/cobre; a porta
+             // usa uma faixa livre para não colidir com esses IDs de item.
+             WOOD_DOOR: 86, WOOD_DOOR_BOTTOM: 87, WOOD_DOOR_TOP: 88,
+             WOOD_DOOR_BOTTOM_OPEN: 89, WOOD_DOOR_TOP_OPEN: 90 };
 
 export const BLOCKS = {
     [ID.GRASS]: { name: 'Grama',      hardness: 0.6, drop: ID.DIRT,   tool: 'shovel', tiles: { top: TILE.GRASS_TOP, side: TILE.GRASS_SIDE, bottom: TILE.DIRT } },
@@ -47,22 +49,22 @@ export const BLOCKS = {
           tiles: { top: TILE.CHEST_TOP, side: TILE.CHEST_SIDE, front: TILE.CHEST_FRONT, bottom: TILE.CHEST_TOP } },
     [ID.WOOD_DOOR_BOTTOM]: {
         name: 'Porta de carvalho', hardness: 3, drop: ID.WOOD_DOOR, tool: 'axe', collectible: false,
-        render: 'cutout', solid: true, door: { half: 'bottom', open: false, tile: TILE.WOOD_DOOR_LOWER },
+        render: 'door', solid: true, door: { half: 'bottom', open: false, tile: TILE.WOOD_DOOR_LOWER },
         tiles: { top: TILE.WOOD_END, side: TILE.WOOD, front: TILE.WOOD_DOOR_LOWER, bottom: TILE.WOOD_END },
     },
     [ID.WOOD_DOOR_TOP]: {
         name: 'Porta de carvalho', hardness: 3, drop: ID.WOOD_DOOR, tool: 'axe', collectible: false,
-        render: 'cutout', solid: true, door: { half: 'top', open: false, tile: TILE.WOOD_DOOR_UPPER },
+        render: 'door', solid: true, door: { half: 'top', open: false, tile: TILE.WOOD_DOOR_UPPER },
         tiles: { top: TILE.WOOD_END, side: TILE.WOOD, front: TILE.WOOD_DOOR_UPPER, bottom: TILE.WOOD_END },
     },
     [ID.WOOD_DOOR_BOTTOM_OPEN]: {
         name: 'Porta de carvalho aberta', hardness: 3, drop: ID.WOOD_DOOR, tool: 'axe', collectible: false,
-        render: 'cutout', solid: false, door: { half: 'bottom', open: true, tile: TILE.WOOD_DOOR_LOWER },
+        render: 'door', solid: false, door: { half: 'bottom', open: true, tile: TILE.WOOD_DOOR_LOWER },
         tiles: { top: TILE.WOOD_END, side: TILE.WOOD, front: TILE.WOOD_DOOR_LOWER, bottom: TILE.WOOD_END },
     },
     [ID.WOOD_DOOR_TOP_OPEN]: {
         name: 'Porta de carvalho aberta', hardness: 3, drop: ID.WOOD_DOOR, tool: 'axe', collectible: false,
-        render: 'cutout', solid: false, door: { half: 'top', open: true, tile: TILE.WOOD_DOOR_UPPER },
+        render: 'door', solid: false, door: { half: 'top', open: true, tile: TILE.WOOD_DOOR_UPPER },
         tiles: { top: TILE.WOOD_END, side: TILE.WOOD, front: TILE.WOOD_DOOR_UPPER, bottom: TILE.WOOD_END },
     },
     ...createMineralBlocks(ID, TILE),

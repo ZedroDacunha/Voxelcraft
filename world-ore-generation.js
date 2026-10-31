@@ -1,6 +1,6 @@
 import { hash2 } from './world-math.js';
 
-const COAL_VEIN_CONFIG = Object.freeze({
+export const COAL_VEIN_CONFIG = Object.freeze({
     horizontalCellSize: 8,
     verticalCellSize: 7,
     horizontalReach: 3,
