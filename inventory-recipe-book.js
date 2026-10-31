@@ -1,4 +1,5 @@
 import { stackHtml } from './inventory-view.js';
+import { createRecipeSearchIndex, filterRecipeSearch } from './inventory-recipe-search.js';
 
 function recipeSection(title, entries) {
     const section = document.createElement('section');
@@ -126,6 +127,13 @@ export function createRecipeBook({ root, search, empty, recipes, smelting, fuels
     );
 
     const sections = [...root.querySelectorAll('.recipe-section')];
+    const searchIndex = createRecipeSearchIndex(sections.flatMap(section =>
+        [...section.querySelectorAll('.recipe-entry')].map(entry => ({
+            entry,
+            section,
+            text: entry.textContent,
+        })),
+    ));
     const refreshAvailability = () => {
         for (const entry of root.querySelectorAll('.recipe-entry-craft')) {
             const recipe = recipes[Number(entry.dataset.recipeIndex)];
@@ -143,20 +151,10 @@ export function createRecipeBook({ root, search, empty, recipes, smelting, fuels
         }
     };
     const filter = () => {
-        const query = search.value.trim().toLocaleLowerCase('pt-BR');
-        let anyVisible = false;
-        for (const section of sections) {
-            const entries = [...section.querySelectorAll('.recipe-entry')];
-            let sectionVisible = false;
-            for (const entry of entries) {
-                const matches = entry.textContent.toLocaleLowerCase('pt-BR').includes(query);
-                entry.hidden = !matches;
-                sectionVisible ||= matches;
-            }
-            section.hidden = !sectionVisible;
-            anyVisible ||= sectionVisible;
-        }
-        empty.hidden = anyVisible;
+        const { visibleEntries, visibleSections, hasResults } = filterRecipeSearch(searchIndex, search.value);
+        for (const record of searchIndex) record.entry.hidden = !visibleEntries.has(record.entry);
+        for (const section of sections) section.hidden = !visibleSections.has(section);
+        empty.hidden = hasResults;
     };
 
     root.addEventListener('click', event => {
@@ -170,6 +168,7 @@ export function createRecipeBook({ root, search, empty, recipes, smelting, fuels
         feedback.hidden = !feedback.textContent;
     });
     search.addEventListener('input', filter);
+    filter();
     refreshAvailability();
     return { refreshAvailability };
 }
