@@ -32,6 +32,8 @@ import { configureTorchFlicker, configureTorchFlameAnimation, updateWorldLightin
 import { FurnaceSmokeSystem } from './world-furnace-effects.js';
 import { canHarvest, damageTool as damageToolStack, getBreakTime } from './world-tool-rules.js';
 import { woodDoorCollision, woodDoorPart, woodDoorShape, woodDoorType } from './world-door.js';
+import { rightClickIntent } from './world-interaction-rules.js';
+import { loadGameSettings } from './world-game-settings.js';
 import {
     BlockFacingStore, DEFAULT_BLOCK_FACING, facingTowardPlayer, isFrontFace, isHorizontalFacing,
     tileForBlockFace,
@@ -89,7 +91,10 @@ const inventoryAssets = createInventoryAssets(THREE);
 const ACTIVE_FURNACE_LIGHT = 13;
 const BLOCK_LIGHT_GAIN = 3.4;
 const BLOCK_LIGHT_MAX = 2.5;
-const RENDER_DISTANCE = 4;     // em chunks
+// Preferências da tela de opções (localStorage). O menu grava e este módulo
+// lê ao ser importado — ou seja, ao entrar em um mundo.
+const GAME_SETTINGS = loadGameSettings();
+const RENDER_DISTANCE = GAME_SETTINGS.renderDistance;   // em chunks
 const START_LOAD_RADIUS = 2;   // chunks prontos antes de liberar o jogador (o resto carrega em jogo)
 const REACH = 5;               // alcance de interação (blocos)
 const ACTIVE_WORLD = window.ACTIVE_WORLD;
@@ -2420,6 +2425,7 @@ const look = { yaw: 0, pitch: 0, spikes: 0, maxDelta: 0 };
 const MAX_EVENT_DELTA = 350;
 const lookEuler = new THREE.Euler(0, 0, 0, 'YXZ');
 const LOOK_SPEED = 0.002;
+const LOOK_SENSITIVITY = GAME_SETTINGS.sensitivity;
 const MAX_PITCH = Math.PI / 2 - 0.02;
 
 let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
@@ -2830,7 +2836,8 @@ function updatePhysics(dt) {
         player.vel.y = Math.max(player.vel.y - GRAVITY * dt, -60);
     }
 
-    const targetFOV = (sprintNow && moveForward && !isCrouching && !inWater) ? 85 : 75;
+    const sprintFov = sprintNow && moveForward && !isCrouching && !inWater;
+    const targetFOV = GAME_SETTINGS.fov + (sprintFov ? 10 : 0);
     if (Math.abs(camera.fov - targetFOV) > 0.1) {
         camera.fov += (targetFOV - camera.fov) * Math.min(1, 10 * dt);
         camera.updateProjectionMatrix();
@@ -2947,8 +2954,8 @@ function onLookMove(e) {
     const big = Math.max(Math.abs(mx), Math.abs(my));
     if (big > look.maxDelta) look.maxDelta = big;
     if (big > MAX_EVENT_DELTA) { look.spikes++; return; }
-    look.yaw -= mx * LOOK_SPEED;
-    look.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, look.pitch - my * LOOK_SPEED));
+    look.yaw -= mx * LOOK_SPEED * LOOK_SENSITIVITY;
+    look.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, look.pitch - my * LOOK_SPEED * LOOK_SENSITIVITY));
     applyLook();
 }
 
@@ -3030,7 +3037,7 @@ async function init() {
     sunLight.position.set(10, 20, 10);
     scene.add(sunLight);
 
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 300);
+    camera = new THREE.PerspectiveCamera(GAME_SETTINGS.fov, window.innerWidth / window.innerHeight, 0.05, 300);
     scene.add(camera);
 
     createHand();
@@ -3238,17 +3245,16 @@ async function init() {
         if (event.button !== 2) return;
         updateTarget();
 
-        const st = currentHit && BLOCKS[currentHit.type].station;
-        if (st && !event.shiftKey && !wantToCrouch) { openStation(st, currentHit); return; }
-        if (currentHit && woodDoorPart(currentHit.type) && !event.shiftKey && !wantToCrouch) {
-            toggleWoodDoor(currentHit);
-            return;
-        }
-
         const held = inventory.slots[selectedSlot];
-        const food = held && ITEMS[held.id].food;
-        // Comida só é consumida pelo clique direito quando o jogador mira no ar.
-        if (food && !currentHit) {
+        const station = currentHit && BLOCKS[currentHit.type].station;
+        const door = Boolean(currentHit && woodDoorPart(currentHit.type));
+        const food = Boolean(held && ITEMS[held.id].food);
+        const intent = rightClickIntent({ sneaking: event.shiftKey || wantToCrouch, station, door, food });
+
+        if (intent === 'station') { openStation(station, currentHit); return; }
+        if (intent === 'door') { toggleWoodDoor(currentHit); return; }
+        // Comer funciona mirando para qualquer lugar (inclusive um bloco).
+        if (intent === 'eat') {
             if (hunger < MAX_HUNGER) { eat.active = true; eat.progress = 0; eat.slot = selectedSlot; eat.id = held.id; }
             else showToast('Você não está com fome');
             return;

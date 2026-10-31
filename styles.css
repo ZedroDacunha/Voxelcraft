@@ -193,6 +193,16 @@
     .world-dialog, .options-dialog { border-radius: 0; }
     .options-dialog p { color: #d0d0d0; line-height: 1.55; }
     .options-dialog kbd { padding: 2px 5px; border: 1px solid #747474; background: #343434; color: #fff; font: 12px monospace; }
+    .options-dialog .world-dialog-actions { justify-content: space-between; }
+    .options-hint { margin: 0; color: #b9c3cc; font-size: 12px; }
+    .options-field { gap: 7px; margin: 14px 0; }
+    .options-field-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    .options-field-head output { color: #fff; font: 13px/1.1 monospace; }
+    .options-field input[type="range"] { width: 100%; margin: 0; padding: 0; border: 0; border-radius: 0;
+        background: transparent; accent-color: #8ed9e7; cursor: pointer; }
+    .options-controls { margin-top: 16px; padding-top: 12px; border-top: 1px solid #33465a; color: #d0d0d0; font-size: 13px; }
+    .options-controls summary { color: #d6d0a4; cursor: pointer; }
+    .options-controls p { margin: 8px 0 0; color: #d0d0d0; line-height: 1.55; }
     @media (max-width: 520px) {
         .title-screen-footer span:last-child { display: none; }
         .title-screen-logo { margin-bottom: 34px; }
