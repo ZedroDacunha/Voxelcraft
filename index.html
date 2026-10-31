@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Voxel Sandbox - Parte 11: Água, Praias e Natação</title>
-<link rel="stylesheet" href="styles.css?v=b7b7ef5542">
+<link rel="stylesheet" href="styles.css?v=c3c1116f3f">
 <link rel="stylesheet" href="inventory.css?v=d7d9c61f74">
 <!-- importmap:start (gerado por tools/stamp-importmap.mjs; não editar à mão) -->
 <script type="importmap">
@@ -12,7 +12,7 @@
   "imports": {
     "three": "./vendor/three/three.module.js?v=76dea8151b",
     "three/addons/": "./vendor/three/addons/",
-    "./game.js": "./game.js?v=e4ae1d51e6",
+    "./game.js": "./game.js?v=eb1fd6ce7c",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
     "./inventory-logic.js": "./inventory-logic.js?v=20ec1c5545",
     "./inventory-model.js": "./inventory-model.js?v=473c73a8c5",
@@ -26,6 +26,7 @@
     "./world-clouds.js": "./world-clouds.js?v=1e269cf3ec",
     "./world-door.js": "./world-door.js?v=d6fc66dde7",
     "./world-furnace-effects.js": "./world-furnace-effects.js?v=190d3dc709",
+    "./world-game-settings.js": "./world-game-settings.js?v=09640fbf34",
     "./world-graphics-quality.js": "./world-graphics-quality.js?v=f20063e81a",
     "./world-grid.js": "./world-grid.js?v=be11481d71",
     "./world-instanced-manager.js": "./world-instanced-manager.js?v=65840e2b5d",
@@ -34,10 +35,11 @@
     "./world-list-store.js": "./world-list-store.js?v=5c92915d17",
     "./world-list-view.js": "./world-list-view.js?v=9ec40da58c",
     "./world-math.js": "./world-math.js?v=ce4a6d9232",
-    "./world-menu.js": "./world-menu.js?v=0b6900b6ac",
+    "./world-menu.js": "./world-menu.js?v=f3b3d8ef32",
     "./world-mineral-blocks.js": "./world-mineral-blocks.js?v=4c39bc041e",
     "./world-mineral-textures.js": "./world-mineral-textures.js?v=ab422ad968",
     "./world-minerals.js": "./world-minerals.js?v=2f66ff7350",
+    "./world-options-view.js": "./world-options-view.js?v=b32c5daec1",
     "./world-ore-generation.js": "./world-ore-generation.js?v=7fe35588d3",
     "./world-raycast.js": "./world-raycast.js?v=0f025b877c",
     "./world-save-codec.js": "./world-save-codec.js?v=71b8b469b6",
@@ -109,14 +111,38 @@
         <p id="world-menu-error" class="world-menu-error" role="alert" hidden></p>
     </section>
 </section>
-<dialog id="options-dialog" class="world-dialog options-dialog">
-    <form method="dialog">
+<dialog id="options-dialog" class="world-dialog options-dialog" aria-labelledby="options-title">
+    <form method="dialog" id="options-form">
         <p class="world-menu-eyebrow">CONFIGURAÇÃO</p>
-        <h2>Opções</h2>
-        <p>Controles: <kbd>W A S D</kbd> mover · <kbd>Espaço</kbd> pular · <kbd>Shift</kbd> correr</p>
-        <p><kbd>F4</kbd> alterna a qualidade gráfica durante o jogo.</p>
-        <p>Mouse: olhar ao redor · botão esquerdo: minerar · botão direito: usar ou colocar blocos.</p>
-        <div class="world-dialog-actions"><button class="classic-btn" value="close">Concluído</button></div>
+        <h2 id="options-title">Opções</h2>
+        <p class="options-hint">As mudanças valem para o próximo mundo que você entrar.</p>
+
+        <label class="world-field options-field">
+            <span class="options-field-head">Sensibilidade do mouse <output id="opt-sensitivity-value">100%</output></span>
+            <input type="range" id="opt-sensitivity" min="0.5" max="2" step="0.05" value="1">
+        </label>
+
+        <label class="world-field options-field">
+            <span class="options-field-head">Campo de visão <output id="opt-fov-value">75°</output></span>
+            <input type="range" id="opt-fov" min="60" max="100" step="1" value="75">
+        </label>
+
+        <label class="world-field options-field">
+            <span class="options-field-head">Distância de render <output id="opt-render-distance-value">4 chunks</output></span>
+            <input type="range" id="opt-render-distance" min="2" max="6" step="1" value="4">
+        </label>
+
+        <details class="options-controls">
+            <summary>Controles</summary>
+            <p><kbd>W A S D</kbd> mover · <kbd>Espaço</kbd> pular · <kbd>Shift</kbd> correr · <kbd>C</kbd> agachar</p>
+            <p><kbd>F4</kbd> alterna a qualidade gráfica durante o jogo.</p>
+            <p>Mouse: olhar ao redor · botão esquerdo: minerar · botão direito: usar ou colocar blocos.</p>
+        </details>
+
+        <div class="world-dialog-actions">
+            <button class="classic-btn" type="button" id="btn-options-reset">Restaurar padrões</button>
+            <button class="classic-btn" value="close">Concluído</button>
+        </div>
     </form>
 </dialog>
 <dialog id="world-dialog" class="world-dialog">
@@ -251,6 +277,6 @@
 </div>
 </div>
 
-<script type="module" src="world-menu.js?v=0b6900b6ac"></script>
+<script type="module" src="world-menu.js?v=f3b3d8ef32"></script>
 </body>
 </html>

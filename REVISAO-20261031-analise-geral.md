@@ -54,6 +54,7 @@ Legenda de prioridade:
 | 8 | Atlas de textura em uma única fileira de 2080 px | `world-catalog.js`, mesher, `inventory-assets.js`, `menu-background.js` | Risco de textura recusada em GPUs antigas (limite garantido: 2048) |
 | 9 | Módulos ES sem versão (cache misto após deploy) | `index.html` + `tools/stamp-importmap.mjs` | Pós-deploy podia misturar `game.js` novo com módulo antigo |
 | 10 | Comida só era consumida mirando no ar | `game.js` › clique direito + `world-interaction-rules.js` | Era preciso "olhar para o céu" para comer |
+| 11 | Opções só listavam controles; nada era configurável | `world-game-settings.js`, `world-options-view.js`, `index.html` | Sensibilidade, FOV e distância de render eram constantes |
 
 ### 1. O Web Worker do terreno estava desligado
 
@@ -157,6 +158,8 @@ node --test tests/*.test.mjs
   célula e nenhum usa o fallback magenta.
 - prioridade do clique direito (bancada/forno/baú > porta > comer > colocar) e
   comer mirando em bloco ou no ar.
+- preferências do jogo: limites, arredondamento, storage corrompido e a ligação
+  entre os controles da tela de opções e o `index.html`.
 
 ### 7. Atlas de textura em grade
 
@@ -210,6 +213,35 @@ continua em cache (o `three.js` de 1,3 MB só baixa de novo quando muda); e o
 grafo nunca mistura versões. Detalhes e fluxo de manutenção em
 [[BUG-20261031-cache-modulos]].
 
+### 9. Tela de opções com preferências persistentes
+
+O diálogo "Opções..." só listava os controles. `RENDER_DISTANCE`, `LOOK_SPEED` e
+o FOV eram constantes no código.
+
+Agora existem três preferências persistidas em `localStorage`
+(`voxel-sandbox/game-settings/v1`), com a mesma linguagem visual do menu
+(`world-dialog`, `classic-btn`, `world-field`):
+
+| opção | faixa | efeito |
+|---|---|---|
+| Sensibilidade do mouse | 50–200% | multiplica a rotação da câmera |
+| Campo de visão | 60–100° | FOV base (correr continua somando 10°) |
+| Distância de render | 2–6 chunks | raio de chunks gerados e da névoa |
+
+- `world-game-settings.js` guarda os campos (min/max/passo/padrão/formato),
+  sanitiza qualquer coisa vinda do storage (clamp + arredondamento no passo) e
+  trata `localStorage` bloqueado/quebrado sem lançar.
+- `world-options-view.js` liga os `input[type=range]` do diálogo ao storage e
+  atualiza o `<output>` com o valor formatado; "Restaurar padrões" volta tudo.
+- `game.js` lê as preferências ao ser importado (ou seja, ao entrar em um
+  mundo) e usa em `RENDER_DISTANCE`, `LOOK_SENSITIVITY` e no FOV da câmera.
+  Como voltar ao menu recarrega a página, a mudança sempre vale no próximo
+  mundo — o diálogo avisa isso.
+
+`tests/game-settings.test.mjs` cobre limites, arredondamento, lixo no storage,
+roundtrip e a ligação entre os campos e os ids do `index.html` (se um input for
+renomeado, o teste reprova).
+
 ---
 
 ## 🐞 Bugs e riscos ainda abertos
@@ -238,17 +270,15 @@ periódico, justamente enquanto o jogador se move.
 Sugestão: grade maior (64×64) recentralizada só na borda, reconstrução fora do
 quadro ou nuvens por `InstancedMesh`/shader.
 
-### P1 — Sem áudio, sem toque, sem opções
+### P1 — Sem áudio e sem toque
 
 - **Áudio**: não há nenhuma API de áudio no projeto. Passos, quebrar/colocar,
   água, forno, dano e uma trilha simples mudariam muito a sensação do jogo.
 - **Celular**: depende de teclado + mouse + pointer lock, que não existe em
   iOS. Um modo toque precisaria de joystick virtual, arrastar para olhar e
   botões de ação (e `touch-action: none`).
-- **Opções**: o diálogo "Opções..." só lista controles. `RENDER_DISTANCE`,
-  `LOOK_SPEED`, `MAX_PIXEL_RATIO`, volume e escala da HUD são constantes. Uma
-  tela de opções persistida em `localStorage` (aplicada antes de criar o mundo)
-  resolve distância de render, sensibilidade, FOV e volume de uma vez.
+- **Opções**: resolvido — veja a seção 9. Faltam apenas volume (não há áudio) e
+  escala da HUD.
 
 ### P2 — Desempenho
 
@@ -342,7 +372,10 @@ No navegador (o preview desta sessão serve a raiz do projeto):
 7. comer uma maçã mirando no chão, numa parede e no céu (as três devem comer);
    agachado em frente ao baú com comida na mão também come, sem abrir o baú;
    com a barra cheia aparece "Você não está com fome".
-8. com `?debug` na URL, o console expõe `dbg.placeDoorAt(x, y, z)`, `dbg.toggleDoor(x, y, z)` e
+8. abrir "Opções..." no menu, mexer nos três controles e conferir que os valores
+   são lembrados ao reabrir o diálogo; entrar em um mundo e sentir a
+   sensibilidade/FOV e ver o alcance da névoa mudando com a distância;
+9. com `?debug` na URL, o console expõe `dbg.placeDoorAt(x, y, z)`, `dbg.toggleDoor(x, y, z)` e
    `dbg.blockAt(x, y, z)` para testar a porta sem mirar com o mouse.
 
 > Se algo parecer estranho na porta (textura girada ou face faltando), o ponto
@@ -362,7 +395,7 @@ teste próprio e um commit/PR separado. O primeiro foi o **atlas em grade**.
 2. ~~Resolver o cache de módulos~~ — feito (`tools/stamp-importmap.mjs`).
 3. ~~Atlas em grade (16 colunas)~~ — feito.
 4. ~~Permitir comer olhando para blocos~~ — feito; revisar o texto da fome.
-5. Tela de opções com distância de render e sensibilidade.
+5. ~~Tela de opções com distância de render e sensibilidade~~ — feito.
 
 **Próximo**
 

@@ -2,6 +2,7 @@ import { storeRequest } from './world-storage.js';
 import { createWorldRecord, deleteWorldRecord, getWorlds, renameWorldRecord } from './world-list-store.js';
 import { createWorldSaveOptions } from './world-save-options.js';
 import { createWorldListView, formatWorldActivity } from './world-list-view.js';
+import { createOptionsView } from './world-options-view.js';
 
 import('./menu-background.js').catch(error => {
     console.warn('Panorama animado indisponível; usando o cenário estático.', error);
@@ -183,6 +184,7 @@ document.getElementById('btn-back-title').addEventListener('click', () => {
     titleScreen.hidden = false;
     document.getElementById('btn-open-worlds').focus();
 });
+createOptionsView(document.getElementById('options-dialog'));
 document.getElementById('btn-open-options').addEventListener('click', () => {
     document.getElementById('options-dialog').showModal();
 });
