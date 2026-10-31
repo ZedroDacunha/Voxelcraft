@@ -32,6 +32,7 @@ import { configureTorchFlicker, configureTorchFlameAnimation, updateWorldLightin
 import { FurnaceSmokeSystem } from './world-furnace-effects.js';
 import { canHarvest, damageTool as damageToolStack, getBreakTime } from './world-tool-rules.js';
 import { woodDoorCollision, woodDoorPart, woodDoorShape, woodDoorType } from './world-door.js';
+import { rightClickIntent } from './world-interaction-rules.js';
 import {
     BlockFacingStore, DEFAULT_BLOCK_FACING, facingTowardPlayer, isFrontFace, isHorizontalFacing,
     tileForBlockFace,
@@ -3238,17 +3239,16 @@ async function init() {
         if (event.button !== 2) return;
         updateTarget();
 
-        const st = currentHit && BLOCKS[currentHit.type].station;
-        if (st && !event.shiftKey && !wantToCrouch) { openStation(st, currentHit); return; }
-        if (currentHit && woodDoorPart(currentHit.type) && !event.shiftKey && !wantToCrouch) {
-            toggleWoodDoor(currentHit);
-            return;
-        }
-
         const held = inventory.slots[selectedSlot];
-        const food = held && ITEMS[held.id].food;
-        // Comida só é consumida pelo clique direito quando o jogador mira no ar.
-        if (food && !currentHit) {
+        const station = currentHit && BLOCKS[currentHit.type].station;
+        const door = Boolean(currentHit && woodDoorPart(currentHit.type));
+        const food = Boolean(held && ITEMS[held.id].food);
+        const intent = rightClickIntent({ sneaking: event.shiftKey || wantToCrouch, station, door, food });
+
+        if (intent === 'station') { openStation(station, currentHit); return; }
+        if (intent === 'door') { toggleWoodDoor(currentHit); return; }
+        // Comer funciona mirando para qualquer lugar (inclusive um bloco).
+        if (intent === 'eat') {
             if (hunger < MAX_HUNGER) { eat.active = true; eat.progress = 0; eat.slot = selectedSlot; eat.id = held.id; }
             else showToast('Você não está com fome');
             return;

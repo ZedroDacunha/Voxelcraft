@@ -53,6 +53,7 @@ Legenda de prioridade:
 | 7 | Sem nenhum teste automatizado | `tests/` (novo) | Regressões passavam silenciosamente |
 | 8 | Atlas de textura em uma única fileira de 2080 px | `world-catalog.js`, mesher, `inventory-assets.js`, `menu-background.js` | Risco de textura recusada em GPUs antigas (limite garantido: 2048) |
 | 9 | Módulos ES sem versão (cache misto após deploy) | `index.html` + `tools/stamp-importmap.mjs` | Pós-deploy podia misturar `game.js` novo com módulo antigo |
+| 10 | Comida só era consumida mirando no ar | `game.js` › clique direito + `world-interaction-rules.js` | Era preciso "olhar para o céu" para comer |
 
 ### 1. O Web Worker do terreno estava desligado
 
@@ -154,6 +155,8 @@ node --test tests/*.test.mjs
   e sem sobreposição de UV entre vizinhos (incluindo o `flipY`);
 - desenho real do atlas em um canvas falso: todo tile/ícone cai dentro da própria
   célula e nenhum usa o fallback magenta.
+- prioridade do clique direito (bancada/forno/baú > porta > comer > colocar) e
+  comer mirando em bloco ou no ar.
 
 ### 7. Atlas de textura em grade
 
@@ -266,10 +269,10 @@ quadro ou nuvens por `InstancedMesh`/shader.
 
 ### P2 — Jogabilidade e conteúdo
 
-- **Comer só mirando no ar**: hoje o clique direito com comida só funciona sem
-  alvo (`food && !currentHit`). Como a barra de fome é central na sobrevivência,
-  o esperado é poder comer olhando para qualquer lugar. Mudança pequena e de
-  grande impacto de usabilidade.
+- ~~**Comer só mirando no ar**~~: resolvido. O clique direito com comida agora
+  come mirando em qualquer lugar; a ordem de prioridade (bancada/forno/baú >
+  porta > comer > colocar bloco, com agachar ignorando as interações de bloco)
+  ficou explícita em `world-interaction-rules.js` e coberta por testes.
 - **Fome não mata**: a vida para em 1. Ou é intencional (modo "sem punição"),
   ou merece um aviso na interface.
 - **Mobs**: só o "Mofim" passivo, sem drop nem interação. Ou ele vira um recurso
@@ -335,8 +338,11 @@ No navegador (o preview desta sessão serve a raiz do projeto):
 4. quebrar uma metade: a outra some e cai uma única porta;
 5. andar de frente para a porta fechada: o corpo deve encostar no painel, sem
    vão; tentar fechar a porta estando no vão mostra "Saia do vão da porta";
-6. colocar/quebrar blocos e observar no F3 `malha … ms` e os picos de CPU.
-7. com `?debug` na URL, o console expõe `dbg.placeDoorAt(x, y, z)`, `dbg.toggleDoor(x, y, z)` e
+6. colocar/quebrar blocos e observar no F3 `malha … ms` e os picos de CPU;
+7. comer uma maçã mirando no chão, numa parede e no céu (as três devem comer);
+   agachado em frente ao baú com comida na mão também come, sem abrir o baú;
+   com a barra cheia aparece "Você não está com fome".
+8. com `?debug` na URL, o console expõe `dbg.placeDoorAt(x, y, z)`, `dbg.toggleDoor(x, y, z)` e
    `dbg.blockAt(x, y, z)` para testar a porta sem mirar com o mouse.
 
 > Se algo parecer estranho na porta (textura girada ou face faltando), o ponto
@@ -355,7 +361,7 @@ teste próprio e um commit/PR separado. O primeiro foi o **atlas em grade**.
 1. Validar visualmente a porta e o novo carregamento.
 2. ~~Resolver o cache de módulos~~ — feito (`tools/stamp-importmap.mjs`).
 3. ~~Atlas em grade (16 colunas)~~ — feito.
-4. Permitir comer olhando para blocos; revisar o texto da fome.
+4. ~~Permitir comer olhando para blocos~~ — feito; revisar o texto da fome.
 5. Tela de opções com distância de render e sensibilidade.
 
 **Próximo**
