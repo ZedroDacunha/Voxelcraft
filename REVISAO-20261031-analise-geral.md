@@ -100,8 +100,14 @@ Correção aplicada:
 - quebrar uma metade remove a outra e dropa **uma** porta (sem duplicar item);
 - a receita continua rendendo 3 portas.
 
-> ⚠️ Falta apenas validação visual no navegador: o formato, o alinhamento da
-> textura nas duas metades e a "dobradiça" (a porta aberta ocupa a borda do
+A **colisão** também acompanhou a geometria: a porta fechada usa uma caixa fina
+igual ao painel e o `moveAxis()` passou a resolver a parada por bissecção, então
+dá para encostar no painel (antes o jogador parava na borda do voxel, com um vão
+de ~0,44 bloco). Detalhes em [[BUG-20261031-colisao-porta]].
+
+> ⚠️ Falta apenas validação visual no navegador: a textura das duas metades já
+> foi conferida gerando o atlas fora do navegador, mas o formato 3D, o
+> alinhamento entre as metades e a "dobradiça" (a porta aberta ocupa a borda do
 > voxel) foram verificados por cálculo, não por captura de tela.
 
 ### 3. Custo de iluminação por edição
@@ -315,8 +321,10 @@ No navegador (o preview desta sessão serve a raiz do projeto):
 2. pegar tábuas, abrir a bancada 3×3 e craftar a porta (devem vir 3 portas);
 3. colocar a porta em um piso sólido: duas metades, clique direito abre/fecha;
 4. quebrar uma metade: a outra some e cai uma única porta;
-5. colocar/quebrar blocos e observar no F3 `malha … ms` e os picos de CPU.
-6. com `?debug` na URL, o console expõe `dbg.placeDoorAt(x, y, z)`, `dbg.toggleDoor(x, y, z)` e
+5. andar de frente para a porta fechada: o corpo deve encostar no painel, sem
+   vão; tentar fechar a porta estando no vão mostra "Saia do vão da porta";
+6. colocar/quebrar blocos e observar no F3 `malha … ms` e os picos de CPU.
+7. com `?debug` na URL, o console expõe `dbg.placeDoorAt(x, y, z)`, `dbg.toggleDoor(x, y, z)` e
    `dbg.blockAt(x, y, z)` para testar a porta sem mirar com o mouse.
 
 > Se algo parecer estranho na porta (textura girada ou face faltando), o ponto

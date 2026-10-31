@@ -28,3 +28,11 @@ export function woodDoorShape(facing, open) {
     }
     return { min, max, normalAxis };
 }
+
+// Caixa de colisão local (0..1, no plano XZ) da porta fechada. A porta aberta
+// devolve null porque o catálogo a marca como `solid: false` (passável).
+export function woodDoorCollision(part, facing) {
+    if (!part || part.open) return null;
+    const { min, max } = woodDoorShape(facing, false);
+    return { minX: min[0], maxX: max[0], minZ: min[2], maxZ: max[2] };
+}
