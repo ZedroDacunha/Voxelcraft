@@ -11,6 +11,8 @@ import { Inventory } from './inventory-model.js';
 import { craftConsume, invCollectSame, invFillRecipe, invLeftClick, invQuickMove, invQuickMoveToCraft, invRightClick, invSwapHotbar, stackable } from './inventory-logic.js';
 import { stackHtml, updateSlotElement } from './inventory-view.js';
 import { createRecipeBook } from './inventory-recipe-book.js';
+import { pauseMenuDisplay } from './game-pause-menu.js';
+import { createPointerLockRequester } from './game-pointer-lock.js';
 import { createInventoryAssets } from './inventory-assets.js';
 import { createTextureTools } from './world-textures.js';
 import { createWorldSaveCodec, WORLD_SAVE_VERSION } from './world-save-codec.js';
@@ -2095,6 +2097,15 @@ let invSlotEls = [], craftSlotEls = [], furnaceSlotEls = [], chestSlotEls = [], 
 let craftResult = null;
 let recipeBook = null;
 
+function syncPauseMenu(overrides = {}) {
+    document.getElementById('menu').style.display = pauseMenuDisplay({
+        locked: !!controls?.isLocked,
+        inventoryOpen,
+        dead,
+        ...overrides,
+    });
+}
+
 function throwStack(id, count, damage = 0) {
     camera.getWorldDirection(tmpDir);
     const pos = camera.position.clone().addScaledVector(tmpDir, 0.6);
@@ -2352,12 +2363,11 @@ function closeInventory(relock) {
     updateHotbarUI();
     saveGame(true);
 
-    const menu = document.getElementById('menu');
+    syncPauseMenu({ locked: false });
     if (relock) {
-        menu.style.display = 'none';
-        requestLock();
-    } else {
-        menu.style.display = 'flex';
+        requestLock().then(ok => {
+            if (!ok) syncPauseMenu({ locked: false });
+        });
     }
 }
 
@@ -2613,6 +2623,7 @@ function die(source = 'generic') {
         })
         .catch(error => console.error('Falha ao preparar o respawn:', error));
     deathEl.style.display = 'flex';
+    syncPauseMenu();
     controls.unlock();
     saveGame(true, true);
 }
@@ -2983,23 +2994,19 @@ function onLookMove(e) {
     applyLook();
 }
 
-const lockInfo = { raw: null };
+let pointerLockRequester = null;
+let pendingLockRequest = null;
 function requestLock() {
-    const el = document.body;
-    const fallback = () => {
-        lockInfo.raw = false;
-        const p2 = el.requestPointerLock();
-        if (p2 && p2.catch) p2.catch(err => console.warn('Aguardando cooldown do navegador...', err));
-    };
-    let pr;
-    try { pr = el.requestPointerLock({ unadjustedMovement: true }); } catch (e) { fallback(); return; }
-    if (pr && pr.then) {
-        pr.then(() => { lockInfo.raw = true; })
-          .catch(err => {
-              if (err && err.name === 'NotSupportedError') fallback();
-              else console.warn('Aguardando cooldown do navegador...', err);
-          });
-    }
+    if (pendingLockRequest) return pendingLockRequest;
+    pointerLockRequester ??= createPointerLockRequester({
+        element: document.body,
+        doc: document,
+        warn: (...args) => console.warn(...args),
+    });
+    pendingLockRequest = pointerLockRequester().finally(() => {
+        pendingLockRequest = null;
+    });
+    return pendingLockRequest;
 }
 
 function getWorldRegionStatus(x, z, radius = RENDER_DISTANCE) {
@@ -3163,7 +3170,11 @@ async function init() {
     const menu = document.getElementById('menu');
     const btnPlay = document.getElementById('btn-play');
 
-    btnPlay.addEventListener('click', () => requestLock());
+    btnPlay.addEventListener('click', () => {
+        requestLock().then(ok => {
+            if (!ok) syncPauseMenu();
+        });
+    });
     const btnWorlds = document.getElementById('btn-worlds');
     btnWorlds.addEventListener('click', async () => {
         btnWorlds.disabled = true;
@@ -3184,20 +3195,26 @@ async function init() {
         }
         location.reload();
     });
-    controls.addEventListener('lock', () => { menu.style.display = 'none'; });
+    controls.addEventListener('lock', () => syncPauseMenu({ locked: true }));
     renderer.domElement.addEventListener('click', () => {
-        if (!controls.isLocked && !inventoryOpen && !dead && menu.style.display === 'none') requestLock();
+        if (!controls.isLocked && !inventoryOpen && !dead && menu.style.display === 'none') {
+            requestLock().then(ok => {
+                if (!ok) syncPauseMenu();
+            });
+        }
     });
     document.getElementById('btn-respawn').addEventListener('click', () => {
         dead = false;
         deathEl.style.display = 'none';
-        requestLock();
-        setTimeout(() => { if (!controls.isLocked) menu.style.display = 'flex'; }, 400);
+        syncPauseMenu();
+        requestLock().then(ok => {
+            if (!ok) syncPauseMenu();
+        });
     });
     controls.addEventListener('unlock', () => {
         const inventoryExit = inventoryOpen || inventoryUnlockPending;
         inventoryUnlockPending = false;
-        if (!inventoryExit && !dead) menu.style.display = 'flex';
+        syncPauseMenu({ locked: false });
         moveForward = moveBackward = moveLeft = moveRight = jumpHeld = swimStrokeLocked = isSprinting = wantToCrouch = false;
         leftHeld = false;
         resetMining();
