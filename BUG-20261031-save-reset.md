@@ -1,8 +1,8 @@
 # BUG: save apagava ao reentrar no mundo com `?reset` na URL
 
-**Data:** 31/10/2026  
-**Status:** corrigido  
-**Arquivos principais:** `world-save-reset.js`, `world-save-loader.js`, `game.js`
+- **Data:** 31/10/2026
+- **Status:** corrigido
+- **Arquivos principais:** `world-save-reset.js`, `world-save-loader.js`, `game.js`
 
 ## Sintoma
 
