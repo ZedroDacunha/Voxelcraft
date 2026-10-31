@@ -56,6 +56,7 @@ Legenda de prioridade:
 | 10 | Comida só era consumida mirando no ar | `game.js` › clique direito + `world-interaction-rules.js` | Era preciso "olhar para o céu" para comer |
 | 11 | Opções só listavam controles; nada era configurável | `world-game-settings.js`, `world-options-view.js`, `index.html` | Sensibilidade, FOV e distância de render eram constantes |
 | 12 | Fome zerada parava em 1 de vida, sem matar nem avisar | `world-survival-rules.js`, `game.js`, `styles.css`, `index.html` | Jogador ficava preso a 1 de vida, sem regeneração e sem entender o motivo |
+| 13 | Árvores nunca nasciam na borda dos chunks (grade de 4 blocos sem árvore) | `world-terrain.js` › `plantTrees()` | Florestas mostravam uma grade invisível a cada 16 blocos |
 
 ### 1. O Web Worker do terreno estava desligado
 
@@ -266,23 +267,45 @@ tinha pista nenhuma do que estava acontecendo.
 - `tests/survival-rules.test.mjs`: faixas, acúmulo do relógio, tique único,
   `dt` negativo, textos de morte e a garantia de que o piso de 1 de vida sumiu.
 
+### 11. Árvores que atravessam a divisa dos chunks
+
+`plantTrees()` só plantava entre `lx/lz = 2..13`: a copa tem raio 2 e o código
+só sabia escrever dentro do próprio chunk. Isso deixava uma faixa de 4 blocos
+sem árvores a cada 16 — uma grade visível no meio das florestas.
+
+Agora a decisão é tomada para uma margem de `-2..17` e apenas as células que
+caem dentro do chunk são escritas. Como a árvore depende só de `(x, z)` do
+mundo (hash da coluna, altura e bioma), ela é idêntica não importa qual chunk
+seja gerado primeiro, e a copa que cruza a divisa aparece inteira nos dois
+lados.
+
+| medida (seed 12345, 7×7 chunks) | antes | depois |
+|---|---|---|
+| troncos em `lx`/`lz` 0, 1, 14 ou 15 | 0 | 51 |
+| colunas locais (0..15) com árvore | 12/16 | 16/16 |
+| células de copa que existiam e ficavam em ar | 2.471 | **0** |
+
+- `world-terrain.js`: `plantTrees()` ganhou a margem e `columnSummary()`
+  (altura, bioma e "está alagada" de uma coluna do mundo); `fill()` passou a
+  guardar o topo da água por coluna para a margem usar a mesma regra. O laço
+  começa pelo hash e só calcula ruído para as ~3,5% de colunas candidatas, o
+  que deixou a geração ~20% mais rápida mesmo plantando o dobro de árvores.
+- Tronco agora vence folha: sem isso a copa de uma árvore vizinha cortava o
+  tronco de outra e a árvore nascia partida (artefato que já existia antes).
+- `tests/terrain-trees.test.mjs`: nenhuma célula de copa em ar, todas as
+  colunas locais com árvore, tronco inteiro e geração independente da ordem.
+
+**Sobre a versão do save**: o formato não mudou. `WORLD_SAVE_VERSION` continua
+1 porque os saves guardam apenas edições do jogador (blocos, baús, fornos,
+inventário) — o terreno é sempre regenerado a partir da seed. Incrementar a
+versão faria `validate()` devolver `null` para todo save antigo e o jogador
+perderia o mundo. O efeito da mudança é aditivo: quem já tem um mundo ganha
+árvores nas divisas dos pedaços não editados, e qualquer bloco colocado pelo
+jogador continua vencendo a geração.
+
 ---
 
 ## 🐞 Bugs e riscos ainda abertos
-
-### P1 — Faixas sem árvores nas bordas dos chunks
-
-`TerrainGenerator.plantTrees()` só planta entre `lx/lz = 2..13`, porque a copa
-tem raio 2 e o código só escreve dentro do próprio chunk. Resultado medido em
-49 chunks (seed 4242): **59 troncos, nenhum** em `lx`/`lz` 0, 1, 14 ou 15 — ou
-seja, uma faixa de 4 blocos sem árvores a cada 16 blocos, visível como grade em
-florestas.
-
-Sugestão: gerar árvores para uma margem de -2..17 usando o mesmo hash por
-coluna e escrever apenas as células que caem dentro do chunk. A mesma ideia
-resolve copas cortadas na divisa. Isso altera a geração de chunks não editados
-(saves antigos ganham árvores nas bordas), então convém combinar com um incremento
-de versão do mundo/save.
 
 ### P1 — Nuvens reconstroem a geometria ao andar
 
@@ -405,7 +428,10 @@ No navegador (o preview desta sessão serve a raiz do projeto):
    `dbg.hunger(0)` — aparece "Você está morrendo de fome!", os ícones ficam
    vermelhos e a vida cai 1 a cada 4 s até a morte, com a tela dizendo "Você
    morreu de fome"; comer uma maçã no meio da contagem para o dano;
-10. com `?debug` na URL, o console expõe `dbg.placeDoorAt(x, y, z)`, `dbg.toggleDoor(x, y, z)` e
+10. andar por uma floresta olhando a divisa dos chunks: as árvores devem
+    atravessar a linha (copa e tronco), sem faixas vazias de 4 blocos nem copa
+    cortada; em `?debug`, `dbg.setBlock` e a seed continuam iguais;
+11. com `?debug` na URL, o console expõe `dbg.placeDoorAt(x, y, z)`, `dbg.toggleDoor(x, y, z)` e
     `dbg.blockAt(x, y, z)` para testar a porta sem mirar com o mouse.
 
 > Se algo parecer estranho na porta (textura girada ou face faltando), o ponto
@@ -427,13 +453,13 @@ teste próprio e um commit/PR separado. O primeiro foi o **atlas em grade**.
 4. ~~Permitir comer olhando para blocos~~ — feito.
 5. ~~Tela de opções com distância de render e sensibilidade~~ — feito.
 6. ~~Fome que mata, avisa e informa a causa da morte~~ — feito.
+7. ~~Árvores com margem entre chunks~~ — feito (sem bump de save: veja a seção 11).
 
 **Próximo**
 
-7. Áudio básico e controles de toque.
 8. Nuvens sem reconstrução síncrona e orçamento do fluxo de água.
 9. Malha de chunk em worker.
-10. Árvores com margem entre chunks (com bump de versão do save).
+10. Áudio básico e controles de toque.
 
 **Depois**
 
