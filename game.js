@@ -34,6 +34,7 @@ import { canHarvest, damageTool as damageToolStack, getBreakTime } from './world
 import { woodDoorCollision, woodDoorPart, woodDoorShape, woodDoorType } from './world-door.js';
 import { rightClickIntent } from './world-interaction-rules.js';
 import { loadGameSettings } from './world-game-settings.js';
+import { advanceStarvation, deathTitle, HUNGER_WARNINGS, hungerStage } from './world-survival-rules.js';
 import {
     BlockFacingStore, DEFAULT_BLOCK_FACING, facingTowardPlayer, isFrontFace, isHorizontalFacing,
     tileForBlockFace,
@@ -2452,6 +2453,7 @@ let health = MAX_HEALTH, hunger = MAX_HUNGER, saturation = 5, exhaustion = 0;
 let breath = MAX_BREATH, breathTimer = 0;
 let regenTimer = 0, starveTimer = 0, invuln = 0, hurtFlash = 0;
 let dead = false;
+let hungerStageShown = 'ok';
 const eat = { active: false, progress: 0, slot: -1, id: 0 };
 const hurtEl = document.getElementById('hurt');
 const deathEl = document.getElementById('death');
@@ -2521,6 +2523,21 @@ function updateSurvivalUI() {
         updateSurvivalIcons(survivalIcons.food, 'food', hunger);
         uiShown.f = hunger;
     }
+    syncHungerWarning();
+}
+
+// A barra de fome pulsa (e fica vermelha quando zera) e um aviso aparece na
+// primeira vez que a fome entra em cada faixa — antes nada acontecia na tela.
+function syncHungerWarning() {
+    const stage = hungerStage(hunger);
+    const bar = document.getElementById('hunger-bar');
+    if (bar) {
+        bar.classList.toggle('low', stage === 'low');
+        bar.classList.toggle('starving', stage === 'empty');
+    }
+    if (stage === hungerStageShown) return;
+    hungerStageShown = stage;
+    if (stage !== 'ok') showToast(HUNGER_WARNINGS[stage]);
 }
 
 const hotbarEls = [], hotbarHtml = new Array(9).fill('');
@@ -2539,6 +2556,7 @@ function resetStats() {
     health = MAX_HEALTH; hunger = MAX_HUNGER; saturation = 5; exhaustion = 0;
     breath = MAX_BREATH; breathTimer = 0;
     regenTimer = 0; starveTimer = 0; hurtFlash = 0;
+    hungerStageShown = 'ok';
     updateSurvivalUI();
 }
 
@@ -2550,10 +2568,10 @@ function takeDamage(amount, source = 'generic') {
     hurtFlash = 1;
     addExhaustion(0.1);
     updateSurvivalUI();
-    if (health <= 0) die();
+    if (health <= 0) die(source);
 }
 
-function die() {
+function die(source = 'generic') {
     if (inventoryOpen) closeInventory(false);
     dead = true;
     cancelEating();
@@ -2580,6 +2598,7 @@ function die() {
     updateHotbarUI();
     updateSurvivalUI();
 
+    document.getElementById('death-cause').textContent = deathTitle(source);
     document.getElementById('death-info').textContent = lost
         ? `Seus ${lost} itens caíram em X ${dx}, Y ${dy}, Z ${dz}. Volte lá para recuperá-los antes que sumem (10 min).`
         : 'Você não tinha itens.';
@@ -2661,10 +2680,9 @@ function updateSurvival(dt) {
         starveTimer = 0;
     } else {
         regenTimer = 0;
-        if (hunger <= 0) {
-            starveTimer += dt;
-            if (starveTimer >= 4) { starveTimer = 0; if (health > 1) takeDamage(1, 'starve'); }
-        } else starveTimer = 0;
+        const starve = advanceStarvation({ hunger, timer: starveTimer, dt });
+        starveTimer = starve.timer;
+        if (starve.damage > 0) takeDamage(starve.damage, 'starve');
     }
 }
 

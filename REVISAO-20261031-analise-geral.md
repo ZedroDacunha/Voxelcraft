@@ -55,6 +55,7 @@ Legenda de prioridade:
 | 9 | Módulos ES sem versão (cache misto após deploy) | `index.html` + `tools/stamp-importmap.mjs` | Pós-deploy podia misturar `game.js` novo com módulo antigo |
 | 10 | Comida só era consumida mirando no ar | `game.js` › clique direito + `world-interaction-rules.js` | Era preciso "olhar para o céu" para comer |
 | 11 | Opções só listavam controles; nada era configurável | `world-game-settings.js`, `world-options-view.js`, `index.html` | Sensibilidade, FOV e distância de render eram constantes |
+| 12 | Fome zerada parava em 1 de vida, sem matar nem avisar | `world-survival-rules.js`, `game.js`, `styles.css`, `index.html` | Jogador ficava preso a 1 de vida, sem regeneração e sem entender o motivo |
 
 ### 1. O Web Worker do terreno estava desligado
 
@@ -242,6 +243,29 @@ Agora existem três preferências persistidas em `localStorage`
 roundtrip e a ligação entre os campos e os ids do `index.html` (se um input for
 renomeado, o teste reprova).
 
+### 10. Fome que mata e avisa
+
+A fome zerava em silêncio: sem aviso na tela, sem som e — pior — sem punição de
+fato. O dano existia, mas com `if (health > 1)`: a vida parava em 1 coração para
+sempre. O jogador não morria, não regenerava (regeneração exige fome ≥ 18) e não
+tinha pista nenhuma do que estava acontecendo.
+
+| antes | agora |
+|---|---|
+| vida parava em 1 | inanição pode matar |
+| nada na tela | barra de fome pisca com fome ≤ 6 e fica vermelha ao zerar |
+| nada na tela | aviso ("Fome baixa…", "Você está morrendo de fome!") na troca de faixa |
+| tela de morte genérica | título por causa: fome, afogamento, queda |
+
+- `world-survival-rules.js` (novo): `hungerStage()`, `advanceStarvation()`
+  (sem DOM, no máximo um tique de dano por quadro para um `dt` grande não virar
+  rajada), `HUNGER_WARNINGS` e `DEATH_CAUSES`.
+- `game.js`: a contagem da inanição passou a usar `advanceStarvation()`,
+  `syncHungerWarning()` cuida do aviso/classes e `die(source)` escolhe o título.
+- `styles.css`: pulso na barra com `prefers-reduced-motion` respeitado.
+- `tests/survival-rules.test.mjs`: faixas, acúmulo do relógio, tique único,
+  `dt` negativo, textos de morte e a garantia de que o piso de 1 de vida sumiu.
+
 ---
 
 ## 🐞 Bugs e riscos ainda abertos
@@ -303,8 +327,10 @@ quadro ou nuvens por `InstancedMesh`/shader.
   come mirando em qualquer lugar; a ordem de prioridade (bancada/forno/baú >
   porta > comer > colocar bloco, com agachar ignorando as interações de bloco)
   ficou explícita em `world-interaction-rules.js` e coberta por testes.
-- **Fome não mata**: a vida para em 1. Ou é intencional (modo "sem punição"),
-  ou merece um aviso na interface.
+- ~~**Fome não mata**~~: resolvido. A inanição agora consome a vida até a morte
+  (sem o piso de 1), a barra de fome pisca e fica vermelha quando zera, um
+  aviso aparece ao entrar nas faixas de alerta e a tela de morte diz a causa
+  ("Você morreu de fome"). Regras puras em `world-survival-rules.js`.
 - **Mobs**: só o "Mofim" passivo, sem drop nem interação. Ou ele vira um recurso
   (lã/carne), ou entra um inimigo noturno com spawn por luz.
 - **Conteúdo de mundo**: cavernas, rios, praias e minérios já existem; faltam
@@ -375,8 +401,12 @@ No navegador (o preview desta sessão serve a raiz do projeto):
 8. abrir "Opções..." no menu, mexer nos três controles e conferir que os valores
    são lembrados ao reabrir o diálogo; entrar em um mundo e sentir a
    sensibilidade/FOV e ver o alcance da névoa mudando com a distância;
-9. com `?debug` na URL, o console expõe `dbg.placeDoorAt(x, y, z)`, `dbg.toggleDoor(x, y, z)` e
-   `dbg.blockAt(x, y, z)` para testar a porta sem mirar com o mouse.
+9. fome: com `?debug`, rode `dbg.hunger(6)` (a barra começa a piscar) e depois
+   `dbg.hunger(0)` — aparece "Você está morrendo de fome!", os ícones ficam
+   vermelhos e a vida cai 1 a cada 4 s até a morte, com a tela dizendo "Você
+   morreu de fome"; comer uma maçã no meio da contagem para o dano;
+10. com `?debug` na URL, o console expõe `dbg.placeDoorAt(x, y, z)`, `dbg.toggleDoor(x, y, z)` e
+    `dbg.blockAt(x, y, z)` para testar a porta sem mirar com o mouse.
 
 > Se algo parecer estranho na porta (textura girada ou face faltando), o ponto
 > a ajustar é `doorPartShape()` em `game.js` e `woodDoorShape()` em
@@ -394,21 +424,22 @@ teste próprio e um commit/PR separado. O primeiro foi o **atlas em grade**.
 1. Validar visualmente a porta e o novo carregamento.
 2. ~~Resolver o cache de módulos~~ — feito (`tools/stamp-importmap.mjs`).
 3. ~~Atlas em grade (16 colunas)~~ — feito.
-4. ~~Permitir comer olhando para blocos~~ — feito; revisar o texto da fome.
+4. ~~Permitir comer olhando para blocos~~ — feito.
 5. ~~Tela de opções com distância de render e sensibilidade~~ — feito.
+6. ~~Fome que mata, avisa e informa a causa da morte~~ — feito.
 
 **Próximo**
 
-6. Áudio básico e controles de toque.
-7. Nuvens sem reconstrução síncrona e orçamento do fluxo de água.
-8. Malha de chunk em worker.
-9. Árvores com margem entre chunks (com bump de versão do save).
+7. Áudio básico e controles de toque.
+8. Nuvens sem reconstrução síncrona e orçamento do fluxo de água.
+9. Malha de chunk em worker.
+10. Árvores com margem entre chunks (com bump de versão do save).
 
 **Depois**
 
-10. Combate/inimigos, drops e progressão.
-11. Estruturas e mais conteúdo de bioma.
-12. Split de `game.js`, service worker/PWA e CI.
+11. Combate/inimigos, drops e progressão.
+12. Estruturas e mais conteúdo de bioma.
+13. Split de `game.js`, service worker/PWA e CI.
 
 ---
 

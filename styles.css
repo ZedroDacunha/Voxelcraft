@@ -125,6 +125,14 @@
     .empty-stat { background: rgba(0,0,0,0.5); border: 1px solid #111; box-shadow: none; }
     .heart.half { background: linear-gradient(90deg, #ff3333 50%, rgba(0,0,0,0.5) 50%); }
     .food.half { background: linear-gradient(90deg, #ffaa00 50%, rgba(0,0,0,0.5) 50%); }
+    /* Fome baixa/zerada: a barra pisca e fica vermelha (antes zerava em silêncio) */
+    #hunger-bar.low .food { animation: hunger-warn 1.6s ease-in-out infinite; }
+    #hunger-bar.starving .food { animation: hunger-warn 0.75s ease-in-out infinite; background: #c0392b; border-color: #5b1410; box-shadow: 0 0 4px #ff5533; }
+    @keyframes hunger-warn { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    @media (prefers-reduced-motion: reduce) {
+        #hunger-bar.low .food, #hunger-bar.starving .food { animation: none; }
+        #hunger-bar.starving .food { opacity: 1; }
+    }
     .btn:disabled { background: #888; cursor: not-allowed; }
     
     #death { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; background: rgba(110,0,0,0.7); color: #fff; z-index: 11; text-align: center; padding: 0 20px; }
