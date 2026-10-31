@@ -14,6 +14,7 @@ import { createRecipeBook } from './inventory-recipe-book.js';
 import { createInventoryAssets } from './inventory-assets.js';
 import { createTextureTools } from './world-textures.js';
 import { createWorldSaveCodec, WORLD_SAVE_VERSION } from './world-save-codec.js';
+import { createWorldSaveLoader } from './world-save-loader.js';
 import { createWorldSaveManager } from './world-save-manager.js';
 import { createWorldSaveIndicator } from './world-save-indicator.js';
 import { createWorldClock } from './world-clock.js';
@@ -2953,9 +2954,14 @@ function saveGame(quiet, immediate = false) {
     saveManager.requestSave(quiet, immediate);
 }
 
-function loadGame() {
-    return saveManager.load({ reset: new URLSearchParams(location.search).has('reset') });
-}
+const loadGame = createWorldSaveLoader({
+    saveManager,
+    world: ACTIVE_WORLD,
+    getHref: () => window.location.href,
+    replaceUrl: url => window.history.replaceState(window.history.state, '', url),
+    confirmReset: message => window.confirm(message),
+    onError: error => console.warn('Reset de save bloqueado para proteger o mundo:', error),
+});
 
 // =====================================================================
 // 11. INICIALIZAÇÃO
