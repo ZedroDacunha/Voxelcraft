@@ -252,6 +252,7 @@ export class TerrainGenerator {
         const coalVeins = this.oreGenerator.createCoalVeinMask(chunk);
         const heights = new Int16Array(CHUNK_SIZE * CHUNK_SIZE);
         const biomes = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+        const waterTops = new Int16Array(CHUNK_SIZE * CHUNK_SIZE);
         for (let lx = 0; lx < CHUNK_SIZE; lx++) {
             for (let lz = 0; lz < CHUNK_SIZE; lz++) {
                 const wx = ox + lx, wz = oz + lz;
@@ -282,6 +283,7 @@ export class TerrainGenerator {
                 }
 
                 const riverWaterTop = riverStrength > 0.72 ? Math.max(WATER_LEVEL, Math.floor(baseHeight) - 2) : WATER_LEVEL;
+                waterTops[column] = riverWaterTop;
                 if (h < riverWaterTop) {
                     for (let y = h + 1; y <= riverWaterTop; y++) {
                         const isShallowChannel = riverStrength > 0.72 && riverWaterTop > WATER_LEVEL && y === riverWaterTop;
@@ -295,7 +297,7 @@ export class TerrainGenerator {
                 if (riverWaterTop > chunk.maxY) chunk.maxY = riverWaterTop;
             }
         }
-        this.plantTrees(chunk, heights, biomes, ox, oz);
+        this.plantTrees(chunk, heights, biomes, waterTops, ox, oz);
         this.plantTallGrass(chunk, heights, biomes, ox, oz);
     }
     plantTallGrass(chunk, heights, biomes, ox, oz) {
@@ -314,25 +316,73 @@ export class TerrainGenerator {
             }
         }
     }
-    plantTrees(chunk, heights, biomes, ox, oz) {
+    /**
+     * Altura, bioma e "está debaixo d'água" de uma coluna em coordenadas de
+     * mundo. `fill()` já calcula isso para as colunas do próprio chunk; esta
+     * versão serve a margem, onde só existem as coordenadas.
+     */
+    columnSummary(wx, wz) {
+        const { WATER_LEVEL } = this.config;
+        const baseHeight = this.baseHeightAt(wx, wz);
+        const riverStrength = this.riverStrengthAt(wx, wz);
+        const height = this.heightFrom(baseHeight, riverStrength);
+        const riverWaterTop = riverStrength > 0.72 ? Math.max(WATER_LEVEL, Math.floor(baseHeight) - 2) : WATER_LEVEL;
+        return { height, biome: this.biomeAt(wx, wz), submerged: height < riverWaterTop };
+    }
+    /**
+     * Planta árvores cujo tronco pode estar até `canopy` blocos fora do chunk.
+     *
+     * A decisão de cada árvore depende só de (x, z) do mundo: o hash da coluna,
+     * a altura do terreno e o bioma. Por isso a árvore é idêntica não importa
+     * qual chunk seja gerado primeiro, e a copa que atravessa a divisa aparece
+     * completa nos dois lados — cada chunk escreve apenas as células que são
+     * dele. Antes o laço ia de 2 a 13 (16 - 2 - 1) para nunca escrever fora do
+     * chunk, o que deixava uma faixa de 4 blocos sem árvores em cada divisa,
+     * visível como grade nas florestas.
+     */
+    plantTrees(chunk, heights, biomes, waterTops, ox, oz) {
         const { CHUNK_SIZE, WORLD_HEIGHT, WATER_LEVEL, ID, BIOME, TREE_CHANCE_FOREST, TREE_CHANCE_PLAINS } = this.config;
+        const canopy = 2;
+        // Maior chance entre os biomas: com ela o hash da coluna descarta ~96%
+        // das posições antes de qualquer cálculo de ruído.
+        const maxChance = Math.max(TREE_CHANCE_FOREST, TREE_CHANCE_PLAINS);
         const set = (lx, y, lz, type) => {
             if (y < 0 || y >= WORLD_HEIGHT) return;
+            if (lx < 0 || lx >= CHUNK_SIZE || lz < 0 || lz >= CHUNK_SIZE) return;
             const i = this.index(lx, y, lz);
-            if (chunk.data[i] === 0) { chunk.data[i] = type; if (y > chunk.maxY) chunk.maxY = y; }
+            const current = chunk.data[i];
+            // Tronco vence folha — sem isso a copa de uma árvore vizinha corta o
+            // tronco de outra e a árvore nasce partida. Folha só ocupa ar e nada
+            // sobrescreve o terreno.
+            if (type === ID.LOG) { if (current !== 0 && current !== ID.LEAVES) return; }
+            else if (current !== 0) return;
+            chunk.data[i] = type;
+            if (y > chunk.maxY) chunk.maxY = y;
         };
-        for (let lx = 2; lx <= 13; lx++) {
-            for (let lz = 2; lz <= 13; lz++) {
+        for (let lx = -canopy; lx < CHUNK_SIZE + canopy; lx++) {
+            for (let lz = -canopy; lz < CHUNK_SIZE + canopy; lz++) {
                 const wx = ox + lx, wz = oz + lz;
                 if (Math.abs(wx) < 4 && Math.abs(wz) < 4) continue;
+                const roll = hash2(wx, wz, this.seed);
+                if (roll > maxChance) continue;
+                const inside = lx >= 0 && lx < CHUNK_SIZE && lz >= 0 && lz < CHUNK_SIZE;
                 const column = lx + lz * CHUNK_SIZE;
-                const biome = biomes[column];
+                let h, biome, submerged;
+                if (inside) {
+                    h = heights[column];
+                    biome = biomes[column];
+                    submerged = h < waterTops[column];
+                } else {
+                    const summary = this.columnSummary(wx, wz);
+                    h = summary.height;
+                    biome = summary.biome;
+                    submerged = summary.submerged;
+                }
                 if (biome === BIOME.DESERT || biome === BIOME.ROCKY) continue;
                 const treeChance = biome === BIOME.FOREST ? TREE_CHANCE_FOREST : TREE_CHANCE_PLAINS;
-                if (hash2(wx, wz, this.seed) > treeChance) continue;
-                const h = heights[column];
+                if (roll > treeChance) continue;
                 if (h <= WATER_LEVEL + 1) continue;
-                if (chunk.data[this.index(lx, h + 1, lz)] === ID.WATER) continue;
+                if (submerged) continue;
                 const treeHeight = 4 + Math.floor(hash2(wx, wz, this.seed + 7) * 3);
                 if (h + treeHeight + 2 >= WORLD_HEIGHT) continue;
                 for (let k = 1; k <= treeHeight; k++) set(lx, h + k, lz, ID.LOG);
