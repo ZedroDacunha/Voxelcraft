@@ -4,24 +4,69 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Voxel Sandbox - Parte 11: Água, Praias e Natação</title>
-<link rel="stylesheet" href="styles.css">
-<link rel="stylesheet" href="inventory.css">
+<link rel="stylesheet" href="styles.css?v=b7b7ef5542">
+<link rel="stylesheet" href="inventory.css?v=d7d9c61f74">
+<!-- importmap:start (gerado por tools/stamp-importmap.mjs; não editar à mão) -->
 <script type="importmap">
-  {
-    "imports": {
-      "three": "./vendor/three/three.module.js",
-      "three/addons/": "./vendor/three/addons/"
+{
+  "imports": {
+    "three": "./vendor/three/three.module.js?v=76dea8151b",
+    "three/addons/": "./vendor/three/addons/",
+    "./game.js": "./game.js?v=3e0fbf8e08",
+    "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
+    "./inventory-logic.js": "./inventory-logic.js?v=20ec1c5545",
+    "./inventory-model.js": "./inventory-model.js?v=473c73a8c5",
+    "./inventory-recipe-book.js": "./inventory-recipe-book.js?v=1aa2c1c5ba",
+    "./inventory-view.js": "./inventory-view.js?v=fe974fc5f3",
+    "./menu-background.js": "./menu-background.js?v=404eee429d",
+    "./world-block-orientation.js": "./world-block-orientation.js?v=f6af440217",
+    "./world-break-particles.js": "./world-break-particles.js?v=9911bc613a",
+    "./world-catalog.js": "./world-catalog.js?v=b04345583e",
+    "./world-clock.js": "./world-clock.js?v=77473e68d7",
+    "./world-clouds.js": "./world-clouds.js?v=1e269cf3ec",
+    "./world-door.js": "./world-door.js?v=d6fc66dde7",
+    "./world-furnace-effects.js": "./world-furnace-effects.js?v=190d3dc709",
+    "./world-graphics-quality.js": "./world-graphics-quality.js?v=f20063e81a",
+    "./world-grid.js": "./world-grid.js?v=be11481d71",
+    "./world-instanced-manager.js": "./world-instanced-manager.js?v=65840e2b5d",
+    "./world-lighting-effects.js": "./world-lighting-effects.js?v=71990bb624",
+    "./world-list-store.js": "./world-list-store.js?v=5c92915d17",
+    "./world-list-view.js": "./world-list-view.js?v=9ec40da58c",
+    "./world-math.js": "./world-math.js?v=ce4a6d9232",
+    "./world-menu.js": "./world-menu.js?v=0b6900b6ac",
+    "./world-mineral-blocks.js": "./world-mineral-blocks.js?v=4c39bc041e",
+    "./world-mineral-textures.js": "./world-mineral-textures.js?v=ab422ad968",
+    "./world-minerals.js": "./world-minerals.js?v=2f66ff7350",
+    "./world-ore-generation.js": "./world-ore-generation.js?v=7fe35588d3",
+    "./world-raycast.js": "./world-raycast.js?v=0f025b877c",
+    "./world-save-codec.js": "./world-save-codec.js?v=71b8b469b6",
+    "./world-save-indicator.js": "./world-save-indicator.js?v=464a1a9ddc",
+    "./world-save-lock.js": "./world-save-lock.js?v=08e031038e",
+    "./world-save-manager.js": "./world-save-manager.js?v=14513057f3",
+    "./world-save-options.js": "./world-save-options.js?v=e8e7f75dd0",
+    "./world-save-recovery.js": "./world-save-recovery.js?v=9aca8eaef2",
+    "./world-save-settings.js": "./world-save-settings.js?v=5867d317b8",
+    "./world-sky.js": "./world-sky.js?v=a4f67b6b64",
+    "./world-storage.js": "./world-storage.js?v=706891ec43",
+    "./world-terrain-worker.js": "./world-terrain-worker.js?v=06cc0dee23",
+    "./world-terrain.js": "./world-terrain.js?v=f2acde3968",
+    "./world-textures.js": "./world-textures.js?v=35fc2bab76",
+    "./world-tool-rules.js": "./world-tool-rules.js?v=85347f4434",
+    "./world-water.js": "./world-water.js?v=f6b99fca46",
+    "./vendor/three/three.module.js": "./vendor/three/three.module.js?v=76dea8151b",
+    "./vendor/three/addons/controls/PointerLockControls.js": "./vendor/three/addons/controls/PointerLockControls.js?v=b6ac6e2331"
+  },
+  "scopes": {
+    "https://unpkg.com/three@0.160.0/examples/jsm/": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
     },
-    "scopes": {
-      "https://unpkg.com/three@0.160.0/examples/jsm/": {
-        "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-      },
-      "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
-      }
+    "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
     }
   }
+}
 </script>
+<!-- importmap:end -->
 </head>
 <body>
 <main id="title-screen" aria-labelledby="title-screen-logo">
@@ -205,6 +250,6 @@
 </div>
 </div>
 
-<script type="module" src="world-menu.js?v=20261031-1"></script>
+<script type="module" src="world-menu.js?v=0b6900b6ac"></script>
 </body>
 </html>

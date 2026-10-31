@@ -52,6 +52,7 @@ Legenda de prioridade:
 | 6 | Three.js vinha de CDN externa | `index.html`, `game.js` | Sem CDN o jogo não abre; versão não é garantida |
 | 7 | Sem nenhum teste automatizado | `tests/` (novo) | Regressões passavam silenciosamente |
 | 8 | Atlas de textura em uma única fileira de 2080 px | `world-catalog.js`, mesher, `inventory-assets.js`, `menu-background.js` | Risco de textura recusada em GPUs antigas (limite garantido: 2048) |
+| 9 | Módulos ES sem versão (cache misto após deploy) | `index.html` + `tools/stamp-importmap.mjs` | Pós-deploy podia misturar `game.js` novo com módulo antigo |
 
 ### 1. O Web Worker do terreno estava desligado
 
@@ -161,13 +162,14 @@ Antes, o atlas era uma fileira única: `ATLAS_COLUMNS = 65` × `TILE_PX = 32` =
 novos a textura dobraria de faixa.
 
 Agora `world-catalog.js` define a grade (`ATLAS_COLUMNS = 16`, `ATLAS_ROWS`
-calculado a partir do maior tile) e expõe três funções compartilhadas:
+calculado a partir do maior tile) e expõe quatro funções compartilhadas:
 
 | função | uso |
 |---|---|
 | `atlasCell(tile)` | `{ col, row }` do tile na grade |
 | `atlasTileRect(tile)` | retângulo em pixels para desenhar/copiar (`drawImage`, `getImageData`) |
 | `atlasUV(tile, padPx)` | retângulo em UV, já considerando o `flipY` do three e o afastamento das bordas |
+| `atlasUVInto(tile, padPx, out)` | a mesma conta escrevendo em um objeto reaproveitado |
 
 Com os 65 tiles atuais o atlas fica em **512×160** e cresce em linhas, não em
 largura. Os quatro pontos que assumiam uma fileira só passaram a usar os
@@ -186,25 +188,28 @@ falhas que o olho não pegava sem abrir o jogo: as duas metades da porta
 `spritePixels()`, então o ícone saía vazio no inventário. Ambos foram
 desenhados agora (tábuas com moldura, maçaneta e o ícone 16×16).
 
+### 8. Cache de módulos em todo o grafo
+
+Antes, só a entrada (`world-menu.js?v=...`) e o `game.js?v=...` tinham versão;
+todo o resto do grafo vinha sem query string — e depois de um deploy o navegador
+podia reusar um `world-catalog.js` antigo junto com o `game.js` novo (o mesmo
+mecanismo de [[BUG-20261029-textura-grama-cache]], que com a mudança de IDs da
+porta deixaria de ser cosmético).
+
+`tools/stamp-importmap.mjs` gera o importmap a partir do **sha256 do conteúdo**
+de cada arquivo, com uma entrada `"./arquivo.js": "./arquivo.js?v=<hash>"` por
+módulo (o importmap aceita chaves relativas, então nenhum `?v=` precisa ser
+escrito à mão nos imports). O mesmo script carimba o `<script type="module">` de
+entrada e os `<link rel="stylesheet">`, que não passam pelo mapa.
+
+Consequências: módulo alterado muda de URL e fura o cache; módulo intacto
+continua em cache (o `three.js` de 1,3 MB só baixa de novo quando muda); e o
+grafo nunca mistura versões. Detalhes e fluxo de manutenção em
+[[BUG-20261031-cache-modulos]].
+
 ---
 
 ## 🐞 Bugs e riscos ainda abertos
-
-### P1 — Cache de módulos ES
-
-Só a entrada (`world-menu.js?v=...`) e o `game.js?v=...` têm versão. Todos os
-`import './world-*.js'` vão sem query string, e `menu-background.js` é importado
-sem versão. É o mesmo mecanismo que causou o bug documentado em
-`BUG-20261029-textura-grama-cache.md`: depois de um deploy, o navegador pode
-misturar `game.js` novo com `world-catalog.js` antigo — e com a mudança de IDs
-da porta isso quebraria o jogo.
-
-Opções, da mais simples à mais robusta:
-
-1. servir `.js`, `.css` e `.html` com `Cache-Control: no-cache` (revalidação);
-2. versionar **todas** as importações (script de build que reescreve os
-   especificadores com `?v=`);
-3. nomes com hash de conteúdo + `importmap` gerado no build.
 
 ### P1 — Faixas sem árvores nas bordas dos chunks
 
@@ -312,7 +317,14 @@ node --test tests/*.test.mjs
 
 # sintaxe de todos os arquivos
 for f in *.js; do node --check "$f"; done
+
+# versões de cache do importmap/CSS/entrada em dia com o conteúdo dos arquivos
+node tools/stamp-importmap.mjs --check
 ```
+
+> Depois de editar qualquer `.js` ou `.css`, rode `node tools/stamp-importmap.mjs`
+> para regravar os hashes no `index.html` (o teste `cache-versioning` reprova se
+> esquecer).
 
 No navegador (o preview desta sessão serve a raiz do projeto):
 
@@ -341,7 +353,7 @@ teste próprio e um commit/PR separado. O primeiro foi o **atlas em grade**.
 **Agora (1-2 sessões)**
 
 1. Validar visualmente a porta e o novo carregamento.
-2. Resolver o cache de módulos (headers ou versão em todas as importações).
+2. ~~Resolver o cache de módulos~~ — feito (`tools/stamp-importmap.mjs`).
 3. ~~Atlas em grade (16 colunas)~~ — feito.
 4. Permitir comer olhando para blocos; revisar o texto da fome.
 5. Tela de opções com distância de render e sensibilidade.
