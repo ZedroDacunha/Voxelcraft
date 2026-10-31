@@ -1,4 +1,4 @@
-import { BLOCKS, ITEMS, TILE_PX } from './world-catalog.js';
+import { BLOCKS, ITEMS, TILE_PX, atlasTileRect } from './world-catalog.js';
 
 export function createInventoryAssets(THREE) {
     const blockColors = {};
@@ -8,8 +8,9 @@ export function createInventoryAssets(THREE) {
         for (const [id, item] of Object.entries(ITEMS)) {
             const canvas = document.createElement('canvas');
             canvas.width = canvas.height = TILE_PX;
+            const icon = atlasTileRect(item.iconTile);
             canvas.getContext('2d').drawImage(
-                atlas, item.iconTile * TILE_PX, 0, TILE_PX, TILE_PX, 0, 0, TILE_PX, TILE_PX,
+                atlas, icon.x, icon.y, TILE_PX, TILE_PX, 0, 0, TILE_PX, TILE_PX,
             );
             iconCss += `.ico-${id}{background-image:url('${canvas.toDataURL()}')}\n`;
         }
@@ -19,7 +20,8 @@ export function createInventoryAssets(THREE) {
 
         const context = atlas.getContext('2d');
         for (const [id, block] of Object.entries(BLOCKS)) {
-            const pixels = context.getImageData(block.tiles.side * TILE_PX, 0, TILE_PX, TILE_PX).data;
+            const side = atlasTileRect(block.tiles.side);
+            const pixels = context.getImageData(side.x, side.y, TILE_PX, TILE_PX).data;
             let red = 0, green = 0, blue = 0, count = 0;
             for (let i = 0; i < pixels.length; i += 4) {
                 if (pixels[i + 3] < 128) continue;

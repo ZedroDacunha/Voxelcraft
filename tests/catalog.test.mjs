@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { BLOCKS, ITEMS, RECIPES, ID, ATLAS_COLUMNS, matchRecipe } from '../world-catalog.js';
+import { BLOCKS, ITEMS, RECIPES, ID, ATLAS_COLUMNS, ATLAS_ROWS, matchRecipe } from '../world-catalog.js';
 import { woodDoorPart, woodDoorType, woodDoorShape } from '../world-door.js';
 import { Inventory } from '../inventory-model.js';
 
@@ -19,7 +19,7 @@ test('itens e blocos não compartilham IDs, exceto o diamante', () => {
 test('toda receita produz um item que existe', () => {
     for (const recipe of RECIPES) {
         assert.ok(ITEMS[recipe.result], `receita com resultado inexistente: ${recipe.result}`);
-        assert.ok(ITEMS[recipe.result].iconTile < ATLAS_COLUMNS);
+        assert.ok(ITEMS[recipe.result].iconTile < ATLAS_COLUMNS * ATLAS_ROWS);
     }
 });
 

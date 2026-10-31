@@ -1,5 +1,5 @@
 import { hash2, mulberry32 } from './world-math.js';
-import { ATLAS_COLUMNS, ITEMS, TILE, TILE_PX } from './world-catalog.js';
+import { ATLAS_COLUMNS, ATLAS_ROWS, ITEMS, TILE, TILE_PX, atlasTileRect } from './world-catalog.js';
 import { createMineralOrePixel, createMineralSpritePixels, isMineralOreTile } from './world-mineral-textures.js';
 
 function cobblePixel(x, y, variant) {
@@ -152,6 +152,35 @@ export function createTextureTools(THREE) {
             return (spriteCache[key] = g);
         }
     
+        if (kind === 'door') {
+            // Sem este caso o item porta ficava com o ícone vazio, porque o
+            // atlas só desenha itens que têm sprite definido.
+            const doorPixels = [
+                '................',
+                '..DDDDDDDDDDDD..',
+                '..DwwwwwwwwwwD..',
+                '..DwwwwwwwwwwD..',
+                '..DwwLLwwwwwwD..',
+                '..DwwwwwwwwwwD..',
+                '..DwwwwwwwwwwD..',
+                '..DwwLLwwwwwwD..',
+                '..DwwwwwwwwhhD..',
+                '..DwwwwwwwwhhD..',
+                '..DwwwwwwwwwwD..',
+                '..DwwLLwwwwwwD..',
+                '..DwwwwwwwwwwD..',
+                '..DwwwwwwwwwwD..',
+                '..DDDDDDDDDDDD..',
+                '................',
+            ];
+            const doorColors = { D: [92, 60, 34], w: [150, 104, 62], L: [176, 128, 82], h: [226, 190, 96] };
+            for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+                const color = doorColors[doorPixels[y][x]];
+                if (color) put(x, y, color);
+            }
+            return (spriteCache[key] = g);
+        }
+
         if (kind === 'apple' || kind === 'charcoal') {
             for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
                 if (kind === 'apple') {
@@ -284,7 +313,7 @@ export function createTextureTools(THREE) {
     function createAtlasTexture() {
         const canvas = document.createElement('canvas');
         canvas.width = ATLAS_COLUMNS * TILE_PX;
-        canvas.height = TILE_PX;
+        canvas.height = ATLAS_ROWS * TILE_PX;
         const ctx = canvas.getContext('2d', { alpha: true });
         ctx.imageSmoothingEnabled = false;
         const grassEdges = [0, 1].map(variant => Array.from({ length: TILE_PX }, (_, x) =>
@@ -598,6 +627,28 @@ export function createTextureTools(THREE) {
                     if (y < 23) return [255, 220 + j(12), 48 + j(10)];
                     return [255, 248, 205];
                 }
+                case TILE.WOOD_DOOR_UPPER:
+                case TILE.WOOD_DOOR_LOWER: {
+                    // As duas metades da porta usavam o fallback magenta do
+                    // atlas (não havia arte para 32/33).
+                    const upper = sourceTile === TILE.WOOD_DOOR_UPPER;
+                    if (x < 2 || x > 29 || y < 2 || y > 29) return [96 + j(4), 62 + j(3), 36 + j(3)];
+                    const grain = hash2(Math.floor(x / 3), Math.floor(y / 5), 6151 + alt * 37);
+                    const plank = grain > 0.8 ? [186 + j(6), 138 + j(5), 84 + j(5)]
+                        : grain < 0.18 ? [128 + j(5), 88 + j(4), 50 + j(4)]
+                        : [158 + j(8), 112 + j(7), 66 + j(6)];
+                    if (x === 10 || x === 21) return plank.map(channel => channel - 26);
+                    const panelTop = upper ? 6 : 20;
+                    const panelBottom = upper ? 15 : 27;
+                    if (x >= 5 && x <= 26 && y >= panelTop && y <= panelBottom) {
+                        const frame = x === 5 || x === 26 || y === panelTop || y === panelBottom;
+                        if (frame) return [92 + j(3), 60 + j(3), 34 + j(2)];
+                        return upper ? [180 + j(6), 138 + j(6), 92 + j(5)] : [128 + j(5), 88 + j(4), 52 + j(4)];
+                    }
+                    // maçaneta, na metade de baixo e do lado oposto às dobradiças
+                    if (!upper && y >= 17 && y <= 19 && x >= 24 && x <= 26) return [232, 194, 96];
+                    return plank;
+                }
                 case TILE.WATER: {
                     return [45 + j(8), 110 + j(8), 215 + j(8)];
                 }
@@ -606,23 +657,25 @@ export function createTextureTools(THREE) {
         };
     
         for (const tile of Object.values(TILE)) {
+            const { x: originX, y: originY } = atlasTileRect(tile);
             for (let x = 0; x < TILE_PX; x++) for (let y = 0; y < TILE_PX; y++) {
                 const raw = pixel(tile, x, y);
                 if (raw[3] === 0) continue;
                 const c = raw.slice(0, 3).map(v => Math.max(0, Math.min(255, Math.round(v / 8) * 8)));
                 ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
-                ctx.fillRect(tile * TILE_PX + x, y, 1, 1);
+                ctx.fillRect(originX + x, originY + y, 1, 1);
             }
         }
     
         for (const item of Object.values(ITEMS)) {
             if (!item.sprite) continue;
             const pix = spritePixels(item.sprite.kind, item.sprite.mat);
+            const { x: originX, y: originY } = atlasTileRect(item.iconTile);
             for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
                 const c = pix[y][x];
                 if (!c) continue;
                 ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
-                ctx.fillRect(item.iconTile * TILE_PX + x * 2, y * 2, 2, 2);
+                ctx.fillRect(originX + x * 2, originY + y * 2, 2, 2);
             }
         }
     

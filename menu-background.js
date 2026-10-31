@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BLOCKS, ID, TILE, ATLAS_COLUMNS, TILE_PX } from './world-catalog.js';
+import { ATLAS_UV_PAD_PX, BLOCKS, ID, TILE, TILE_PX, atlasTileRect, atlasUV } from './world-catalog.js';
 import { hash2 } from './world-math.js';
 import { createTextureTools } from './world-textures.js';
 import { tileForBlockFace } from './world-block-orientation.js';
@@ -57,17 +57,15 @@ const faces = [
 
 function blockGeometry(block, variant) {
     const positions = [], normals = [], uvs = [], indices = [];
-    const uvPad = 0.0005;
     for (const face of faces) {
         const baseTile = tileForBlockFace(block.tiles, face.kind, face.dir);
         const tile = variant ? (altTiles.get(baseTile) ?? baseTile) : baseTile;
-        const u0 = tile / ATLAS_COLUMNS + uvPad;
-        const uWidth = 1 / ATLAS_COLUMNS - 2 * uvPad;
+        const { u0, v0, uWidth, vHeight } = atlasUV(tile, ATLAS_UV_PAD_PX);
         const start = positions.length / 3;
         for (const [x, y, z, u, v] of face.corners) {
             positions.push(x - 0.5, y - 0.5, z - 0.5);
             normals.push(...face.dir);
-            uvs.push(u0 + u * uWidth, uvPad + v * (1 - 2 * uvPad));
+            uvs.push(u0 + u * uWidth, v0 + v * vHeight);
         }
         indices.push(start, start + 1, start + 2, start + 2, start + 1, start + 3);
     }
@@ -145,7 +143,8 @@ for (const [key, instances] of Object.entries(positions)) {
 
 const waterTileCanvas = document.createElement('canvas');
 waterTileCanvas.width = waterTileCanvas.height = TILE_PX;
-waterTileCanvas.getContext('2d').drawImage(atlas.image, TILE.WATER * TILE_PX, 0, TILE_PX, TILE_PX, 0, 0, TILE_PX, TILE_PX);
+const waterTile = atlasTileRect(TILE.WATER);
+waterTileCanvas.getContext('2d').drawImage(atlas.image, waterTile.x, waterTile.y, TILE_PX, TILE_PX, 0, 0, TILE_PX, TILE_PX);
 const waterTexture = new THREE.CanvasTexture(waterTileCanvas);
 waterTexture.magFilter = waterTexture.minFilter = THREE.NearestFilter;
 waterTexture.generateMipmaps = false;

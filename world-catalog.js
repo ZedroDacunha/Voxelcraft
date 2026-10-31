@@ -170,11 +170,56 @@ ITEMS[ID.APPLE]    = { name: 'Maçã', maxStack: 64, food: { hunger: 4, sat: 2.4
 ITEMS[ID.CHARCOAL] = { name: 'Carvão vegetal', maxStack: 64, sprite: { kind: 'charcoal', mat: 'coal' }, iconTile: nextTile++ };
 ITEMS[ID.TORCH].sprite = { kind: 'torch', mat: 'wood' };
 
-export const ATLAS_COLUMNS = [
+// O atlas é uma grade fixa, não uma fileira única: com 16 colunas a largura
+// fica em 512 px e a altura cresce em linhas de 32 px (65 tiles = 5 linhas =
+// 160 px). Assim a textura nunca chega perto do limite garantido de 2048 px em
+// WebGL e novos tiles só ocupam a próxima célula livre.
+export const ATLAS_COLUMNS = 16;
+const ATLAS_TILE_COUNT = [
     ...Object.values(TILE),
     ...Object.values(BLOCKS).flatMap(block => Object.values(block.tiles)),
     ...Object.values(ITEMS).map(item => item.iconTile),
-].reduce((columns, tile) => Math.max(columns, tile + 1), 0);
+].reduce((count, tile) => Math.max(count, tile + 1), 0);
+export const ATLAS_ROWS = Math.max(1, Math.ceil(ATLAS_TILE_COUNT / ATLAS_COLUMNS));
+// Afastamento (em pixels do atlas) das bordas de cada célula ao montar as UVs,
+// para a filtragem nunca amostrar o tile vizinho.
+export const ATLAS_UV_PAD_PX = 0.5;
+
+export function atlasCell(tile) {
+    const index = Number.isFinite(tile) ? Math.max(0, Math.floor(tile)) : 0;
+    return { col: index % ATLAS_COLUMNS, row: Math.floor(index / ATLAS_COLUMNS) };
+}
+
+// Retângulo do tile no canvas do atlas (origem no canto superior esquerdo).
+export function atlasTileRect(tile) {
+    const { col, row } = atlasCell(tile);
+    return { x: col * TILE_PX, y: row * TILE_PX, size: TILE_PX };
+}
+
+// Retângulo do tile em coordenadas UV. O canvas é desenhado de cima para
+// baixo, mas o three usa flipY: a linha 0 do atlas ocupa o topo da textura, ou
+// seja, a faixa de v mais alta. `padPx` afasta a amostragem das bordas da
+// célula (em pixels), evitando vazar para o tile vizinho.
+//
+// `atlasUVInto` escreve em um objeto reaproveitado: o mesher chama isso para
+// cada face e não deve alocar um objeto por chamada.
+export function atlasUVInto(tile, padPx = 0, out = {}) {
+    const index = Number.isFinite(tile) ? Math.max(0, Math.floor(tile)) : 0;
+    const col = index % ATLAS_COLUMNS;
+    const row = (index - col) / ATLAS_COLUMNS;
+    const width = ATLAS_COLUMNS * TILE_PX;
+    const height = ATLAS_ROWS * TILE_PX;
+    const pad = Math.max(0, Math.min(TILE_PX / 2 - 1, padPx));
+    out.u0 = (col * TILE_PX + pad) / width;
+    out.v0 = ((ATLAS_ROWS - 1 - row) * TILE_PX + pad) / height;
+    out.uWidth = (TILE_PX - 2 * pad) / width;
+    out.vHeight = (TILE_PX - 2 * pad) / height;
+    return out;
+}
+
+export function atlasUV(tile, padPx = 0) {
+    return atlasUVInto(tile, padPx, {});
+}
 
 export const SMELT = {
     [ID.COBBLE]: { result: ID.STONE, time: 10 },
