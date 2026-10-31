@@ -1,6 +1,6 @@
 /* Estilos da interface de inventário e das estações de crafting. */
 #inventory { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.55); z-index: 9; user-select: none; }
-    #inv-panel { position: relative; box-sizing: border-box; width: min(560px, calc(100vw - 24px)); background: #2b2b2b; border: 3px solid #111; outline: 3px solid #555; border-radius: 4px; padding: 12px 14px 10px; box-shadow: 0 8px 30px rgba(0,0,0,0.6); color: #eee; max-height: 96vh; overflow-y: auto; }
+    #inv-panel { position: relative; box-sizing: border-box; width: min(560px, calc(100vw - 24px)); max-width: calc(100vw - 24px); background: #2b2b2b; border: 3px solid #111; outline: 3px solid #555; border-radius: 4px; padding: clamp(8px, 2vw, 14px); box-shadow: 0 8px 30px rgba(0,0,0,0.6); color: #eee; max-height: calc(100dvh - 24px); overflow-y: auto; }
     .inv-titlebar { min-height: 30px; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
     .inv-title { font: bold 14px monospace; color: #ddd; }
     .recipe-book-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; color: #f0e4c5; background: linear-gradient(#695439, #46351f); border: 2px solid #21180f; box-shadow: inset 1px 1px #a58a5d, 1px 2px #111; font: bold 11px monospace; cursor: pointer; }
@@ -48,15 +48,17 @@
     .recipe-entry-result { color: #f1e0b8; font-weight: bold; text-align: right; }
     .recipe-entry small { grid-column: 1 / -1; color: #a99e8a; font: 9px monospace; }
     .recipe-empty { margin: 8px 0 0; color: #b9ad96; font: 11px monospace; }
-    .inv-grid { display: grid; grid-template-columns: repeat(9, 44px); gap: 4px; }
-    .craft-row { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
-    .craft-grid { grid-template-columns: repeat(2, 44px); }
+    .inv-grid { display: grid; grid-template-columns: repeat(9, var(--inv-slot-size)); gap: var(--inv-gap); }
+    .craft-row { display: flex; align-items: center; gap: clamp(8px, 2vw, 14px); margin-bottom: 12px; }
+    .craft-grid { grid-template-columns: repeat(2, var(--inv-slot-size)); }
     .craft-arrow { font: bold 22px monospace; color: #aaa; }
     .inv-sep { height: 12px; }
-    .islot { width: 44px; height: 44px; box-sizing: border-box; background: rgba(255,255,255,0.12); border: 2px solid #555; border-radius: 3px; position: relative; display: flex; align-items: center; justify-content: center; }
+    .islot { width: var(--inv-slot-size); height: var(--inv-slot-size); box-sizing: border-box; background: rgba(255,255,255,0.12); border: 2px solid #555; border-radius: 3px; position: relative; display: flex; align-items: center; justify-content: center; }
     .islot:hover { background: rgba(255,255,255,0.3); border-color: #bbb; }
     .islot.sel { border-color: #fff; }
-    .islot.out { width: 52px; height: 52px; border-color: #997733; }
+    .islot.out { width: calc(var(--inv-slot-size) * 1.18); height: calc(var(--inv-slot-size) * 1.18); border-color: #997733; }
+    .islot .slot-icon { width: calc(var(--inv-slot-size) * 0.68); height: calc(var(--inv-slot-size) * 0.68); }
+    .islot .slot-count { font-size: clamp(8px, calc(var(--inv-slot-size) * 0.27), 12px); }
     #inv-cursor { position: fixed; width: 30px; height: 30px; pointer-events: none; z-index: 12; display: none; }
     #inv-tooltip { position: fixed; pointer-events: none; z-index: 13; display: none; background: rgba(20,0,30,0.92); border: 2px solid #3a1a5c; color: #fff; font: 12px monospace; padding: 3px 6px; white-space: pre; }
 
