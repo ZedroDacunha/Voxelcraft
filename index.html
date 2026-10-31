@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Voxel Sandbox - Parte 11: Água, Praias e Natação</title>
-<link rel="stylesheet" href="styles.css?v=c3c1116f3f">
+<link rel="stylesheet" href="styles.css?v=c697957989">
 <link rel="stylesheet" href="inventory.css?v=d7d9c61f74">
 <!-- importmap:start (gerado por tools/stamp-importmap.mjs; não editar à mão) -->
 <script type="importmap">
@@ -12,7 +12,7 @@
   "imports": {
     "three": "./vendor/three/three.module.js?v=76dea8151b",
     "three/addons/": "./vendor/three/addons/",
-    "./game.js": "./game.js?v=eb1fd6ce7c",
+    "./game.js": "./game.js?v=b60b8bbb4f",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
     "./inventory-logic.js": "./inventory-logic.js?v=20ec1c5545",
     "./inventory-model.js": "./inventory-model.js?v=473c73a8c5",
@@ -51,6 +51,7 @@
     "./world-save-settings.js": "./world-save-settings.js?v=5867d317b8",
     "./world-sky.js": "./world-sky.js?v=a4f67b6b64",
     "./world-storage.js": "./world-storage.js?v=706891ec43",
+    "./world-survival-rules.js": "./world-survival-rules.js?v=e602b31b0a",
     "./world-terrain-worker.js": "./world-terrain-worker.js?v=06cc0dee23",
     "./world-terrain.js": "./world-terrain.js?v=f2acde3968",
     "./world-textures.js": "./world-textures.js?v=35fc2bab76",
@@ -196,7 +197,7 @@
 <div id="toast"></div>
 <div id="hurt"></div>
 <div id="death">
-    <h1>Você morreu</h1>
+    <h1 id="death-cause">Você morreu</h1>
     <p id="death-info"></p>
     <button class="btn" id="btn-respawn">Renascer</button>
 </div>
