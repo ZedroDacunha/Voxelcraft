@@ -27,6 +27,7 @@ import { raycastVoxels } from './world-raycast.js';
 import { createBreakParticleSystem } from './world-break-particles.js';
 import { InstancedBlockManager, testInstancedMesh } from './world-instanced-manager.js';
 import { chunkKey, floorDiv, idx } from './world-grid.js';
+import { buildLightRegions } from './world-light-region.js';
 import {
     CHUNK_SIZE, DEATH_DROP_TTL, MAX_BREATH, MAX_HEALTH, MAX_HUNGER,
     PLAYER_INVENTORY_SIZE, START_TIME, WORLD_HEIGHT,
@@ -373,19 +374,26 @@ class World {
     }
 
     rebuildSkyLight(chunk) {
-        // A luz só alcança 15 células; um anel de chunks cobre qualquer influência local,
-        // inclusive diagonais nas quinas, e evita recalcular o mundo inteiro.
-        const region = [];
-        for (let dx = -1; dx <= 1; dx++) {
-            for (let dz = -1; dz <= 1; dz++) {
-                const part = this.getChunk(chunk.cx + dx, chunk.cz + dz);
-                if (part) region.push(part);
-            }
-        }
+        // O alvo continua sendo o anel imediato, mas a luz de blocos usa um halo
+        // externo para não perder emissores que ainda alcançam a borda do alvo.
+        const { target: region, block: blockRegion } = buildLightRegions({
+            cx: chunk.cx,
+            cz: chunk.cz,
+            radius: 1,
+            chunkSize: CHUNK_SIZE,
+            maxLight: 15,
+            getChunk: (cx, cz) => this.getChunk(cx, cz),
+        });
         if (!region.length) return;
 
         const regionIndex = new Map(region.map((part, i) => [part, i]));
-        const hasBlockEmitter = region.some(part => this.lightSourceChunks.has(chunkKey(part.cx, part.cz)));
+        const blockRegionIndex = new Map(blockRegion.map((part, i) => [part, i]));
+        const hasBlockEmitter = blockRegion.some(part => this.lightSourceChunks.has(chunkKey(part.cx, part.cz)));
+        const hasExternalBlockEmitter = blockRegion.some(part =>
+            !regionIndex.has(part) && this.lightSourceChunks.has(chunkKey(part.cx, part.cz)),
+        );
+        const blockLightRegion = hasExternalBlockEmitter ? blockRegion : region;
+        const blockLightRegionIndex = hasExternalBlockEmitter ? blockRegionIndex : regionIndex;
         for (const part of region) {
             this.lightDirty.delete(part);
             part.lightChanged = false;
@@ -401,13 +409,9 @@ class World {
                 for (let lz = 0; lz < CHUNK_SIZE; lz++) this.rebuildSkyLightColumn(part, lx, lz);
             }
         }
-        this.propagateSkyLight(region, regionIndex, hasBlockEmitter);
-        for (const part of region) if (part.lightChanged) this.dirty.add(part);
-    }
-
-    propagateSkyLight(region, regionIndex, hasBlockEmitter = true) {
         this.propagateLightChannel(region, regionIndex, 'skyLight', false);
-        if (hasBlockEmitter) this.propagateLightChannel(region, regionIndex, 'blockLight', true);
+        if (hasBlockEmitter) this.propagateLightChannel(blockLightRegion, blockLightRegionIndex, 'blockLight', true);
+        for (const part of blockLightRegion) if (part.lightChanged) this.dirty.add(part);
     }
 
     propagateLightChannel(region, regionIndex, channel, seedEmitters) {
@@ -3356,6 +3360,18 @@ async function init() {
             time: (t) => { worldClock.time = t; updateSky(); },
             // Ajuda a testar portas e blocos sem precisar mirar com o mouse.
             blockAt: (x, y, z) => world.getBlock(x, y, z),
+            lightAt: (x, y, z) => {
+                const chunk = world.getChunk(floorDiv(x, CHUNK_SIZE), floorDiv(z, CHUNK_SIZE));
+                if (!chunk || y < 0 || y >= WORLD_HEIGHT) return null;
+                const i = idx(x - chunk.cx * CHUNK_SIZE, y, z - chunk.cz * CHUNK_SIZE);
+                return { sky: chunk.skyLight[i], block: chunk.blockLight[i] };
+            },
+            rebuildLight: (cx, cz) => {
+                const chunk = world.getChunk(cx, cz);
+                if (!chunk) return false;
+                world.rebuildSkyLight(chunk);
+                return true;
+            },
             setBlock: (id, x, y, z) => world.setBlock(x, y, z, id),
             toggleDoor: (x, y, z) => toggleWoodDoor({ x, y, z }),
             placeDoorAt: (x, y, z, facing = 'south') =>
