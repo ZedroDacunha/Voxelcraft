@@ -3,6 +3,7 @@ import { openDatabase as dbOpen, storeRequest as dbRun } from './world-storage.j
 import { clamp01, hash2, mulberry32, Noise2D, smoothstep } from './world-math.js';
 import { ATLAS_COLUMNS, BLOCKS, FUEL, ID, ITEMS, matchRecipe, RECIPES, SMELT, TILE, TILE_PX } from './world-catalog.js';
 import { findSpawn, TerrainGenerator } from './world-terrain.js';
+import { createTerrainWorkerSource } from './world-terrain-worker.js';
 import { createWaterSystemClass } from './world-water.js';
 import { Inventory } from './inventory-model.js';
 import { craftConsume, invCollectSame, invFillRecipe, invLeftClick, invQuickMove, invQuickMoveToCraft, invRightClick, invSwapHotbar, stackable } from './inventory-logic.js';
@@ -28,27 +29,43 @@ import {
 import { configureTorchFlicker, configureTorchFlameAnimation, updateWorldLightingEffects } from './world-lighting-effects.js';
 import { FurnaceSmokeSystem } from './world-furnace-effects.js';
 import { canHarvest, damageTool as damageToolStack, getBreakTime } from './world-tool-rules.js';
+import { woodDoorPart, woodDoorShape, woodDoorType } from './world-door.js';
 import {
     BlockFacingStore, DEFAULT_BLOCK_FACING, facingTowardPlayer, isFrontFace, isHorizontalFacing,
     tileForBlockFace,
 } from './world-block-orientation.js';
 
 async function loadThreeModules() {
+    // A cópia em vendor/ evita depender de CDN (funciona offline e garante a
+    // mesma versão para todos os módulos). Os CDNs continuam como reserva.
     const providers = [
-        { name: 'unpkg', base: 'https://unpkg.com/three@0.160.0' },
-        { name: 'jsDelivr', base: 'https://cdn.jsdelivr.net/npm/three@0.160.0' },
+        {
+            name: 'cópia local',
+            build: './vendor/three/three.module.js',
+            controls: './vendor/three/addons/controls/PointerLockControls.js',
+        },
+        {
+            name: 'unpkg',
+            build: 'https://unpkg.com/three@0.160.0/build/three.module.js',
+            controls: 'https://unpkg.com/three@0.160.0/examples/jsm/controls/PointerLockControls.js',
+        },
+        {
+            name: 'jsDelivr',
+            build: 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js',
+            controls: 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/PointerLockControls.js',
+        },
     ];
     let lastError = null;
     for (const provider of providers) {
         try {
             const [THREE, controls] = await Promise.all([
-                import(`${provider.base}/build/three.module.js`),
-                import(`${provider.base}/examples/jsm/controls/PointerLockControls.js`),
+                import(provider.build),
+                import(provider.controls),
             ]);
             return { THREE, PointerLockControls: controls.PointerLockControls };
         } catch (error) {
             lastError = error;
-            console.warn(`Falha ao carregar Three.js por ${provider.name}; tentando o próximo CDN.`, error);
+            console.warn(`Falha ao carregar Three.js por ${provider.name}; tentando a próxima opção.`, error);
         }
     }
 
@@ -71,8 +88,7 @@ const ACTIVE_FURNACE_LIGHT = 13;
 const BLOCK_LIGHT_GAIN = 3.4;
 const BLOCK_LIGHT_MAX = 2.5;
 const RENDER_DISTANCE = 4;     // em chunks
-const GEN_PER_FRAME = 2;       // chunks gerados por quadro
-const MESH_PER_FRAME = 2;      // malhas reconstruídas por quadro
+const START_LOAD_RADIUS = 2;   // chunks prontos antes de liberar o jogador (o resto carrega em jogo)
 const REACH = 5;               // alcance de interação (blocos)
 const ACTIVE_WORLD = window.ACTIVE_WORLD;
 if (!ACTIVE_WORLD || !Number.isFinite(ACTIVE_WORLD.seed) || !ACTIVE_WORLD.saveKey) {
@@ -146,6 +162,9 @@ class Chunk {
         this.maxY = 0;
         this.mesh = null;
         this.flameMesh = null;
+        // Marcado quando algum valor de luz realmente muda, para evitar
+        // remalhar os 9 chunks vizinhos a cada bloco editado.
+        this.lightChanged = false;
     }
 }
 
@@ -230,6 +249,19 @@ function buildHeldTorchFlameGeometry() {
 const TORCH_PARTS = [
     { min: [0.45, 0.02, 0.45], max: [0.55, 0.70, 0.55], tiles: { top: TILE.WOOD_END, side: TILE.WOOD, bottom: TILE.WOOD_END } },
 ];
+
+// A porta ocupa o voxel inteiro em altura, mas é fina no eixo perpendicular
+// à frente. O formato é gerado por world-door.js e reaproveita o caminho de
+// geometria não cúbica já usado pela tocha.
+function doorPartShape(type, facing) {
+    const block = BLOCKS[type];
+    const { min, max } = woodDoorShape(facing, Boolean(block?.door?.open));
+    const faceTile = block?.door?.tile ?? TILE.WOOD_DOOR_LOWER;
+    return {
+        min, max,
+        tiles: { top: TILE.WOOD_END, bottom: TILE.WOOD_END, side: faceTile, front: faceTile },
+    };
+}
 const FACES = [
     { kind: 'side',   dir: [-1, 0, 0], corners: [ { pos: [0,1,0], uv: [0,1] }, { pos: [0,0,0], uv: [0,0] }, { pos: [0,1,1], uv: [1,1] }, { pos: [0,0,1], uv: [1,0] } ] },
     { kind: 'side',   dir: [ 1, 0, 0], corners: [ { pos: [1,1,1], uv: [0,1] }, { pos: [1,0,1], uv: [0,0] }, { pos: [1,1,0], uv: [1,1] }, { pos: [1,0,0], uv: [1,0] } ] },
@@ -315,19 +347,18 @@ class World {
         for (let y = WORLD_HEIGHT - 1; y >= 0; y--) {
             const i = idx(lx, y, lz);
             const type = chunk.data[i];
-            if (type === 0) { chunk.skyLight[i] = light; continue; }
-            if (type === ID.LEAVES) {
-                chunk.skyLight[i] = light;
+            let value = 0;
+            if (type === 0) value = light;
+            else if (type === ID.LEAVES || WaterSystem.isBlock(type)) {
+                value = light;
                 light = Math.max(0, light - 1);
-                continue;
+            } else if (BLOCKS[type]?.solid !== false) {
+                light = 0;
             }
-            if (WaterSystem.isBlock(type)) {
-                chunk.skyLight[i] = light;
-                light = Math.max(0, light - 1);
-                continue;
+            if (chunk.skyLight[i] !== value) {
+                chunk.skyLight[i] = value;
+                chunk.lightChanged = true;
             }
-            chunk.skyLight[i] = 0;
-            if (BLOCKS[type]?.solid !== false) light = 0;
         }
     }
 
@@ -347,13 +378,21 @@ class World {
         const hasBlockEmitter = region.some(part => this.lightSourceChunks.has(chunkKey(part.cx, part.cz)));
         for (const part of region) {
             this.lightDirty.delete(part);
-            part.blockLight.fill(0);
+            part.lightChanged = false;
+            let hadBlockLight = false;
+            for (let i = 0; i < part.blockLight.length; i++) {
+                if (part.blockLight[i] !== 0) { hadBlockLight = true; break; }
+            }
+            if (hadBlockLight) {
+                part.blockLight.fill(0);
+                part.lightChanged = true;
+            }
             for (let lx = 0; lx < CHUNK_SIZE; lx++) {
                 for (let lz = 0; lz < CHUNK_SIZE; lz++) this.rebuildSkyLightColumn(part, lx, lz);
             }
         }
         this.propagateSkyLight(region, regionIndex, hasBlockEmitter);
-        for (const part of region) this.dirty.add(part);
+        for (const part of region) if (part.lightChanged) this.dirty.add(part);
     }
 
     propagateSkyLight(region, regionIndex, hasBlockEmitter = true) {
@@ -394,7 +433,10 @@ class World {
                         const x = chunk.cx * CHUNK_SIZE + lx, z = chunk.cz * CHUNK_SIZE + lz;
                         if (furnaces.get(`${x},${y},${z}`)?.burn > 0) emission = ACTIVE_FURNACE_LIGHT;
                     }
-                    if (emission > lightMap[i]) lightMap[i] = emission;
+                    if (emission > lightMap[i]) {
+                        lightMap[i] = emission;
+                        chunk.lightChanged = true;
+                    }
                     if (emission > 0) hasEmitter = true;
                 }
                 const level = lightMap[i];
@@ -421,6 +463,7 @@ class World {
             const candidate = sourceLevel - attenuation, targetLight = target[channel];
             if (candidate <= targetLight[targetIndex]) return;
             targetLight[targetIndex] = candidate;
+            target.lightChanged = true;
             if (candidate > 1) buckets[candidate].push(targetChunkIndex * volume + targetIndex);
         };
         for (let level = 15; level > 1; level--) {
@@ -439,22 +482,7 @@ class World {
     }
     createTerrainWorker() {
         if (typeof Worker === 'undefined' || typeof Blob === 'undefined' || typeof URL.createObjectURL !== 'function') return;
-        const workerSource = [
-            `const CHUNK_SIZE = ${CHUNK_SIZE};`,
-            `const WORLD_HEIGHT = ${WORLD_HEIGHT};`,
-            `const TERRAIN_CONFIG = ${JSON.stringify(TERRAIN_CONFIG)};`,
-            `const clamp01 = ${clamp01.toString()};`,
-            `const smoothstep = ${smoothstep.toString()};`,
-            mulberry32.toString(), hash2.toString(), Noise2D.toString(),
-            TerrainGenerator.toString(),
-            `let workerGenerator = null; let workerSeed = null;`,
-            `self.onmessage = ({ data }) => {`,
-            `  if (!workerGenerator || workerSeed !== data.seed) { workerGenerator = new TerrainGenerator(data.seed, TERRAIN_CONFIG); workerSeed = data.seed; }`,
-            `  const chunk = { cx: data.cx, cz: data.cz, data: new Uint8Array(CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT), maxY: 0 };`,
-            `  workerGenerator.fill(chunk);`,
-            `  self.postMessage({ jobId: data.jobId, cx: data.cx, cz: data.cz, maxY: chunk.maxY, data: chunk.data.buffer }, [chunk.data.buffer]);`,
-            `};`
-        ].join('\n');
+        const workerSource = createTerrainWorkerSource({ CHUNK_SIZE, WORLD_HEIGHT, TERRAIN_CONFIG });
 
         try {
             this.terrainWorkerUrl = URL.createObjectURL(new Blob([workerSource], { type: 'text/javascript' }));
@@ -496,7 +524,6 @@ class World {
         const chunk = new Chunk(job.cx, job.cz);
         chunk.data = new Uint8Array(result.data);
         chunk.maxY = result.maxY;
-        if (this.terrainWorkerUrl) { URL.revokeObjectURL(this.terrainWorkerUrl); this.terrainWorkerUrl = null; }
         this.finishGeneratedChunk(chunk);
     }
 
@@ -801,6 +828,9 @@ class World {
             const currentRender = BLOCKS[currentType]?.render;
             const neighborRender = BLOCKS[nType]?.render;
             if (currentRender === 'torch') return false;
+            // Portas desenham todas as faces (formato fino); só a face entre as
+            // duas metades é omitida para não haver z-fighting.
+            if (currentRender === 'door') return neighborRender === 'door';
             if (currentRender === 'liquid') {
                 if (nType === 0) return false;
                 if (neighborRender !== 'liquid') return true;
@@ -820,7 +850,8 @@ class World {
 
         const ambientOcclusionWeight = type => {
             if (type === 0 || BLOCKS[type]?.render === 'liquid' || BLOCKS[type]?.render === 'torch') return 0;
-            return BLOCKS[type]?.render === 'cutout' ? 0.35 : 1;
+            const render = BLOCKS[type]?.render;
+            return render === 'cutout' || render === 'door' ? 0.35 : 1;
         };
         const ambientOcclusionAt = (lx, y, lz, face, corner, includeAO = true) => {
             let axisA, axisB;
@@ -890,23 +921,23 @@ class World {
                     const renderMode = block.render;
                     const aboveType = y + 1 < WORLD_HEIGHT ? data[lx + lz * CS + (y + 1) * CS2] : 0;
                     const blockTop = renderMode === 'liquid' ? WaterSystem.surfaceHeightFor(t, aboveType) : 1;
+                    const wx = chunk.cx * CS + lx, wz = chunk.cz * CS + lz;
+                    const facing = tiles.front !== undefined ? this.getBlockFacing(wx, y, wz) : DEFAULT_BLOCK_FACING;
+                    const doorShape = renderMode === 'door' ? doorPartShape(t, facing) : null;
                     const shapeCount = renderMode === 'torch' ? TORCH_PARTS.length : 1;
                     const orientation = block.orientation || [0, 0];
                     if (renderMode === 'torch') {
                         const lean = block.orientation ? (0.82 * 0.35 - 0.38) : 0;
-                        const wx = chunk.cx * CS + lx, wz = chunk.cz * CS + lz;
                         const phase = Math.abs(Math.sin(wx * 12.9898 + wz * 78.233) * 43758.5453) % (Math.PI * 2);
                         torchFlameCenters.push([lx + 0.5 + orientation[0] * lean, y, lz + 0.5 + orientation[1] * lean, phase]);
                     }
                     for (let shapeIndex = 0; shapeIndex < shapeCount; shapeIndex++) {
-                        const shape = renderMode === 'torch' ? TORCH_PARTS[shapeIndex] : null;
+                        const shape = renderMode === 'torch' ? TORCH_PARTS[shapeIndex] : doorShape;
                         for (const f of FACES) {
                         const neighborX = lx + f.dir[0], neighborY = y + f.dir[1], neighborZ = lz + f.dir[2];
                         const neighborType = blockAt(neighborX, neighborY, neighborZ);
                         const leafLayerFace = renderMode === 'cutout' && BLOCKS[neighborType]?.render === 'cutout' && isLayeredLeafFace(f.dir);
                         if (renderMode !== 'torch' && solid(lx, y, lz, t, f.dir)) continue;
-                        const wx = chunk.cx * CS + lx, wz = chunk.cz * CS + lz;
-                        const facing = tiles.front !== undefined ? this.getBlockFacing(wx, y, wz) : DEFAULT_BLOCK_FACING;
                         const frontFace = tiles.front !== undefined && isFrontFace(f.dir, facing);
                         let faceTile = tileForBlockFace(tiles, f.kind, f.dir, facing);
                         const furnaceFlameFace = frontFace && t === ID.FURNACE && furnaces.get(`${wx},${y},${wz}`)?.burn > 0;
@@ -926,7 +957,7 @@ class World {
                         torchInfluence = growTypedArray(torchInfluence, vertexCount + 4);
                         furnaceFlame = growTypedArray(furnaceFlame, vertexCount + 4);
                         let target, targetOffset;
-                        if (renderMode === 'cutout' || renderMode === 'torch') {
+                        if (renderMode === 'cutout' || renderMode === 'torch' || renderMode === 'door') {
                             cutoutIndices = growTypedArray(cutoutIndices, cutoutIndexCount + 6);
                             target = cutoutIndices; targetOffset = cutoutIndexCount; cutoutIndexCount += 6;
                         } else if (renderMode === 'liquid') {
@@ -1403,6 +1434,47 @@ function openStation(type, hit) {
     openInventory({ type, furnace: f });
 }
 
+function otherDoorHalf(x, y, z, type) {
+    const part = woodDoorPart(type);
+    if (!part) return null;
+    return { x, y: y + (part.half === 'bottom' ? 1 : -1), z, part };
+}
+
+function toggleWoodDoor(hit) {
+    const type = world.getBlock(hit.x, hit.y, hit.z);
+    const part = woodDoorPart(type);
+    if (!part) return false;
+    const open = !part.open;
+    const halves = [{ x: hit.x, y: hit.y, z: hit.z, part }, otherDoorHalf(hit.x, hit.y, hit.z, type)];
+    for (const half of halves) {
+        if (!half) continue;
+        const current = world.getBlock(half.x, half.y, half.z);
+        const currentPart = woodDoorPart(current);
+        if (!currentPart) continue;
+        world.setBlock(half.x, half.y, half.z, woodDoorType(currentPart.half, open));
+    }
+    handAnim.punch = 1;
+    return true;
+}
+
+// Coloca as duas metades da porta (base + topo) de uma vez. A base precisa de
+// apoio sólido e as duas células devem estar livres.
+function placeWoodDoor(px, py, pz, facing) {
+    const topY = py + 1;
+    if (py <= 0 || topY >= WORLD_HEIGHT) return false;
+    const supportType = world.getBlock(px, py - 1, pz);
+    if (!(BLOCKS[supportType]?.solid ?? false) || BLOCKS[supportType]?.render === 'door') return false;
+    const topType = world.getBlock(px, topY, pz);
+    if (topType !== 0 && BLOCKS[topType]?.solid !== false) return false;
+    if (intersectsPlayer(px, py, pz) || intersectsPlayer(px, topY, pz)) return false;
+    if (!world.setBlock(px, py, pz, ID.WOOD_DOOR_BOTTOM, facing)) return false;
+    if (!world.setBlock(px, topY, pz, ID.WOOD_DOOR_TOP, facing)) {
+        world.setBlock(px, py, pz, 0);
+        return false;
+    }
+    return true;
+}
+
 function waterImmersionAt(world, x, y, z, halfHeight) {
     const bx = Math.floor(x), by = Math.floor(y - halfHeight + 0.001), bz = Math.floor(z);
     const type = world.getBlock(bx, by, bz);
@@ -1666,6 +1738,10 @@ function breakBlock(x, y, z) {
     const dropChance = type === ID.TALL_GRASS ? 0.12 : (BLOCKS[type].dropChance ?? 1);
     if (type === ID.FURNACE) spillFurnace(x, y, z);
     if (type === ID.CHEST) spillChest(x, y, z);
+    const doorHalf = otherDoorHalf(x, y, z, type);
+    if (doorHalf && woodDoorPart(world.getBlock(doorHalf.x, doorHalf.y, doorHalf.z))) {
+        world.setBlock(doorHalf.x, doorHalf.y, doorHalf.z, 0);
+    }
     const touchesWater = world.water.isAdjacent(world, x, y, z);
     world.setBlock(x, y, z, touchesWater ? ID.WATER : 0);
     if (touchesWater) world.water.activate(world, x, y, z);
@@ -2852,12 +2928,12 @@ function requestLock() {
     }
 }
 
-function getWorldRegionStatus(x, z) {
+function getWorldRegionStatus(x, z, radius = RENDER_DISTANCE) {
     const cx = floorDiv(x, CHUNK_SIZE), cz = floorDiv(z, CHUNK_SIZE);
-    const total = (RENDER_DISTANCE * 2 + 1) ** 2;
+    const total = (radius * 2 + 1) ** 2;
     let loaded = 0, meshed = 0;
-    for (let dx = -RENDER_DISTANCE; dx <= RENDER_DISTANCE; dx++) {
-        for (let dz = -RENDER_DISTANCE; dz <= RENDER_DISTANCE; dz++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+        for (let dz = -radius; dz <= radius; dz++) {
             const chunk = world.getChunk(cx + dx, cz + dz);
             if (!chunk) continue;
             loaded++;
@@ -2871,22 +2947,24 @@ function setWorldLoadProgress(status) {
     const percent = Math.min(100, Math.floor(status.meshed / status.total * 100));
     document.getElementById('world-loading-title').textContent = `Gerando mundo... ${percent}%`;
     document.getElementById('world-loading-fill').style.width = `${percent}%`;
-    document.getElementById('world-loading-detail').textContent = `Áreas prontas: ${status.meshed} de ${status.total}`;
+    document.getElementById('world-loading-detail').textContent = `Preparando as áreas próximas: ${status.meshed} de ${status.total}. O restante continua carregando durante o jogo.`;
 }
 
-function isWorldRegionReady(x, z) {
-    const status = getWorldRegionStatus(x, z);
+function isWorldRegionReady(x, z, radius = RENDER_DISTANCE) {
+    const status = getWorldRegionStatus(x, z, radius);
     return status.meshed === status.total;
 }
 
-async function waitForWorldRegion(x, z, { driveUpdates = true, onProgress = null } = {}) {
-    while (!isWorldRegionReady(x, z)) {
+// radius menor no início: entrega os chunks próximos ao jogador e deixa o
+// restante do raio de renderização terminar de chegar em segundo plano.
+async function waitForWorldRegion(x, z, { driveUpdates = true, onProgress = null, radius = RENDER_DISTANCE } = {}) {
+    while (!isWorldRegionReady(x, z, radius)) {
         if (driveUpdates) world.update(x, z);
-        const status = getWorldRegionStatus(x, z);
+        const status = getWorldRegionStatus(x, z, radius);
         if (onProgress) onProgress(status);
         await new Promise(resolve => requestAnimationFrame(resolve));
     }
-    if (onProgress) onProgress(getWorldRegionStatus(x, z));
+    if (onProgress) onProgress(getWorldRegionStatus(x, z, radius));
 }
 
 function showWorldLoadError(error) {
@@ -2998,7 +3076,7 @@ async function init() {
     const recoveredSavedPosition = !!save && !savedPositionIsInWorld;
     if (recoveredSavedPosition) console.warn('Posição do jogador fora do mundo; mantendo o restante do save e recuperando no ponto inicial.');
     const start = savedPositionIsInWorld ? save.player : spawnPoint;
-    await waitForWorldRegion(start.x, start.z, { driveUpdates: true, onProgress: setWorldLoadProgress });
+    await waitForWorldRegion(start.x, start.z, { driveUpdates: true, onProgress: setWorldLoadProgress, radius: START_LOAD_RADIUS });
     player.pos.set(start.x, start.y, start.z);
     for (let guard = 0; guard < 70 && collides(player.pos.x, player.pos.y, player.pos.z, player.height); guard++) player.pos.y += 1;
     camera.position.set(player.pos.x, player.pos.y + player.eye, player.pos.z);
@@ -3119,6 +3197,10 @@ async function init() {
 
         const st = currentHit && BLOCKS[currentHit.type].station;
         if (st && !event.shiftKey && !wantToCrouch) { openStation(st, currentHit); return; }
+        if (currentHit && woodDoorPart(currentHit.type) && !event.shiftKey && !wantToCrouch) {
+            toggleWoodDoor(currentHit);
+            return;
+        }
 
         const held = inventory.slots[selectedSlot];
         const food = held && ITEMS[held.id].food;
@@ -3153,10 +3235,15 @@ async function init() {
         const facing = BLOCKS[placedType]?.tiles.front !== undefined
             ? facingTowardPlayer(px + 0.5, pz + 0.5, player.pos.x, player.pos.z)
             : null;
-        if (world.setBlock(px, py, pz, placedType, facing)) {
+        const placed = placedType === ID.WOOD_DOOR_BOTTOM
+            ? placeWoodDoor(px, py, pz, facing)
+            : world.setBlock(px, py, pz, placedType, facing);
+        if (placed) {
             inventory.removeOne(selectedSlot);
             updateHotbarUI();
             handAnim.punch = 1;
+        } else if (placedType === ID.WOOD_DOOR_BOTTOM) {
+            showToast('A porta precisa de apoio sólido e de dois blocos livres');
         }
     });
 
@@ -3177,6 +3264,12 @@ async function init() {
             exhaust: (n) => addExhaustion(n),
             give: (id, n = 1) => { inventory.add(id, n); updateHotbarUI(); },
             time: (t) => { worldClock.time = t; updateSky(); },
+            // Ajuda a testar portas e blocos sem precisar mirar com o mouse.
+            blockAt: (x, y, z) => world.getBlock(x, y, z),
+            setBlock: (id, x, y, z) => world.setBlock(x, y, z, id),
+            toggleDoor: (x, y, z) => toggleWoodDoor({ x, y, z }),
+            placeDoorAt: (x, y, z, facing = 'south') =>
+                placeWoodDoor(x, y, z, facing) ? world.getBlock(x, y, z) : 0,
         };
     }
 
