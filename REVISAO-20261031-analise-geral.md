@@ -51,6 +51,7 @@ Legenda de prioridade:
 | 5 | Loading esperava 81 chunks | `game.js` › `waitForWorldRegion()` | Entrada no mundo demorava vários segundos |
 | 6 | Three.js vinha de CDN externa | `index.html`, `game.js` | Sem CDN o jogo não abre; versão não é garantida |
 | 7 | Sem nenhum teste automatizado | `tests/` (novo) | Regressões passavam silenciosamente |
+| 8 | Atlas de textura em uma única fileira de 2080 px | `world-catalog.js`, mesher, `inventory-assets.js`, `menu-background.js` | Risco de textura recusada em GPUs antigas (limite garantido: 2048) |
 
 ### 1. O Web Worker do terreno estava desligado
 
@@ -99,8 +100,14 @@ Correção aplicada:
 - quebrar uma metade remove a outra e dropa **uma** porta (sem duplicar item);
 - a receita continua rendendo 3 portas.
 
-> ⚠️ Falta apenas validação visual no navegador: o formato, o alinhamento da
-> textura nas duas metades e a "dobradiça" (a porta aberta ocupa a borda do
+A **colisão** também acompanhou a geometria: a porta fechada usa uma caixa fina
+igual ao painel e o `moveAxis()` passou a resolver a parada por bissecção, então
+dá para encostar no painel (antes o jogador parava na borda do voxel, com um vão
+de ~0,44 bloco). Detalhes em [[BUG-20261031-colisao-porta]].
+
+> ⚠️ Falta apenas validação visual no navegador: a textura das duas metades já
+> foi conferida gerando o atlas fora do navegador, mas o formato 3D, o
+> alinhamento entre as metades e a "dobradiça" (a porta aberta ocupa a borda do
 > voxel) foram verificados por cálculo, não por captura de tela.
 
 ### 3. Custo de iluminação por edição
@@ -142,23 +149,46 @@ node --test tests/*.test.mjs
 - receita da porta e alternância aberta/fechada;
 - formato da porta (eixo e espessura);
 - ida e volta do save, rejeição por seed/versão e descarte de item inválido.
+- grade do atlas: cada tile em uma célula exclusiva, dentro dos limites de textura
+  e sem sobreposição de UV entre vizinhos (incluindo o `flipY`);
+- desenho real do atlas em um canvas falso: todo tile/ícone cai dentro da própria
+  célula e nenhum usa o fallback magenta.
+
+### 7. Atlas de textura em grade
+
+Antes, o atlas era uma fileira única: `ATLAS_COLUMNS = 65` × `TILE_PX = 32` =
+**2080×32**, acima do limite garantido de 2048 px em WebGL. A cada ~13 tiles
+novos a textura dobraria de faixa.
+
+Agora `world-catalog.js` define a grade (`ATLAS_COLUMNS = 16`, `ATLAS_ROWS`
+calculado a partir do maior tile) e expõe três funções compartilhadas:
+
+| função | uso |
+|---|---|
+| `atlasCell(tile)` | `{ col, row }` do tile na grade |
+| `atlasTileRect(tile)` | retângulo em pixels para desenhar/copiar (`drawImage`, `getImageData`) |
+| `atlasUV(tile, padPx)` | retângulo em UV, já considerando o `flipY` do three e o afastamento das bordas |
+
+Com os 65 tiles atuais o atlas fica em **512×160** e cresce em linhas, não em
+largura. Os quatro pontos que assumiam uma fileira só passaram a usar os
+helpers: o mesher e o `buildCubeGeo` (`game.js`), o `createAtlasTexture`
+(`world-textures.js`), os ícones do inventário (`inventory-assets.js`) e o
+panorama do menu (`menu-background.js`). O afastamento agora é medido em pixels
+(meio texel), em vez de um valor em UV que valia 1 px na horizontal e quase nada
+na vertical. No mesher a conta é feita com `atlasUVInto`, que escreve em um
+objeto reaproveitado — a malha chama isso uma vez por face de bloco e não pode
+alocar um objeto por chamada.
+
+Ao escrever o teste que desenha o atlas em um canvas falso, apareceram duas
+falhas que o olho não pegava sem abrir o jogo: as duas metades da porta
+(`TILE.WOOD_DOOR_UPPER/LOWER`) não tinham arte e caíam no **fallback magenta** do
+`pixel()`, e o item porta tinha `sprite: { kind: 'door' }` sem nenhum caso em
+`spritePixels()`, então o ícone saía vazio no inventário. Ambos foram
+desenhados agora (tábuas com moldura, maçaneta e o ícone 16×16).
 
 ---
 
 ## 🐞 Bugs e riscos ainda abertos
-
-### P1 — Atlas de textura com 2080 px em uma linha
-
-`ATLAS_COLUMNS` hoje vale **65** e `TILE_PX` 32, então o canvas do atlas mede
-**2080×32**. O mínimo garantido em implementações WebGL é 2048; GPUs antigas ou
-drivers restritos podem recusar a textura e o mundo fica sem textura. Além
-disso, a cada ~13 tiles novos o atlas dobra de faixa (128 tiles → 4096 px).
-
-Sugestão: atlas em grade (ex.: 16 colunas × N linhas) com `u0`/`v0` calculados a
-partir de `tile % cols` e `Math.floor(tile / cols)`. Os pontos que hoje assumem
-uma linha só são: `game.js` (mesher e `buildCubeGeo`), `world-textures.js`
-(`createAtlasTexture`), `inventory-assets.js` (`drawImage`) e
-`menu-background.js`. Vale fazer agora, enquanto são 4 pontos.
 
 ### P1 — Cache de módulos ES
 
@@ -291,8 +321,10 @@ No navegador (o preview desta sessão serve a raiz do projeto):
 2. pegar tábuas, abrir a bancada 3×3 e craftar a porta (devem vir 3 portas);
 3. colocar a porta em um piso sólido: duas metades, clique direito abre/fecha;
 4. quebrar uma metade: a outra some e cai uma única porta;
-5. colocar/quebrar blocos e observar no F3 `malha … ms` e os picos de CPU.
-6. com `?debug` na URL, o console expõe `dbg.placeDoorAt(x, y, z)`, `dbg.toggleDoor(x, y, z)` e
+5. andar de frente para a porta fechada: o corpo deve encostar no painel, sem
+   vão; tentar fechar a porta estando no vão mostra "Saia do vão da porta";
+6. colocar/quebrar blocos e observar no F3 `malha … ms` e os picos de CPU.
+7. com `?debug` na URL, o console expõe `dbg.placeDoorAt(x, y, z)`, `dbg.toggleDoor(x, y, z)` e
    `dbg.blockAt(x, y, z)` para testar a porta sem mirar com o mouse.
 
 > Se algo parecer estranho na porta (textura girada ou face faltando), o ponto
@@ -303,11 +335,14 @@ No navegador (o preview desta sessão serve a raiz do projeto):
 
 ## 🗺️ Roadmap sugerido
 
+As melhorias são entregues em módulos pequenos e independentes, cada um com
+teste próprio e um commit/PR separado. O primeiro foi o **atlas em grade**.
+
 **Agora (1-2 sessões)**
 
 1. Validar visualmente a porta e o novo carregamento.
 2. Resolver o cache de módulos (headers ou versão em todas as importações).
-3. Atlas em grade (16 colunas) antes de adicionar novos blocos.
+3. ~~Atlas em grade (16 colunas)~~ — feito.
 4. Permitir comer olhando para blocos; revisar o texto da fome.
 5. Tela de opções com distância de render e sensibilidade.
 

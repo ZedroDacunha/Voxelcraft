@@ -1,7 +1,9 @@
 
 import { openDatabase as dbOpen, storeRequest as dbRun } from './world-storage.js';
 import { clamp01, hash2, mulberry32, Noise2D, smoothstep } from './world-math.js';
-import { ATLAS_COLUMNS, BLOCKS, FUEL, ID, ITEMS, matchRecipe, RECIPES, SMELT, TILE, TILE_PX } from './world-catalog.js';
+import {
+    ATLAS_UV_PAD_PX, BLOCKS, FUEL, ID, ITEMS, atlasUV, atlasUVInto, matchRecipe, RECIPES, SMELT, TILE, TILE_PX,
+} from './world-catalog.js';
 import { findSpawn, TerrainGenerator } from './world-terrain.js';
 import { createTerrainWorkerSource } from './world-terrain-worker.js';
 import { createWaterSystemClass } from './world-water.js';
@@ -29,7 +31,7 @@ import {
 import { configureTorchFlicker, configureTorchFlameAnimation, updateWorldLightingEffects } from './world-lighting-effects.js';
 import { FurnaceSmokeSystem } from './world-furnace-effects.js';
 import { canHarvest, damageTool as damageToolStack, getBreakTime } from './world-tool-rules.js';
-import { woodDoorPart, woodDoorShape, woodDoorType } from './world-door.js';
+import { woodDoorCollision, woodDoorPart, woodDoorShape, woodDoorType } from './world-door.js';
 import {
     BlockFacingStore, DEFAULT_BLOCK_FACING, facingTowardPlayer, isFrontFace, isHorizontalFacing,
     tileForBlockFace,
@@ -281,7 +283,6 @@ const worldSky = createWorldSkySystem({
     renderDistance: RENDER_DISTANCE,
     chunkSize: CHUNK_SIZE,
 });
-const UV_PAD = 0.0005;
 const openChests = new Set();
 
 function variantTile(tile, wx, y, wz) {
@@ -570,6 +571,17 @@ class World {
 
     getBlockFacing(x, y, z) {
         return this.blockFacings.get(x, y, z);
+    }
+
+    // Caixa fina de colisão das portas. Sem isso o jogador parava na borda do
+    // voxel e ficava um vão de ~0,44 bloco entre ele e o painel.
+    doorCollisionBox(x, y, z, type) {
+        const local = woodDoorCollision(woodDoorPart(type), this.getBlockFacing(x, y, z));
+        if (!local) return null;
+        return {
+            minX: x + local.minX, maxX: x + local.maxX,
+            minZ: z + local.minZ, maxZ: z + local.maxZ,
+        };
     }
 
     isSolidForPhysics(x, y, z) {
@@ -906,8 +918,8 @@ class World {
             grown.set(array);
             return grown;
         };
-        const uWidth = 1 / ATLAS_COLUMNS - 2 * UV_PAD;
         const torchFlameCenters = [];
+        const tileUV = { u0: 0, v0: 0, uWidth: 0, vHeight: 0 };
 
         for (let y = 0; y <= chunk.maxY; y++) {
             for (let lz = 0; lz < CS; lz++) {
@@ -948,7 +960,7 @@ class World {
                             faceTile = TILE.CHEST_FRONT_OPEN;
                         }
                         const tile = shape ? shape.tiles[f.kind] : variantTile(faceTile, wx, y, wz);
-                        const u0 = tile / ATLAS_COLUMNS + UV_PAD;
+                        atlasUVInto(tile, ATLAS_UV_PAD_PX, tileUV);
                         const ndx = vertexCount;
                         positions = growTypedArray(positions, (vertexCount + 4) * 3);
                         normals = growTypedArray(normals, (vertexCount + 4) * 3);
@@ -986,8 +998,8 @@ class World {
                             positions[p + 1] = py - f.dir[1] * layerInset;
                             positions[p + 2] = lz + (shape ? shape.min[2] + c.pos[2] * (shape.max[2] - shape.min[2]) + orientation[1] * wallOffset : c.pos[2]) - f.dir[2] * layerInset;
                             normals[p] = f.dir[0]; normals[p + 1] = f.dir[1]; normals[p + 2] = f.dir[2];
-                            uvs[uv] = u0 + c.uv[0] * uWidth;
-                            uvs[uv + 1] = UV_PAD + c.uv[1] * (1 - 2 * UV_PAD);
+                            uvs[uv] = tileUV.u0 + c.uv[0] * tileUV.uWidth;
+                            uvs[uv + 1] = tileUV.v0 + c.uv[1] * tileUV.vHeight;
                             const shade = ambientOcclusionAt(lx, y, lz, f, c, renderMode !== 'liquid');
                             colors[p] = shade[0]; colors[p + 1] = shade[1]; colors[p + 2] = shade[2];
                             torchInfluence[vertex] = shade[3];
@@ -1440,12 +1452,28 @@ function otherDoorHalf(x, y, z, type) {
     return { x, y: y + (part.half === 'bottom' ? 1 : -1), z, part };
 }
 
+// A porta fechada colide só com o painel; se o jogador estiver no vão, fechar
+// deixaria ele preso dentro da geometria.
+function doorWouldHitPlayer(x, y, z, type) {
+    const box = world.doorCollisionBox(x, y, z, type);
+    if (!box) return false;
+    const p = player.pos;
+    return p.x + PLAYER_RADIUS > box.minX && p.x - PLAYER_RADIUS < box.maxX
+        && p.z + PLAYER_RADIUS > box.minZ && p.z - PLAYER_RADIUS < box.maxZ
+        && p.y < y + 1 && p.y + player.height > y;
+}
+
 function toggleWoodDoor(hit) {
     const type = world.getBlock(hit.x, hit.y, hit.z);
     const part = woodDoorPart(type);
     if (!part) return false;
     const open = !part.open;
     const halves = [{ x: hit.x, y: hit.y, z: hit.z, part }, otherDoorHalf(hit.x, hit.y, hit.z, type)];
+    if (!open && halves.some(half => half && doorWouldHitPlayer(
+        half.x, half.y, half.z, ID.WOOD_DOOR_BOTTOM))) {
+        showToast('Saia do vão da porta para fechá-la');
+        return false;
+    }
     for (const half of halves) {
         if (!half) continue;
         const current = world.getBlock(half.x, half.y, half.z);
@@ -1485,15 +1513,14 @@ function waterImmersionAt(world, x, y, z, halfHeight) {
 
 function buildCubeGeo(tiles, size, facing = DEFAULT_BLOCK_FACING) {
     const positions = [], normals = [], uvs = [], indices = [];
-    const uWidth = 1 / ATLAS_COLUMNS - 2 * UV_PAD;
     for (const f of FACES) {
         const tile = tileForBlockFace(tiles, f.kind, f.dir, facing);
-        const u0 = tile / ATLAS_COLUMNS + UV_PAD;
+        const { u0, v0, uWidth, vHeight } = atlasUV(tile, ATLAS_UV_PAD_PX);
         const ndx = positions.length / 3;
         for (const c of f.corners) {
             positions.push((c.pos[0] - 0.5) * size, (c.pos[1] - 0.5) * size, (c.pos[2] - 0.5) * size);
             normals.push(f.dir[0], f.dir[1], f.dir[2]);
-            uvs.push(u0 + c.uv[0] * uWidth, UV_PAD + c.uv[1] * (1 - 2 * UV_PAD));
+            uvs.push(u0 + c.uv[0] * uWidth, v0 + c.uv[1] * vHeight);
         }
         indices.push(ndx, ndx + 1, ndx + 2, ndx + 2, ndx + 1, ndx + 3);
     }
@@ -2675,10 +2702,19 @@ function collides(x, y, z, height) {
     const x0 = Math.floor(x - PLAYER_RADIUS + e), x1 = Math.floor(x + PLAYER_RADIUS - e);
     const y0 = Math.floor(y + e),                 y1 = Math.floor(y + height - e);
     const z0 = Math.floor(z - PLAYER_RADIUS + e), z1 = Math.floor(z + PLAYER_RADIUS - e);
+    const pMinX = x - PLAYER_RADIUS, pMaxX = x + PLAYER_RADIUS;
+    const pMinZ = z - PLAYER_RADIUS, pMaxZ = z + PLAYER_RADIUS;
     for (let bx = x0; bx <= x1; bx++)
         for (let by = y0; by <= y1; by++)
-            for (let bz = z0; bz <= z1; bz++)
-                if (world.isSolidForPhysics(bx, by, bz)) return true;
+            for (let bz = z0; bz <= z1; bz++) {
+                if (!world.isSolidForPhysics(bx, by, bz)) continue;
+                const type = world.getBlock(bx, by, bz);
+                if (!woodDoorPart(type)) return true;
+                // Porta: colide só com o painel (fechada). Aberta é passável.
+                const box = world.doorCollisionBox(bx, by, bz, type);
+                if (!box) continue;
+                if (pMaxX > box.minX && pMinX < box.maxX && pMaxZ > box.minZ && pMinZ < box.maxZ) return true;
+            }
     return false;
 }
 
@@ -2686,16 +2722,23 @@ function moveAxis(axis, amount) {
     if (amount === 0) return false;
     const steps = Math.max(1, Math.ceil(Math.abs(amount) / 0.25));
     const step = amount / steps;
-    const lo = axis === 'y' ? 0 : PLAYER_RADIUS;
-    const hi = axis === 'y' ? player.height : PLAYER_RADIUS;
     const p = player.pos;
     for (let i = 0; i < steps; i++) {
-        p[axis] += step;
-        if (collides(p.x, p.y, p.z, player.height)) {
-            if (step > 0) p[axis] = Math.floor(p[axis] + hi) - hi - 0.001;
-            else          p[axis] = Math.floor(p[axis] - lo) + 1 + lo;
-            return true;
+        const from = p[axis];
+        p[axis] = from + step;
+        if (!collides(p.x, p.y, p.z, player.height)) continue;
+        // Encostou em algo: aproxima o máximo possível da superfície em vez de
+        // voltar para a borda do voxel. Blocos comuns param no mesmo ponto de
+        // antes; a porta fina deixa o jogador encostar no painel.
+        let free = from, blocked = p[axis];
+        for (let k = 0; k < 6; k++) {
+            const mid = (free + blocked) / 2;
+            p[axis] = mid;
+            if (collides(p.x, p.y, p.z, player.height)) blocked = mid;
+            else free = mid;
         }
+        p[axis] = free;
+        return true;
     }
     return false;
 }
