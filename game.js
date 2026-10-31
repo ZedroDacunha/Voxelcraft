@@ -11,6 +11,7 @@ import { Inventory } from './inventory-model.js';
 import { craftConsume, invCollectSame, invFillRecipe, invLeftClick, invQuickMove, invQuickMoveToCraft, invRightClick, invSwapHotbar, stackable } from './inventory-logic.js';
 import { stackHtml, updateSlotElement } from './inventory-view.js';
 import { createRecipeBook } from './inventory-recipe-book.js';
+import { craftGridTemplateColumns } from './inventory-layout.js';
 import { pauseMenuDisplay } from './game-pause-menu.js';
 import { createPointerLockRequester } from './game-pointer-lock.js';
 import { createInventoryAssets } from './inventory-assets.js';
@@ -2238,7 +2239,7 @@ function applyInventoryLayout() {
     document.getElementById('inv-title').textContent =
         isFurnace ? 'Forno' : isChest ? 'Baú' : station ? 'Bancada de criação (3×3)' : 'Inventário (criação 2×2)';
     document.getElementById('recipe-book-toggle').hidden = isFurnace || isChest;
-    document.getElementById('inv-craft').style.gridTemplateColumns = `repeat(${craftN}, 44px)`;
+    document.getElementById('inv-craft').style.gridTemplateColumns = craftGridTemplateColumns(craftN);
     craftSlotEls.forEach((el, i) => { el.style.display = i < craftN * craftN ? '' : 'none'; });
 }
 
