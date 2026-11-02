@@ -1783,9 +1783,9 @@ function breakBlock(x, y, z) {
     if (doorHalf && woodDoorPart(world.getBlock(doorHalf.x, doorHalf.y, doorHalf.z))) {
         world.setBlock(doorHalf.x, doorHalf.y, doorHalf.z, 0);
     }
-    const touchesWater = world.water.isAdjacent(world, x, y, z);
-    world.setBlock(x, y, z, touchesWater ? ID.WATER : 0);
-    if (touchesWater) world.water.activate(world, x, y, z);
+    // A célula fica vazia; a água em volta escorre para dentro como fluxo
+    // (nunca como fonte). Ver `world-water.js` › `onBlockBroken()`.
+    world.water.onBlockBroken(world, x, y, z);
     breakParticles.spawn(x, y, z, type);
     if (harvest && drop && Math.random() < dropChance) {
         spawnItemEntity(
