@@ -1,5 +1,5 @@
 import { storeRequest } from './world-storage.js';
-import { createWorldRecord, deleteWorldRecord, getWorlds, renameWorldRecord } from './world-list-store.js';
+import { createWorldRecord, deleteWorldRecord, getWorlds, markWorldSaved, renameWorldRecord } from './world-list-store.js';
 import { createWorldSaveOptions } from './world-save-options.js';
 import { createWorldListView, formatWorldActivity } from './world-list-view.js';
 import { createOptionsView } from './world-options-view.js';
@@ -68,6 +68,7 @@ const worldSaveOptions = createWorldSaveOptions({
         openWorldDialog(world);
     },
     onDeleteWorld: world => deleteWorld(world),
+    onWorldSaved: (worldId, savedAt) => markWorldSaved(worldId, savedAt),
 });
 
 function renderWorldOptions(world) {

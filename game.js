@@ -20,6 +20,7 @@ import { createTextureTools } from './world-textures.js';
 import { createWorldSaveCodec, WORLD_SAVE_VERSION } from './world-save-codec.js';
 import { createWorldSaveLoader } from './world-save-loader.js';
 import { createWorldSaveManager } from './world-save-manager.js';
+import { markWorldSaved } from './world-list-store.js';
 import { createWorldSaveIndicator } from './world-save-indicator.js';
 import { createWorldClock } from './world-clock.js';
 import { createWorldClouds, WORLD_CLOUD_CONFIG } from './world-clouds.js';
@@ -3082,6 +3083,10 @@ const saveManager = createWorldSaveManager({
     onToast: showToast,
     onSaveState: setSaveIndicator,
     onBuildDuration: duration => { perf.buildMs = duration; },
+    // Mantém a data do último save nos metadados do mundo: a lista do menu passa
+    // a mostrá-la sem abrir o save inteiro.
+    onSaved: data => markWorldSaved(ACTIVE_WORLD.id, data?.time)
+        .catch(error => console.warn('Falha ao atualizar a data do save nos metadados:', error)),
     onError: error => console.warn('Falha ao salvar:', error),
 });
 

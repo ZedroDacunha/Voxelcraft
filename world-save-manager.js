@@ -20,6 +20,7 @@ export function createWorldSaveManager({
     onToast = () => {},
     onSaveState = () => {},
     onBuildDuration = () => {},
+    onSaved = () => {},
     onError = error => console.warn('Falha no salvamento do mundo:', error),
 }) {
     const backupKey = saveBackupKeyFor(saveKey);
@@ -57,6 +58,17 @@ export function createWorldSaveManager({
             return 'O navegador bloqueou o armazenamento local do jogo';
         }
         return 'Falha ao salvar; o jogo tentará novamente';
+    }
+
+    // Avisa quem cuida dos metadados do mundo (data do último save) que o save
+    // foi gravado. Falha aqui não pode derrubar o salvamento em si.
+    function notifySaved(data) {
+        try {
+            const pending = onSaved(data);
+            if (pending && typeof pending.catch === 'function') pending.catch(onError);
+        } catch (error) {
+            onError(error);
+        }
     }
 
     function clearSaveTimer() {
@@ -144,6 +156,7 @@ export function createWorldSaveManager({
                         if (restored) {
                             primarySaveKnownGood = true;
                             saveWriteBlocked = false;
+                            notifySaved(raw);
                             onToast(`Progresso recuperado de ${label}`);
                             console.info(`Save principal restaurado de ${label}:`, key);
                         } else {
@@ -217,6 +230,7 @@ export function createWorldSaveManager({
             if (!wrote) saveWriteBlocked = true;
             else {
                 primarySaveKnownGood = true;
+                notifySaved(data);
                 const recovered = saveFailureActive;
                 saveFailureActive = false;
                 clearSaveRetry(true);
