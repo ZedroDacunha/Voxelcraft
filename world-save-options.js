@@ -17,6 +17,7 @@ export function createWorldSaveOptions({
     onRefreshWorlds,
     onRenameWorld,
     onDeleteWorld,
+    onWorldSaved = () => {},
 }) {
     const saveCodec = createWorldSaveCodec();
 
@@ -103,7 +104,10 @@ export function createWorldSaveOptions({
         );
         if (!confirmed) return;
         try {
-            await restoreSaveCopy(storeRequest, world, kind, saveCodec, LOCK_TTL);
+            const restoredSave = await restoreSaveCopy(storeRequest, world, kind, saveCodec, LOCK_TTL);
+            // O save principal mudou: a data do último save nos metadados precisa
+            // acompanhar, senão a lista mostraria a data antiga.
+            await onWorldSaved(world.id, restoredSave?.time);
             worldOptionsDialog.close();
             await onRefreshWorlds();
             onNotice(`Cópia restaurada em “${world.name}”.`);

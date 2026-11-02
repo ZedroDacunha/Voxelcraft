@@ -22,7 +22,7 @@ O que mais falta não é “mais bloco” ou “mais bioma”: é **robustez de 
 | Média | HUD/inventário não são responsivos | Hotbar cortada e menu escalado em celular | `styles.css:88-112`, `inventory.css:3` |
 | Média | Quebrar bloco ao lado de água cria nova fonte permanente | Água infinita / duplicação de nascente | `game.js:1778-1780` — **corrigido em 02/11** ([BUG-20261102](BUG-20261102-agua-fonte-infinita.md)) |
 | Média | Porta aberta não tem colisão | Jogador atravessa o painel aberto | `world-door.js:34-37`, `world-catalog.js:60-69` |
-| Média | Lista de mundos lê o save completo de todos os mundos | Custo de memória/tempo cresce com o total de saves | `world-list-store.js:48-57` |
+| Média | Lista de mundos lê o save completo de todos os mundos | Custo de memória/tempo cresce com o total de saves | `world-list-store.js` — **corrigido em 02/11** ([MELHORIA-20261102](MELHORIA-20261102-lista-de-mundos.md)) |
 | Média | Malha, nuvens, água e fornos ainda têm trabalho síncrono evitável | Picos de CPU em mundo maior | `game.js:790`, `world-clouds.js:90-102`, `world-water.js:63-126` |
 | Baixa | Acessibilidade do inventário/HUD, áudio, toque, PWA e conteúdo | Polimento e alcance | Acessibilidade **corrigida em 02/11** ([MELHORIA-20261102](MELHORIA-20261102-acessibilidade.md)); áudio/toque/PWA/conteúdo seguem abertos |
 
@@ -260,7 +260,8 @@ O painel aberto ainda é desenhado fino na borda do voxel, mas o jogador pode at
 
 ### 8. A lista de mundos lê saves completos só para mostrar data/status
 
-**Prioridade:** média.
+**Prioridade:** média. **Status:** ~~aberto~~ corrigido em 02/11
+([MELHORIA-20261102](MELHORIA-20261102-lista-de-mundos.md)).
 
 `getWorlds()` faz `store.get(world.saveKey)` para cada mundo e usa apenas `save.time`. Isso traz o blob inteiro do save para a memória, mesmo quando a tela só precisa de metadados.
 
@@ -273,6 +274,18 @@ O painel aberto ainda é desenhado fino na borda do voxel, mas o jogador pode at
 - Atualizar metadados no mesmo fluxo de save.
 
 **Teste de aceitação:** abrir a lista com N mundos grandes deve ter custo proporcional aos metadados, não ao tamanho total dos saves.
+
+**Correção aplicada (02/11):**
+
+- A data do último save passou a morar no metadado do mundo (`lastSavedAt`), gravada
+  por `markWorldSaved()` no mesmo fluxo do save: salvamento normal, recuperação no
+  carregamento e restauração de cópia pelo menu.
+- Existência de save/backup/rejeitado/importado é checada com `getKey()`, que
+  devolve só a chave (antes, "o save existe?" também abria o blob inteiro).
+- Metadados antigos sem data: o save é lido uma única vez e a data volta para o meta.
+- Resultado para N mundos: **0 leituras de save** por abertura do menu (era N), 4N
+  checagens de chave. Coberto por `tests/world-list-metadata.test.mjs` com 20 mundos
+  "grandes".
 
 ---
 

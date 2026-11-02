@@ -90,6 +90,7 @@ export async function restoreSaveCopy(storeRequest, world, kind, codec, lockTtl 
     let worldIsOpen = false;
     let sourceIsInvalid = false;
     let restored = false;
+    let restoredSave = null;
     await storeRequest('readwrite', store => {
         const lockRequest = store.get(`${world.saveKey}-writer-lock`);
         const currentRequest = store.get(world.saveKey);
@@ -120,6 +121,7 @@ export async function restoreSaveCopy(storeRequest, world, kind, codec, lockTtl 
             store.put(source, world.saveKey);
             if (kind === 'imported') store.delete(sourceKey);
             restored = true;
+            restoredSave = source;
         };
 
         for (const request of requests) request.onsuccess = prepareRestore;
@@ -128,6 +130,7 @@ export async function restoreSaveCopy(storeRequest, world, kind, codec, lockTtl 
 
     if (worldIsOpen) throw new Error('Feche este mundo em outra aba antes de restaurar uma cópia.');
     if (sourceIsInvalid || !restored) throw new Error('Esta cópia não é válida para o mundo selecionado.');
+    return restoredSave;
 }
 
 // Guarda o primeiro save rejeitado sem substituir o último backup válido.

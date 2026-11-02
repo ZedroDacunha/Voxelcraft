@@ -5,12 +5,28 @@ import {
 
 export const META_PREFIX = 'world-meta:';
 
-export async function migrateLegacyWorlds() {
-    const keys = await storeRequest('readonly', store => store.getAllKeys());
+/**
+ * Grava a data do último save nos metadados do mundo.
+ *
+ * A lista de mundos só precisa de data e status; com a data no meta, abrir o
+ * menu não abre mais o blob inteiro de cada save. Retorna `true` quando o meta
+ * mudou de fato.
+ */
+export async function markWorldSaved(worldId, savedAt, db = storeRequest) {
+    if (typeof worldId !== 'string' || !worldId || !Number.isFinite(savedAt)) return false;
+    const metaKey = META_PREFIX + worldId;
+    const world = await db('readonly', store => store.get(metaKey));
+    if (!world || world.lastSavedAt === savedAt) return false;
+    await db('readwrite', store => store.put({ ...world, lastSavedAt: savedAt }, metaKey));
+    return true;
+}
+
+export async function migrateLegacyWorlds(db = storeRequest) {
+    const keys = await db('readonly', store => store.getAllKeys());
     const legacyKeys = keys.filter(key => typeof key === 'string' && /^world--?\d+$/.test(key));
     if (!legacyKeys.length) return;
 
-    const legacyRequests = await storeRequest('readonly', store => legacyKeys.map(key => store.get(key)));
+    const legacyRequests = await db('readonly', store => legacyKeys.map(key => store.get(key)));
     const candidates = legacyKeys.flatMap((key, index) => {
         const save = legacyRequests[index].result;
         if (!save || !Number.isFinite(save.seed) || key !== `world-${save.seed}`) return [];
@@ -19,11 +35,11 @@ export async function migrateLegacyWorlds() {
     });
     if (!candidates.length) return;
 
-    const existingRequests = await storeRequest('readonly', store => candidates.map(({ metaKey }) => store.get(metaKey)));
+    const existingRequests = await db('readonly', store => candidates.map(({ metaKey }) => store.get(metaKey)));
     const missing = candidates.filter((candidate, index) => existingRequests[index].result === undefined);
     if (!missing.length) return;
 
-    await storeRequest('readwrite', store => {
+    await db('readwrite', store => {
         for (const { key, save, id, metaKey } of missing) {
             store.put({
                 id,
@@ -31,42 +47,79 @@ export async function migrateLegacyWorlds() {
                 seed: save.seed,
                 saveKey: key,
                 createdAt: Number.isFinite(save.time) ? save.time : Date.now(),
+                ...(Number.isFinite(save.time) ? { lastSavedAt: save.time } : {}),
                 legacy: true,
             }, metaKey);
         }
+        return null;
     });
 }
 
-export async function getWorlds() {
-    await migrateLegacyWorlds();
-    const keys = await storeRequest('readonly', store => store.getAllKeys());
+/**
+ * Mundos com data e status, do mais recente para o mais antigo.
+ *
+ * O custo é proporcional ao número de mundos, não ao tamanho dos saves: a data
+ * vem dos metadados e a existência das cópias é checada com `getKey`, que não
+ * traz o conteúdo. Metadados criados antes desta versão não têm `lastSavedAt`;
+ * nesse caso o save é lido uma única vez e a data é gravada no meta.
+ */
+export async function getWorlds(db = storeRequest) {
+    await migrateLegacyWorlds(db);
+    const keys = await db('readonly', store => store.getAllKeys());
     const metaKeys = keys.filter(key => typeof key === 'string' && key.startsWith(META_PREFIX));
-    const metaRequests = await storeRequest('readonly', store => metaKeys.map(key => store.get(key)));
+    const metaRequests = await db('readonly', store => metaKeys.map(key => store.get(key)));
     const worlds = metaRequests
         .map(request => request.result)
         .filter(world => world && typeof world.id === 'string' && Number.isFinite(world.seed) && typeof world.saveKey === 'string');
-    const saveRequests = await storeRequest('readonly', store => worlds.map(world => ({
-        save: store.get(world.saveKey),
+
+    const presenceRequests = await db('readonly', store => worlds.map(world => ({
+        save: store.getKey(world.saveKey),
         backup: store.getKey(saveBackupKeyFor(world.saveKey)),
         rejected: store.getKey(rejectedSaveKeyFor(world.saveKey)),
         imported: store.getKey(importedSaveKeyFor(world.saveKey)),
     })));
 
     const enrichedWorlds = worlds.map((world, index) => {
-        const records = saveRequests[index];
-        const save = records.save.result;
-        const lastSavedAt = Number.isFinite(save?.time) ? save.time : null;
+        const presence = presenceRequests[index];
         return {
             ...world,
-            lastSavedAt,
-            sortTimestamp: lastSavedAt ?? (Number.isFinite(world.createdAt) ? world.createdAt : 0),
-            hasSave: save !== undefined,
-            hasBackup: records.backup.result !== undefined,
-            hasRejectedSave: records.rejected.result !== undefined,
-            hasImportedSave: records.imported.result !== undefined,
+            hasSave: presence.save.result !== undefined,
+            hasBackup: presence.backup.result !== undefined,
+            hasRejectedSave: presence.rejected.result !== undefined,
+            hasImportedSave: presence.imported.result !== undefined,
         };
     });
-    return enrichedWorlds.sort((a, b) => b.sortTimestamp - a.sortTimestamp);
+
+    const withoutDate = [];
+    enrichedWorlds.forEach((world, index) => {
+        if (!Number.isFinite(world.lastSavedAt) && world.hasSave) withoutDate.push(index);
+    });
+    if (withoutDate.length) {
+        const saveRequests = await db('readonly', store => withoutDate.map(index => store.get(worlds[index].saveKey)));
+        const backfill = [];
+        withoutDate.forEach((index, position) => {
+            const savedAt = saveRequests[position].result?.time;
+            if (!Number.isFinite(savedAt)) return;
+            worlds[index].lastSavedAt = savedAt;
+            enrichedWorlds[index].lastSavedAt = savedAt;
+            backfill.push(index);
+        });
+        if (backfill.length) {
+            await db('readwrite', store => {
+                for (const index of backfill) store.put({ ...worlds[index] }, META_PREFIX + worlds[index].id);
+                return null;
+            });
+        }
+    }
+
+    return enrichedWorlds
+        .map(world => ({
+            ...world,
+            lastSavedAt: Number.isFinite(world.lastSavedAt) ? world.lastSavedAt : null,
+            sortTimestamp: Number.isFinite(world.lastSavedAt) ? world.lastSavedAt
+                : Number.isFinite(world.createdAt) ? world.createdAt : 0,
+        }))
+        .sort((a, b) => b.sortTimestamp - a.sortTimestamp);
 }
 
 export async function createWorldRecord(world) {
