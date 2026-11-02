@@ -12,6 +12,7 @@ import { craftConsume, invCollectSame, invFillRecipe, invLeftClick, invQuickMove
 import { stackHtml, updateSlotElement } from './inventory-view.js';
 import { createRecipeBook } from './inventory-recipe-book.js';
 import { craftGridTemplateColumns } from './inventory-layout.js';
+import { keyToSlotAction, nextSlotIndex, slotLabel, statusLabels } from './inventory-a11y.js';
 import { pauseMenuDisplay } from './game-pause-menu.js';
 import { createPointerLockRequester } from './game-pointer-lock.js';
 import { createInventoryAssets } from './inventory-assets.js';
@@ -2133,6 +2134,12 @@ function buildInventoryUI() {
         el.className = 'islot';
         el.dataset.inv = name;
         el.dataset.index = i;
+        // Acessibilidade: cada slot é uma célula de grade com nome em texto e
+        // alcançável pelo teclado (um slot por grade fica no Tab, os demais são
+        // alcançados com as setas).
+        el.setAttribute('role', 'gridcell');
+        el.setAttribute('aria-label', 'Vazio');
+        el.tabIndex = -1;
         parent.appendChild(el);
         return el;
     };
@@ -2154,9 +2161,77 @@ function buildInventoryUI() {
     });
     document.getElementById('recipe-book-close').addEventListener('click', () => setRecipeBookOpen(false));
 
+    const markGrid = (el, columns, label) => {
+        if (!el) return;
+        el.setAttribute('role', 'grid');
+        el.setAttribute('aria-label', label);
+        el.dataset.columns = String(columns);
+    };
+    markGrid(main, 9, 'Inventário');
+    markGrid(bar, 9, 'Barra rápida');
+    markGrid(craft, 2, 'Grade de criação');
+    markGrid(out, 1, 'Resultado da criação');
+    markGrid(chestEl, 9, 'Baú');
+    markGrid(document.getElementById('fur-in'), 1, 'Forno: entrada');
+    markGrid(document.getElementById('fur-fuel'), 1, 'Forno: combustível');
+    markGrid(document.getElementById('fur-out'), 1, 'Forno: resultado');
+    // HUD: a hotbar continua sem foco (o mouse está travado no jogo), mas cada
+    // casinha ganha nome para leitores de tela.
+    for (let i = 0; i < 9; i++) document.getElementById(`slot-${i}`)?.setAttribute('role', 'img');
+    resetRovingTabIndex();
+
     const overlay = document.getElementById('inventory');
     overlay.addEventListener('mousedown', onInventoryMouseDown);
     overlay.addEventListener('mousemove', onInventoryMouseMove);
+    overlay.addEventListener('keydown', onInventoryKeyDown);
+}
+
+/** Um único slot de cada grade fica no Tab; os outros são alcançados com setas. */
+function resetRovingTabIndex() {
+    for (const gridEl of document.querySelectorAll('#inventory [role="grid"]')) {
+        focusableSlots(gridEl).forEach((slot, i) => { slot.tabIndex = i === 0 ? 0 : -1; });
+    }
+}
+
+function focusableSlots(gridEl) {
+    return [...gridEl.querySelectorAll('.islot')].filter(slot => slot.style.display !== 'none');
+}
+
+function focusSlot(el) {
+    const gridEl = el.closest('[role="grid"]');
+    if (gridEl) for (const slot of gridEl.querySelectorAll('.islot')) slot.tabIndex = -1;
+    el.tabIndex = 0;
+    el.focus();
+}
+
+function onInventoryKeyDown(event) {
+    if (event.target.closest?.('button, input, textarea, select')) return;
+    const el = event.target.closest?.('.islot');
+    if (!el) return;
+    const gridEl = el.closest('[role="grid"]');
+    const slots = gridEl ? focusableSlots(gridEl) : [el];
+    const target = nextSlotIndex({
+        index: slots.indexOf(el),
+        total: slots.length,
+        columns: Number(gridEl?.dataset.columns) || 1,
+        key: event.key,
+    });
+    if (target !== null) {
+        event.preventDefault();
+        focusSlot(slots[target]);
+        return;
+    }
+    const action = keyToSlotAction(event.key, { shiftKey: event.shiftKey });
+    if (!action) return;
+    event.preventDefault();
+    // Feedback visual para quem usa teclado: a pilha segurada e a dica do item
+    // aparecem ao lado do slot focado, como se o mouse estivesse em cima dele.
+    const rect = el.getBoundingClientRect();
+    invMouse.x = rect.left + rect.width / 2;
+    invMouse.y = rect.top + rect.height / 2;
+    invMouse.seen = true;
+    activateSlot(el, action);
+    focusSlot(el);
 }
 
 function buildRecipeList() {
@@ -2241,25 +2316,35 @@ function applyInventoryLayout() {
     document.getElementById('recipe-book-toggle').hidden = isFurnace || isChest;
     document.getElementById('inv-craft').style.gridTemplateColumns = craftGridTemplateColumns(craftN);
     craftSlotEls.forEach((el, i) => { el.style.display = i < craftN * craftN ? '' : 'none'; });
+    document.getElementById('inv-craft').dataset.columns = String(craftN);
+    resetRovingTabIndex();
+}
+
+// Conteúdo visual + nome acessível do slot (o rótulo só é regravado quando
+// muda, para não acordar leitores de tela à toa).
+function refreshSlot(el, stack) {
+    updateSlotElement(el, stack);
+    const label = slotLabel(stack);
+    if (el.getAttribute('aria-label') !== label) el.setAttribute('aria-label', label);
 }
 
 function renderInventory() {
     for (let i = 0; i < 36; i++) {
         const el = invSlotEls[i];
-        updateSlotElement(el, inventory.slots[i]);
+        refreshSlot(el, inventory.slots[i]);
         el.classList.toggle('sel', i === selectedSlot);
     }
     if (station && station.type === 'chest') {
-        for (let i = 0; i < 27; i++) updateSlotElement(chestSlotEls[i], station.chest.inv.slots[i]);
+        for (let i = 0; i < 27; i++) refreshSlot(chestSlotEls[i], station.chest.inv.slots[i]);
         craftResult = null;
     } else if (station && station.type === 'furnace') {
-        for (let i = 0; i < 3; i++) updateSlotElement(furnaceSlotEls[i], station.furnace.inv.slots[i]);
+        for (let i = 0; i < 3; i++) refreshSlot(furnaceSlotEls[i], station.furnace.inv.slots[i]);
         craftResult = null;
         updateFurnaceBars();
     } else {
-        for (let i = 0; i < craftN * craftN; i++) updateSlotElement(craftSlotEls[i], craftInv.slots[i]);
+        for (let i = 0; i < craftN * craftN; i++) refreshSlot(craftSlotEls[i], craftInv.slots[i]);
         craftResult = matchRecipe(craftInv, craftN);
-        updateSlotElement(outSlotEl, craftResult);
+        refreshSlot(outSlotEl, craftResult);
     }
     updateInventoryFloaters();
     updateHotbarUI();
@@ -2291,25 +2376,32 @@ function onInventoryMouseDown(e) {
         return;
     }
 
+    activateSlot(el, { button: e.button, shiftKey: e.shiftKey });
+}
+
+// Uma ativação de slot — vem do mouse ou da tecla Enter/Espaço (ver
+// `onInventoryKeyDown`). Recebe só `button`/`shiftKey` para não depender de um
+// evento de ponteiro.
+function activateSlot(el, { button = 0, shiftKey = false } = {}) {
     const name = el.dataset.inv, i = Number(el.dataset.index);
     invHover = { inv: name, i };
 
     if (name === 'out') {
-        if (e.button === 0 || e.button === 2) handleOutputClick(e);
+        if (button === 0 || button === 2) handleOutputClick({ button, shiftKey });
         renderInventory();
         return;
     }
     if (name === 'furnace') {
-        if (station && station.furnace) furnaceClick(e, i);
+        if (station && station.furnace) furnaceClick({ button, shiftKey }, i);
         renderInventory();
         return;
     }
 
     const target = name === 'craft' ? craftInv : name === 'chest' ? station.chest.inv : inventory;
     const key = name + i;
-    if (e.button === 0) {
+    if (button === 0) {
         const now = performance.now();
-        if (e.shiftKey && !cursorHeld.stack) {
+        if (shiftKey && !cursorHeld.stack) {
             if (name === 'main' && station && station.type === 'furnace') quickToFurnace(i);
             else if (name === 'main' && station && station.type === 'chest') invQuickMove(inventory, i, station.chest.inv, 0, 27);
             else if (name === 'main') invQuickMoveToCraft(inventory, craftInv, i, craftN);
@@ -2319,13 +2411,13 @@ function onInventoryMouseDown(e) {
         else if (cursorHeld.stack && invLastClick.key === key && now - invLastClick.time < 350) invCollectSame(target, cursorHeld);
         else invLeftClick(target, i, cursorHeld);
         invLastClick = { time: now, key };
-    } else if (e.button === 2) {
+    } else if (button === 2) {
         invRightClick(target, i, cursorHeld);
     }
     renderInventory();
 }
 
-function openInventory(st = null) {
+function openInventory(st = null, { focusFirst = false } = {}) {
     if (!controls.isLocked || inventoryOpen) return;
     setRecipeBookOpen(false);
     station = st;
@@ -2337,6 +2429,12 @@ function openInventory(st = null) {
     applyInventoryLayout();
     document.getElementById('inventory').style.display = 'flex';
     renderInventory();
+    // Aberto pelo teclado: o foco entra direto no primeiro slot do inventário,
+    // em vez de começar fora da grade.
+    if (focusFirst) {
+        const first = document.querySelector('#inv-main .islot');
+        if (first) focusSlot(first);
+    }
     inventoryUnlockPending = true;
     controls.unlock();
     setTimeout(() => { inventoryUnlockPending = false; }, 300);
@@ -2515,6 +2613,9 @@ function updateBreathUI() {
         breathBar.style.display = visible ? 'flex' : 'none';
         uiShown.breathVisible = visible;
     }
+    setAriaLabel(breathBar, statusLabels({
+        health, hunger, breath, maxHealth: MAX_HEALTH, maxHunger: MAX_HUNGER, maxBreath: MAX_BREATH,
+    }).breath);
     if (!visible || uiShown.b === breath) return;
     ensureSurvivalIcons(breathBar, survivalIcons.bubbles, 'bubble');
     for (let i = 0; i < 10; i++) {
@@ -2539,7 +2640,18 @@ function updateSurvivalUI() {
         updateSurvivalIcons(survivalIcons.food, 'food', hunger);
         uiShown.f = hunger;
     }
+    const labels = statusLabels({
+        health, hunger, breath, maxHealth: MAX_HEALTH, maxHunger: MAX_HUNGER, maxBreath: MAX_BREATH,
+    });
+    setAriaLabel(healthBar, labels.health);
+    setAriaLabel(hungerBar, labels.hunger);
     syncHungerWarning();
+}
+
+// As barras são só ícones na tela; o rótulo em texto é o que chega ao leitor de
+// tela (e serve de legenda para quem usa zoom alto).
+function setAriaLabel(el, label) {
+    if (el && el.getAttribute('aria-label') !== label) el.setAttribute('aria-label', label);
 }
 
 // A barra de fome pulsa (e fica vermelha quando zera) e um aviso aparece na
@@ -2563,6 +2675,7 @@ function updateHotbarUI() {
         slot.classList.toggle('active', i === selectedSlot);
         const html = `<span class="slot-number">${i + 1}</span>` + stackHtml(inventory.slots[i]);
         if (html !== hotbarHtml[i]) { slot.innerHTML = html; hotbarHtml[i] = html; }
+        setAriaLabel(slot, `${i + 1}: ${slotLabel(inventory.slots[i])}${i === selectedSlot ? ' (selecionado)' : ''}`);
     }
 }
 
@@ -2624,10 +2737,16 @@ function die(source = 'generic') {
     waitForWorldRegion(spawnPoint.x, spawnPoint.z, { driveUpdates: false })
         .then(() => new Promise(resolve => setTimeout(resolve, 1200)))
         .then(() => {
-            if (dead) { btn.disabled = false; btn.textContent = 'Renascer'; }
+            if (dead) {
+                btn.disabled = false; btn.textContent = 'Renascer';
+                // Só leva o foco para o botão se o jogador ainda estiver na tela
+                // de morte (não rouba o foco de quem já navegou para outro lugar).
+                if (deathEl.contains(document.activeElement) || document.activeElement === document.body) btn.focus();
+            }
         })
         .catch(error => console.error('Falha ao preparar o respawn:', error));
     deathEl.style.display = 'flex';
+    deathEl.focus();
     syncPauseMenu();
     controls.unlock();
     saveGame(true, true);
@@ -3249,7 +3368,7 @@ async function init() {
             case 'KeyD': moveRight = true; break;
             case 'Space': jumpHeld = true; break;
             case 'KeyQ': dropSelectedItem(); break;
-            case 'KeyE': if (!event.repeat) openInventory(); break;
+            case 'KeyE': if (!event.repeat) openInventory(null, { focusFirst: true }); break;
             case 'ShiftLeft': case 'ShiftRight': isSprinting = true; break;
             case 'KeyC': wantToCrouch = true; break;
             case 'F4': event.preventDefault(); cycleQuality(); break;

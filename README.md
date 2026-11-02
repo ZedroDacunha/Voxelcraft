@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 115 testes de módulos puros (node --test)
+npm test           # 142 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -65,6 +65,21 @@ recuperação e importação/exportação de save.
 | `?pr=1` | limita o `devicePixelRatio` usado no render |
 | `?reset` | apaga o save do mundo atual **uma vez** (o parâmetro é consumido e removido da URL) |
 
+## Acessibilidade
+
+A interface é operável sem mouse:
+
+- **Inventário**: `Tab` entra na grade, setas/`Home`/`End` navegam, `Enter` =
+  clique esquerdo, `Espaço` = clique direito, `Shift` + esses dois = movimento
+  rápido. Cada slot tem `aria-label` com item, quantidade e durabilidade.
+- **Barras de status**: vida, fome e fôlego expõem o valor em texto
+  (`"Fome: 6 de 20 (fome baixa)"`) e os avisos do jogo são anunciados.
+- **Tela de morte**: aparece com foco e leva o foco ao botão `Renascer` quando
+  ele fica disponível.
+- `prefers-reduced-motion` desliga as animações de HUD.
+
+Detalhes em [`MELHORIA-20261102-acessibilidade.md`](MELHORIA-20261102-acessibilidade.md).
+
 ## Import map e cache
 
 O `index.html` aponta cada módulo com um sufixo `?v=<sha256>`, gerado por
@@ -87,4 +102,6 @@ Se esquecer, o teste `cache-versioning` e o `npm run check` reprovam.
   é o que permite testar com `node --test`.
 - Bug corrigido ganha um `BUG-AAAAMMDD-*.md` com sintoma, causa, correção e
   validação.
-- Análises e revisões ficam em `ANALISE-*.md` e `REVISAO-*.md`.
+- Análises e revisões ficam em `ANALISE-*.md` e `REVISAO-*.md`; melhoria de
+  interface/polimento ganha um `MELHORIA-AAAAMMDD-*.md` com antes, depois,
+  validação e limitações.

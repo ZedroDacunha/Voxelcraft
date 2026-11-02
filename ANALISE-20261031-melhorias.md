@@ -24,7 +24,7 @@ O que mais falta não é “mais bloco” ou “mais bioma”: é **robustez de 
 | Média | Porta aberta não tem colisão | Jogador atravessa o painel aberto | `world-door.js:34-37`, `world-catalog.js:60-69` |
 | Média | Lista de mundos lê o save completo de todos os mundos | Custo de memória/tempo cresce com o total de saves | `world-list-store.js:48-57` |
 | Média | Malha, nuvens, água e fornos ainda têm trabalho síncrono evitável | Picos de CPU em mundo maior | `game.js:790`, `world-clouds.js:90-102`, `world-water.js:63-126` |
-| Baixa | Acessibilidade do inventário/HUD, áudio, toque, PWA e conteúdo | Polimento e alcance | Vários |
+| Baixa | Acessibilidade do inventário/HUD, áudio, toque, PWA e conteúdo | Polimento e alcance | Acessibilidade **corrigida em 02/11** ([MELHORIA-20261102](MELHORIA-20261102-acessibilidade.md)); áudio/toque/PWA/conteúdo seguem abertos |
 
 ---
 
@@ -331,7 +331,8 @@ O que ainda pesa:
 
 ### 11. Acessibilidade da interface de jogo
 
-**Prioridade:** média.
+**Prioridade:** média. **Status:** ~~aberto~~ corrigido em 02/11
+([MELHORIA-20261102](MELHORIA-20261102-acessibilidade.md)).
 
 O menu inicial é razoavelmente semântico, mas o inventário e a HUD não são.
 
@@ -356,6 +357,20 @@ Os slots são `div` com `mousedown`; não são focáveis nem operáveis por tecl
 - Expor vida/fome/fôlego como valores acessíveis, não só ícones.
 - Garantir foco visível e ordem de foco previsível.
 - Respeitar `prefers-reduced-motion` também em animações de jogo quando aplicável.
+
+**Correção aplicada (02/11):**
+
+- `inventory-a11y.js` (novo, puro): `slotLabel`, `nextSlotIndex`,
+  `keyToSlotAction` e `statusLabels` — testados em `tests/inventory-a11y.test.mjs`.
+- Slots viraram `role="gridcell"` com nome em texto; grades viraram `role="grid"`
+  com rótulo e `data-columns`; roving tabindex (1 slot por grade no `Tab`).
+- Teclado: setas/`Home`/`End` navegam, `Enter`/`Espaço` clicam (esquerdo/direito)
+  e com `Shift` fazem movimento rápido, tudo pelo mesmo `activateSlot()` do mouse.
+- Vida/fome/fôlego têm `aria-label` com valor e faixa; `#toast` é região viva;
+  hotbar tem rótulo por casinha.
+- `#death` é `alertdialog`, recebe foco e passa o foco ao botão `Renascer`.
+- `prefers-reduced-motion` também desliga o pulinho do slot ativo da hotbar.
+- Resultado: 76 → 6 paradas de `Tab` no inventário, 76 slots nomeados.
 
 ---
 

@@ -56,6 +56,8 @@
     .islot { width: var(--inv-slot-size); height: var(--inv-slot-size); box-sizing: border-box; background: rgba(255,255,255,0.12); border: 2px solid #555; border-radius: 3px; position: relative; display: flex; align-items: center; justify-content: center; }
     .islot:hover { background: rgba(255,255,255,0.3); border-color: #bbb; }
     .islot.sel { border-color: #fff; }
+    /* Foco de teclado visível (a grade é operável com setas + Enter/Espaço). */
+    .islot:focus-visible { outline: 2px solid #f3d58a; outline-offset: -2px; background: rgba(255,255,255,0.28); }
     .islot.out { width: calc(var(--inv-slot-size) * 1.18); height: calc(var(--inv-slot-size) * 1.18); border-color: #997733; }
     .islot .slot-icon { width: calc(var(--inv-slot-size) * 0.68); height: calc(var(--inv-slot-size) * 0.68); }
     .islot .slot-count { font-size: clamp(8px, calc(var(--inv-slot-size) * 0.27), 12px); }

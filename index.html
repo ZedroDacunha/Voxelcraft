@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Voxel Sandbox - Parte 11: Água, Praias e Natação</title>
-<link rel="stylesheet" href="styles.css?v=73ae6c41d6">
-<link rel="stylesheet" href="inventory.css?v=c364e431e1">
+<link rel="stylesheet" href="styles.css?v=521f1afcbb">
+<link rel="stylesheet" href="inventory.css?v=3c73d92add">
 <!-- importmap:start (gerado por tools/stamp-importmap.mjs; não editar à mão) -->
 <script type="importmap">
 {
@@ -14,7 +14,8 @@
     "three/addons/": "./vendor/three/addons/",
     "./game-pause-menu.js": "./game-pause-menu.js?v=ccdc70fb50",
     "./game-pointer-lock.js": "./game-pointer-lock.js?v=cf53899b88",
-    "./game.js": "./game.js?v=17065e9c83",
+    "./game.js": "./game.js?v=d6013c8878",
+    "./inventory-a11y.js": "./inventory-a11y.js?v=25f3dab87d",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
     "./inventory-layout.js": "./inventory-layout.js?v=439823a409",
     "./inventory-logic.js": "./inventory-logic.js?v=20ec1c5545",
@@ -201,14 +202,14 @@
     </svg>
     <span id="save-indicator-text" class="visually-hidden"></span>
 </div>
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite"></div>
 <div id="hurt"></div>
-<div id="death">
+<div id="death" role="alertdialog" aria-labelledby="death-cause" aria-describedby="death-info" tabindex="-1">
     <h1 id="death-cause">Você morreu</h1>
     <p id="death-info"></p>
     <button class="btn" id="btn-respawn">Renascer</button>
 </div>
-<div id="inventory">
+<div id="inventory" role="dialog" aria-labelledby="inv-title">
     <div id="inv-panel">
         <div class="inv-titlebar">
             <div class="inv-title" id="inv-title">Inventário</div>
@@ -267,10 +268,10 @@
 <div id="hud-bottom">
 <div id="survival-hud">
     <div id="left-stats">
-        <div class="stat-bar" id="breath-bar"></div>
-        <div class="stat-bar" id="health-bar"></div>
+        <div class="stat-bar" id="breath-bar" role="img" aria-label="Fôlego: 20 de 20"></div>
+        <div class="stat-bar" id="health-bar" role="img" aria-label="Vida: 20 de 20"></div>
     </div>
-    <div class="stat-bar" id="hunger-bar"></div>
+    <div class="stat-bar" id="hunger-bar" role="img" aria-label="Fome: 20 de 20"></div>
 </div>
 <div id="hotbar">
     <div class="slot active" id="slot-0"></div>
