@@ -23,7 +23,7 @@ O que mais falta não é “mais bloco” ou “mais bioma”: é **robustez de 
 | Média | Quebrar bloco ao lado de água cria nova fonte permanente | Água infinita / duplicação de nascente | `game.js:1778-1780` — **corrigido em 02/11** ([BUG-20261102](BUG-20261102-agua-fonte-infinita.md)) |
 | Média | Porta aberta não tem colisão | Jogador atravessa o painel aberto | `world-door.js:34-37`, `world-catalog.js:60-69` |
 | Média | Lista de mundos lê o save completo de todos os mundos | Custo de memória/tempo cresce com o total de saves | `world-list-store.js` — **corrigido em 02/11** ([MELHORIA-20261102](MELHORIA-20261102-lista-de-mundos.md)) |
-| Média | Malha, nuvens, água e fornos ainda têm trabalho síncrono evitável | Picos de CPU em mundo maior | `game.js:790`, `world-clouds.js:90-102`, `world-water.js:63-126` — **fornos corrigidos em 02/11** ([MELHORIA-20261102](MELHORIA-20261102-fornos-por-chunk.md)); malha/nuvens/água abertos |
+| Média | Malha, nuvens, água e fornos ainda têm trabalho síncrono evitável | Picos de CPU em mundo maior | `game.js:790`, `world-clouds.js:90-102`, `world-water.js:63-126` — **fornos corrigidos e fila da água refeita em 02/11** ([fornos](MELHORIA-20261102-fornos-por-chunk.md), [água](MELHORIA-20261102-fila-de-agua.md)); malha em worker, nuvens e BFS de água abertos |
 | Baixa | Acessibilidade do inventário/HUD, áudio, toque, PWA e conteúdo | Polimento e alcance | Acessibilidade **corrigida em 02/11** ([MELHORIA-20261102](MELHORIA-20261102-acessibilidade.md)); áudio/toque/PWA/conteúdo seguem abertos |
 
 ---
@@ -292,14 +292,19 @@ O painel aberto ainda é desenhado fino na borda do voxel, mas o jogador pode at
 ### 9. Desempenho: ainda há trabalho síncrono evitável
 
 **Prioridade:** média. **Status:** parcialmente resolvido em 02/11 — fornos já
-simulam só em chunks carregados ([MELHORIA-20261102](MELHORIA-20261102-fornos-por-chunk.md));
-malha, nuvens, água e save seguem abertos.
+simulam só em chunks carregados ([MELHORIA-20261102](MELHORIA-20261102-fornos-por-chunk.md))
+e a fila da água deixou de usar `shift()`
+([MELHORIA-20261102](MELHORIA-20261102-fila-de-agua.md)); malha em worker, nuvens,
+BFS de água e save seguem abertos.
 
 A revisão anterior já apontava parte disso, e o código atual continua com os mesmos padrões:
 
 - **Malha na thread principal:** `World.meshChunk()` percorre voxels e monta buffers no quadro atual.
 - **Nuvens:** `worldClouds.update()` reconstrói a geometria quando muda a célula da câmera/scroll.
 - **Água:** `hasNearbySource()` faz BFS por célula de fluxo; a fila pode chegar a 4096 células.
+  *(A fila já não usa `shift()` — custo O(fila) por célula — e os limites viraram
+  constantes testáveis desde 02/11: ver [MELHORIA-20261102](MELHORIA-20261102-fila-de-agua.md).
+  O BFS continua sendo o custo dominante.)*
 - ~~**Fornos:** `updateFurnaces()` percorre todos os fornos do mundo, não só os carregados/próximos.~~ **Corrigido em 02/11**: o passo virou `stepFurnace()`
   (`world-furnace-rules.js`) e só roda para chunks carregados; forno distante congela em vez de
   fundir sozinho. Ver [MELHORIA-20261102](MELHORIA-20261102-fornos-por-chunk.md).
@@ -311,7 +316,7 @@ A revisão anterior já apontava parte disso, e o código atual continua com os 
 2. Mover geração de malha para worker com buffers transferíveis.
 3. Reutilizar buffers de rascunho no mesher.
 4. Reconstruir nuvens com menos frequência ou usar instancing/shader.
-5. Cachear conectividade/fontes de água.
+5. Cachear conectividade/fontes de água. *(A fila já foi refeita sem `shift()`; falta o cache do BFS.)*
 6. ~~Limitar atualização de fornos a chunks ativos.~~ Feito em 02/11.
 7. Considerar compressão/RLE ou formato por chunk para saves grandes.
 
