@@ -21,6 +21,7 @@ import { createWorldSaveCodec, WORLD_SAVE_VERSION } from './world-save-codec.js'
 import { createWorldSaveLoader } from './world-save-loader.js';
 import { createWorldSaveManager } from './world-save-manager.js';
 import { markWorldSaved } from './world-list-store.js';
+import { furnaceChunk, stepFurnace } from './world-furnace-rules.js';
 import { createWorldSaveIndicator } from './world-save-indicator.js';
 import { createWorldClock } from './world-clock.js';
 import { createWorldClouds, WORLD_CLOUD_CONFIG } from './world-clouds.js';
@@ -1369,40 +1370,21 @@ const furnaces = new Map();
 let station = null;
 let furnaceDirty = false;
 
+// Fornos em chunks carregados são simulados; os que ficaram para trás ficam
+// congelados (combustível e preparo param), como no Minecraft. Assim o custo
+// por quadro acompanha o que está perto do jogador, não o total do save.
 function updateFurnaces(dt) {
     for (const [key, f] of furnaces) {
-        const wasBurning = f.burn > 0;
-        const s = f.inv.slots;
-        const rec = s[0] && SMELT[s[0].id];
-        const canSmelt = !!rec && (!s[2] || (s[2].id === rec.result && s[2].count < ITEMS[rec.result].maxStack));
-        const open = station && station.furnace === f;
+        const coords = furnaceChunk(f, key, CHUNK_SIZE);
+        const chunk = coords ? world?.getChunk(coords.cx, coords.cz) : null;
+        if (!chunk) continue;
 
-        if (f.burn <= 0 && canSmelt && s[1] && FUEL[s[1].id]) {
-            f.burn = f.burnMax = FUEL[s[1].id];
-            f.inv.removeOne(1);
-            if (open) furnaceDirty = true;
-        }
-        if (f.burn > 0) {
-            f.burn = Math.max(0, f.burn - dt);
-            if (canSmelt) {
-                f.cook += dt;
-                if (f.cook >= rec.time) {
-                    f.cook = 0;
-                    f.inv.removeOne(0);
-                    if (s[2]) s[2].count++; else s[2] = { id: rec.result, count: 1 };
-                    if (open) furnaceDirty = true;
-                }
-            } else f.cook = Math.max(0, f.cook - dt * 2);
-        } else f.cook = Math.max(0, f.cook - dt * 2);
-
-        if (wasBurning !== (f.burn > 0)) {
-            const [x, , z] = key.split(',').map(Number);
-            const chunk = world?.getChunk(floorDiv(x, CHUNK_SIZE), floorDiv(z, CHUNK_SIZE));
-            if (chunk) {
-                world.refreshLightSourceChunk(chunk.cx, chunk.cz, chunk);
-                world.lightDirty.add(chunk);
-                world.dirty.add(chunk);
-            }
+        const { changed, litChanged } = stepFurnace(f, dt);
+        if (changed && station && station.furnace === f) furnaceDirty = true;
+        if (litChanged) {
+            world.refreshLightSourceChunk(chunk.cx, chunk.cz, chunk);
+            world.lightDirty.add(chunk);
+            world.dirty.add(chunk);
         }
     }
 }

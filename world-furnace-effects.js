@@ -40,12 +40,14 @@ export class FurnaceSmokeSystem {
         for (const [key, furnace] of furnaces) {
             if (furnace.burn <= 0) { this.emitTimers.delete(key); continue; }
             const [x, y, z] = key.split(',').map(Number);
+            // Distância antes de consultar o mundo: forno longe não gera fumaça
+            // nem custa leitura de bloco.
+            const dx = playerPosition.x - (x + 0.5), dz = playerPosition.z - (z + 0.5);
+            if (dx * dx + dz * dz > nearRadiusSq) { this.emitTimers.delete(key); continue; }
             if (world.getBlock(x, y, z) !== ID.FURNACE || world.getBlock(x, y + 1, z) !== 0) {
                 this.emitTimers.delete(key);
                 continue;
             }
-            const dx = playerPosition.x - (x + 0.5), dz = playerPosition.z - (z + 0.5);
-            if (dx * dx + dz * dz > nearRadiusSq) { this.emitTimers.delete(key); continue; }
             let timer = (this.emitTimers.get(key) ?? 0) - dt;
             if (timer <= 0) {
                 this.spawn(x, y, z);

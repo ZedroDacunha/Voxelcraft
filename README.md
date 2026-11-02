@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 156 testes de módulos puros (node --test)
+npm test           # 170 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -47,7 +47,7 @@ O `check` é o que o CI (`.github/workflows/ci.yml`) roda em todo PR para `main`
 | Catálogo de blocos e receitas | `world-catalog.js`, `inventory-recipe-book.js` |
 | Geração de terreno | `world-terrain.js`, `world-terrain-worker.js`, `world-ore-generation.js`, `world-math.js` |
 | Malha e render | `world-grid.js`, `world-instanced-manager.js`, `world-textures.js`, `world-sky.js`, `world-clouds.js`, `world-water.js` |
-| Sobrevivência e regras | `world-survival-rules.js`, `world-interaction-rules.js`, `world-tool-rules.js`, `world-door.js` |
+| Sobrevivência e regras | `world-survival-rules.js`, `world-interaction-rules.js`, `world-tool-rules.js`, `world-door.js`, `world-furnace-rules.js` |
 | Save e armazenamento | `world-save-*.js`, `world-storage.js`, `world-list-store.js` |
 | Inventário | `inventory-*.js`, `inventory.css` |
 | Ferramentas | `tools/serve.mjs`, `tools/check.mjs`, `tools/stamp-importmap.mjs` |
