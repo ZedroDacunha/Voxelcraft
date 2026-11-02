@@ -304,7 +304,9 @@ A revisão anterior já apontava parte disso, e o código atual continua com os 
 
 ### 10. Arquitetura e manutenção
 
-**Prioridade:** média.
+**Prioridade:** média. **Status:** ~~aberto~~ parcialmente resolvido em 02/11 —
+`package.json`, CI, README e remoção dos assets mortos feitos; extrair módulos de
+`game.js` e limpar o código experimental seguem pendentes.
 
 Pontos positivos: já existem muitos módulos puros (`world-*`, `inventory-*`) e testes sem DOM.
 
@@ -314,16 +316,14 @@ O que ainda pesa:
 - Não há `package.json`, então não existe um comando padrão de projeto para testar/validar.
 - Não há CI configurado no repositório.
 - Não há README de onboarding.
-- Há assets antigos não referenciados: `tall-grass-*.png` na raiz; o jogo usa `assets/*-v2.png`.
+- ~~Há assets antigos não referenciados: `tall-grass-*.png` na raiz; o jogo usa `assets/*-v2.png`.~~ Removidos em 02/11 (~580 KB).
 - Há código experimental/não usado em `world-terrain.js`, como greedy meshing e testes expostos em `window`.
 
 **Melhoria recomendada:**
 
-- Criar `package.json` com scripts:
-  - `test`: `node --test tests/*.test.mjs`
-  - `check`: sintaxe + `stamp-importmap --check`
-- Adicionar workflow de CI rodando esses scripts.
-- Escrever README com requisitos, comandos e arquitetura.
+- ~~Criar `package.json` com scripts~~ — feito (`start`, `test`, `check`, `stamp`).
+- ~~Adicionar workflow de CI rodando esses scripts~~ — feito (`.github/workflows/ci.yml`).
+- ~~Escrever README com requisitos, comandos e arquitetura~~ — feito (`README.md`).
 - Extrair gradualmente de `game.js`: `player.js`, `mesher.js`, `hud.js`, `interaction.js`, `game-loop.js`.
 - Remover assets/código morto ou movê-los para uma área explicitamente experimental.
 

@@ -374,10 +374,10 @@ quadro ou nuvens por `InstancedMesh`/shader.
   sobrevivência e save. Separar em módulos (`player.js`, `mesher.js`, `hud.js`,
   `interaction.js`) tornaria as próximas partes muito menos arriscadas. O
   arquivo já importa 25 módulos; falta o passo de sair dele.
-- **Código morto**: `tall-grass-*.png` na raiz (~580 KB, substituídos por
-  `assets/*-v2.png`), `HELD_DEBUG`/`console.log` de ajuste, `buildChunkGreedyGeometry`
+- **Código morto**: `HELD_DEBUG`/`console.log` de ajuste, `buildChunkGreedyGeometry`
   e os testes `testOcclusionCulling`/`testGreedyMeshing` em `world-terrain.js`
-  (não usados pelo jogo). `world-door.js` deixou de ser morto nesta revisão.
+  (não usados pelo jogo). `world-door.js` deixou de ser morto nesta revisão e os
+  `tall-grass-*.png` da raiz (~580 KB) foram removidos em 02/11.
 - **Versionamento do conteúdo**: título da aba, tela de início, menu e F3 ainda
   dizem "Parte 11". Centralizar em uma constante evitaria divergência.
 - **Acessibilidade**: os slots do inventário são `div` com `mousedown` (não são
