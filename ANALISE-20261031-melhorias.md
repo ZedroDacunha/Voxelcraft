@@ -20,7 +20,7 @@ O que mais falta não é “mais bloco” ou “mais bioma”: é **robustez de 
 | Alta | Luz de tocha some na borda de um chunk após editar chunk vizinho | Escurecimento incorreto e intermitente | `game.js:372-402` |
 | Alta | Fechar inventário esconde o menu mesmo se o pointer lock falhar | Tela fica sem pausa nem orientação | `game.js:2354-2357`, `2981-2996` |
 | Média | HUD/inventário não são responsivos | Hotbar cortada e menu escalado em celular | `styles.css:88-112`, `inventory.css:3` |
-| Média | Quebrar bloco ao lado de água cria nova fonte permanente | Água infinita / duplicação de nascente | `game.js:1778-1780` |
+| Média | Quebrar bloco ao lado de água cria nova fonte permanente | Água infinita / duplicação de nascente | `game.js:1778-1780` — **corrigido em 02/11** ([BUG-20261102](BUG-20261102-agua-fonte-infinita.md)) |
 | Média | Porta aberta não tem colisão | Jogador atravessa o painel aberto | `world-door.js:34-37`, `world-catalog.js:60-69` |
 | Média | Lista de mundos lê o save completo de todos os mundos | Custo de memória/tempo cresce com o total de saves | `world-list-store.js:48-57` |
 | Média | Malha, nuvens, água e fornos ainda têm trabalho síncrono evitável | Picos de CPU em mundo maior | `game.js:790`, `world-clouds.js:90-102`, `world-water.js:63-126` |
@@ -201,7 +201,7 @@ Além disso, o grid do inventário usa 9 colunas fixas de 44 px, o que não cabe
 
 ### 6. Quebrar bloco adjacente à água cria uma fonte permanente
 
-**Prioridade:** média.
+**Prioridade:** média. **Status:** ~~aberto~~ corrigido em 02/11.
 
 `breakBlock()` faz:
 
@@ -226,6 +226,12 @@ world.setBlock(x, y, z, touchesWater ? ID.WATER : 0);
 - Ou criar uma regra explícita de formação de fonte, se isso for uma mecânica desejada.
 
 **Teste de aceitação:** quebrar um bloco adjacente a uma fonte não pode aumentar o número de fontes permanentes.
+
+**Correção aplicada (02/11):** a regra saiu de `breakBlock()` e foi para
+`WaterSystem.onBlockBroken()`: a célula vira ar e, se havia líquido em volta, o
+fluxo reenfileira os vizinhos e preenche o vão com água corrente. O número de
+fontes permanentes não muda — coberto por `tests/water-source.test.mjs`. Detalhes
+em [[BUG-20261102-agua-fonte-infinita]].
 
 ---
 

@@ -60,6 +60,19 @@ export function createWaterSystemClass({ THREE, BLOCKS, ID, WORLD_HEIGHT, onSubm
             }
         }
     
+        // Chamado quando o jogador quebra um bloco: a célula fica vazia e, se
+        // havia água em volta, os vizinhos são reenfileirados para escorrer
+        // para dentro — como água de fluxo, que evapora quando se afasta da
+        // fonte. Antes o jogo gravava `ID.WATER` (fonte) nessa célula, então
+        // cada bloco quebrado ao lado d'água virava uma nascente permanente e
+        // dava para duplicar água minerando em volta de um lago.
+        onBlockBroken(world, x, y, z) {
+            const touchesWater = this.isAdjacent(world, x, y, z);
+            world.setBlock(x, y, z, 0);
+            if (touchesWater) this.activate(world, x, y, z);
+            return touchesWater;
+        }
+
         hasNearbySource(world, start, maxSteps = 7) {
             const queue = [{ x: start.x, y: start.y, z: start.z, steps: 0 }];
             const visited = new Set([`${start.x},${start.y},${start.z}`]);
