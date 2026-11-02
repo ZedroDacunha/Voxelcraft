@@ -22,6 +22,7 @@ import { createWorldSaveLoader } from './world-save-loader.js';
 import { createWorldSaveManager } from './world-save-manager.js';
 import { markWorldSaved } from './world-list-store.js';
 import { furnaceChunk, stepFurnace } from './world-furnace-rules.js';
+import { acquireMeshScratch, exactMeshBuffer, storeMeshScratch } from './world-mesh-buffers.js';
 import { createWorldSaveIndicator } from './world-save-indicator.js';
 import { createWorldClock } from './world-clock.js';
 import { createWorldClouds, WORLD_CLOUD_CONFIG } from './world-clouds.js';
@@ -319,6 +320,8 @@ class World {
         this.decorationsByChunk = new Map();
         this.generator = new TerrainGenerator(seed, TERRAIN_CONFIG);
         this.chunks = new Map();
+        // Arrays reaproveitados entre malhas de chunks (ver world-mesh-buffers.js).
+        this.meshScratch = {};
         this.edits = new Map();
         this.blockFacings = new BlockFacingStore();
         this.dirty = new Set();
@@ -915,17 +918,14 @@ class World {
             return [base * (1 + warmth), base, base * (1 - warmth * 0.85), local];
         };
 
-        const initialVertexCapacity = CS * CS * 8;
-        const initialIndexCapacity = CS * CS * 12;
-        let positions = new Float32Array(initialVertexCapacity * 3);
-        let normals = new Float32Array(initialVertexCapacity * 3);
-        let uvs = new Float32Array(initialVertexCapacity * 2);
-        let colors = new Float32Array(initialVertexCapacity * 3);
-        let torchInfluence = new Float32Array(initialVertexCapacity);
-        let furnaceFlame = new Float32Array(initialVertexCapacity);
-        let indices = new Uint32Array(initialIndexCapacity);
-        let cutoutIndices = new Uint32Array(initialIndexCapacity);
-        let waterIndices = new Uint32Array(initialIndexCapacity);
+        // Buffers de rascunho reaproveitados entre chunks: `growTypedArray` pode
+        // trocar as arrays no meio do caminho, e `storeScratch()` devolve a versão
+        // final para a próxima malha usar.
+        let { positions, normals, uvs, colors, torchInfluence, furnaceFlame, indices, cutoutIndices, waterIndices } =
+            acquireMeshScratch(this.meshScratch, CS * CS * 8, CS * CS * 12);
+        const storeScratch = () => storeMeshScratch(this.meshScratch, {
+            positions, normals, uvs, colors, torchInfluence, furnaceFlame, indices, cutoutIndices, waterIndices,
+        });
         let vertexCount = 0, indexCount = 0, cutoutIndexCount = 0, waterIndexCount = 0;
         const growTypedArray = (array, required) => {
             if (required <= array.length) return array;
@@ -1032,15 +1032,17 @@ class World {
             }
         }
 
-        if (vertexCount === 0) return;
+        if (vertexCount === 0) { storeScratch(); return; }
 
+        // Cópia do tamanho exato: a geometria não fica presa ao buffer grande do
+        // rascunho (nem é sobrescrita pela próxima malha).
         const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.BufferAttribute(positions.subarray(0, vertexCount * 3), 3));
-        geo.setAttribute('normal', new THREE.BufferAttribute(normals.subarray(0, vertexCount * 3), 3));
-        geo.setAttribute('uv', new THREE.BufferAttribute(uvs.subarray(0, vertexCount * 2), 2));
-        geo.setAttribute('color', new THREE.BufferAttribute(colors.subarray(0, vertexCount * 3), 3));
-        geo.setAttribute('torchInfluence', new THREE.BufferAttribute(torchInfluence.subarray(0, vertexCount), 1));
-        geo.setAttribute('furnaceFlame', new THREE.BufferAttribute(furnaceFlame.subarray(0, vertexCount), 1));
+        geo.setAttribute('position', new THREE.BufferAttribute(exactMeshBuffer(positions, vertexCount * 3), 3));
+        geo.setAttribute('normal', new THREE.BufferAttribute(exactMeshBuffer(normals, vertexCount * 3), 3));
+        geo.setAttribute('uv', new THREE.BufferAttribute(exactMeshBuffer(uvs, vertexCount * 2), 2));
+        geo.setAttribute('color', new THREE.BufferAttribute(exactMeshBuffer(colors, vertexCount * 3), 3));
+        geo.setAttribute('torchInfluence', new THREE.BufferAttribute(exactMeshBuffer(torchInfluence, vertexCount), 1));
+        geo.setAttribute('furnaceFlame', new THREE.BufferAttribute(exactMeshBuffer(furnaceFlame, vertexCount), 1));
 
         const totalIndexCount = indexCount + cutoutIndexCount + waterIndexCount;
         const mergedIndices = vertexCount > 65535 ? new Uint32Array(totalIndexCount) : new Uint16Array(totalIndexCount);
@@ -1049,6 +1051,8 @@ class World {
         if (cutoutIndexCount) { mergedIndices.set(cutoutIndices.subarray(0, cutoutIndexCount), offset); geo.addGroup(offset, cutoutIndexCount, 1); offset += cutoutIndexCount; }
         if (waterIndexCount) { mergedIndices.set(waterIndices.subarray(0, waterIndexCount), offset); geo.addGroup(offset, waterIndexCount, 2); }
         geo.setIndex(new THREE.BufferAttribute(mergedIndices, 1));
+
+        storeScratch();
 
         const mesh = new THREE.Mesh(geo, [this.chunkMaterial, this.cutoutMaterial, this.water.material]);
         mesh.position.set(chunk.cx * CS, 0, chunk.cz * CS);
