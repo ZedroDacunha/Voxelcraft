@@ -402,11 +402,15 @@ Os slots são `div` com `mousedown`; não são focáveis nem operáveis por tecl
 
 ### 12. Testes: bons módulos puros, mas faltam fluxos críticos
 
-**Prioridade:** média.
+**Prioridade:** média. **Status:** parcialmente resolvido em 02/11 — concorrência
+de save agora tem testes ([TESTES-20261102](TESTES-20261102-concorrencia-do-save.md)).
 
 Os 62 testes existentes passaram, mas ainda não cobrem bem:
 
-- `world-save-manager.js` e `world-save-lock.js` em cenários de erro/concorrência.
+- ~~`world-save-manager.js` e `world-save-lock.js` em cenários de erro/concorrência.~~
+  **Coberto em 02/11** (16 testes com IndexedDB falso): lease entre abas, expiração,
+  `write` sem posse, backup/`deleteKey`, `release`, falha ao abrir o banco, heartbeat,
+  e o save manager recusando gravar por cima de outra aba + debounce.
 - Recuperação/importação de save com dados corrompidos.
 - Busca/visibilidade real do livro de receitas.
 - Pointer lock falhando.
@@ -418,7 +422,9 @@ Os 62 testes existentes passaram, mas ainda não cobrem bem:
 **Melhoria recomendada:**
 
 - Adicionar testes de DOM com browser real para UI.
-- Adicionar testes de integração para save/lock/recuperação.
+- ~~Adicionar testes de integração para save/lock/recuperação.~~ Lock e save manager
+  já estão cobertos (#TESTES-20261102); falta a parte de recuperação com dados
+  corrompidos e a integração real entre duas abas.
 - Transformar cada bug desta análise em teste de regressão antes de corrigir.
 
 ---
