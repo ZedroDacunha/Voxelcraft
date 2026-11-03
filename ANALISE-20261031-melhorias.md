@@ -403,7 +403,8 @@ Os slots são `div` com `mousedown`; não são focáveis nem operáveis por tecl
 ### 12. Testes: bons módulos puros, mas faltam fluxos críticos
 
 **Prioridade:** média. **Status:** parcialmente resolvido em 02/11 — concorrência
-de save agora tem testes ([TESTES-20261102](TESTES-20261102-concorrencia-do-save.md)).
+([TESTES-20261102](TESTES-20261102-concorrencia-do-save.md)) e recuperação de save
+([TESTES-20261102](TESTES-20261102-recuperacao-de-save.md)) agora têm testes.
 
 Os 62 testes existentes passaram, mas ainda não cobrem bem:
 
@@ -411,7 +412,10 @@ Os 62 testes existentes passaram, mas ainda não cobrem bem:
   **Coberto em 02/11** (16 testes com IndexedDB falso): lease entre abas, expiração,
   `write` sem posse, backup/`deleteKey`, `release`, falha ao abrir o banco, heartbeat,
   e o save manager recusando gravar por cima de outra aba + debounce.
-- Recuperação/importação de save com dados corrompidos.
+- ~~Recuperação/importação de save com dados corrompidos.~~ **Coberto em 02/11**:
+  `parseSaveCopy`, `stageImportedSaveCopy`, `preserveRejectedSave`,
+  `restoreSaveCopy` e o carregamento (save inválido → backup/rejeitado/importada,
+  `reset` e falha de leitura bloqueando gravação).
 - Busca/visibilidade real do livro de receitas.
 - Pointer lock falhando.
 - Iluminação entre chunks.

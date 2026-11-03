@@ -3,57 +3,7 @@ import assert from 'node:assert/strict';
 
 import { createWorldSaveLock } from '../world-save-lock.js';
 import { createWorldSaveManager } from '../world-save-manager.js';
-
-const clone = value => (value === undefined ? undefined : structuredClone(value));
-
-// IndexedDB de mentira com o mínimo que o lock usa: transação readwrite, store
-// com get/put/delete e callbacks `onsuccess`/`oncomplete` disparados de forma
-// assíncrona (como no navegador). `db.data` deixa o teste inspecionar o disco.
-function createFakeDatabase(initial = {}) {
-    const data = new Map(Object.entries(initial));
-    const db = {
-        closes: 0,
-        close() { db.closes++; },
-        transaction() {
-            let aborted = false;
-            const ops = [];
-            const store = {
-                get(key) { return enqueue(() => clone(data.get(key))); },
-                put(value, key) { return enqueue(() => { data.set(key, clone(value)); return key; }); },
-                delete(key) { return enqueue(() => { data.delete(key); return undefined; }); },
-            };
-            const tx = {
-                error: null,
-                abort() { aborted = true; tx.onabort?.(); },
-                objectStore() { return store; },
-            };
-            function enqueue(run) {
-                const request = { result: undefined, error: null, onsuccess: null, onerror: null };
-                ops.push({ request, run });
-                return request;
-            }
-            const flush = () => {
-                // Um request por vez; callbacks podem criar novos (ex.: put dentro
-                // do onsuccess de um get).
-                for (let i = 0; i < ops.length && !aborted; i++) {
-                    const { request, run } = ops[i];
-                    try {
-                        request.result = run();
-                    } catch (error) {
-                        request.error = error;
-                        request.onerror?.();
-                        return;
-                    }
-                    request.onsuccess?.();
-                }
-                if (!aborted) tx.oncomplete?.();
-            };
-            queueMicrotask(flush);
-            return tx;
-        },
-    };
-    return { data, db };
-}
+import { createFakeDatabase, createStoreRequest, withWindowStub } from './helpers/fake-indexeddb.mjs';
 
 const LOCK_KEY = 'world-a-writer-lock';
 
@@ -218,28 +168,6 @@ test('heartbeat renova o lease e detecta quando outra aba assume', async () => {
 // Save manager: as travas de concorrência vistas de fora (é o que impede duas
 // abas de sobrescreverem o mesmo mundo).
 // ---------------------------------------------------------------------------
-// O manager registra um listener de `pagehide` ao ser criado; no Node não há
-// window, então o teste oferece um stub mínimo.
-function withWindowStub() {
-    const previous = globalThis.window;
-    globalThis.window = { addEventListener() {} };
-    return () => {
-        if (previous === undefined) delete globalThis.window;
-        else globalThis.window = previous;
-    };
-}
-
-function createStoreRequest(db) {
-    return async (mode, action) => {
-        const tx = db.transaction('worlds', mode);
-        const outcome = action(tx.objectStore('worlds'));
-        if (Array.isArray(outcome)) return outcome;
-        if (outcome === null || outcome === undefined) return outcome;
-        await new Promise(resolve => setImmediate(resolve));
-        return outcome.result;
-    };
-}
-
 test('o save manager não grava quando outra aba tem o lease', async () => {
     const restoreWindow = withWindowStub();
     try {
