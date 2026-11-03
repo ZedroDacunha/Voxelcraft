@@ -24,6 +24,7 @@
     "./inventory-recipe-search.js": "./inventory-recipe-search.js?v=e910d2e22b",
     "./inventory-view.js": "./inventory-view.js?v=fe974fc5f3",
     "./menu-background.js": "./menu-background.js?v=404eee429d",
+    "./world-audio.js": "./world-audio.js?v=79aa6e38e5",
     "./world-block-orientation.js": "./world-block-orientation.js?v=f6af440217",
     "./world-break-particles.js": "./world-break-particles.js?v=9911bc613a",
     "./world-catalog.js": "./world-catalog.js?v=b04345583e",
@@ -32,7 +33,7 @@
     "./world-door.js": "./world-door.js?v=00488042b1",
     "./world-furnace-effects.js": "./world-furnace-effects.js?v=b5fc477140",
     "./world-furnace-rules.js": "./world-furnace-rules.js?v=d4fe1262ee",
-    "./world-game-settings.js": "./world-game-settings.js?v=09640fbf34",
+    "./world-game-settings.js": "./world-game-settings.js?v=9a35caccda",
     "./world-graphics-quality.js": "./world-graphics-quality.js?v=f20063e81a",
     "./world-grid.js": "./world-grid.js?v=be11481d71",
     "./world-instanced-manager.js": "./world-instanced-manager.js?v=65840e2b5d",
@@ -42,12 +43,12 @@
     "./world-list-store.js": "./world-list-store.js?v=cc5476e288",
     "./world-list-view.js": "./world-list-view.js?v=9ec40da58c",
     "./world-math.js": "./world-math.js?v=ce4a6d9232",
-    "./world-menu.js": "./world-menu.js?v=530261e33a",
+    "./world-menu.js": "./world-menu.js?v=3f9bcac527",
     "./world-mesh-buffers.js": "./world-mesh-buffers.js?v=ceba787639",
     "./world-mineral-blocks.js": "./world-mineral-blocks.js?v=4c39bc041e",
     "./world-mineral-textures.js": "./world-mineral-textures.js?v=ab422ad968",
     "./world-minerals.js": "./world-minerals.js?v=2f66ff7350",
-    "./world-options-view.js": "./world-options-view.js?v=b32c5daec1",
+    "./world-options-view.js": "./world-options-view.js?v=d5a1219e68",
     "./world-ore-generation.js": "./world-ore-generation.js?v=7fe35588d3",
     "./world-raycast.js": "./world-raycast.js?v=0f025b877c",
     "./world-save-codec.js": "./world-save-codec.js?v=71b8b469b6",
@@ -141,6 +142,11 @@
         <label class="world-field options-field">
             <span class="options-field-head">Distância de render <output id="opt-render-distance-value">4 chunks</output></span>
             <input type="range" id="opt-render-distance" min="2" max="6" step="1" value="4">
+        </label>
+
+        <label class="world-field options-field">
+            <span class="options-field-head">Volume <output id="opt-volume-value">70%</output></span>
+            <input type="range" id="opt-volume" min="0" max="1" step="0.05" value="0.7">
         </label>
 
         <details class="options-controls">
@@ -288,6 +294,6 @@
 </div>
 </div>
 
-<script type="module" src="world-menu.js?v=530261e33a"></script>
+<script type="module" src="world-menu.js?v=3f9bcac527"></script>
 </body>
 </html>
