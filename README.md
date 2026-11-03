@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 190 testes de módulos puros (node --test)
+npm test           # 206 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -104,4 +104,5 @@ Se esquecer, o teste `cache-versioning` e o `npm run check` reprovam.
   validação.
 - Análises e revisões ficam em `ANALISE-*.md` e `REVISAO-*.md`; melhoria de
   interface/polimento ganha um `MELHORIA-AAAAMMDD-*.md` com antes, depois,
-  validação e limitações.
+  validação e limitações; cobertura de teste nova ganha um
+  `TESTES-AAAAMMDD-*.md` dizendo o que passou a ser verificado.
