@@ -21,7 +21,7 @@ O que mais falta não é “mais bloco” ou “mais bioma”: é **robustez de 
 | Alta | Fechar inventário esconde o menu mesmo se o pointer lock falhar | Tela fica sem pausa nem orientação | `game.js:2354-2357`, `2981-2996` |
 | Média | HUD/inventário não são responsivos | Hotbar cortada e menu escalado em celular | `styles.css:88-112`, `inventory.css:3` |
 | Média | Quebrar bloco ao lado de água cria nova fonte permanente | Água infinita / duplicação de nascente | `game.js:1778-1780` — **corrigido em 02/11** ([BUG-20261102](BUG-20261102-agua-fonte-infinita.md)) |
-| Média | Porta aberta não tem colisão | Jogador atravessa o painel aberto | `world-door.js:34-37`, `world-catalog.js:60-69` |
+| Média | Porta aberta não tem colisão | Jogador atravessa o painel aberto | `world-door.js`, `game.js` — **corrigido em 03/11** ([MELHORIA-20261103](MELHORIA-20261103-porta-aberta.md)) |
 | Média | Lista de mundos lê o save completo de todos os mundos | Custo de memória/tempo cresce com o total de saves | `world-list-store.js` — **corrigido em 02/11** ([MELHORIA-20261102](MELHORIA-20261102-lista-de-mundos.md)) |
 | Média | Malha, nuvens, água e fornos ainda têm trabalho síncrono evitável | Picos de CPU em mundo maior | `game.js:790`, `world-clouds.js:90-102`, `world-water.js:63-126` — **fornos, buffers de malha e fila da água corrigidos em 02/11** ([fornos](MELHORIA-20261102-fornos-por-chunk.md), [buffers](MELHORIA-20261102-buffers-malha.md), [água](MELHORIA-20261102-fila-de-agua.md)); malha em worker, nuvens e BFS de água abertos |
 | Baixa | Acessibilidade do inventário/HUD, áudio, toque, PWA e conteúdo | Polimento e alcance | Acessibilidade **corrigida em 02/11** ([MELHORIA-20261102](MELHORIA-20261102-acessibilidade.md)); áudio/toque/PWA/conteúdo seguem abertos |
@@ -237,7 +237,8 @@ em [[BUG-20261102-agua-fonte-infinita]].
 
 ### 7. Porta aberta é visualmente sólida, mas fisicamente inexistente
 
-**Prioridade:** média, depende da intenção de design.
+**Prioridade:** média. **Status:** resolvido em 03/11
+([MELHORIA-20261103](MELHORIA-20261103-porta-aberta.md)).
 
 As portas abertas são marcadas com `solid: false`, e `woodDoorCollision()` retorna `null` quando `part.open`.
 
@@ -249,12 +250,16 @@ As portas abertas são marcadas com `solid: false`, e `woodDoorCollision()` reto
 
 O painel aberto ainda é desenhado fino na borda do voxel, mas o jogador pode atravessá-lo.
 
-**Melhoria recomendada:**
+**Melhoria aplicada:** a porta aberta bloqueia, com a **caixa fina rotacionada**
+que o mesher já desenhava. `woodDoorCollision()` devolve a caixa nos dois
+estados; `collides()` resolve a porta antes do teste de solidez (a aberta é
+`solid: false` para não vedar o vão, mas o painel colide); abrir a porta também
+recusa quando o painel nasceria em cima do jogador; e `unstickPlayer()` tira o
+jogador de dentro do painel ao carregar um save antigo. O vão segue passável
+(0,875 livre para um corpo de 0,6).
 
-- Se a porta aberta deve bloquear: retornar a caixa fina rotacionada e manter colisão.
-- Se a porta aberta deve ser totalmente passável: documentar essa decisão e, idealmente, ajustar a geometria para não sugerir uma barreira física.
-
-**Teste de aceitação:** o comportamento de colisão da porta aberta deve ser uma regra explícita, não um efeito colateral de `solid: false`.
+**Teste de aceitação:** coberto por `tests/door-collision.test.mjs` — a colisão
+da porta aberta agora é regra explícita, não efeito colateral de `solid: false`.
 
 ---
 
