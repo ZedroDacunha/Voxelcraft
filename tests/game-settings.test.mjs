@@ -68,11 +68,22 @@ test('chaves desconhecidas não vazam para as preferências', () => {
 
 test('save grava na chave certa e load devolve o mesmo', () => {
     const storage = fakeStorage();
-    saveGameSettings({ sensitivity: 1.5, fov: 90, renderDistance: 2 }, storage);
+    const settings = { sensitivity: 1.5, fov: 90, renderDistance: 2, volume: 0.35 };
+    saveGameSettings(settings, storage);
     const [[key, value]] = storage.entries();
     assert.equal(key, GAME_SETTINGS_KEY);
-    assert.deepEqual(JSON.parse(value), { sensitivity: 1.5, fov: 90, renderDistance: 2 });
-    assert.deepEqual(loadGameSettings(storage), { sensitivity: 1.5, fov: 90, renderDistance: 2 });
+    assert.deepEqual(JSON.parse(value), settings);
+    assert.deepEqual(loadGameSettings(storage), settings);
+});
+
+test('volume aceita mudo, respeita 0–1 e arredonda no passo', () => {
+    assert.equal(DEFAULT_GAME_SETTINGS.volume, 0.7);
+    assert.equal(GAME_SETTING_FIELDS.volume.format(0), 'mudo');
+    assert.equal(GAME_SETTING_FIELDS.volume.format(0.7), '70%');
+    assert.equal(sanitizeGameSettings({ volume: 0 }).volume, 0);
+    assert.equal(sanitizeGameSettings({ volume: -3 }).volume, 0);
+    assert.equal(sanitizeGameSettings({ volume: 4 }).volume, 1);
+    assert.equal(sanitizeGameSettings({ volume: 0.62 }).volume, 0.6);
 });
 
 test('save com storage bloqueado não lança', () => {

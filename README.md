@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 238 testes de módulos puros (node --test)
+npm test           # 257 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -50,6 +50,7 @@ O `check` é o que o CI (`.github/workflows/ci.yml`) roda em todo PR para `main`
 | Sobrevivência e regras | `world-survival-rules.js`, `world-interaction-rules.js`, `world-tool-rules.js`, `world-door.js`, `world-furnace-rules.js` |
 | Save e armazenamento | `world-save-*.js`, `world-storage.js`, `world-list-store.js` |
 | Inventário | `inventory-*.js`, `inventory.css` |
+| Áudio | `world-audio.js` (síntese em WebAudio; arquivos opcionais em `assets/sounds/`) |
 | Ferramentas | `tools/serve.mjs`, `tools/check.mjs`, `tools/stamp-importmap.mjs` |
 | Testes | `tests/*.test.mjs` |
 
@@ -79,6 +80,17 @@ A interface é operável sem mouse:
 - `prefers-reduced-motion` desliga as animações de HUD.
 
 Detalhes em [`MELHORIA-20261102-acessibilidade.md`](MELHORIA-20261102-acessibilidade.md).
+
+## Som
+
+Não há arquivos de som no repositório: cada efeito é **sintetizado** em WebAudio
+(`world-audio.js`) e o áudio só é criado no primeiro clique/tecla, como os
+navegadores exigem. O volume fica nas opções (0% = mudo) e vale na hora.
+
+Para usar um som gravado, copie o arquivo com o nome do efeito para
+`assets/sounds/` — o carregador prefere `ui-click.ogg`/`.wav` (e assim por
+diante) e cai na síntese quando o arquivo não existe. Lista completa em
+[`assets/sounds/LEIA-ME.md`](assets/sounds/LEIA-ME.md).
 
 ## Import map e cache
 

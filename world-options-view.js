@@ -8,9 +8,10 @@ export const OPTION_CONTROLS = [
     { key: 'sensitivity', input: 'opt-sensitivity', output: 'opt-sensitivity-value' },
     { key: 'fov', input: 'opt-fov', output: 'opt-fov-value' },
     { key: 'renderDistance', input: 'opt-render-distance', output: 'opt-render-distance-value' },
+    { key: 'volume', input: 'opt-volume', output: 'opt-volume-value' },
 ];
 
-export function createOptionsView(dialog = document.getElementById('options-dialog')) {
+export function createOptionsView(dialog = document.getElementById('options-dialog'), { onChange } = {}) {
     if (!dialog) return null;
 
     const rows = OPTION_CONTROLS.map(({ key, input, output }) => {
@@ -37,6 +38,8 @@ export function createOptionsView(dialog = document.getElementById('options-dial
         row.inputEl.addEventListener('input', () => {
             current = saveGameSettings({ ...current, [row.key]: Number(row.inputEl.value) });
             render(current);
+            // o volume vale na hora; as outras opções só no próximo mundo
+            onChange?.(current);
         });
     }
 

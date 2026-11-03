@@ -16,6 +16,10 @@ export const GAME_SETTING_FIELDS = Object.freeze({
         min: 2, max: 6, step: 1, default: 4,
         format: value => `${Math.round(value)} chunks`,
     }),
+    volume: Object.freeze({
+        min: 0, max: 1, step: 0.05, default: 0.7,
+        format: value => (value <= 0 ? 'mudo' : `${Math.round(value * 100)}%`),
+    }),
 });
 
 export const DEFAULT_GAME_SETTINGS = Object.freeze(Object.fromEntries(
