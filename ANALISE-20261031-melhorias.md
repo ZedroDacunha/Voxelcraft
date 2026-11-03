@@ -402,9 +402,10 @@ Os slots são `div` com `mousedown`; não são focáveis nem operáveis por tecl
 
 ### 12. Testes: bons módulos puros, mas faltam fluxos críticos
 
-**Prioridade:** média. **Status:** parcialmente resolvido em 02/11 — concorrência
-([TESTES-20261102](TESTES-20261102-concorrencia-do-save.md)) e recuperação de save
-([TESTES-20261102](TESTES-20261102-recuperacao-de-save.md)) agora têm testes.
+**Prioridade:** média. **Status:** resolvido em 03/11 nos módulos puros —
+concorrência ([TESTES-20261102](TESTES-20261102-concorrencia-do-save.md)),
+recuperação de save ([TESTES-20261102](TESTES-20261102-recuperacao-de-save.md)) e
+qualidade gráfica ([TESTES-20261103](TESTES-20261103-qualidade-grafica.md)).
 
 Os 62 testes existentes passaram, mas ainda não cobrem bem:
 
@@ -416,19 +417,28 @@ Os 62 testes existentes passaram, mas ainda não cobrem bem:
   `parseSaveCopy`, `stageImportedSaveCopy`, `preserveRejectedSave`,
   `restoreSaveCopy` e o carregamento (save inválido → backup/rejeitado/importada,
   `reset` e falha de leitura bloqueando gravação).
-- Busca/visibilidade real do livro de receitas.
-- Pointer lock falhando.
-- Iluminação entre chunks.
-- Responsividade da HUD/inventário.
-- Regras de água/fonte.
-- Qualidade gráfica automática.
+- ~~Busca/visibilidade real do livro de receitas.~~ Coberto por
+  `tests/recipe-search.test.mjs`.
+- ~~Pointer lock falhando.~~ Coberto por `tests/game-menu-state.test.mjs` (requisição
+  memoizada, retentativa sem `unadjustedMovement`, timeout, `pointerlockerror` e a
+  regra de quando o menu de pausa aparece).
+- ~~Iluminação entre chunks.~~ Coberto por `tests/light-region.test.mjs`.
+- ~~Responsividade da HUD/inventário.~~ Coberto por `tests/ui-layout.test.mjs`
+  (regras de layout; o comportamento visual real depende de navegador).
+- ~~Regras de água/fonte.~~ Coberto por `tests/water-source.test.mjs` e
+  `tests/water-flow-queue.test.mjs`.
+- ~~Qualidade gráfica automática.~~ **Coberto em 03/11**: histerese de subida/descida,
+  critério GPU × CPU, desligamento quando baixar a resolução não melhora o FPS,
+  `cycle()` do F4 e a ligação com o loop em `game.js`.
 
 **Melhoria recomendada:**
 
-- Adicionar testes de DOM com browser real para UI.
-- ~~Adicionar testes de integração para save/lock/recuperação.~~ Lock e save manager
-  já estão cobertos (#TESTES-20261102); falta a parte de recuperação com dados
-  corrompidos e a integração real entre duas abas.
+- Adicionar testes de DOM com browser real para UI — **único ponto ainda aberto**:
+  depende de um navegador no CI (o sandbox não tem Chromium), então fica registrado
+  como validação manual.
+- ~~Adicionar testes de integração para save/lock/recuperação.~~ Lock, save manager
+  e recuperação com dados corrompidos cobertos em 02/11; falta só a integração real
+  entre duas abas do navegador.
 - Transformar cada bug desta análise em teste de regressão antes de corrigir.
 
 ---
