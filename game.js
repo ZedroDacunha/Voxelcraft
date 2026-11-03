@@ -40,7 +40,7 @@ import {
 import { configureTorchFlicker, configureTorchFlameAnimation, updateWorldLightingEffects } from './world-lighting-effects.js';
 import { FurnaceSmokeSystem } from './world-furnace-effects.js';
 import { canHarvest, damageTool as damageToolStack, getBreakTime } from './world-tool-rules.js';
-import { woodDoorCollision, woodDoorPart, woodDoorShape, woodDoorType } from './world-door.js';
+import { boxOverlapsXZ, woodDoorCollision, woodDoorPart, woodDoorShape, woodDoorType } from './world-door.js';
 import { rightClickIntent } from './world-interaction-rules.js';
 import { loadGameSettings } from './world-game-settings.js';
 import { advanceStarvation, deathTitle, HUNGER_WARNINGS, hungerStage } from './world-survival-rules.js';
@@ -593,8 +593,9 @@ class World {
         return this.blockFacings.get(x, y, z);
     }
 
-    // Caixa fina de colisão das portas. Sem isso o jogador parava na borda do
-    // voxel e ficava um vão de ~0,44 bloco entre ele e o painel.
+    // Caixa fina de colisão do painel da porta, fechada ou aberta. Sem isso o
+    // jogador parava na borda do voxel (porta fechada) ou atravessava o painel
+    // que estava vendo (porta aberta).
     doorCollisionBox(x, y, z, type) {
         const local = woodDoorCollision(woodDoorPart(type), this.getBlockFacing(x, y, z));
         if (!local) return null;
@@ -604,12 +605,12 @@ class World {
         };
     }
 
-    isSolidForPhysics(x, y, z) {
+    isSolidForPhysics(x, y, z, knownType = null) {
         if (y < 0) return true;
         if (y >= WORLD_HEIGHT) return false;
         const chunk = this.getChunk(floorDiv(x, CHUNK_SIZE), floorDiv(z, CHUNK_SIZE));
         if (!chunk) return true;
-        const type = chunk.data[idx(x - chunk.cx * CHUNK_SIZE, y, z - chunk.cz * CHUNK_SIZE)];
+        const type = knownType ?? chunk.data[idx(x - chunk.cx * CHUNK_SIZE, y, z - chunk.cz * CHUNK_SIZE)];
         return type !== 0 && (BLOCKS[type]?.solid ?? true);
     }
 
@@ -1454,14 +1455,13 @@ function otherDoorHalf(x, y, z, type) {
     return { x, y: y + (part.half === 'bottom' ? 1 : -1), z, part };
 }
 
-// A porta fechada colide só com o painel; se o jogador estiver no vão, fechar
-// deixaria ele preso dentro da geometria.
+// O painel colide nos dois estados; se o jogador estiver onde o painel vai
+// ficar, a porta não muda de estado para não prender ninguém dentro dela.
 function doorWouldHitPlayer(x, y, z, type) {
     const box = world.doorCollisionBox(x, y, z, type);
     if (!box) return false;
     const p = player.pos;
-    return p.x + PLAYER_RADIUS > box.minX && p.x - PLAYER_RADIUS < box.maxX
-        && p.z + PLAYER_RADIUS > box.minZ && p.z - PLAYER_RADIUS < box.maxZ
+    return boxOverlapsXZ(box, p.x - PLAYER_RADIUS, p.x + PLAYER_RADIUS, p.z - PLAYER_RADIUS, p.z + PLAYER_RADIUS)
         && p.y < y + 1 && p.y + player.height > y;
 }
 
@@ -1471,9 +1471,9 @@ function toggleWoodDoor(hit) {
     if (!part) return false;
     const open = !part.open;
     const halves = [{ x: hit.x, y: hit.y, z: hit.z, part }, otherDoorHalf(hit.x, hit.y, hit.z, type)];
-    if (!open && halves.some(half => half && doorWouldHitPlayer(
-        half.x, half.y, half.z, ID.WOOD_DOOR_BOTTOM))) {
-        showToast('Saia do vão da porta para fechá-la');
+    const targetType = woodDoorType('bottom', open);
+    if (halves.some(half => half && doorWouldHitPlayer(half.x, half.y, half.z, targetType))) {
+        showToast(open ? 'Saia do vão da porta para abri-la' : 'Saia do vão da porta para fechá-la');
         return false;
     }
     for (const half of halves) {
@@ -2854,14 +2854,36 @@ function collides(x, y, z, height) {
     for (let bx = x0; bx <= x1; bx++)
         for (let by = y0; by <= y1; by++)
             for (let bz = z0; bz <= z1; bz++) {
-                if (!world.isSolidForPhysics(bx, by, bz)) continue;
                 const type = world.getBlock(bx, by, bz);
-                if (!woodDoorPart(type)) return true;
-                // Porta: colide só com o painel (fechada). Aberta é passável.
-                const box = world.doorCollisionBox(bx, by, bz, type);
-                if (!box) continue;
-                if (pMaxX > box.minX && pMinX < box.maxX && pMaxZ > box.minZ && pMinZ < box.maxZ) return true;
+                // Porta: colide só com o painel, esteja aberta ou fechada. A porta
+                // aberta é `solid: false` para não tapar o vão, então ela precisa
+                // ser tratada antes do teste de solidez.
+                if (woodDoorPart(type)) {
+                    const box = world.doorCollisionBox(bx, by, bz, type);
+                    if (box && boxOverlapsXZ(box, pMinX, pMaxX, pMinZ, pMaxZ)) return true;
+                    continue;
+                }
+                if (!world.isSolidForPhysics(bx, by, bz, type)) continue;
+                return true;
             }
+    return false;
+}
+
+// Um save antigo pode ter o corpo dentro do painel de uma porta que passou a
+// colidir (ou sob areia que caiu). Em vez de nascer preso, procura o ponto
+// livre mais próximo: mesmo bloco, depois um bloco acima, com deslocamentos
+// laterais suficientes para sair do painel fino.
+const UNSTICK_OFFSETS = [
+    [0, 0], [0.45, 0], [-0.45, 0], [0, 0.45], [0, -0.45],
+    [0.45, 0.45], [-0.45, -0.45], [0.45, -0.45], [-0.45, 0.45],
+];
+function unstickPlayer() {
+    if (!collides(player.pos.x, player.pos.y, player.pos.z, player.height)) return false;
+    for (let dy = 0; dy <= 2; dy++)
+        for (const [dx, dz] of UNSTICK_OFFSETS) {
+            const x = player.pos.x + dx, y = player.pos.y + dy, z = player.pos.z + dz;
+            if (!collides(x, y, z, player.height)) { player.pos.set(x, y, z); return true; }
+        }
     return false;
 }
 
@@ -3274,7 +3296,9 @@ async function init() {
     const start = savedPositionIsInWorld ? save.player : spawnPoint;
     await waitForWorldRegion(start.x, start.z, { driveUpdates: true, onProgress: setWorldLoadProgress, radius: START_LOAD_RADIUS });
     player.pos.set(start.x, start.y, start.z);
-    for (let guard = 0; guard < 70 && collides(player.pos.x, player.pos.y, player.pos.z, player.height); guard++) player.pos.y += 1;
+    if (!unstickPlayer()) {
+        for (let guard = 0; guard < 70 && collides(player.pos.x, player.pos.y, player.pos.z, player.height); guard++) player.pos.y += 1;
+    }
     camera.position.set(player.pos.x, player.pos.y + player.eye, player.pos.z);
     
     initGameplayAssets();

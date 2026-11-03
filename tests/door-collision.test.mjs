@@ -1,8 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { ID } from '../world-catalog.js';
-import { woodDoorCollision, woodDoorPart } from '../world-door.js';
+import {
+    WOOD_DOOR_THICKNESS,
+    boxOverlapsXZ,
+    woodDoorCollision,
+    woodDoorPart,
+    woodDoorShape,
+} from '../world-door.js';
 
 const near = (actual, expected, message) =>
     assert.ok(Math.abs(actual - expected) < 1e-9, `${message}: ${actual} != ${expected}`);
@@ -28,12 +35,67 @@ test('porta fechada colide só com o painel, centralizado no voxel', () => {
     }
 });
 
-test('porta aberta é passável e não tem caixa de colisão', () => {
+test('porta aberta colide com o painel girado, encostado na borda', () => {
     for (const facing of ['north', 'south', 'east', 'west']) {
-        assert.equal(woodDoorCollision(woodDoorPart(ID.WOOD_DOOR_BOTTOM_OPEN), facing), null);
-        assert.equal(woodDoorCollision(woodDoorPart(ID.WOOD_DOOR_TOP_OPEN), facing), null);
+        const box = woodDoorCollision(woodDoorPart(ID.WOOD_DOOR_BOTTOM_OPEN), facing);
+        assert.ok(box, `sem caixa de colisão para ${facing}`);
+        const eastWest = facing === 'east' || facing === 'west';
+        // Aberta: o painel gira 90° e fica fino no eixo do batente.
+        if (eastWest) {
+            near(box.minZ, 0, 'borda do batente');
+            near(box.maxZ - box.minZ, WOOD_DOOR_THICKNESS, 'espessura');
+            near(box.minX, 0, 'vão minX');
+            near(box.maxX, 1, 'vão maxX');
+        } else {
+            near(box.minX, 0, 'borda do batente');
+            near(box.maxX - box.minX, WOOD_DOOR_THICKNESS, 'espessura');
+            near(box.minZ, 0, 'vão minZ');
+            near(box.maxZ, 1, 'vão maxZ');
+        }
+        // A metade de cima acompanha a de baixo.
+        assert.deepEqual(woodDoorCollision(woodDoorPart(ID.WOOD_DOOR_TOP_OPEN), facing), box);
     }
     assert.equal(woodDoorCollision(null, 'south'), null);
+});
+
+test('o vão da porta aberta continua largo o bastante para o jogador', () => {
+    const radius = 0.3;
+    const box = woodDoorCollision(woodDoorPart(ID.WOOD_DOOR_BOTTOM_OPEN), 'south');
+    const free = 1 - (box.maxX - box.minX);
+    assert.ok(free > 2 * radius + 0.2, `folga insuficiente: ${free}`);
+
+    // Passando pelo meio do vão o corpo não toca no painel...
+    assert.equal(boxOverlapsXZ(box, 0.5 - radius, 0.5 + radius, -0.5, 0.5), false);
+    // ...mas encostado no batente, toca.
+    assert.equal(boxOverlapsXZ(box, 0.1 - radius, 0.1 + radius, -0.5, 0.5), true);
+});
+
+test('o painel aberto é sólido do mesmo jeito que o fechado', () => {
+    const facing = 'north';
+    const closed = woodDoorShape(facing, false);
+    const open = woodDoorShape(facing, true);
+    assert.equal(closed.normalAxis, 2, 'fechada é fina em Z');
+    assert.equal(open.normalAxis, 0, 'aberta é fina em X');
+    near(closed.max[2] - closed.min[2], WOOD_DOOR_THICKNESS, 'espessura fechada');
+    near(open.max[0] - open.min[0], WOOD_DOOR_THICKNESS, 'espessura aberta');
+});
+
+test('boxOverlapsXZ detecta contato de borda como não-colisão', () => {
+    const box = { minX: 0, maxX: 0.125, minZ: 0, maxZ: 1 };
+    assert.equal(boxOverlapsXZ(box, 0.125, 0.425, 0.2, 0.8), false, 'encostado não sobrepõe');
+    assert.equal(boxOverlapsXZ(box, 0.124, 0.424, 0.2, 0.8), true, '1 mm dentro já colide');
+    assert.equal(boxOverlapsXZ(box, 0.5, 0.8, 0.2, 0.8), false, 'do outro lado do vão é livre');
+    assert.equal(boxOverlapsXZ(box, 0.1, 0.4, 0.9, 1.3), true, 'sobrepõe no eixo Z também');
+});
+
+test('game.js colide com o painel antes de descartar blocos não sólidos', () => {
+    const source = readFileSync(new URL('../game.js', import.meta.url), 'utf8');
+    // A porta aberta é `solid: false`; se o laço de colisão a descartasse antes
+    // de olhar a caixa, o jogador voltaria a atravessar o painel.
+    assert.match(source, /for \(let bz = z0; bz <= z1; bz\+\+\) \{\s+const type = world\.getBlock\(bx, by, bz\);[\s\S]{0,400}?if \(woodDoorPart\(type\)\) \{[\s\S]{0,200}?boxOverlapsXZ/);
+    assert.match(source, /const targetType = woodDoorType\('bottom', open\)/);
+    assert.match(source, /Saia do vão da porta para abri-la/);
+    assert.match(source, /function unstickPlayer\(\)/);
 });
 
 test('jogador encosta no painel em vez de parar na borda do voxel', () => {
