@@ -5,7 +5,8 @@ import { createWorldListView, formatWorldActivity } from './world-list-view.js';
 import { createOptionsView } from './world-options-view.js';
 import { bindUiSounds, getSharedAudio } from './world-audio.js';
 import { loadGameSettings } from './world-game-settings.js';
-import { registerServiceWorker } from './world-pwa.js';
+import { registerServiceWorker, isStandalone } from './world-pwa.js';
+import { INSTALL_UNAVAILABLE_HINT, createInstallPrompt } from './world-install-prompt.js';
 
 // Registra o service worker cedo (não bloqueia o menu): é o que permite instalar
 // o jogo e abrir sem rede depois da primeira visita.
@@ -206,6 +207,66 @@ document.getElementById('btn-open-options').addEventListener('click', () => {
 document.getElementById('btn-quit-game').addEventListener('click', () => {
     document.getElementById('quit-hint').hidden = false;
 });
+
+// =====================================================================
+// INSTALAR (PWA)
+// =====================================================================
+// O Chrome/Edge só deixam instalar se o jogo guardar o evento
+// `beforeinstallprompt`; sem isso o convite do navegador passa e não volta. O
+// Safari não tem evento: o botão vira a instrução manual. Toda a decisão está
+// em world-install-prompt.js — aqui só se ligam os botões.
+const installPrompt = createInstallPrompt({
+    userAgent: navigator.userAgent,
+    standalone: isStandalone(),
+});
+const installButton = document.getElementById('btn-install');
+const installHint = document.getElementById('install-hint');
+
+function refreshInstallButton() {
+    const view = installPrompt.view;
+    installButton.hidden = !view.visible;
+    installButton.textContent = view.label;
+    installButton.setAttribute('aria-describedby', 'install-hint');
+    // Com convite do navegador, o texto de instrução fica escondido até o
+    // clique falhar; no iOS ele é o próprio botão.
+    if (!view.hint) installHint.hidden = true;
+    else installHint.textContent = view.hint;
+}
+
+function showInstallHint(text) {
+    installHint.textContent = text;
+    installHint.hidden = !text;
+}
+
+window.addEventListener('beforeinstallprompt', event => {
+    // Sem `preventDefault` o Chrome mostra o mini-aviso dele e o nosso botão
+    // não recebe o evento para chamar depois.
+    event.preventDefault();
+    installPrompt.capturePromptEvent(event);
+    refreshInstallButton();
+});
+
+window.addEventListener('appinstalled', () => {
+    installPrompt.markInstalled();
+    refreshInstallButton();
+    showInstallHint('');
+});
+
+installButton.addEventListener('click', async () => {
+    if (!installPrompt.hasPrompt) {
+        // Sem convite programático: revela a instrução manual (iOS) ou avisa
+        // que o navegador não oferece.
+        showInstallHint(installPrompt.view.hint || INSTALL_UNAVAILABLE_HINT);
+        return;
+    }
+    const result = await installPrompt.prompt();
+    refreshInstallButton();
+    if (result === 'accepted') showInstallHint('Instalado! O jogo agora abre pelo ícone, inclusive sem rede.');
+    else if (result === 'unavailable') showInstallHint(INSTALL_UNAVAILABLE_HINT);
+    else showInstallHint('');
+});
+
+refreshInstallButton();
 dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
 worldOptionsDialog.addEventListener('click', event => { if (event.target === worldOptionsDialog) worldOptionsDialog.close(); });
 
