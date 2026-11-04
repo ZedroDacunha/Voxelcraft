@@ -10,7 +10,7 @@ export const TILE = { GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, STONE: 3, WOOD: 4, C
                GRASS_TOP_ALT: 19, GRASS_SIDE_ALT: 20, DIRT_ALT: 21, STONE_ALT: 22, LEAVES_ALT: 23,
                SAND: 24, WATER: 25, TORCH_FLAME: 26, COPPER_ORE: 27, CHEST_FRONT: 28,
                FURNACE_FRONT_ON: 29, FURNACE_SIDE: 30, CHEST_FRONT_OPEN: 31,
-               WOOD_DOOR_UPPER: 32, WOOD_DOOR_LOWER: 33 };
+               WOOD_DOOR_UPPER: 32, WOOD_DOOR_LOWER: 33, MOFIM_LANTERN: 34 };
 export const TILE_PX = 32;
 
 const allFaces = (t) => ({ top: t, side: t, bottom: t });
@@ -31,7 +31,10 @@ export const ID = { GRASS: 1, STONE: 2, LOG: 3, DIRT: 4, COBBLE: 5, PLANKS: 6, L
              // 65-73 pertencem às ferramentas de ouro/diamante/cobre; a porta
              // usa uma faixa livre para não colidir com esses IDs de item.
              WOOD_DOOR: 86, WOOD_DOOR_BOTTOM: 87, WOOD_DOOR_TOP: 88,
-             WOOD_DOOR_BOTTOM_OPEN: 89, WOOD_DOOR_TOP_OPEN: 90 };
+             WOOD_DOOR_BOTTOM_OPEN: 89, WOOD_DOOR_TOP_OPEN: 90,
+             // Recurso do Mofim: o pó luminoso que ele solta e a lanterna que
+             // se faz com ele (bloco sólido que emite luz).
+             MOFIM_DUST: 91, MOFIM_LANTERN: 92 };
 
 export const BLOCKS = {
     [ID.GRASS]: { name: 'Grama',      hardness: 0.6, drop: ID.DIRT,   tool: 'shovel', tiles: { top: TILE.GRASS_TOP, side: TILE.GRASS_SIDE, bottom: TILE.DIRT } },
@@ -72,6 +75,12 @@ export const BLOCKS = {
     [ID.TALL_GRASS]: { name: 'Grama alta', hardness: 0, drop: null, collectible: false, tool: null,
         render: 'instanced', solid: false, opaque: false, tiles: allFaces(TILE.GRASS_TOP) },
     [ID.TORCH]: { name: 'Tocha', hardness: 0.3, drop: ID.TORCH, tool: null, light: 14, render: 'torch', solid: false, tiles: allFaces(TILE.TORCH_FLAME) },
+    // Lanterna: um bloco sólido que ilumina (o sistema de luz pega qualquer
+    // bloco com `light`), feito com o pó que o Mofim solta.
+    [ID.MOFIM_LANTERN]: {
+        name: 'Lanterna de mofim', hardness: 0.8, drop: ID.MOFIM_LANTERN, tool: null,
+        light: 13, tiles: allFaces(TILE.MOFIM_LANTERN),
+    },
     [ID.WATER]: { name: 'Água',      hardness: 100, drop: null, tool: null, render: 'liquid', solid: false, collectible: false, tiles: allFaces(TILE.WATER) }, // Água só existe no mundo
 };
 
@@ -129,6 +138,10 @@ ITEMS[ID.WOOD_DOOR] = {
 ITEMS[ID.WHEAT_SEEDS] = {
     name: 'Sementes de trigo', maxStack: 64,
     sprite: { kind: 'wheat-seeds', mat: 'wheat' }, iconTile: nextTile++,
+};
+ITEMS[ID.MOFIM_DUST] = {
+    name: 'Pó luminoso', maxStack: 64,
+    sprite: { kind: 'mofim-dust', mat: 'glow' }, iconTile: nextTile++,
 };
 
 const TOOL_MATS = {
@@ -256,6 +269,9 @@ defRecipe([[ID.PLANKS, ID.PLANKS], [ID.PLANKS, ID.PLANKS]], ID.CRAFTING_TABLE);
 defRecipe([[ID.COBBLE, ID.COBBLE, ID.COBBLE], [ID.COBBLE, null, ID.COBBLE], [ID.COBBLE, ID.COBBLE, ID.COBBLE]], ID.FURNACE);
 defRecipe([[ID.PLANKS, ID.PLANKS, ID.PLANKS], [ID.PLANKS, null, ID.PLANKS], [ID.PLANKS, ID.PLANKS, ID.PLANKS]], ID.CHEST);
 defRecipe([[ID.PLANKS, ID.PLANKS], [ID.PLANKS, ID.PLANKS], [ID.PLANKS, ID.PLANKS]], ID.WOOD_DOOR, 3);
+// Pó luminoso + tábuas: a lanterna do Mofim. Três pós por lanterna é o que faz
+// valer a pena caçar (cada bicho solta um ou dois).
+defRecipe([[ID.MOFIM_DUST, ID.MOFIM_DUST], [ID.MOFIM_DUST, ID.PLANKS]], ID.MOFIM_LANTERN);
 
 function shapesEqual(a, b) {
     if (a.length !== b.length || a[0].length !== b[0].length) return false;

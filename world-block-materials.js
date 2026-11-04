@@ -13,7 +13,7 @@ const assign = (material, ids) => {
 
 assign('grass', [ID.GRASS, ID.TALL_GRASS, ID.LEAVES]);
 assign('dirt', [ID.DIRT]);
-assign('stone', [ID.STONE, ID.COBBLE, ID.FURNACE,
+assign('stone', [ID.STONE, ID.COBBLE, ID.FURNACE, ID.MOFIM_LANTERN,
     ID.COAL_ORE, ID.IRON_ORE, ID.GOLD_ORE, ID.DIAMOND_ORE, ID.COPPER_ORE]);
 assign('wood', [ID.LOG, ID.PLANKS, ID.CRAFTING_TABLE, ID.CHEST,
     ID.WOOD_DOOR_BOTTOM, ID.WOOD_DOOR_TOP,

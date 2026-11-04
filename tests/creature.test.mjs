@@ -13,6 +13,9 @@ import {
     HIT_COOLDOWN,
     HOP_DURATION,
     HOP_HEIGHT,
+    HURT_FLASH,
+    KNOCKBACK_DISTANCE,
+    MOFIM_HEALTH,
     SCARE_DURATION,
     SCARE_RADIUS,
     SCARE_SPEED,
@@ -46,9 +49,9 @@ function makeWorld({ heightAt = () => GROUND, groundType = () => ID.GRASS, above
     };
 }
 
-function makeSystem(world, clock, { onChirp = () => {} } = {}) {
+function makeSystem(world, clock, { onChirp = () => {}, onDeath = () => {} } = {}) {
     const CreatureSystem = createCreatureSystemClass({
-        THREE, ID, BLOCKS, CHUNK_SIZE, now: () => clock.t, onChirp,
+        THREE, ID, BLOCKS, CHUNK_SIZE, now: () => clock.t, onChirp, onDeath,
     });
     return new CreatureSystem(world);
 }
@@ -195,14 +198,92 @@ test('levar um golpe assusta na hora, mesmo agachado e de perto', () => {
 
     const origin = { x: 0, y: GROUND + 1.45, z: 0 };
     const hit = system.hitFrom(origin, { x: 1, y: 0, z: 0 });
-    assert.equal(hit, creature, 'o golpe achou o Mofim');
+    assert.equal(hit.entity, creature, 'o golpe achou o Mofim');
+    assert.equal(hit.killed, false, 'um golpe só não derruba');
     assert.equal(creature.scaredUntil, 100 + SCARE_DURATION);
 
     // Botão segurado não vira uma saraivada de golpes: o mesmo Mofim fica em
     // cooldown por um instante.
     assert.equal(system.hitFrom(origin, { x: 1, y: 0, z: 0 }), null);
     clock.t = 100 + HIT_COOLDOWN + 0.001;
-    assert.equal(system.hitFrom(origin, { x: 1, y: 0, z: 0 }), creature, 'depois do cooldown volta a valer');
+    const again = system.hitFrom(origin, { x: 1, y: 0, z: 0 });
+    assert.equal(again.entity, creature, 'depois do cooldown volta a valer');
+    assert.equal(again.killed, false);
+});
+
+test('o golpe empurra o Mofim para longe de quem bateu', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    const creature = spawnOne(system, world, clock, player);
+
+    creature.x = 2; creature.z = 0; creature.y = GROUND + 1;
+    clock.t = 70;
+    const antes = creature.x;
+    system.hitFrom({ x: 0, y: GROUND + 1.45, z: 0 }, { x: 1, y: 0, z: 0 });
+
+    assert.ok(creature.x > antes + KNOCKBACK_DISTANCE * 0.9, 'recuou na direção do golpe');
+    assert.equal(creature.z, 0, 'sem escorregar para o lado');
+});
+
+test('o dano acende o corpo do Mofim e apaga sozinho', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    const creature = spawnOne(system, world, clock, player);
+
+    // Material próprio: o clarão não pode pintar de vermelho todos os Mofins.
+    assert.notEqual(creature.bodyMaterial, system.materials.body);
+
+    creature.x = 2; creature.z = 0; creature.y = GROUND + 1;
+    clock.t = 60;
+    system.update(0.016, player, true);
+    assert.equal(creature.bodyMaterial.emissive.r, 0, 'sem levar golpe fica apagado');
+
+    system.hitFrom({ x: 0, y: GROUND + 1.45, z: 0 }, { x: 1, y: 0, z: 0 });
+    system.update(0.016, player, true);
+    assert.ok(creature.bodyMaterial.emissive.r > 0.5, 'acende no golpe');
+
+    clock.t += HURT_FLASH + 0.01;
+    system.update(0.016, player, true);
+    assert.equal(creature.bodyMaterial.emissive.r, 0, 'e apaga sozinho');
+});
+
+test('três golpes derrubam o Mofim e avisam quem chamou', () => {
+    const clock = { t: 0 };
+    const deaths = [];
+    const world = makeWorld();
+    const system = makeSystem(world, clock, { onDeath: entity => deaths.push(entity) });
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    const creature = spawnOne(system, world, clock, player);
+    const cenas = world.scene.children.length;
+
+    creature.x = 2; creature.z = 0; creature.y = GROUND + 1;
+    clock.t = 50;
+    const origin = { x: 0, y: GROUND + 1.45, z: 0 };
+    for (let golpe = 1; golpe < MOFIM_HEALTH; golpe++) {
+        const hit = system.hitFrom(origin, { x: 1, y: 0, z: 0 });
+        assert.equal(hit.killed, false, `o golpe ${golpe} ainda não derruba`);
+        assert.equal(system.entities.length, 1, 'e ele continua no mundo');
+        clock.t += HIT_COOLDOWN + 0.001;
+    }
+
+    const ultimo = system.hitFrom(origin, { x: 1, y: 0, z: 0 });
+    assert.equal(ultimo.killed, true, 'o último golpe derruba');
+    assert.equal(system.entities.length, 0, 'saiu da lista de bichos');
+    assert.equal(world.scene.children.length, cenas - 1, 'e saiu da cena');
+    assert.equal(deaths.length, 1, 'avisou uma vez só');
+    assert.equal(deaths[0].id, creature.id, 'com o Mofim que morreu');
+    assert.equal(deaths[0].y, GROUND + 1, 'no lugar do corpo');
+    assert.ok(deaths[0].x > 1.9, 'onde ele caiu');
+
+    // Morto, ele não volta a andar no quadro seguinte (outro pode nascer no
+    // lugar, mas não esse).
+    system.update(0.016, player, true);
+    assert.ok(!system.entities.includes(creature), 'o Mofim derrubado não volta');
+    assert.equal(deaths.length, 1, 'e ninguém mais morre');
 });
 
 test('golpe no vazio não assusta ninguém', () => {

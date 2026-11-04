@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { BLOCKS, ITEMS, RECIPES, ID, ATLAS_COLUMNS, ATLAS_ROWS, matchRecipe } from '../world-catalog.js';
+import { BLOCKS, ITEMS, RECIPES, ID, TILE, ATLAS_COLUMNS, ATLAS_ROWS, matchRecipe } from '../world-catalog.js';
 import { woodDoorPart, woodDoorType, woodDoorShape } from '../world-door.js';
 import { Inventory } from '../inventory-model.js';
 
@@ -75,4 +75,33 @@ test('a grade 3x3 reconhece a receita da porta', () => {
     const inv = new Inventory(9);
     for (const index of [0, 1, 3, 4, 6, 7]) inv.slots[index] = { id: ID.PLANKS, count: 1 };
     assert.deepEqual(matchRecipe(inv, 3), { id: ID.WOOD_DOOR, count: 3 });
+});
+
+test('a lanterna de mofim é um bloco sólido que ilumina', () => {
+    const TILE_MOFIM_LANTERN = TILE.MOFIM_LANTERN;
+    const block = BLOCKS[ID.MOFIM_LANTERN];
+    assert.ok(block, 'o bloco existe');
+    assert.ok(block.light > 0, 'emite luz');
+    assert.ok(block.light < BLOCKS[ID.TORCH].light, 'um pouco menos que a tocha');
+    assert.notEqual(block.solid, false, 'é sólido (dá para apoiar coisas em cima)');
+    assert.equal(block.render, 'opaque', 'renderiza como cubo normal, não como tocha');
+    assert.equal(block.tiles.top, TILE_MOFIM_LANTERN, 'as seis faces usam o tile da lanterna');
+    assert.equal(block.drop, ID.MOFIM_LANTERN, 'quebrar devolve a lanterna');
+    assert.equal(ITEMS[ID.MOFIM_LANTERN].block, ID.MOFIM_LANTERN, 'e ela pode ser colocada de novo');
+});
+
+test('o pó luminoso é item de pilha e a receita da lanterna usa três pós', () => {
+    const dust = ITEMS[ID.MOFIM_DUST];
+    assert.equal(dust.name, 'Pó luminoso');
+    assert.equal(dust.maxStack, 64);
+    assert.deepEqual(dust.sprite, { kind: 'mofim-dust', mat: 'glow' }, 'tem sprite próprio, não ícone de bloco');
+
+    const inv = new Inventory(9);
+    for (const index of [0, 1, 3]) inv.slots[index] = { id: ID.MOFIM_DUST, count: 1 };
+    inv.slots[4] = { id: ID.PLANKS, count: 1 };
+    assert.deepEqual(matchRecipe(inv, 3), { id: ID.MOFIM_LANTERN, count: 1 });
+
+    // Sem a tábua não é a receita: o pó sozinho não faz lanterna.
+    inv.slots[4] = null;
+    assert.equal(matchRecipe(inv, 3), null);
 });
