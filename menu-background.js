@@ -1,18 +1,41 @@
+// O panorama animado atrás do título: a ilha gira devagar enquanto o jogo abre.
+//
+// Ele agora usa a **mesma luz do mundo** em vez de uma cópia parecida:
+//
+// - a malha vem de `menu-panorama.js`, com as faces escondidas fora e a sombra
+//   de canto escrita em cor de vértice — o mesmo relevo dos blocos do jogo;
+// - o céu é o `world-sky.js`, que é quem decide cor do fundo, nevoeiro, força e
+//   cor do sol (e desenha sol, lua e estrelas). O relógio aqui é parado numa
+//   tarde de sol: um menu que escurece sozinho deixaria o título ilegível.
+// - as luzes (hemisférica + direcional) nascem com os valores do jogo e são
+//   reescritas pelo céu a cada quadro, como no mundo.
+
 import * as THREE from 'three';
-import { ATLAS_UV_PAD_PX, BLOCKS, ID, TILE, TILE_PX, atlasTileRect, atlasUV } from './world-catalog.js';
-import { hash2 } from './world-math.js';
+import { TILE, TILE_PX, atlasTileRect } from './world-catalog.js';
+import { clamp01, mulberry32, smoothstep } from './world-math.js';
 import { createTextureTools } from './world-textures.js';
-import { tileForBlockFace } from './world-block-orientation.js';
+import { createWorldSkySystem } from './world-sky.js';
+import { MENU_LAKE, buildMenuPanorama, panoramaGeometry } from './menu-panorama.js';
 
 const canvas = document.getElementById('menu-world');
 const titleScreen = document.getElementById('title-screen');
 if (!canvas || !titleScreen) throw new Error('A tela inicial não está pronta para mostrar o panorama.');
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x9bcce7);
-scene.fog = new THREE.Fog(0x9bcce7, 42, 105);
+const SKY_COLOR = 0x9bcce7;
+// Onde o sol está no céu do menu, em fração do dia (0 = nascer, 0.25 = meio-dia).
+// 0.06 é manhã de céu limpo: dia cheio, luz branca e sombra no ponto mais claro
+// do jogo. Baixar para perto de 0.02 dá fim de tarde laranja; subir passa do
+// meio-dia. É o único número a mexer para trocar a hora do menu.
+const MENU_SUN_TIME = 0.06;
+const FOG_NEAR = 42;
+const FOG_FAR = 105;
 
-const camera = new THREE.PerspectiveCamera(43, 1, 0.1, 150);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(SKY_COLOR);
+scene.fog = new THREE.Fog(SKY_COLOR, FOG_NEAR, FOG_FAR);
+
+// `far` generoso: o sol, a lua e as estrelas ficam a 250 unidades da câmera.
+const camera = new THREE.PerspectiveCamera(43, 1, 0.1, 400);
 const target = new THREE.Vector3(0, 5, 0);
 
 const renderer = new THREE.WebGLRenderer({
@@ -25,119 +48,61 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
 renderer.setSize(window.innerWidth, window.innerHeight, false);
 
-scene.add(new THREE.HemisphereLight(0xe7f5ff, 0x596343, 2.2));
-const sun = new THREE.DirectionalLight(0xfff1cf, 2.4);
-sun.position.set(-28, 42, 16);
-scene.add(sun);
+// Mesmos valores do `init()` do jogo: quem manda neles depois é o céu.
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8);
+const sunLight = new THREE.DirectionalLight(0xffffff, 0.6);
+sunLight.position.set(10, 20, 10);
+scene.add(hemiLight, sunLight);
 
-const atlas = createTextureTools(THREE).createAtlasTexture();
-const blockTypes = {
-    grass: BLOCKS[ID.GRASS], dirt: BLOCKS[ID.DIRT], stone: BLOCKS[ID.STONE],
-    sand: BLOCKS[ID.SAND], wood: BLOCKS[ID.LOG], leaves: BLOCKS[ID.LEAVES],
+// Nuvens: o céu avisa a hora e a cor quente para elas acompanharem o sol.
+const cloudMaterial = new THREE.MeshLambertMaterial({ color: 0xf2f4ec, flatShading: true });
+const cloudNight = new THREE.Color(0x232a46);
+const cloudDusk = new THREE.Color(0xffb690);
+const cloudDay = new THREE.Color(0xf2f4ec);
+const cloudColor = new THREE.Color();
+const cloudTint = {
+    updateTint(day, warm) {
+        cloudColor.copy(cloudNight).lerp(cloudDay, day).lerp(cloudDusk, warm * 0.55);
+        cloudMaterial.color.copy(cloudColor);
+    },
 };
-const altTiles = new Map([
-    [TILE.GRASS_TOP, TILE.GRASS_TOP_ALT], [TILE.GRASS_SIDE, TILE.GRASS_SIDE_ALT],
-    [TILE.DIRT, TILE.DIRT_ALT], [TILE.STONE, TILE.STONE_ALT], [TILE.LEAVES, TILE.LEAVES_ALT],
-]);
-const positions = {};
-for (const kind of Object.keys(blockTypes)) for (const variant of [0, 1]) positions[`${kind}:${variant}`] = [];
-const addBlock = (kind, x, y, z, variant = 0) => positions[`${kind}:${variant}`].push([x, y, z]);
-const variantFor = (x, y, z) => hash2(x + y * 13, z - y * 7, 404) > 0.16 ? 0 : 1;
-const smoothNoise = (x, z) => Math.sin(x * 0.21) * 1.35 + Math.cos(z * 0.17) * 1.25
-    + Math.sin((x + z) * 0.095) * 1.1 + Math.cos((x - z) * 0.13) * 0.65;
+const worldSky = createWorldSkySystem({
+    THREE,
+    clamp01,
+    smoothstep,
+    mulberry32,
+    clouds: cloudTint,
+    skyColor: SKY_COLOR,
+});
+worldSky.create(scene);
 
-const faces = [
-    { kind: 'side', dir: [-1, 0, 0], corners: [[0,1,0,0,1],[0,0,0,0,0],[0,1,1,1,1],[0,0,1,1,0]] },
-    { kind: 'side', dir: [1, 0, 0], corners: [[1,1,1,0,1],[1,0,1,0,0],[1,1,0,1,1],[1,0,0,1,0]] },
-    { kind: 'bottom', dir: [0,-1,0], corners: [[1,0,1,1,0],[0,0,1,0,0],[1,0,0,1,1],[0,0,0,0,1]] },
-    { kind: 'top', dir: [0,1,0], corners: [[0,1,1,1,1],[1,1,1,0,1],[0,1,0,1,0],[1,1,0,0,0]] },
-    { kind: 'side', dir: [0,0,-1], corners: [[1,0,0,0,0],[0,0,0,1,0],[1,1,0,0,1],[0,1,0,1,1]] },
-    { kind: 'side', dir: [0,0,1], corners: [[0,0,1,0,0],[1,0,1,1,0],[0,1,1,0,1],[1,1,1,1,1]] },
-];
-
-function blockGeometry(block, variant) {
-    const positions = [], normals = [], uvs = [], indices = [];
-    for (const face of faces) {
-        const baseTile = tileForBlockFace(block.tiles, face.kind, face.dir);
-        const tile = variant ? (altTiles.get(baseTile) ?? baseTile) : baseTile;
-        const { u0, v0, uWidth, vHeight } = atlasUV(tile, ATLAS_UV_PAD_PX);
-        const start = positions.length / 3;
-        for (const [x, y, z, u, v] of face.corners) {
-            positions.push(x - 0.5, y - 0.5, z - 0.5);
-            normals.push(...face.dir);
-            uvs.push(u0 + u * uWidth, v0 + v * vHeight);
-        }
-        indices.push(start, start + 1, start + 2, start + 2, start + 1, start + 3);
-    }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-    geometry.setIndex(indices);
-    return geometry;
-}
-
-for (let x = -24; x <= 24; x++) {
-    for (let z = -24; z <= 24; z++) {
-        const lakeX = (x - 3) / 10;
-        const lakeZ = (z + 3) / 7;
-        const lakeDistance = lakeX * lakeX + lakeZ * lakeZ;
-        const isLake = lakeDistance < 0.78;
-        const isShore = lakeDistance >= 0.78 && lakeDistance < 1.03;
-        const height = isLake ? 0 : Math.max(2, Math.round(4 + smoothNoise(x, z)));
-        const sandyColumn = isLake || isShore;
-        addBlock(sandyColumn ? 'sand' : 'grass', x, height, z,
-            sandyColumn ? 0 : variantFor(x, height, z));
-        for (let depth = 1; depth <= 3; depth++) {
-            const layerY = height - depth;
-            if (layerY < 0) break;
-            const layerType = sandyColumn ? 'sand' : 'dirt';
-            addBlock(layerType, x, layerY, z, variantFor(x, layerY, z));
-        }
-        for (let layerY = height - 4; layerY >= 0; layerY--) {
-            addBlock('stone', x, layerY, z, variantFor(x, layerY, z));
-        }
-
-        const treeSeed = Math.abs(Math.sin(x * 127.1 + z * 311.7) * 43758.5453) % 1;
-        if (treeSeed > 0.89 && !isLake && !isShore && Math.abs(x) + Math.abs(z) > 8) {
-            const trunkHeight = 3 + Math.floor(treeSeed * 3);
-            for (let y = 1; y <= trunkHeight; y++) addBlock('wood', x, height + y, z);
-            const crownY = height + trunkHeight;
-            for (let dy = -1; dy <= 1; dy++) {
-                const radius = dy === 1 ? 1 : 2;
-                for (let dx = -radius; dx <= radius; dx++) {
-                    for (let dz = -radius; dz <= radius; dz++) {
-                        if (Math.abs(dx) === radius && Math.abs(dz) === radius && dy === 0) continue;
-                        const leafX = x + dx, leafZ = z + dz, leafY = crownY + dy;
-                        addBlock('leaves', leafX, leafY, leafZ, variantFor(leafX, leafY, leafZ));
-                    }
-                }
-            }
-            const leafY = crownY + 2;
-            addBlock('leaves', x, leafY, z, variantFor(x, leafY, z));
-        }
-    }
-}
-
-const dummy = new THREE.Object3D();
-for (const [key, instances] of Object.entries(positions)) {
-    if (!instances.length) continue;
-    const [kind, variantText] = key.split(':');
-    const block = blockTypes[kind];
-    const material = new THREE.MeshLambertMaterial({
+// Chão, árvores e lago. A malha já vem com UV do atlas, face escondida fora e
+// sombra de canto — o mesmo acabamento dos blocos do jogo.
+const atlas = createTextureTools(THREE).createAtlasTexture();
+const panorama = buildMenuPanorama();
+const panoramaParts = panoramaGeometry(panorama);
+const blockMaterials = {
+    opaque: new THREE.MeshLambertMaterial({ map: atlas, vertexColors: true }),
+    cutout: new THREE.MeshLambertMaterial({
         map: atlas,
-        alphaTest: block.render === 'cutout' ? 0.5 : 0,
-        side: block.render === 'cutout' ? THREE.DoubleSide : THREE.FrontSide,
-    });
-    const mesh = new THREE.InstancedMesh(blockGeometry(block, Number(variantText)), material, instances.length);
+        alphaTest: 0.5,
+        transparent: false,
+        depthWrite: true,
+        vertexColors: true,
+        side: THREE.DoubleSide,
+    }),
+};
+for (const name of ['opaque', 'cutout']) {
+    const part = panoramaParts[name];
+    if (!part.faces) continue;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(part.positions, 3));
+    geometry.setAttribute('normal', new THREE.BufferAttribute(part.normals, 3));
+    geometry.setAttribute('uv', new THREE.BufferAttribute(part.uvs, 2));
+    geometry.setAttribute('color', new THREE.BufferAttribute(part.colors, 3));
+    geometry.setIndex(new THREE.BufferAttribute(part.indices, 1));
+    const mesh = new THREE.Mesh(geometry, blockMaterials[name]);
     mesh.frustumCulled = false;
-    instances.forEach(([x, y, z], index) => {
-        dummy.position.set(x, y, z);
-        dummy.scale.setScalar(1);
-        dummy.updateMatrix();
-        mesh.setMatrixAt(index, dummy.matrix);
-    });
-    mesh.instanceMatrix.needsUpdate = true;
     scene.add(mesh);
 }
 
@@ -156,12 +121,15 @@ const water = new THREE.Mesh(
     new THREE.MeshLambertMaterial({ map: waterTexture, transparent: true, opacity: 0.9 }),
 );
 water.rotation.x = -Math.PI / 2;
-water.position.set(3, 2.42, -3);
-water.scale.set(10 * Math.sqrt(0.78) + 0.5, 7 * Math.sqrt(0.78) + 0.5, 1);
+water.position.set(MENU_LAKE.centerX, MENU_LAKE.surfaceY, MENU_LAKE.centerZ);
+water.scale.set(
+    MENU_LAKE.radiusX * Math.sqrt(MENU_LAKE.fill) + 0.5,
+    MENU_LAKE.radiusZ * Math.sqrt(MENU_LAKE.fill) + 0.5,
+    1,
+);
 scene.add(water);
 
 const clouds = new THREE.Group();
-const cloudMaterial = new THREE.MeshLambertMaterial({ color: 0xf2f4ec, flatShading: true });
 const cloudShapes = [
     [-25, 20, -12, 8, 1, 4], [-6, 23, -24, 7, 1, 3], [15, 19, -18, 9, 1, 3],
     [30, 22, 2, 8, 1, 4], [-34, 18, 13, 7, 1, 3], [4, 25, 21, 8, 1, 3],
@@ -193,6 +161,15 @@ function render(now = 0) {
     const radius = 39;
     camera.position.set(Math.sin(angle) * radius, 18.5 + Math.sin(angle * 1.7) * 0.7, Math.cos(angle) * radius);
     camera.lookAt(target);
+    worldSky.update({
+        scene,
+        camera,
+        hemiLight,
+        sunLight,
+        worldTime: MENU_SUN_TIME,
+        fogNear: FOG_NEAR,
+        fogFar: FOG_FAR,
+    });
     renderer.render(scene, camera);
 }
 function animate(now) {
