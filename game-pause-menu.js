@@ -7,5 +7,7 @@ export function shouldShowPauseMenu({ locked = false, inventoryOpen = false, dea
 }
 
 export function pauseMenuDisplay(state) {
-    return shouldShowPauseMenu(state) ? 'flex' : 'none';
+    // 'grid' (e não 'flex'): o cartão de pausa é centralizado pelo
+    // `place-items` do #menu, sem precisar de margem.
+    return shouldShowPauseMenu(state) ? 'grid' : 'none';
 }

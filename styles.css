@@ -12,10 +12,21 @@
     #crosshair::before, #crosshair::after { content: ''; position: absolute; background-color: white; box-shadow: 0 0 2px black; }
     #crosshair::before { top: 9px; left: 0; width: 20px; height: 2px; }
     #crosshair::after { top: 0; left: 9px; width: 2px; height: 20px; }
-    #menu { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.6); display: none; flex-direction: column; justify-content: center; align-items: center; color: white; z-index: 10; text-align: center; }
-    body.game-started #menu { display: flex; }
-    #menu h1 { margin: 0 0 10px 0; }
-    #menu p { margin: 0 0 20px 0; }
+    #menu { position: absolute; inset: 0; display: none; place-items: center; padding: 16px; overflow-y: auto;
+        background-color: rgba(0,0,0,0.55); color: white; z-index: 10; text-align: center; }
+    body.game-started #menu { display: grid; }
+    /* Menu de pausa: um cartão no padrão de botões clássico do jogo (sem raio,
+       borda 2px) em vez do texto solto que existia antes. */
+    .pause-card { box-sizing: border-box; width: min(380px, 100%); display: grid; gap: 10px; padding: 18px 16px;
+        border: 2px solid #171717; background: rgba(26, 26, 26, .93);
+        box-shadow: inset 2px 2px 0 #ffffff1f, inset -2px -2px 0 #0006, 0 14px 44px #000a; }
+    .pause-card h1 { margin: 0 0 4px; font: bold clamp(20px, 5vw, 26px)/1.2 Arial, sans-serif; text-shadow: 2px 2px 0 #0009; }
+    .pause-actions { display: grid; gap: 8px; }
+    .pause-controls { text-align: left; font-size: 12px; line-height: 1.55; color: #d8d8d8; }
+    .pause-controls summary { padding: 4px 0; color: #fff; cursor: pointer; }
+    .pause-controls p { margin: 6px 0; }
+    .pause-controls kbd, .options-controls kbd { padding: 1px 4px; border: 1px solid #747474; background: #343434; color: #fff; font: 11px monospace; }
+    #menu-touch-hint { margin: 0; font-size: 12px; line-height: 1.45; color: #cfcfcf; }
     #world-loading { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: rgba(5, 9, 16, 0.94); color: #fff; text-align: center; }
     #world-loading[hidden] { display: none; }
     .world-loading-card { width: min(420px, calc(100vw - 48px)); padding: 28px; background: rgba(26, 34, 48, 0.95); border: 2px solid #52637b; border-radius: 8px; box-shadow: 0 12px 40px rgba(0,0,0,.45); }
@@ -217,11 +228,16 @@
     .options-dialog kbd { padding: 2px 5px; border: 1px solid #747474; background: #343434; color: #fff; font: 12px monospace; }
     .options-dialog .world-dialog-actions { justify-content: space-between; }
     .options-hint { margin: 0; color: #b9c3cc; font-size: 12px; }
-    .options-field { gap: 7px; margin: 14px 0; }
-    .options-field-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-    .options-field-head output { color: #fff; font: 13px/1.1 monospace; }
-    .options-field input[type="range"] { width: 100%; margin: 0; padding: 0; border: 0; border-radius: 0;
-        background: transparent; accent-color: #8ed9e7; cursor: pointer; }
+    /* Grade de opções estilo Minecraft: cada opção é uma barra com o nome à
+       esquerda e o valor à direita. O preenchimento (`--option-fill`) é escrito
+       pelo world-options-view.js conforme o valor. */
+    .options-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 14px 0; }
+    .option-btn { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+        min-height: 36px; padding: 7px 10px; text-align: left; touch-action: none; }
+    .option-btn::before { content: ''; position: absolute; inset: 0 auto 0 0; width: var(--option-fill, 0%);
+        background: #ffffff26; pointer-events: none; }
+    .option-name, .option-value { position: relative; z-index: 1; }
+    .option-value { color: #fff; font: 700 13px/1 monospace; text-shadow: 1px 1px 0 #0008; }
     .options-controls { margin-top: 16px; padding-top: 12px; border-top: 1px solid #33465a; color: #d0d0d0; font-size: 13px; }
     .options-controls summary { color: #d6d0a4; cursor: pointer; }
     .options-controls p { margin: 8px 0 0; color: #d0d0d0; line-height: 1.55; }
@@ -279,4 +295,8 @@
         .title-logo-main { font-size: clamp(42px, 12vh, 72px); }
         .title-screen-actions { gap: 5px; width: min(320px, calc(100vw - 40px)); }
         .classic-btn-wide { min-height: 32px; }
+    }
+
+    @media (max-width: 560px) {
+        .options-grid { grid-template-columns: 1fr; }
     }

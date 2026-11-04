@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 542 testes de módulos puros (node --test)
+npm test           # 564 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -42,7 +42,7 @@ O `check` é o que o CI (`.github/workflows/ci.yml`) roda em todo PR para `main`
 
 | Área | Arquivos |
 | --- | --- |
-| Entrada | `world-menu.js` (menu, seleção/criação de mundo, opções) |
+| Entrada | `world-menu.js` (menu, seleção/criação de mundo), `world-options-view.js` (tela de opções em grade, aberta no menu e no ESC do jogo), `game-pause-menu.js` (menu de pausa) |
 | Panorama do menu | `menu-background.js` (a câmera que gira e o céu) e `menu-panorama.js` (a ilha em malha única, com sombra de canto) |
 | Loop e estado do jogo | `game.js` (mundo, HUD, interação, save) |
 | Física e colisão do jogador | `player-physics.js` (AABB × voxels, passo subdividido, destravar, ocupação de célula, apoio no chão agachado), `player-jump.js` (janela do pulo tardio) |
@@ -159,6 +159,30 @@ jogo. A luz e o céu vêm do `world-sky.js`: cor do fundo, nevoeiro, sol, lua,
 estrelas e a intensidade/cor do sol e da hemisférica. O relógio dele fica parado
 numa manhã de sol (`MENU_SUN_TIME`), porque menu que escurece sozinho deixa o
 título ilegível.
+
+## Pausa e opções (ESC)
+
+`ESC` durante o jogo solta o mouse e abre o **menu de pausa**: `Voltar ao jogo`,
+`Opções…` e `Salvar e sair para os mundos` — todos no `.classic-btn` cinza do
+menu, e as teclas ficam num `Controles` recolhido. No toque, o botão `Pausar`
+abre o mesmo cartão.
+
+A tela de opções é a **mesma** do menu inicial, agora também com o jogo rodando
+atrás: cada opção é uma barra estilo Minecraft (`Sensibilidade: 100%`,
+`Campo de visão: 75°`…) — clique ou arraste na barra para mudar, setas e
+`Home`/`End` pelo teclado, e `role="slider"` para o leitor de tela.
+
+| Opção | Vale quando |
+| --- | --- |
+| Sensibilidade do mouse | na hora |
+| Campo de visão | na hora |
+| Volume | na hora |
+| Gráficos (automática/máxima/alta/média) | na hora — o mesmo caminho do `F4` |
+| Distância de render | no próximo mundo (recarregar chunks ao vivo é outro assunto) |
+
+Quem grava é `world-game-settings.js` (localStorage), que também **avisa** os
+assinantes — o jogo aplica o que dá na hora e o áudio da interface troca de
+volume sem recarregar a página.
 
 ## Instalar e jogar sem rede (PWA)
 

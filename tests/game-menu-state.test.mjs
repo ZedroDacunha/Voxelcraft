@@ -63,7 +63,7 @@ function makeRequester({ element, doc = makeDoc(), timers = makeTimers(), warn =
 test('menu de pausa aparece quando nenhum estado exclusivo está ativo', () => {
     assert.equal(shouldShowPauseMenu(), true);
     assert.equal(shouldShowPauseMenu({ locked: false, inventoryOpen: false, dead: false }), true);
-    assert.equal(pauseMenuDisplay({}), 'flex');
+    assert.equal(pauseMenuDisplay({}), 'grid');
 });
 
 test('menu de pausa fica oculto durante jogo, inventário ou morte', () => {

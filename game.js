@@ -63,7 +63,7 @@ import {
 } from './world-touch-controls.js';
 import { getSharedAudio } from './world-audio.js';
 import { rightClickIntent } from './world-interaction-rules.js';
-import { loadGameSettings } from './world-game-settings.js';
+import { loadGameSettings, onGameSettingsChange } from './world-game-settings.js';
 import { advanceStarvation, deathTitle, HUNGER_WARNINGS, hungerStage } from './world-survival-rules.js';
 import {
     BlockFacingStore, DEFAULT_BLOCK_FACING, facingTowardPlayer, isFrontFace, isHorizontalFacing,
@@ -2656,7 +2656,9 @@ function syncTouchUi() {
 const MAX_EVENT_DELTA = 350;
 const lookEuler = new THREE.Euler(0, 0, 0, 'YXZ');
 const LOOK_SPEED = 0.002;
-const LOOK_SENSITIVITY = GAME_SETTINGS.sensitivity;
+// A sensibilidade é lida a cada movimento (a tela de opções pode mudá-la com o
+// jogo rodando), então fica numa variável, não numa constante.
+let LOOK_SENSITIVITY = GAME_SETTINGS.sensitivity;
 const MAX_PITCH = Math.PI / 2 - 0.02;
 
 let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
@@ -2701,6 +2703,22 @@ const gfx = createWorldGraphicsQuality({
     notify: showToast,
 });
 const cycleQuality = () => gfx.cycle();
+
+// A tela de opções grava em world-game-settings e avisa; aqui só se aplica o
+// que dá para aplicar sem recarregar o mundo. A distância de render fica de
+// fora de propósito: mudar chunks ao vivo é outro assunto (vale no próximo).
+const QUALITY_FROM_SETTING = { auto: 'auto', max: 'max', 0.75: 0.75, 0.5: 0.5 };
+function applyGameSettings(settings, { quiet = false } = {}) {
+    GAME_SETTINGS.sensitivity = settings.sensitivity;
+    GAME_SETTINGS.fov = settings.fov;
+    GAME_SETTINGS.volume = settings.volume;
+    LOOK_SENSITIVITY = settings.sensitivity;
+    audio.setVolume?.(settings.volume);
+    const mode = QUALITY_FROM_SETTING[settings.graphics];
+    if (mode !== undefined && gfx.mode !== mode) gfx.setMode(mode, { quiet });
+}
+applyGameSettings(GAME_SETTINGS, { quiet: true });
+onGameSettingsChange(settings => applyGameSettings(settings));
 
 // =====================================================================
 // 7. HUD E STATUS DE SOBREVIVÊNCIA
@@ -3495,6 +3513,13 @@ async function init() {
 
     btnPlay.addEventListener('click', () => {
         startPlay({ preferMouse: lastPointerKind === 'mouse' });
+    });
+    // "Opções…" abre a mesma tela do menu de fora, agora com o jogo pausado
+    // atrás. O que dá para aplicar na hora (sensibilidade, visão, volume e
+    // gráficos) muda na hora; a distância de render vale no próximo mundo.
+    const optionsDialog = document.getElementById('options-dialog');
+    document.getElementById('btn-menu-options')?.addEventListener('click', () => {
+        optionsDialog?.showModal();
     });
     const btnWorlds = document.getElementById('btn-worlds');
     btnWorlds.addEventListener('click', async () => {
