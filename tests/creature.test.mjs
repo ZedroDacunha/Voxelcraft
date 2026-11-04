@@ -6,6 +6,7 @@ import { ID } from '../world-catalog.js';
 import {
     CHIRP_COOLDOWN,
     CHIRP_RANGE,
+    GLIDE_DURATION,
     CREATURE_LIMIT,
     DESPAWN_DISTANCE,
     FLEE_SPEED,
@@ -19,6 +20,7 @@ import {
     chirpFor,
     createCreatureSystemClass,
     creatureInReach,
+    glideHeightAt,
     shouldFlee,
 } from '../world-creature.js';
 
@@ -366,4 +368,92 @@ test('degrau de dois blocos: continua barrado', () => {
 
     assert.equal(creature.y, GROUND + 1, 'não subiu');
     assert.ok(creature.x < 3, `parou antes da parede (x = ${creature.x.toFixed(2)})`);
+});
+
+// ------------------------------------------------ descida (planeio)
+
+test('planeio desce depressa no começo e pousa devagar', () => {
+    const from = 12, to = 11;
+
+    assert.equal(glideHeightAt(from, to, 0), from);
+    assert.equal(glideHeightAt(from, to, 1), to);
+
+    // Monotônico: sempre descendo, nunca abaixo do chão.
+    let previous = from;
+    for (const progress of [0.1, 0.25, 0.5, 0.75, 0.9, 0.99]) {
+        const y = glideHeightAt(from, to, progress);
+        assert.ok(y < previous, `desce em ${progress}: ${y} >= ${previous}`);
+        assert.ok(y > to, `não atravessa o chão em ${progress}: ${y}`);
+        previous = y;
+    }
+
+    // O primeiro quarto da descida cai muito mais que o último: é o que separa
+    // "planeio" de "queda" (que aceleraria ao contrário).
+    const primeiroQuarto = from - glideHeightAt(from, to, 0.25);
+    const ultimoQuarto = glideHeightAt(from, to, 0.75) - to;
+    assert.ok(primeiroQuarto > ultimoQuarto * 3, 'a descida desacelera até pousar');
+});
+
+test('descer um degrau é planeio: o corpo fica no ar com as asas abertas', () => {
+    const clock = { t: 0 };
+    // Chão em 11 (pé em 12) até x = 2; a partir de x = 3 o chão desce um bloco.
+    const world = makeWorld({ heightAt: x => (x >= 3 ? GROUND - 1 : GROUND) });
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    const creature = spawnOne(system, world, clock, player);
+
+    creature.x = 1.5; creature.z = 0; creature.y = GROUND + 1;
+    const frames = [];
+    for (let i = 0; i < 60; i++) {
+        clock.t += 0.05;
+        creature.targetX = 6; creature.targetZ = 0;
+        system.update(0.05, player, true);
+        frames.push({
+            above: creature.group.position.y - creature.y,
+            wing: Math.abs(creature.leftWing.rotation.z),
+            pitch: creature.group.rotation.x,
+        });
+    }
+
+    assert.equal(creature.y, GROUND, 'o nível lógico desceu');
+    assert.ok(creature.x > 3, `atravessou o degrau (x = ${creature.x.toFixed(2)})`);
+
+    const planejando = frames.filter(f => f.above > 0.3);
+    assert.ok(planejando.length > 0, 'em algum quadro o corpo estava acima do chão novo');
+    assert.ok(
+        planejando.every(f => f.wing < 0.12),
+        'com as asas abertas na horizontal enquanto planeia',
+    );
+    assert.ok(
+        Math.max(...frames.map(f => f.pitch)) > 0.1,
+        'o corpo inclina para a frente no planeio',
+    );
+
+    // No fim, assentou no chão e voltou à pose de passeio.
+    clock.t += GLIDE_DURATION;
+    system.update(GLIDE_DURATION, player, true);
+    assert.ok(Math.abs(creature.group.position.y - creature.y) < 0.1, 'pousou');
+    assert.ok(Math.abs(creature.leftWing.rotation.z) > 0.1, 'asas voltaram ao normal');
+});
+
+test('subir e descer em sequência não teleporta o corpo', () => {
+    const clock = { t: 0 };
+    // Serrilhado: 11, 12, 11... a cada bloco de x.
+    const world = makeWorld({ heightAt: x => GROUND + (Math.floor(x) % 2 ? 1 : 0) });
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    const creature = spawnOne(system, world, clock, player);
+
+    creature.x = 1.5; creature.z = 0; creature.y = GROUND + 1;
+    let biggestJump = 0;
+    let previousY = creature.group.position.y;
+    for (let i = 0; i < 80; i++) {
+        clock.t += 0.03;
+        creature.targetX = 8; creature.targetZ = 0;
+        system.update(0.03, player, true);
+        biggestJump = Math.max(biggestJump, Math.abs(creature.group.position.y - previousY));
+        previousY = creature.group.position.y;
+    }
+
+    assert.ok(biggestJump < 0.35, `sem salto seco no desenho (maior variação ${biggestJump.toFixed(2)})`);
 });

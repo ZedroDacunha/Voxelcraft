@@ -45,6 +45,8 @@ export const HIT_COOLDOWN = 0.35;
 export const STEP_UP = 1;
 export const HOP_DURATION = 0.26;
 export const HOP_HEIGHT = 0.42;
+/** Descida: em vez de cair seco, ele planeja com as asas abertas. */
+export const GLIDE_DURATION = 0.42;
 /** Chilreio: alcance, ritmo e o silêncio entre um chamado e outro. */
 export const CHIRP_RANGE = 16;
 export const CHIRP_COOLDOWN = 1.2;
@@ -144,6 +146,20 @@ export function hopHeightAt(from, to, progress, altura = HOP_HEIGHT) {
         : peak + (to - peak) * ((progress - subida) / (1 - subida));
 }
 
+/**
+ * Altura do corpo ao descer um degrau, com as asas abertas.
+ *
+ * É o inverso do pulo: desce depressa no começo e **pousa devagar** (a curva
+ * desacelera até parar no chão). Queda `to + (from - to) * (1 - p)²` — sem
+ * "quique", sem passar do chão.
+ */
+export function glideHeightAt(from, to, progress) {
+    if (!(progress > 0)) return from;
+    if (progress >= 1) return to;
+    const queda = 1 - progress;
+    return to + (from - to) * queda * queda;
+}
+
 /** Gira um vetor 2D: usado para desviar de encostas enquanto foge. */
 function rotate2(x, z, angle) {
     const c = Math.cos(angle), s = Math.sin(angle);
@@ -233,6 +249,7 @@ export function createCreatureSystemClass({
                     lastChirpAt: -Infinity, chirpPending: null,
                     nextIdleAt: at + CHIRP_IDLE_MIN + hash2(seed, attempt, 211) * (CHIRP_IDLE_MAX - CHIRP_IDLE_MIN),
                     hopFrom: 0, hopTo: 0, hopT: HOP_DURATION,
+                    glideFrom: y, glideT: GLIDE_DURATION, visualY: y, glidePitch: 0,
                     ...model,
                 });
                 return;
@@ -342,12 +359,18 @@ export function createCreatureSystemClass({
                     const nx = e.x + dx / distance * step, nz = e.z + dz / distance * step;
                     const ny = this.surfaceAt(nx, nz);
                     if (ny !== null && Math.abs(ny - e.y) <= STEP_UP) {
-                        // Degrau para cima: o corpo sobe na hora (é ele que anda),
-                        // mas o desenho faz um pulo curto em vez de teletransportar.
+                        // O corpo muda de nível na hora (é ele que anda); o desenho é
+                        // que faz o movimento: pula para cima, planeia para baixo.
                         if (ny > e.y) {
-                            e.hopFrom = e.y;
+                            // Sai do desenho atual (não do chão): se ele ainda está
+                            // no ar de um planeio, o pulo continua de onde o corpo
+                            // está, em vez de voltar ao chão e saltar de novo.
+                            e.hopFrom = e.visualY;
                             e.hopTo = ny;
                             e.hopT = 0;
+                        } else if (ny < e.y) {
+                            e.glideFrom = e.visualY;
+                            e.glideT = 0;
                         }
                         e.x = nx; e.z = nz; e.y = ny;
                         e.heading = Math.atan2(dx, dz);
@@ -364,13 +387,25 @@ export function createCreatureSystemClass({
 
                 const bob = fleeing ? 0.02 : 0.035;
                 e.hopT = Math.min(HOP_DURATION, e.hopT + dt);
-                const hopY = hopHeightAt(e.hopFrom, e.y, e.hopT / HOP_DURATION);
-                e.group.position.set(e.x, hopY + Math.sin(at * 3 + e.phase) * bob, e.z);
+                e.glideT = Math.min(GLIDE_DURATION, e.glideT + dt);
+                const hopping = e.hopT < HOP_DURATION;
+                const gliding = !hopping && e.glideT < GLIDE_DURATION;
+                if (hopping) e.visualY = hopHeightAt(e.hopFrom, e.y, e.hopT / HOP_DURATION);
+                else if (gliding) e.visualY = glideHeightAt(e.glideFrom, e.y, e.glideT / GLIDE_DURATION);
+                else e.visualY = e.y;
+                e.group.position.set(e.x, e.visualY + Math.sin(at * 3 + e.phase) * bob, e.z);
                 e.group.rotation.y = e.heading;
-                const flapSpeed = fleeing ? 22 : 8;
-                const flap = Math.sin(at * flapSpeed + e.phase) * (fleeing ? 0.36 : 0.18);
-                e.leftWing.rotation.z = -0.25 + flap;
-                e.rightWing.rotation.z = 0.25 - flap;
+                // Planando, o corpo inclina um pouco para a frente e as asas
+                // abrem na horizontal — é o que faz a descida parecer planeio.
+                const pitchTarget = gliding ? 0.2 : 0;
+                e.glidePitch += (pitchTarget - e.glidePitch) * Math.min(1, 10 * dt);
+                e.group.rotation.x = e.glidePitch;
+                const wingBase = gliding ? 0.03 : 0.25;
+                const flapSpeed = gliding ? 5 : (fleeing ? 22 : 8);
+                const flapAmp = gliding ? 0.07 : (fleeing ? 0.36 : 0.18);
+                const flap = Math.sin(at * flapSpeed + e.phase) * flapAmp;
+                e.leftWing.rotation.z = -wingBase + flap;
+                e.rightWing.rotation.z = wingBase - flap;
             }
         }
     }
