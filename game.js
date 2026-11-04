@@ -48,6 +48,7 @@ import { advanceHandAnimation, countStrikes, createHandAnimation, handSwingAmoun
 import { advanceStepTracker, createStepTracker, stepDistanceThisFrame, stepPitch, stepSoundFor } from './world-step-sounds.js';
 import { materialSoundName } from './world-block-materials.js';
 import { createWaterAudioState, waterSoundFor } from './world-water-sounds.js';
+import { LIGHT_POOL_RANGE, LIGHT_POOL_SIZE, heldLightFor, heldLightIntensity, pickEmitters } from './world-point-lights.js';
 import { damageSoundFor } from './world-damage-sounds.js';
 import { ambientAvailability, createAmbientState, stepAmbient } from './world-ambient-sounds.js';
 import {
@@ -1947,15 +1948,62 @@ function updateHand(dt) {
 
 function updateHeldTorchLight() {
     if (!heldTorchLight || !camera || !world?.water) return;
-    const torchSelected = inventory.slots[selectedSlot]?.id === ID.TORCH;
-    if (!torchSelected || world.water.headInWater) {
+    // Tocha e lanterna iluminam na mão; cada uma com sua cor, alcance e tremor
+    // (a chama tremula, o pó do Mofim é firme). Debaixo d'água, nenhuma das duas.
+    const spec = heldLightFor(inventory.slots[selectedSlot]?.id);
+    if (!spec || world.water.headInWater) {
         heldTorchLight.intensity = 0;
         return;
     }
-    const time = performance.now() * 0.001;
-    heldTorchLight.intensity = 1.05 + 0.12 * Math.sin(time * 8.7) + 0.05 * Math.sin(time * 13.1 + 1.2);
-    heldTorchLight.position.set(0.34, -0.25, -0.7);
+    heldTorchLight.color.setHex(spec.color);
+    heldTorchLight.distance = spec.distance;
+    heldTorchLight.intensity = heldLightIntensity(spec, performance.now() * 0.001);
+    heldTorchLight.position.set(spec.offset.x, spec.offset.y, spec.offset.z);
     camera.localToWorld(heldTorchLight.position);
+}
+
+// Fontes de luz reais em volta do jogador: a luz assada por voxel dá o degradê
+// do cômodo, mas não ilumina o Mofim nem os itens no chão. Aqui as duas fontes
+// mais próximas ganham uma PointLight de verdade.
+const emitterCandidates = [];
+function scanNearbyEmitters(center) {
+    emitterCandidates.length = 0;
+    const cx = Math.floor(center.x), cy = Math.floor(center.y), cz = Math.floor(center.z);
+    const yFrom = Math.max(0, cy - 10), yTo = Math.min(WORLD_HEIGHT - 1, cy + 10);
+    for (let x = cx - LIGHT_POOL_RANGE; x <= cx + LIGHT_POOL_RANGE; x++) {
+        for (let z = cz - LIGHT_POOL_RANGE; z <= cz + LIGHT_POOL_RANGE; z++) {
+            for (let y = yFrom; y <= yTo; y++) {
+                const type = world.getBlock(x, y, z);
+                if (!type) continue;
+                const level = BLOCKS[type]?.light ?? 0;
+                if (level > 0) emitterCandidates.push({ x, y, z, level, type });
+            }
+        }
+    }
+    return emitterCandidates;
+}
+
+function updateEmitterLights(now) {
+    if (!emitterLights.length || !camera || !world) return;
+    // A busca em caixa custa ~15 mil leituras de bloco; quatro vezes por segundo
+    // é imperceptível na luz e cabe folgado no quadro.
+    if (now >= emitterScanAt) {
+        emitterScanAt = now + 0.25;
+        activeEmitters = pickEmitters(scanNearbyEmitters(camera.position), { origin: camera.position });
+    }
+    for (let i = 0; i < emitterLights.length; i++) {
+        const light = emitterLights[i];
+        const emitter = activeEmitters[i];
+        if (!emitter) {
+            light.intensity = 0;
+            continue;
+        }
+        light.color.setHex(emitter.color);
+        light.position.set(emitter.x, emitter.y, emitter.z);
+        // Tremor leve e fora de fase entre as fontes: duas tochas iguais piscando
+        // no mesmo ritmo parecem um só fogo.
+        light.intensity = emitter.intensity * (0.93 + 0.07 * Math.sin(now * 6.7 + i * 2.3));
+    }
 }
 
 // =====================================================================
@@ -2438,6 +2486,10 @@ function handleInventoryKey(event) {
 // =====================================================================
 const worldClock = createWorldClock({ dayLength: DAY_LENGTH, initialTime: START_TIME });
 let hemiLight, sunLight;
+// Luz real (PointLight) das fontes próximas: pool fixo, ver updateEmitterLights.
+let emitterLights = [];
+let activeEmitters = [];
+let emitterScanAt = 0;
 
 function updateWorldClock(dt) {
     worldClock.advance(dt);
@@ -3280,6 +3332,17 @@ async function init() {
     sunLight.position.set(10, 20, 10);
     scene.add(sunLight);
 
+    // Luz de verdade das tochas/lanternas próximas. O pool é fixo e entra na
+    // cena **antes** de qualquer material ser compilado: mudar a quantidade de
+    // luzes depois faria o Three recompilar tudo a cada tocha acesa (engasgo).
+    emitterLights = [];
+    for (let i = 0; i < LIGHT_POOL_SIZE; i++) {
+        const light = new THREE.PointLight(0xffc07a, 0, LIGHT_POOL_RANGE, 2);
+        light.castShadow = false;
+        scene.add(light);
+        emitterLights.push(light);
+    }
+
     camera = new THREE.PerspectiveCamera(GAME_SETTINGS.fov, window.innerWidth / window.innerHeight, 0.05, 300);
     scene.add(camera);
 
@@ -3757,6 +3820,7 @@ function animate() {
         }
     }
     updateSky();
+    updateEmitterLights(now * 0.001);
     
     // Override da visão embaixo d'água
     if (world.water.headInWater) {
