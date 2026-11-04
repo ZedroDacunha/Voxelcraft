@@ -57,7 +57,8 @@ export function createWorldSkySystem({
         scene.add(starPoints);
     }
 
-    function update({ scene, camera, hemiLight, sunLight, handAmbient, worldTime }) {
+    function update({ scene, camera, hemiLight, sunLight, handAmbient = null, worldTime,
+        fogNear = null, fogFar = null }) {
         if (!sunMesh || !moonMesh || !starPoints) return;
         const angle = worldTime * Math.PI * 2;
         sunDirection.set(Math.cos(angle), Math.sin(angle), 0.3).normalize();
@@ -72,8 +73,10 @@ export function createWorldSkySystem({
         scene.background.copy(skyColorScratch);
         scene.fog.color.copy(skyColorScratch);
         const viewDistance = renderDistance * chunkSize;
-        scene.fog.near = viewDistance * 0.55;
-        scene.fog.far = viewDistance * 0.95;
+        // Quem tem enquadramento próprio (o panorama do menu) manda as distâncias
+        // de nevoeiro; o jogo deixa o padrão, que é proporcional ao alcance.
+        scene.fog.near = fogNear ?? viewDistance * 0.55;
+        scene.fog.far = fogFar ?? viewDistance * 0.95;
 
         hemiLight.intensity = 0.22 + 0.58 * day;
         if (elevation >= -0.05) {
@@ -85,7 +88,7 @@ export function createWorldSkySystem({
             sunLight.color.copy(moonLight);
             sunLight.intensity = 0.14 * smoothstep(-0.05, -0.25, elevation);
         }
-        handAmbient.intensity = 0.38 + 0.37 * day;
+        if (handAmbient) handAmbient.intensity = 0.38 + 0.37 * day;
 
         const cameraPosition = camera.position;
         sunMesh.position.copy(cameraPosition).addScaledVector(sunDirection, skyDistance);
@@ -98,7 +101,7 @@ export function createWorldSkySystem({
         starPoints.rotation.z = angle;
         starPoints.material.opacity = clamp01((0.35 - day) / 0.35) * 0.9;
         starPoints.visible = starPoints.material.opacity > 0.01;
-        clouds.updateTint(day, warm);
+        clouds?.updateTint?.(day, warm);
     }
 
     return {

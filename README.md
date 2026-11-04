@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 517 testes de módulos puros (node --test)
+npm test           # 528 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -43,6 +43,7 @@ O `check` é o que o CI (`.github/workflows/ci.yml`) roda em todo PR para `main`
 | Área | Arquivos |
 | --- | --- |
 | Entrada | `world-menu.js` (menu, seleção/criação de mundo, opções) |
+| Panorama do menu | `menu-background.js` (a câmera que gira e o céu) e `menu-panorama.js` (a ilha em malha única, com sombra de canto) |
 | Loop e estado do jogo | `game.js` (mundo, HUD, interação, save) |
 | Física e colisão do jogador | `player-physics.js` (AABB × voxels, passo subdividido, destravar, ocupação de célula, apoio no chão agachado), `player-jump.js` (janela do pulo tardio) |
 | Criaturas | `world-creature.js` (Mofim: spawn **só de noite**, passeio, medo, chilreio, pulo de degrau, planeio na descida, brilho noturno e o pó luminoso que o corpo derrubado solta) |
@@ -146,6 +147,18 @@ Para usar um som gravado, copie o arquivo com o nome do efeito para
 `assets/sounds/` — o carregador prefere `ui-click.ogg`/`.wav` (e assim por
 diante) e cai na síntese quando o arquivo não existe. Lista completa em
 [`assets/sounds/LEIA-ME.md`](assets/sounds/LEIA-ME.md).
+
+## O menu inicial
+
+O panorama que gira atrás do título **não é um cenário de enfeite**: ele é
+montado com as mesmas regras do mundo. A ilha sai de `menu-panorama.js` em duas
+malhas (opaca e recortada), com as faces escondidas fora e a **sombra de canto**
+escrita em cor de vértice — a mesma conta de `ambientOcclusionAt` no `game.js` —,
+e o material é o mesmo par `MeshLambertMaterial` + `vertexColors` dos pedaços do
+jogo. A luz e o céu vêm do `world-sky.js`: cor do fundo, nevoeiro, sol, lua,
+estrelas e a intensidade/cor do sol e da hemisférica. O relógio dele fica parado
+numa manhã de sol (`MENU_SUN_TIME`), porque menu que escurece sozinho deixa o
+título ilegível.
 
 ## Instalar e jogar sem rede (PWA)
 
