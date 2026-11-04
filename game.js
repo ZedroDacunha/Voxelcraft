@@ -45,6 +45,7 @@ import { advanceHandAnimation, countStrikes, createHandAnimation, handSwingAmoun
 import { advanceStepTracker, createStepTracker, stepDistanceThisFrame, stepPitch, stepSoundFor } from './world-step-sounds.js';
 import { materialSoundName } from './world-block-materials.js';
 import { createWaterAudioState, waterSoundFor } from './world-water-sounds.js';
+import { damageSoundFor } from './world-damage-sounds.js';
 import { getSharedAudio } from './world-audio.js';
 import { rightClickIntent } from './world-interaction-rules.js';
 import { loadGameSettings } from './world-game-settings.js';
@@ -2698,6 +2699,10 @@ function takeDamage(amount, source = 'generic') {
     hurtFlash = 1;
     addExhaustion(0.1);
     updateSurvivalUI();
+    // Som único para ferimento, queda, fome e afogamento; a morte tem o seu.
+    // Dano bloqueado por invulnerabilidade sai antes, sem som.
+    const sound = damageSoundFor({ damage: amount, dead: health <= 0 });
+    if (sound) audio.play(sound.name, { gainScale: sound.gainScale, rate: stepPitch() });
     if (health <= 0) die(source);
 }
 

@@ -24,7 +24,7 @@ O que mais falta não é “mais bloco” ou “mais bioma”: é **robustez de 
 | Média | Porta aberta não tem colisão | Jogador atravessa o painel aberto | `world-door.js`, `game.js` — **corrigido em 03/11** ([MELHORIA-20261103](MELHORIA-20261103-porta-aberta.md)) |
 | Média | Lista de mundos lê o save completo de todos os mundos | Custo de memória/tempo cresce com o total de saves | `world-list-store.js` — **corrigido em 02/11** ([MELHORIA-20261102](MELHORIA-20261102-lista-de-mundos.md)) |
 | Média | Malha, nuvens, água e fornos ainda têm trabalho síncrono evitável | Picos de CPU em mundo maior | `game.js:790`, `world-clouds.js:90-102`, `world-water.js:63-126` — **fornos, buffers de malha e fila da água corrigidos em 02/11** ([fornos](MELHORIA-20261102-fornos-por-chunk.md), [buffers](MELHORIA-20261102-buffers-malha.md), [água](MELHORIA-20261102-fila-de-agua.md)); malha em worker, nuvens e BFS de água abertos |
-| Baixa | Acessibilidade do inventário/HUD, áudio, toque, PWA e conteúdo | Polimento e alcance | Acessibilidade **corrigida em 02/11** ([MELHORIA-20261102](MELHORIA-20261102-acessibilidade.md)); **áudio da interface e volume em 03/11** ([MELHORIA-20261103](MELHORIA-20261103-audio-interface.md)), **passos, blocos, batida de mineração, porta e água em 04/11** ([passos](MELHORIA-20261104-passos.md), [blocos](MELHORIA-20261104-sons-de-bloco.md), [batida](MELHORIA-20261104-batida-de-mineracao.md), [porta](MELHORIA-20261104-som-de-porta.md), [água](MELHORIA-20261104-som-de-agua.md)); dano/forno, toque, PWA e conteúdo seguem abertos |
+| Baixa | Acessibilidade do inventário/HUD, áudio, toque, PWA e conteúdo | Polimento e alcance | Acessibilidade **corrigida em 02/11** ([MELHORIA-20261102](MELHORIA-20261102-acessibilidade.md)); **áudio da interface e volume em 03/11** ([MELHORIA-20261103](MELHORIA-20261103-audio-interface.md)), **passos, blocos, batida de mineração, porta, água e dano em 04/11** ([passos](MELHORIA-20261104-passos.md), [blocos](MELHORIA-20261104-sons-de-bloco.md), [batida](MELHORIA-20261104-batida-de-mineracao.md), [porta](MELHORIA-20261104-som-de-porta.md), [água](MELHORIA-20261104-som-de-agua.md), [dano](MELHORIA-20261104-som-de-dano.md)); forno, toque, PWA e conteúdo seguem abertos |
 
 ---
 
@@ -460,8 +460,9 @@ Faltam ou estão simples:
   **quebrar/colocar bloco em 04/11** ([MELHORIA-20261104](MELHORIA-20261104-sons-de-bloco.md))
   e a **batida de cada golpe** ([MELHORIA-20261104](MELHORIA-20261104-batida-de-mineracao.md));
   **porta em 04/11** ([MELHORIA-20261104](MELHORIA-20261104-som-de-porta.md)) e
-  **água em 04/11** ([MELHORIA-20261104](MELHORIA-20261104-som-de-agua.md)).
-  Faltam dano, forno e ambiente, que usam a mesma base.
+  **água em 04/11** ([MELHORIA-20261104](MELHORIA-20261104-som-de-agua.md)) e
+  **dano/morte em 04/11** ([MELHORIA-20261104](MELHORIA-20261104-som-de-dano.md)).
+  Faltam forno e ambiente, que usam a mesma base.
 - Mobs: hoje há apenas criatura passiva sem drop/interação relevante.
 - Estruturas: ruínas, vilas, dungeons.
 - Vegetação/clima mais variados.

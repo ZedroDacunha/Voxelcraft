@@ -78,6 +78,16 @@ export const SOUND_RECIPES = Object.freeze({
     'hit-sand': Object.freeze({
         kind: 'noise', cut: 2500, cutTo: 2000, q: 0.4, attack: 0.002, duration: 0.06, gain: 0.07,
     }),
+    // Dano: impacto curto com gemido grave descendo. A morte é a mesma ideia
+    // esticada — o corpo cai, o tom vai até o fundo do poço.
+    'hurt': Object.freeze({
+        kind: 'noise', cut: 900, cutTo: 300, q: 1.4, attack: 0.003, duration: 0.18, gain: 0.15,
+        thump: Object.freeze({ from: 220, to: 110, duration: 0.16, gain: 0.14 }),
+    }),
+    'death': Object.freeze({
+        kind: 'noise', cut: 700, cutTo: 180, q: 1.2, attack: 0.01, duration: 0.6, gain: 0.18,
+        thump: Object.freeze({ from: 180, to: 55, duration: 0.55, gain: 0.16 }),
+    }),
     // Água: entrar (splash com corpo grave), sair (curto, escorrendo),
     // submergir (abafado, grave) e a braçada (leve e curta).
     'water-splash': Object.freeze({

@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 298 testes de módulos puros (node --test)
+npm test           # 303 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -97,7 +97,8 @@ cada golpe. Durante a mineração, a **batida** de cada golpe sai no ritmo do br
 (a fase da animação dita o som, não um cronômetro). A **porta** tem som próprio
 para abrir (rangido de dobradiça) e fechar (batida no batente), e a **água** só
 soa na transição — splash ao entrar (mais forte quanto maior a queda), saída,
-mergulho abafado e braçada — sem laço contínuo.
+mergulho abafado e braçada — sem laço contínuo. **Dano** tem gemido grave que
+cresce com o tamanho do golpe, e a morte tem som próprio.
 
 Para usar um som gravado, copie o arquivo com o nome do efeito para
 `assets/sounds/` — o carregador prefere `ui-click.ogg`/`.wav` (e assim por
