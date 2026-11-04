@@ -20,11 +20,13 @@ const sameStack = (stack, id) => Boolean(stack) && stack.id === id;
  * - Sem receita possível, o preparo esfria em dobro do tempo.
  *
  * Muta `furnace` (incluindo `furnace.inv.slots`) e devolve o que aconteceu:
- * `changed` (itens, combustível ou preparo mudaram) e `litChanged` (o forno
- * acendeu ou apagou neste passo).
+ * `changed` (itens, combustível ou preparo mudaram), `litChanged` (o forno
+ * acendeu ou apagou neste passo) e `smelted` (uma peça ficou pronta agora).
+ * `smelted` existe para o som: quem ouve precisa saber que o item saiu, e
+ * comparar a pilha de saída antes/depois seria frágil.
  */
 export function stepFurnace(furnace, dt, { smelt = SMELT, fuel = FUEL, items = ITEMS } = {}) {
-    if (!Number.isFinite(dt) || dt <= 0) return { changed: false, litChanged: false };
+    if (!Number.isFinite(dt) || dt <= 0) return { changed: false, litChanged: false, smelted: false };
     const slots = furnace.inv.slots;
     const wasLit = furnace.burn > 0;
     const recipe = slots[0] && smelt[slots[0].id];
@@ -33,6 +35,7 @@ export function stepFurnace(furnace, dt, { smelt = SMELT, fuel = FUEL, items = I
     const canSmelt = Boolean(recipe) && (!output || (sameStack(output, recipe.result) && output.count < maxStack));
 
     let changed = false;
+    let smelted = false;
     if (furnace.burn <= 0 && canSmelt && slots[1] && fuel[slots[1].id]) {
         furnace.burn = furnace.burnMax = fuel[slots[1].id];
         consumeOne(slots, 1);
@@ -45,6 +48,7 @@ export function stepFurnace(furnace, dt, { smelt = SMELT, fuel = FUEL, items = I
             furnace.cook += dt;
             if (furnace.cook >= recipe.time) {
                 furnace.cook = 0;
+                smelted = true;
                 consumeOne(slots, 0);
                 if (slots[2]) slots[2].count++;
                 else slots[2] = { id: recipe.result, count: 1 };
@@ -57,7 +61,7 @@ export function stepFurnace(furnace, dt, { smelt = SMELT, fuel = FUEL, items = I
         furnace.cook = Math.max(0, furnace.cook - dt * 2);
     }
 
-    return { changed, litChanged: wasLit !== (furnace.burn > 0) };
+    return { changed, litChanged: wasLit !== (furnace.burn > 0), smelted };
 }
 
 function consumeOne(slots, index) {

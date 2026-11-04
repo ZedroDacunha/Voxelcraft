@@ -19,16 +19,16 @@ const withOre = () => ({ id: ID.COBBLE, count: 4 });
 
 test('forno sem receita ou sem combustível não muda nada', () => {
     const idle = furnace();
-    assert.deepEqual(stepFurnace(idle, 1), { changed: false, litChanged: false });
+    assert.deepEqual(stepFurnace(idle, 1), { changed: false, litChanged: false, smelted: false });
     assert.equal(idle.burn, 0);
 
     const onlyOre = furnace([withOre()]);
-    assert.deepEqual(stepFurnace(onlyOre, 1), { changed: false, litChanged: false });
+    assert.deepEqual(stepFurnace(onlyOre, 1), { changed: false, litChanged: false, smelted: false });
     assert.equal(onlyOre.burn, 0);
     assert.equal(onlyOre.cook, 0);
 
     const onlyFuel = furnace([null, withFuel()]);
-    assert.deepEqual(stepFurnace(onlyFuel, 1), { changed: false, litChanged: false });
+    assert.deepEqual(stepFurnace(onlyFuel, 1), { changed: false, litChanged: false, smelted: false });
     assert.deepEqual(onlyFuel.inv.slots[1], { id: ID.STICK, count: 3 }, 'combustível não é gasto à toa');
 });
 
@@ -40,7 +40,7 @@ test('acende consumindo um combustível e reporta a mudança de luz', () => {
     assert.equal(f.burnMax, FUEL[ID.STICK]);
     assert.deepEqual(f.inv.slots[1], { id: ID.STICK, count: 2 });
     assert.equal(f.cook, 1);
-    assert.deepEqual(result, { changed: true, litChanged: true });
+    assert.deepEqual(result, { changed: true, litChanged: true, smelted: false });
 });
 
 test('não acende de novo enquanto ainda está queimando', () => {
@@ -90,7 +90,7 @@ test('resultado de outro item impede acender e fundir', () => {
     assert.equal(f.cook, 0);
     assert.equal(f.burn, 0, 'nem acende, para não queimar combustível à toa');
     assert.deepEqual(f.inv.slots[1], { id: ID.STICK, count: 3 });
-    assert.deepEqual(result, { changed: false, litChanged: false });
+    assert.deepEqual(result, { changed: false, litChanged: false, smelted: false });
 });
 
 test('preparo esfria em dobro quando não há o que fundir', () => {
@@ -115,10 +115,28 @@ test('queima termina sem ficar negativa e apaga', () => {
     assert.equal(result.litChanged, true, 'o jogo precisa apagar a luz do forno');
 });
 
+test('item pronto no forno reporta smelted (é o gancho do som)', () => {
+    const f = furnace([withOre(), withFuel()]);
+    const lit = stepFurnace(f, 0.1);
+    assert.equal(lit.smelted, false, 'acender não é item pronto');
+
+    // deixa o forno aceso com folga e o preparo a um quadro do fim
+    const time = SMELT[ID.COBBLE].time;
+    f.burn = f.burnMax = 999;
+    f.cook = time - 0.05;
+    const done = stepFurnace(f, 0.1);
+    assert.equal(done.smelted, true);
+    assert.equal(done.changed, true);
+    assert.deepEqual(f.inv.slots[2], { id: SMELT[ID.COBBLE].result, count: 1 });
+
+    const next = stepFurnace(f, 0.1);
+    assert.equal(next.smelted, false, 'só um aviso por peça');
+});
+
 test('dt inválido ou zero não faz nada', () => {
     const f = furnace([withOre(), withFuel()]);
     for (const dt of [0, -1, NaN, undefined]) {
-        assert.deepEqual(stepFurnace(f, dt), { changed: false, litChanged: false });
+        assert.deepEqual(stepFurnace(f, dt), { changed: false, litChanged: false, smelted: false });
         assert.equal(f.burn, 0);
     }
 });

@@ -21,6 +21,9 @@ existir, usa a síntese.
 | `step-sand.ogg` / `.wav` | passo em areia | ruído 2600→2300 Hz, 120 ms |
 | `break-*.ogg` / `.wav` | bloco quebrado (um por material: grass, dirt, stone, wood, sand) | ruído 0,11–0,18 s + baque grave |
 | `hit-*.ogg` / `.wav` | batida de cada golpe enquanto minera (um por material) | ruído 0,04–0,06 s |
+| `furnace-light.ogg` / `.wav` | forno acende | crepitar 0,5 s + corpo grave |
+| `furnace-out.ogg` / `.wav` | forno apaga | sopro de cinza 0,4 s |
+| `furnace-done.ogg` / `.wav` | item ficou pronto | toque curto 0,12 s (1180→880 Hz) |
 | `hurt.ogg` / `.wav` | levar dano (queda, fome, afogamento) | ruído 0,18 s + gemido 220→110 Hz |
 | `death.ogg` / `.wav` | morte do jogador | ruído 0,6 s + gemido 180→55 Hz |
 | `water-splash.ogg` / `.wav` | entrar na água (ganho cresce com a queda) | ruído 2600→500 Hz, 0,22 s + corpo grave |

@@ -78,6 +78,18 @@ export const SOUND_RECIPES = Object.freeze({
     'hit-sand': Object.freeze({
         kind: 'noise', cut: 2500, cutTo: 2000, q: 0.4, attack: 0.002, duration: 0.06, gain: 0.07,
     }),
+    // Forno: acender (crepitar que abre), apagar (sopro de cinza) e o item que
+    // ficou pronto (golpe curto, quase metálico). Sem laço enquanto queima.
+    'furnace-light': Object.freeze({
+        kind: 'noise', cut: 2400, cutTo: 700, q: 0.6, attack: 0.03, duration: 0.50, gain: 0.13,
+        thump: Object.freeze({ from: 130, to: 85, duration: 0.28, gain: 0.05 }),
+    }),
+    'furnace-out': Object.freeze({
+        kind: 'noise', cut: 900, cutTo: 260, q: 0.5, attack: 0.06, duration: 0.40, gain: 0.09,
+    }),
+    'furnace-done': Object.freeze({
+        wave: 'triangle', from: 1180, to: 880, attack: 0.002, duration: 0.12, gain: 0.10,
+    }),
     // Dano: impacto curto com gemido grave descendo. A morte é a mesma ideia
     // esticada — o corpo cai, o tom vai até o fundo do poço.
     'hurt': Object.freeze({
