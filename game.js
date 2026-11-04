@@ -43,6 +43,7 @@ import { FurnaceSmokeSystem } from './world-furnace-effects.js';
 import { canHarvest, damageTool as damageToolStack, getBreakTime } from './world-tool-rules.js';
 import { boxOverlapsXZ, woodDoorCollision, woodDoorPart, woodDoorShape, woodDoorType } from './world-door.js';
 import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld } from './player-physics.js';
+import { createCreatureSystemClass, creatureInReach } from './world-creature.js';
 import { advanceHandAnimation, countStrikes, createHandAnimation, handSwingAmount, startPunch } from './world-hand-animation.js';
 import { advanceStepTracker, createStepTracker, stepDistanceThisFrame, stepPitch, stepSoundFor } from './world-step-sounds.js';
 import { materialSoundName } from './world-block-materials.js';
@@ -1245,120 +1246,21 @@ class World {
 // =====================================================================
 // 5A. CRIATURAS PASSIVAS — Mofim
 // =====================================================================
-class CreatureSystem {
-    constructor(world) {
-        this.world = world;
-        this.entities = [];
-        this.nextSpawnAt = 0;
-        this.spawnAttempt = 0;
-        this.nextId = 1;
-        this.cube = new THREE.BoxGeometry(1, 1, 1);
-        this.materials = {
-            body: new THREE.MeshLambertMaterial({ color: 0x438f78 }),
-            belly: new THREE.MeshLambertMaterial({ color: 0xb7d8a1 }),
-            wing: new THREE.MeshLambertMaterial({ color: 0xb8e5d8, transparent: true, opacity: 0.78 }),
-            eye: new THREE.MeshLambertMaterial({ color: 0x173b42 }),
-            glow: new THREE.MeshBasicMaterial({ color: 0xf2c86b })
-        };
-    }
-
-    surfaceAt(x, z) {
-        const bx = Math.floor(x), bz = Math.floor(z);
-        if (!this.world.getChunk(floorDiv(bx, CHUNK_SIZE), floorDiv(bz, CHUNK_SIZE))) return null;
-        const y = this.world.generator.heightAt(bx, bz);
-        const top = this.world.getBlock(bx, y, bz);
-        if (top !== ID.GRASS && top !== ID.DIRT) return null;
-        if (this.world.getBlock(bx, y + 1, bz) !== 0 || this.world.getBlock(bx, y + 2, bz) !== 0) return null;
-        return y + 1;
-    }
-
-    addPart(group, material, x, y, z, sx, sy, sz) {
-        const mesh = new THREE.Mesh(this.cube, material);
-        mesh.position.set(x, y, z);
-        mesh.scale.set(sx, sy, sz);
-        mesh.castShadow = false;
-        mesh.receiveShadow = false;
-        group.add(mesh);
-        return mesh;
-    }
-
-    createModel() {
-        const group = new THREE.Group();
-        this.addPart(group, this.materials.body, 0, 0.24, 0, 0.46, 0.34, 0.42);
-        this.addPart(group, this.materials.belly, 0, 0.18, 0.215, 0.28, 0.18, 0.025);
-        this.addPart(group, this.materials.body, 0, 0.43, 0.105, 0.30, 0.28, 0.28);
-        this.addPart(group, this.materials.eye, -0.075, 0.46, 0.248, 0.045, 0.06, 0.025);
-        this.addPart(group, this.materials.eye, 0.075, 0.46, 0.248, 0.045, 0.06, 0.025);
-        const leftWing = this.addPart(group, this.materials.wing, -0.29, 0.32, -0.015, 0.24, 0.12, 0.035);
-        const rightWing = this.addPart(group, this.materials.wing, 0.29, 0.32, -0.015, 0.24, 0.12, 0.035);
-        leftWing.rotation.z = -0.25;
-        rightWing.rotation.z = 0.25;
-        this.addPart(group, this.materials.glow, 0, 0.62, 0.08, 0.07, 0.07, 0.07);
-        return { group, leftWing, rightWing };
-    }
-
-    trySpawn(playerPos, now) {
-        if (now < this.nextSpawnAt || this.entities.length >= 3) return;
-        this.nextSpawnAt = now + 4.5;
-        const seed = this.world.seed + this.spawnAttempt++ * 7919;
-        for (let attempt = 0; attempt < 10; attempt++) {
-            const angle = hash2(seed, attempt, 41) * Math.PI * 2;
-            const distance = 9 + hash2(seed, attempt, 89) * 15;
-            const x = playerPos.x + Math.cos(angle) * distance;
-            const z = playerPos.z + Math.sin(angle) * distance;
-            const y = this.surfaceAt(x, z);
-            if (y === null) continue;
-            if (this.entities.some(e => (e.x - x) ** 2 + (e.z - z) ** 2 < 64)) continue;
-            const model = this.createModel();
-            model.group.position.set(x, y, z);
-            this.world.scene.add(model.group);
-            this.entities.push({ id: this.nextId++, x, y, z, targetX: x, targetZ: z, turnAt: now,
-                phase: hash2(seed, attempt, 131) * Math.PI * 2, heading: 0, ...model });
-            return;
-        }
-    }
-
-    update(dt, playerPos, active) {
-        if (!active) return;
-        const now = performance.now() * 0.001;
-        this.trySpawn(playerPos, now);
-        for (let i = this.entities.length - 1; i >= 0; i--) {
-            const e = this.entities[i];
-            const dxp = e.x - playerPos.x, dzp = e.z - playerPos.z;
-            if (dxp * dxp + dzp * dzp > 38 * 38) {
-                this.world.scene.remove(e.group);
-                this.entities.splice(i, 1);
-                continue;
-            }
-            if (now >= e.turnAt) {
-                const seed = this.world.seed + e.id * 104729 + Math.floor(now * 0.2);
-                const angle = hash2(seed, e.id, 7) * Math.PI * 2;
-                const distance = 1.5 + hash2(seed, e.id, 13) * 3;
-                e.targetX = e.x + Math.cos(angle) * distance;
-                e.targetZ = e.z + Math.sin(angle) * distance;
-                e.turnAt = now + 2 + hash2(seed, e.id, 23) * 3;
-            }
-            const dx = e.targetX - e.x, dz = e.targetZ - e.z;
-            const distance = Math.hypot(dx, dz);
-            if (distance > 0.08) {
-                const step = Math.min(distance, 0.72 * dt);
-                const nx = e.x + dx / distance * step, nz = e.z + dz / distance * step;
-                const ny = this.surfaceAt(nx, nz);
-                if (ny !== null && Math.abs(ny - e.y) <= 1) {
-                    e.x = nx; e.z = nz; e.y = ny;
-                    e.heading = Math.atan2(dx, dz);
-                } else {
-                    e.turnAt = now;
-                }
-            }
-            e.group.position.set(e.x, e.y + Math.sin(now * 3 + e.phase) * 0.035, e.z);
-            e.group.rotation.y = e.heading;
-            const flap = Math.sin(now * 8 + e.phase) * 0.18;
-            e.leftWing.rotation.z = -0.25 + flap;
-            e.rightWing.rotation.z = 0.25 - flap;
-        }
-    }
-}
+// Modelo, spawn, vagar e medo vivem em world-creature.js; aqui só se conectam
+// os pedaços do jogo que o módulo não conhece (Three, catálogo, chunk, hash).
+const CreatureSystem = createCreatureSystemClass({
+    THREE, ID, CHUNK_SIZE, floorDiv, hash2,
+    // O chilreio chega mais fraco com a distância; `startle` (levou golpe ou viu
+    // o jogador de perto) sai mais alto e mais agudo que o chamado de passeio.
+    onChirp: ({ reason, distance }) => {
+        const falloff = clamp01(1 - distance / 16);
+        if (falloff < 0.12) return;
+        audio.play('mofim-chirp', {
+            gainScale: falloff * (reason === 'idle' ? 0.55 : 0.95),
+            rate: reason === 'startle' ? 1.22 : (reason === 'panic' ? 1.1 : 1),
+        });
+    },
+});
 
 // =====================================================================
 // 5B. INVENTÁRIO E FERRAMENTAS
@@ -1818,6 +1720,20 @@ function breakBlock(x, y, z) {
     // iguais seguidos soam como um clique repetido.
     const breakSound = materialSoundName(type, 'break');
     if (breakSound) audio.play(breakSound, { rate: stepPitch() });
+}
+
+// Golpe em Mofim. A mira é a da câmera e o alcance é curto: se acertou, o bicho
+// se assusta e o bloco que estava atrás dele não é minerado neste quadro (senão
+// o golpe viraria uma mineração silenciosa do cenário).
+function strikeCreature() {
+    if (!leftHeld) return false;
+    camera.getWorldDirection(creatureAim);
+    if (!creatureInReach(creatureSystem.entities, camera.position, creatureAim)) return false;
+    // O golpe em si tem cooldown: segurar o botão assusta uma vez, não a cada
+    // quadro. Mas enquanto a mira estiver no bicho, o bloco atrás não é minerado.
+    if (creatureSystem.hitFrom(camera.position, creatureAim)) startPunch(handAnim);
+    resetMining();
+    return true;
 }
 
 function updateMining(dt) {
@@ -2570,6 +2486,7 @@ const WORLD_RAYCAST_ACCESS = {
 let targetMesh;
 let currentHit = null;
 const tmpDir = new THREE.Vector3();
+const creatureAim = new THREE.Vector3();
 const yawEuler = new THREE.Euler(0, 0, 0, 'YXZ');
 const look = { yaw: 0, pitch: 0, spikes: 0, maxDelta: 0 };
 
@@ -3806,9 +3723,9 @@ function animate() {
 
     if (playing()) {
         updatePhysics(dt);
-        creatureSystem.update(dt, player.pos, true);
+        creatureSystem.update(dt, { pos: player.pos, vel: player.vel, crouching: isCrouching }, true);
         updateTarget();
-        updateMining(dt);
+        if (!strikeCreature()) updateMining(dt);
         updateEating(dt);
         updateSurvival(dt);
         updateItemEntities(dt);
