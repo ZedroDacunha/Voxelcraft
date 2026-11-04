@@ -8,11 +8,11 @@ import {
 // O botão (`role="slider"`) recebe o clique/arraste e o `<span>` de saída mostra
 // o valor formatado — os dois vivem no index.html e são achados por id.
 export const OPTION_CONTROLS = [
-    { key: 'sensitivity', button: 'opt-sensitivity', output: 'opt-sensitivity-value' },
-    { key: 'fov', button: 'opt-fov', output: 'opt-fov-value' },
-    { key: 'renderDistance', button: 'opt-render-distance', output: 'opt-render-distance-value' },
-    { key: 'volume', button: 'opt-volume', output: 'opt-volume-value' },
-    { key: 'graphics', button: 'opt-graphics', output: 'opt-graphics-value' },
+    { key: 'sensitivity', button: 'opt-sensitivity', output: 'opt-sensitivity-value', label: 'Sensibilidade do mouse' },
+    { key: 'fov', button: 'opt-fov', output: 'opt-fov-value', label: 'Campo de visão' },
+    { key: 'renderDistance', button: 'opt-render-distance', output: 'opt-render-distance-value', label: 'Distância de render' },
+    { key: 'volume', button: 'opt-volume', output: 'opt-volume-value', label: 'Volume' },
+    { key: 'graphics', button: 'opt-graphics', output: 'opt-graphics-value', label: 'Gráficos' },
 ];
 
 // Onde o ponteiro caiu na barra, de 0 (esquerda) a 1 (direita). Barra sem
@@ -26,25 +26,35 @@ function fractionFromPointer(event, element) {
 export function createOptionsView(dialog = document.getElementById('options-dialog'), { onChange } = {}) {
     if (!dialog) return null;
 
-    const rows = OPTION_CONTROLS.map(({ key, button, output }) => {
+    // Campo com faixa numérica é barra arrastável (role="slider"); campo de
+    // lista (gráficos) é botão: cada clique passa para o modo seguinte, como no
+    // Minecraft — arrastar numa lista de quatro modos só daria saltos.
+    const rows = OPTION_CONTROLS.map(({ key, button, output, label }) => {
         const buttonEl = dialog.querySelector(`#${button}`);
         const field = GAME_SETTING_FIELDS[key];
         if (!buttonEl || !field) return null;
-        buttonEl.setAttribute('role', 'slider');
-        buttonEl.setAttribute('aria-valuemin', field.choices ? '0' : String(field.min));
-        buttonEl.setAttribute('aria-valuemax', field.choices ? String(field.choices.length - 1) : String(field.max));
-        return { key, field, buttonEl, outputEl: dialog.querySelector(`#${output}`) };
+        const slider = !field.choices;
+        if (slider) {
+            buttonEl.setAttribute('role', 'slider');
+            buttonEl.setAttribute('aria-valuemin', String(field.min));
+            buttonEl.setAttribute('aria-valuemax', String(field.max));
+        }
+        return { key, field, label, slider, buttonEl, outputEl: dialog.querySelector(`#${output}`) };
     }).filter(Boolean);
 
     const render = (settings) => {
         for (const row of rows) {
             const value = settings[row.key];
-            if (row.outputEl) row.outputEl.textContent = formatSetting(row.key, value);
-            row.buttonEl.setAttribute('aria-valuenow', String(
-                row.field.choices ? Math.max(0, row.field.choices.indexOf(value)) : value,
-            ));
-            row.buttonEl.setAttribute('aria-valuetext', formatSetting(row.key, value));
-            // posição na barra: é ela que o CSS usa para desenhar o preenchimento
+            const text = formatSetting(row.key, value);
+            if (row.outputEl) row.outputEl.textContent = text;
+            if (!row.slider) {
+                // botão não tem valor ARIA: o nome acessível carrega o valor
+                row.buttonEl.setAttribute('aria-label', `${row.label}: ${text}`);
+                continue;
+            }
+            row.buttonEl.setAttribute('aria-valuenow', String(value));
+            row.buttonEl.setAttribute('aria-valuetext', text);
+            // posição na barra: é ela que o CSS usa para pôr o cursor da barra
             row.buttonEl.style.setProperty('--option-fill', `${(settingFraction(row.key, value) * 100).toFixed(1)}%`);
         }
     };
@@ -62,26 +72,33 @@ export function createOptionsView(dialog = document.getElementById('options-dial
         notifyGameSettingsChange(current);
     };
 
-    for (const { key, buttonEl } of rows) {
-        // Clique e arraste definem o valor pela posição na barra — é o gesto do
-        // Minecraft e o único que serve para toque.
-        const drag = (event) => {
-            const fraction = fractionFromPointer(event, buttonEl);
-            if (fraction === null) return;
-            apply(key, settingFromFraction(key, fraction));
-        };
-        buttonEl.addEventListener('pointerdown', (event) => {
-            event.preventDefault();
-            // preventDefault tira o foco do clique; sem o focus() as setas não
-            // funcionariam logo depois de arrastar.
-            buttonEl.focus?.();
-            buttonEl.setPointerCapture?.(event.pointerId);
-            drag(event);
-        });
-        buttonEl.addEventListener('pointermove', (event) => {
-            if (!buttonEl.hasPointerCapture?.(event.pointerId)) return;
-            drag(event);
-        });
+    for (const { key, buttonEl, slider } of rows) {
+        if (slider) {
+            // Clique e arraste definem o valor pela posição na barra — é o gesto
+            // do Minecraft e o único que serve para toque.
+            const drag = (event) => {
+                const fraction = fractionFromPointer(event, buttonEl);
+                if (fraction === null) return;
+                apply(key, settingFromFraction(key, fraction));
+            };
+            buttonEl.addEventListener('pointerdown', (event) => {
+                event.preventDefault();
+                // preventDefault tira o foco do clique; sem o focus() as setas não
+                // funcionariam logo depois de arrastar.
+                buttonEl.focus?.();
+                buttonEl.setPointerCapture?.(event.pointerId);
+                drag(event);
+            });
+            buttonEl.addEventListener('pointermove', (event) => {
+                if (!buttonEl.hasPointerCapture?.(event.pointerId)) return;
+                drag(event);
+            });
+        } else {
+            // botão: um clique, um modo. Enter e Espaço já viram clique sozinhos.
+            buttonEl.addEventListener('click', () => {
+                apply(key, stepSetting(key, current[key], 1));
+            });
+        }
         buttonEl.addEventListener('keydown', (event) => {
             const step = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[event.key];
             if (step !== undefined) {

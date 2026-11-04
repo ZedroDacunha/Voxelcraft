@@ -56,14 +56,23 @@ valor à direita:
 | Volume | mudo a 100% |
 | Gráficos | Automática · Máxima · Alta · Média |
 
-Gesto: **clique e arraste** definem o valor pela posição na barra (é o que
-funciona no dedo também); setas andam um passo e `Home`/`End` vão aos extremos.
-O botão tem `role="slider"` com `aria-valuemin/max/now/valuetext`, então leitor
-de tela anuncia "Campo de visão: 75°" como slider de verdade.
+**Duas formas, conforme o campo:** opção de **faixa** (sensibilidade, campo de
+visão, distância de render, volume) é barra; opção de **lista** (gráficos) é
+botão.
 
-O preenchimento da barra é uma variável CSS (`--option-fill`) escrita pelo
-`world-options-view.js` — sem `input[type=range]`, que no toque e no visual do
-jogo nunca ficou bom.
+- Na **barra**, clique e arraste definem o valor pela posição — é o gesto do
+  Minecraft e o único que serve no dedo. O visual segue o original: texto
+  **centrado** no botão (`Campo de visão: 75°`), **trilho escuro** por dentro e a
+  **alça clara** em cima, um pouco mais alta que o trilho. A posição da alça vem
+  da variável CSS `--option-fill`, escrita pelo `world-options-view.js` — sem
+  `input[type=range]`, que no toque e no visual do jogo nunca ficou bom. O botão
+  tem `role="slider"` com `aria-valuemin/max/now/valuetext`.
+- No **botão** (gráficos) cada clique passa para o modo seguinte, e a lista dá a
+  volta (Automática → Máxima → Alta → Média → Automática). Arrastar numa lista de
+  quatro modos só daria saltos, então nem trilho nem alça: é botão de verdade, e
+  o nome acessível carrega o valor ("Gráficos: Alta").
+
+Em ambas, setas andam um passo e `Home`/`End` vão aos extremos.
 
 ## 3. O que vale na hora e o que espera
 
@@ -90,14 +99,17 @@ A distância de render fica de fora de propósito: mudar chunks com o mundo
 rodando é outro assunto (recarregar região, reconstruir malha, mexer no que já
 foi gerado). Prometer ao vivo e não cumprir seria pior do que dizer quando vale.
 
-## 4. Testes (22 novos, 564 no total)
+## 4. Testes (24 novos, 566 no total)
 
-- `tests/pause-options.test.mjs` (11): o menu de pausa tem os três botões no
+- `tests/pause-options.test.mjs` (13): o menu de pausa tem os três botões no
   `.classic-btn`, o texto velho saiu, o cartão segue o padrão (borda 2px), o
   `ESC` abre o diálogo, as duas telas usam **os mesmos** controles, todo botão
   do formulário tem `type` (um `submit` acidental fecharia a tela), a grade vira
   uma coluna no celular, e o `game.js` aplica ao vivo **menos** a distância de
-  render;
+  render. Dois testes são do formato novo: **um trilho e uma alça por barra**
+  (fora do leitor de tela) e **gráficos sem trilho nem alça**, com o clique
+  andando um modo; um terceiro confere que o `aria-label` de cada controle bate
+  com o nome que aparece na tela;
 - `tests/game-settings.test.mjs` (+5): campo de lista (`graphics`) com
   sanitização, posição/valor na barra (ida e volta), passo que para no limite e
   dá a volta na lista, formatação, e o aviso de mudança (ouvinte com erro não
