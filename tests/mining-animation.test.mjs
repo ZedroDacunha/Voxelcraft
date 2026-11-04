@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import {
     PUNCH_SECONDS,
     advanceHandAnimation,
+    countStrikes,
     createHandAnimation,
     handSwingAmount,
     startPunch,
@@ -89,6 +90,38 @@ test('a troca de item mergulha o braço e volta', () => {
     assert.equal(handSwingAmount(hand).dip, 0.5);
     simulate(hand, 30);
     assert.equal(handSwingAmount(hand).dip, 0);
+});
+
+test('a fase do braço dita a batida: um som por fim de movimento', () => {
+    const PI = Math.PI;
+    // os picos ficam em π/2 + kπ
+    assert.equal(countStrikes(0, PI / 2), 1, 'primeiro golpe no primeiro pico');
+    assert.equal(countStrikes(0, PI / 2 - 1e-6), 0, 'ainda não chegou no pico');
+    assert.equal(countStrikes(PI / 2, PI), 0, 'entre dois picos não há batida');
+    assert.equal(countStrikes(PI / 2, 3 * PI / 2), 1);
+    assert.equal(countStrikes(0, 3 * PI / 2), 2);
+    assert.equal(countStrikes(1, 1), 0, 'sem avanço, sem batida');
+    assert.equal(countStrikes(2, 1), 0, 'fase não anda para trás');
+    assert.equal(countStrikes(NaN, 3), 0);
+    assert.equal(countStrikes(0, 40), 2, 'quadro engasgado não vira rajada');
+});
+
+test('a batida sai no ritmo do braço, não de um cronômetro', () => {
+    // O laço de mineração avança 9 rad/s: um golpe a cada π de fase.
+    const hand = createHandAnimation();
+    let strikes = 0;
+    let phase = 0;
+    for (let frame = 0; frame < 60; frame++) { // 1 segundo a 60 fps
+        const before = hand.phase;
+        advanceHandAnimation(hand, 1 / 60, { mining: true });
+        strikes += countStrikes(before, hand.phase);
+    }
+    assert.ok(strikes >= 2 && strikes <= 3, `batidas em 1 s: ${strikes}`);
+    const perSecond = strikes / (1 / 1);
+    const expected = 9 / Math.PI;
+    assert.ok(Math.abs(perSecond - expected) < 1, `esperado ~${expected.toFixed(2)} batidas/s`);
+    assert.ok(hand.phase > 0);
+    assert.equal(phase, 0, 'a fase antiga é só leitura');
 });
 
 test('game.js golpeia em toda quebra e mantém a grama no ritmo do braço', () => {

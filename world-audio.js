@@ -58,6 +58,26 @@ export const SOUND_RECIPES = Object.freeze({
         kind: 'noise', cut: 2400, cutTo: 1800, q: 0.4, attack: 0.004, duration: 0.18, gain: 0.14,
         thump: Object.freeze({ from: 140, to: 80, duration: 0.12, gain: 0.07 }),
     }),
+    // Batida: cada golpe durante a mineração, antes do bloco cair. Mais curta e
+    // mais discreta que o quebrar — é a percussão que segura o ritmo, não o
+    // evento. Sem baque: o grave fica reservado para o impacto final.
+    'hit-grass': Object.freeze({
+        kind: 'noise', cut: 1600, cutTo: 900, q: 0.7, attack: 0.001, duration: 0.05, gain: 0.075,
+    }),
+    'hit-dirt': Object.freeze({
+        kind: 'noise', cut: 1050, cutTo: 600, q: 0.8, attack: 0.001, duration: 0.05, gain: 0.08,
+    }),
+    'hit-stone': Object.freeze({
+        kind: 'noise', cut: 3800, cutTo: 2200, q: 1.5, attack: 0.001, duration: 0.04, gain: 0.085,
+        thump: Object.freeze({ from: 300, to: 220, duration: 0.03, gain: 0.03 }),
+    }),
+    'hit-wood': Object.freeze({
+        kind: 'noise', cut: 1900, cutTo: 1100, q: 2.2, attack: 0.001, duration: 0.045, gain: 0.08,
+        thump: Object.freeze({ from: 330, to: 240, duration: 0.03, gain: 0.025 }),
+    }),
+    'hit-sand': Object.freeze({
+        kind: 'noise', cut: 2500, cutTo: 2000, q: 0.4, attack: 0.002, duration: 0.06, gain: 0.07,
+    }),
     // Colocar: seco, curto e mais agudo que quebrar — é o "assentar" do bloco.
     'place-grass': Object.freeze({
         kind: 'noise', cut: 1300, cutTo: 700, q: 0.8, attack: 0.002, duration: 0.07, gain: 0.11,
