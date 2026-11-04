@@ -43,6 +43,7 @@ import { FurnaceSmokeSystem } from './world-furnace-effects.js';
 import { canHarvest, damageTool as damageToolStack, getBreakTime } from './world-tool-rules.js';
 import { boxOverlapsXZ, woodDoorCollision, woodDoorPart, woodDoorShape, woodDoorType } from './world-door.js';
 import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld } from './player-physics.js';
+import { canJumpFrom, createJumpState, updateJumpWindow } from './player-jump.js';
 import { createCreatureSystemClass, creatureInReach } from './world-creature.js';
 import { advanceHandAnimation, countStrikes, createHandAnimation, handSwingAmount, startPunch } from './world-hand-animation.js';
 import { advanceStepTracker, createStepTracker, stepDistanceThisFrame, stepPitch, stepSoundFor } from './world-step-sounds.js';
@@ -2641,6 +2642,8 @@ const spawnPoint = new THREE.Vector3();
 
 let bobTimer = 0;
 const stepTracker = createStepTracker();
+// Janela do pulo tardio (coyote time): ver player-jump.js.
+const jumpState = createJumpState();
 const waterAudio = createWaterAudioState();
 const audio = getSharedAudio();
 
@@ -3033,6 +3036,7 @@ function updatePhysics(dt) {
     }
 
     // Pulo e Gravidade com Natação
+    let jumpedNow = false;
     if (inWater) {
         if (wantsDive) {
             player.vel.y = Math.max(player.vel.y - 12.0 * dt, -3.2);
@@ -3048,9 +3052,12 @@ function updatePhysics(dt) {
         player.vel.y *= Math.exp(-5.0 * dt); // Arrasto estável mesmo com variação no FPS
         player.vel.y -= (GRAVITY * 0.1) * dt;    // Gravidade muito fraca (simula peso d'água)
     } else {
-        if (jumpHeld && !swimStrokeLocked && player.onGround && !isCrouching) {
+        // `onGround` aqui é o apoio do quadro anterior: por isso a janela do
+        // pulo tardio também vale (sair da borda e apertar logo depois).
+        if (jumpHeld && !swimStrokeLocked && !isCrouching && canJumpFrom(jumpState, { onGround: player.onGround })) {
             player.vel.y = JUMP_SPEED;
             player.onGround = false;
+            jumpedNow = true;
             addExhaustion(sprintNow ? 0.2 : 0.05);
         }
         player.vel.y = Math.max(player.vel.y - GRAVITY * dt, -60);
@@ -3105,6 +3112,10 @@ function updatePhysics(dt) {
         }
         player.vel.y = 0;
     }
+
+    // Com o apoio do quadro já resolvido, a janela do pulo tardio é recarregada
+    // (no chão), fechada (pulou / nadando) ou escorrida (no ar).
+    updateJumpWindow(jumpState, { dt, onGround: player.onGround, jumped: jumpedNow, inWater });
 
     const targetEye = isCrouching ? EYE_CROUCH : EYE_STAND;
     player.eye += (targetEye - player.eye) * Math.min(1, 15 * dt);
