@@ -5,7 +5,8 @@ import path from 'node:path';
 
 import {
     DEFAULT_GAME_SETTINGS, GAME_SETTINGS_KEY, GAME_SETTING_FIELDS,
-    loadGameSettings, sanitizeGameSettings, saveGameSettings,
+    formatSetting, loadGameSettings, notifyGameSettingsChange, onGameSettingsChange,
+    sanitizeGameSettings, saveGameSettings, settingFraction, settingFromFraction, stepSetting,
 } from '../world-game-settings.js';
 import { OPTION_CONTROLS } from '../world-options-view.js';
 
@@ -28,9 +29,15 @@ test('sem nada salvo, valem os padrões', () => {
 
 test('cada campo tem limites coerentes e formato legível', () => {
     for (const [key, field] of Object.entries(GAME_SETTING_FIELDS)) {
-        assert.ok(field.min < field.max, `${key}: min < max`);
-        assert.ok(field.step > 0, `${key}: step > 0`);
-        assert.ok(field.default >= field.min && field.default <= field.max, `${key}: default na faixa`);
+        if (field.choices) {
+            assert.ok(field.choices.length > 1, `${key}: lista com mais de um modo`);
+            assert.ok(field.choices.includes(field.default), `${key}: default está na lista`);
+            assert.deepEqual([...field.choices], [...new Set(field.choices)], `${key}: sem repetição`);
+        } else {
+            assert.ok(field.min < field.max, `${key}: min < max`);
+            assert.ok(field.step > 0, `${key}: step > 0`);
+            assert.ok(field.default >= field.min && field.default <= field.max, `${key}: default na faixa`);
+        }
         assert.equal(DEFAULT_GAME_SETTINGS[key], field.default);
         assert.ok(field.format(field.default).length > 0, `${key}: format devolve texto`);
     }
@@ -68,7 +75,7 @@ test('chaves desconhecidas não vazam para as preferências', () => {
 
 test('save grava na chave certa e load devolve o mesmo', () => {
     const storage = fakeStorage();
-    const settings = { sensitivity: 1.5, fov: 90, renderDistance: 2, volume: 0.35 };
+    const settings = { sensitivity: 1.5, fov: 90, renderDistance: 2, volume: 0.35, graphics: '0.5' };
     saveGameSettings(settings, storage);
     const [[key, value]] = storage.entries();
     assert.equal(key, GAME_SETTINGS_KEY);
@@ -94,10 +101,89 @@ test('save com storage bloqueado não lança', () => {
 
 test('todo controle da tela de opções existe no index.html', () => {
     const html = readFileSync(path.join(import.meta.dirname, '..', 'index.html'), 'utf8');
-    for (const { key, input, output } of OPTION_CONTROLS) {
+    for (const { key, button, output } of OPTION_CONTROLS) {
         assert.ok(GAME_SETTING_FIELDS[key], `campo desconhecido: ${key}`);
-        assert.ok(html.includes(`id="${input}"`), `input #${input} ausente no index.html`);
-        assert.ok(html.includes(`id="${output}"`), `output #${output} ausente no index.html`);
+        assert.ok(html.includes(`id="${button}"`), `botão #${button} ausente no index.html`);
+        assert.ok(html.includes(`id="${output}"`), `saída #${output} ausente no index.html`);
     }
     assert.ok(html.includes('id="btn-options-reset"'), 'botão de restaurar padrões ausente');
+});
+
+test('a tela de opções tem uma barra para cada campo', () => {
+    assert.deepEqual(OPTION_CONTROLS.map(row => row.key), Object.keys(GAME_SETTING_FIELDS));
+});
+
+// ------------------------------------------------ qualidade gráfica (lista)
+
+test('gráficos guardam o modo escolhido e voltam ao padrão quando o valor não existe', () => {
+    assert.equal(DEFAULT_GAME_SETTINGS.graphics, 'auto');
+    assert.equal(sanitizeGameSettings({ graphics: '0.75' }).graphics, '0.75');
+    assert.equal(sanitizeGameSettings({ graphics: 'max' }).graphics, 'max');
+    assert.equal(sanitizeGameSettings({ graphics: 'ultra' }).graphics, 'auto', 'modo desconhecido não entra');
+    assert.equal(sanitizeGameSettings({ graphics: 0.5 }).graphics, 'auto', 'número não é modo');
+    assert.equal(GAME_SETTING_FIELDS.graphics.format('0.5'), 'Média');
+    assert.equal(GAME_SETTING_FIELDS.graphics.format('auto'), 'Automática');
+});
+
+test('valor na barra: posição, ida e volta', () => {
+    // campo numérico: 0 na esquerda, 1 na direita
+    assert.equal(settingFraction('fov', 60), 0);
+    assert.equal(settingFraction('fov', 100), 1);
+    assert.equal(settingFraction('fov', 80), 0.5);
+    assert.equal(settingFromFraction('fov', 0), 60);
+    assert.equal(settingFromFraction('fov', 1), 100);
+    assert.equal(settingFromFraction('fov', 0.5), 80);
+
+    // lista: 4 modos ocupam 0, 1/3, 2/3 e 1
+    assert.equal(settingFraction('graphics', 'auto'), 0);
+    assert.equal(settingFraction('graphics', '0.5'), 1);
+    assert.equal(settingFromFraction('graphics', 0), 'auto');
+    assert.equal(settingFromFraction('graphics', 1), '0.5');
+    assert.equal(settingFromFraction('graphics', 0.9), '0.5', 'arredonda para o modo mais perto');
+});
+
+test('a barra nunca gera valor fora da faixa nem valor quebrado', () => {
+    assert.equal(settingFromFraction('volume', -1), 0);
+    assert.equal(settingFromFraction('volume', 2), 1);
+    assert.equal(settingFromFraction('volume', Number.NaN), 0);
+    assert.equal(settingFromFraction('sensitivity', 0.333), 1, 'arredonda no passo de 0,05');
+    assert.equal(settingFromFraction('renderDistance', 0.5), 4, 'chunks são inteiros (passo 1)');
+    assert.equal(settingFromFraction('campo-que-nao-existe', 0.5), undefined);
+});
+
+test('passo a passo para no limite e dá a volta nas listas', () => {
+    assert.equal(stepSetting('fov', 75, 1), 76);
+    assert.equal(stepSetting('fov', 75, -1), 74);
+    assert.equal(stepSetting('fov', 100, 1), 100, 'no máximo, o + não passa da faixa');
+    assert.equal(stepSetting('fov', 60, -1), 60);
+    assert.equal(stepSetting('volume', 1, 1), 1);
+    assert.equal(stepSetting('graphics', 'auto', 1), 'max');
+    assert.equal(stepSetting('graphics', '0.5', 1), 'auto', 'lista dá a volta');
+    assert.equal(stepSetting('graphics', 'auto', -1), '0.5', 'e também para trás');
+});
+
+test('formatar valor usa o formato do campo', () => {
+    assert.equal(formatSetting('fov', 75), '75°');
+    assert.equal(formatSetting('volume', 0), 'mudo');
+    assert.equal(formatSetting('graphics', '0.75'), 'Alta');
+    assert.equal(formatSetting('campo-que-nao-existe', 3), '3');
+});
+
+test('quem grava avisa quem assina, e um ouvinte quebrado não derruba os outros', () => {
+    const seen = [];
+    const stopA = onGameSettingsChange(() => { throw new Error('tela quebrada'); });
+    const stopB = onGameSettingsChange(settings => seen.push(settings.volume));
+
+    notifyGameSettingsChange({ ...DEFAULT_GAME_SETTINGS, volume: 0.4 });
+    assert.deepEqual(seen, [0.4], 'o segundo ouvinte recebe mesmo com o primeiro falhando');
+
+    stopB();
+    stopA();
+    notifyGameSettingsChange({ ...DEFAULT_GAME_SETTINGS, volume: 0.9 });
+    assert.deepEqual(seen, [0.4], 'depois de cancelar não chega mais nada');
+
+    // assinatura inválida não quebra e devolve uma função de cancelar
+    const stopNothing = onGameSettingsChange(null);
+    assert.equal(typeof stopNothing, 'function');
+    stopNothing();
 });

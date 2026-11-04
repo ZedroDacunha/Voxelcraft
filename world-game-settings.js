@@ -1,6 +1,7 @@
-// Preferências do jogo (não do save): sensibilidade, campo de visão e
-// distância de render. Ficam em localStorage e são lidas quando `game.js` é
-// importado (ao entrar em um mundo). A tela de opções do menu grava aqui.
+// Preferências do jogo (não do save): sensibilidade, campo de visão, distância
+// de render, volume e qualidade gráfica. Ficam em localStorage e são lidas
+// quando `game.js` é importado (ao entrar em um mundo). A tela de opções — do
+// menu e a do ESC durante o jogo — grava aqui.
 export const GAME_SETTINGS_KEY = 'voxel-sandbox/game-settings/v1';
 
 export const GAME_SETTING_FIELDS = Object.freeze({
@@ -20,6 +21,15 @@ export const GAME_SETTING_FIELDS = Object.freeze({
         min: 0, max: 1, step: 0.05, default: 0.7,
         format: value => (value <= 0 ? 'mudo' : `${Math.round(value * 100)}%`),
     }),
+    // Qualidade gráfica não é um número numa faixa: é uma lista de modos, do
+    // automático à metade da resolução. Fica gravada como texto para o save
+    // antigo continuar válido.
+    graphics: Object.freeze({
+        choices: Object.freeze(['auto', 'max', '0.75', '0.5']),
+        labels: Object.freeze({ auto: 'Automática', max: 'Máxima', 0.75: 'Alta', 0.5: 'Média' }),
+        default: 'auto',
+        format: value => GAME_SETTING_FIELDS.graphics.labels[value] ?? 'Automática',
+    }),
 });
 
 export const DEFAULT_GAME_SETTINGS = Object.freeze(Object.fromEntries(
@@ -32,6 +42,10 @@ export function sanitizeGameSettings(raw = {}) {
     const clean = { ...DEFAULT_GAME_SETTINGS };
     if (!raw || typeof raw !== 'object') return clean;
     for (const [key, field] of Object.entries(GAME_SETTING_FIELDS)) {
+        if (field.choices) {
+            clean[key] = field.choices.includes(raw[key]) ? raw[key] : field.default;
+            continue;
+        }
         const value = Number(raw[key]);
         if (!Number.isFinite(value)) continue;
         const stepped = Math.round((value - field.min) / field.step) * field.step + field.min;
@@ -68,4 +82,101 @@ export function saveGameSettings(settings, storage = defaultStorage()) {
         // quota cheia ou storage bloqueado: vale só para esta sessão
     }
     return clean;
+}
+
+// ------------------------------------------------------------------
+// Valores da tela de opções
+//
+// Cada opção é uma barra que mostra "Rótulo: valor". Quem desenha pergunta
+// estas funções puras: onde está o valor na barra (0 a 1), qual valor cai em
+// cada ponto, qual é o próximo e como escrever. Assim a regra de cada campo
+// (passo, faixa, lista) fica num lugar só e dá para testar sem DOM.
+// ------------------------------------------------------------------
+
+function clampField(field, value) {
+    const stepped = Math.round((value - field.min) / field.step) * field.step + field.min;
+    const clamped = Math.min(field.max, Math.max(field.min, stepped));
+    return Number(clamped.toFixed(4));
+}
+
+/** Texto do valor, do jeito que aparece na tela ("75°", "Automática"). */
+export function formatSetting(key, value = DEFAULT_GAME_SETTINGS[key]) {
+    const field = GAME_SETTING_FIELDS[key];
+    return field ? field.format(value) : String(value);
+}
+
+/**
+ * Posição do valor na barra, de 0 (mínimo) a 1 (máximo). Campo de lista usa a
+ * posição na lista — `graphics` com 4 modos tem 0, 1/3, 2/3 e 1.
+ */
+export function settingFraction(key, value) {
+    const field = GAME_SETTING_FIELDS[key];
+    if (!field) return 0;
+    if (field.choices) {
+        const index = field.choices.indexOf(value);
+        if (index < 0) return 0;
+        return field.choices.length > 1 ? index / (field.choices.length - 1) : 0;
+    }
+    const span = field.max - field.min;
+    if (!(span > 0)) return 0;
+    return Math.min(1, Math.max(0, (Number(value) - field.min) / span));
+}
+
+/**
+ * Valor que cai num ponto da barra — é o que o clique e o arraste usam. O ponto
+ * é arredondado no passo do campo, então a barra nunca gera valor "quebrado".
+ */
+export function settingFromFraction(key, fraction) {
+    const field = GAME_SETTING_FIELDS[key];
+    if (!field) return undefined;
+    const t = Number.isFinite(fraction) ? Math.min(1, Math.max(0, fraction)) : 0;
+    if (field.choices) return field.choices[Math.round(t * (field.choices.length - 1))];
+    return clampField(field, field.min + t * (field.max - field.min));
+}
+
+/**
+ * Passo a passo (seta do teclado, clique curto): anda `direction` casas. Nos
+ * campos numéricos para no limite — quem quer o outro extremo arrasta ou usa
+ * Home/End. Nas listas dá a volta, porque são poucos modos e voltar ao começo é
+ * o que se espera de um botão que cicla.
+ */
+export function stepSetting(key, value, direction = 1) {
+    const field = GAME_SETTING_FIELDS[key];
+    if (!field) return value;
+    const dir = direction < 0 ? -1 : 1;
+    if (field.choices) {
+        const total = field.choices.length;
+        const index = field.choices.indexOf(value);
+        const from = index < 0 ? 0 : index;
+        return field.choices[((from + dir) % total + total) % total];
+    }
+    return clampField(field, Number(value) + field.step * dir);
+}
+
+// ------------------------------------------------------------------
+// Aviso de mudança
+//
+// O menu grava as opções; o jogo (FOV, sensibilidade, volume, qualidade) e o
+// áudio da interface precisam saber na hora. Em vez de cada tela conhecer a
+// outra, quem grava avisa e quem quer saber assina.
+// ------------------------------------------------------------------
+
+const changeListeners = new Set();
+
+/** Assina as mudanças de opções. Devolve a função que cancela a assinatura. */
+export function onGameSettingsChange(listener) {
+    if (typeof listener !== 'function') return () => {};
+    changeListeners.add(listener);
+    return () => { changeListeners.delete(listener); };
+}
+
+/** Avisa os assinantes. Um ouvinte com erro não derruba os outros. */
+export function notifyGameSettingsChange(settings) {
+    for (const listener of [...changeListeners]) {
+        try {
+            listener(settings);
+        } catch {
+            // uma tela quebrada não pode travar a mudança de volume
+        }
+    }
 }

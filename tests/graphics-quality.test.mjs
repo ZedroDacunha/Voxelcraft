@@ -165,3 +165,49 @@ test('o jogo aplica a escala pendente e mede FPS para adaptar', () => {
     assert.match(source, /renderer\.setPixelRatio\(gfx\.scale\)/);
     assert.match(source, /const cycleQuality = \(\) => gfx\.cycle\(\)/);
 });
+
+test('escolha direta pela tela de opções usa o mesmo caminho do F4', () => {
+    const { quality, notices } = makeQuality();
+
+    assert.equal(quality.mode, 'auto', 'começa em automático');
+    assert.equal(quality.setMode(0.75), true);
+    assert.equal(quality.mode, 0.75);
+    assert.equal(quality.auto, false);
+    assert.equal(quality.scale, 0.75);
+    assert.equal(quality.consumePending(), 0.75);
+    assert.match(notices.at(-1), /75%/);
+
+    assert.equal(quality.setMode('max'), true);
+    assert.equal(quality.scale, 1);
+    assert.match(notices.at(-1), /máxima/);
+
+    assert.equal(quality.setMode('auto'), true);
+    assert.equal(quality.auto, true);
+    assert.match(notices.at(-1), /automática/);
+});
+
+test('modo desconhecido é ignorado sem mudar nada', () => {
+    const { quality, notices } = makeQuality();
+    quality.setMode(0.5);
+    const before = { mode: quality.mode, scale: quality.scale, notices: notices.length };
+
+    assert.equal(quality.setMode(0.3), false, 'escala fora da lista não entra');
+    assert.equal(quality.setMode('ultra'), false);
+    assert.equal(quality.mode, before.mode);
+    assert.equal(quality.scale, before.scale);
+    assert.equal(notices.length, before.notices);
+});
+
+test('aplicar o valor já salvo ao entrar no mundo não avisa', () => {
+    const { quality, notices } = makeQuality();
+    assert.equal(quality.setMode(0.5, { quiet: true }), true);
+    assert.equal(quality.scale, 0.5);
+    assert.equal(notices.length, 0, 'ninguém mudou nada agora, então nada de aviso');
+});
+
+test('cycle continua andando de onde a escolha direta parou', () => {
+    const { quality } = makeQuality();
+    quality.setMode(0.75);
+    quality.cycle();
+    assert.equal(quality.mode, 0.5, 'o F4 segue a lista a partir do modo atual');
+});

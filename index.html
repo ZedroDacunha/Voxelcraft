@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="Voxel">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
-<link rel="stylesheet" href="styles.css?v=0e660a37d5">
+<link rel="stylesheet" href="styles.css?v=bcec49172d">
 <link rel="stylesheet" href="inventory.css?v=3c73d92add">
 <!-- importmap:start (gerado por tools/stamp-importmap.mjs; não editar à mão) -->
 <script type="importmap">
@@ -19,9 +19,9 @@
   "imports": {
     "three": "./vendor/three/three.module.js?v=76dea8151b",
     "three/addons/": "./vendor/three/addons/",
-    "./game-pause-menu.js": "./game-pause-menu.js?v=ccdc70fb50",
+    "./game-pause-menu.js": "./game-pause-menu.js?v=b592dfec15",
     "./game-pointer-lock.js": "./game-pointer-lock.js?v=cf53899b88",
-    "./game.js": "./game.js?v=666d234b9b",
+    "./game.js": "./game.js?v=10af7d9674",
     "./inventory-a11y.js": "./inventory-a11y.js?v=25f3dab87d",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
     "./inventory-layout.js": "./inventory-layout.js?v=439823a409",
@@ -48,8 +48,8 @@
     "./world-furnace-effects.js": "./world-furnace-effects.js?v=b5fc477140",
     "./world-furnace-rules.js": "./world-furnace-rules.js?v=195bb6a8fc",
     "./world-furnace-sounds.js": "./world-furnace-sounds.js?v=a844b58f3c",
-    "./world-game-settings.js": "./world-game-settings.js?v=9a35caccda",
-    "./world-graphics-quality.js": "./world-graphics-quality.js?v=f20063e81a",
+    "./world-game-settings.js": "./world-game-settings.js?v=f1c1bf9208",
+    "./world-graphics-quality.js": "./world-graphics-quality.js?v=1aafc939df",
     "./world-grid.js": "./world-grid.js?v=be11481d71",
     "./world-hand-animation.js": "./world-hand-animation.js?v=5db4d45ae7",
     "./world-install-prompt.js": "./world-install-prompt.js?v=bedfbf7894",
@@ -65,7 +65,7 @@
     "./world-mineral-blocks.js": "./world-mineral-blocks.js?v=4c39bc041e",
     "./world-mineral-textures.js": "./world-mineral-textures.js?v=ab422ad968",
     "./world-minerals.js": "./world-minerals.js?v=2f66ff7350",
-    "./world-options-view.js": "./world-options-view.js?v=d5a1219e68",
+    "./world-options-view.js": "./world-options-view.js?v=9a8394627c",
     "./world-ore-generation.js": "./world-ore-generation.js?v=7fe35588d3",
     "./world-point-lights.js": "./world-point-lights.js?v=2116448dd8",
     "./world-pwa.js": "./world-pwa.js?v=634eb5dc1b",
@@ -152,38 +152,41 @@
     <form method="dialog" id="options-form">
         <p class="world-menu-eyebrow">CONFIGURAÇÃO</p>
         <h2 id="options-title">Opções</h2>
-        <p class="options-hint">As mudanças valem para o próximo mundo que você entrar.</p>
+        <p class="options-hint">Clique ou arraste na barra para mudar. Sensibilidade, campo de visão, volume e gráficos valem na hora; a distância de render vale ao entrar no próximo mundo.</p>
 
-        <label class="world-field options-field">
-            <span class="options-field-head">Sensibilidade do mouse <output id="opt-sensitivity-value">100%</output></span>
-            <input type="range" id="opt-sensitivity" min="0.5" max="2" step="0.05" value="1">
-        </label>
-
-        <label class="world-field options-field">
-            <span class="options-field-head">Campo de visão <output id="opt-fov-value">75°</output></span>
-            <input type="range" id="opt-fov" min="60" max="100" step="1" value="75">
-        </label>
-
-        <label class="world-field options-field">
-            <span class="options-field-head">Distância de render <output id="opt-render-distance-value">4 chunks</output></span>
-            <input type="range" id="opt-render-distance" min="2" max="6" step="1" value="4">
-        </label>
-
-        <label class="world-field options-field">
-            <span class="options-field-head">Volume <output id="opt-volume-value">70%</output></span>
-            <input type="range" id="opt-volume" min="0" max="1" step="0.05" value="0.7">
-        </label>
+        <div class="options-grid">
+            <button type="button" class="classic-btn option-btn" id="opt-sensitivity" aria-label="Sensibilidade do mouse">
+                <span class="option-name">Sensibilidade do mouse</span>
+                <span class="option-value" id="opt-sensitivity-value">100%</span>
+            </button>
+            <button type="button" class="classic-btn option-btn" id="opt-fov" aria-label="Campo de visão">
+                <span class="option-name">Campo de visão</span>
+                <span class="option-value" id="opt-fov-value">75°</span>
+            </button>
+            <button type="button" class="classic-btn option-btn" id="opt-render-distance" aria-label="Distância de render">
+                <span class="option-name">Distância de render</span>
+                <span class="option-value" id="opt-render-distance-value">4 chunks</span>
+            </button>
+            <button type="button" class="classic-btn option-btn" id="opt-volume" aria-label="Volume">
+                <span class="option-name">Volume</span>
+                <span class="option-value" id="opt-volume-value">70%</span>
+            </button>
+            <button type="button" class="classic-btn option-btn" id="opt-graphics" aria-label="Gráficos">
+                <span class="option-name">Gráficos</span>
+                <span class="option-value" id="opt-graphics-value">Automática</span>
+            </button>
+        </div>
 
         <details class="options-controls">
             <summary>Controles</summary>
-            <p><kbd>W A S D</kbd> mover · <kbd>Espaço</kbd> pular · <kbd>Shift</kbd> correr · <kbd>C</kbd> agachar</p>
-            <p><kbd>F4</kbd> alterna a qualidade gráfica durante o jogo.</p>
+            <p><kbd>W A S D</kbd> mover · <kbd>Espaço</kbd> pular/nadar · <kbd>Shift</kbd> correr · <kbd>C</kbd> agachar/mergulhar · <kbd>E</kbd> inventário</p>
+            <p><kbd>F3</kbd> depuração · <kbd>F4</kbd> alterna a qualidade gráfica durante o jogo</p>
             <p>Mouse: olhar ao redor · botão esquerdo: minerar · botão direito: usar ou colocar blocos.</p>
         </details>
 
         <div class="world-dialog-actions">
             <button class="classic-btn" type="button" id="btn-options-reset">Restaurar padrões</button>
-            <button class="classic-btn" value="close">Concluído</button>
+            <button class="classic-btn" type="submit" value="close">Concluído</button>
         </div>
     </form>
 </dialog>
@@ -290,13 +293,21 @@
     </div>
 </div>
 <div id="menu">
-    <h1>Voxel Sandbox</h1>
-    <p>Parte 11 — Água, Natação, Fôlego e Geração de Praias com Areia!</p>
-    <button class="btn" id="btn-play" disabled>Clique para Jogar</button>
-    <button class="btn btn-secondary" id="btn-worlds">Voltar à seleção de mundos</button>
-    <p style="font-size: 14px; opacity: 0.8; margin-top: 15px;">[WASD] Mover | [Espaço] Pular/Nadar | [Shift] Correr | [C] Agachar/Mergulhar | [F3] Debug | [F4] Qualidade | Botão esq: minerar | Botão dir: colocar / usar bancada e forno</p>
-    <p id="menu-touch-hint" style="font-size: 14px; opacity: 0.8; margin-top: 8px; display: none;">No toque: joystick à esquerda, arraste na tela para olhar, botões à direita (Cavar, Usar, Pular, Agachar, Mochila e Pausar).</p>
-    <p style="font-size: 12px; opacity: 0.6; margin-top: 0;">Na água, segure C para mergulhar e Espaço para subir; solte e pressione Espaço novamente para outro impulso na superfície.</p>
+    <div class="pause-card">
+        <h1>Jogo pausado</h1>
+        <div class="pause-actions">
+            <button class="classic-btn classic-btn-wide" id="btn-play" disabled>Voltar ao jogo</button>
+            <button class="classic-btn classic-btn-wide" id="btn-menu-options">Opções…</button>
+            <button class="classic-btn classic-btn-wide" id="btn-worlds">Salvar e sair para os mundos</button>
+        </div>
+        <details class="pause-controls">
+            <summary>Controles</summary>
+            <p><kbd>W A S D</kbd> mover · <kbd>Espaço</kbd> pular/nadar · <kbd>Shift</kbd> correr · <kbd>C</kbd> agachar/mergulhar · <kbd>E</kbd> inventário</p>
+            <p><kbd>F3</kbd> depuração · <kbd>F4</kbd> qualidade · botão esquerdo minera, botão direito usa ou coloca</p>
+            <p>Na água, segure <kbd>C</kbd> para mergulhar e <kbd>Espaço</kbd> para subir; solte e pressione <kbd>Espaço</kbd> de novo para outro impulso na superfície.</p>
+        </details>
+        <p id="menu-touch-hint" style="display: none;">No toque: joystick à esquerda, arraste na tela para olhar, botões à direita (Cavar, Usar, Pular, Agachar, Mochila e Pausar).</p>
+    </div>
 </div>
 
 <div id="hud-bottom">

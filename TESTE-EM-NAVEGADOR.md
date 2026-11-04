@@ -76,6 +76,21 @@ aparelho do jogador.
 - [ ] Se nada mudou no código, o comportamento é o mesmo — `CACHE_VERSION` só
       sobe quando a casca ou a estratégia mudam.
 
+## 6. Pausa e opções (não é PWA, mas passa por aqui)
+
+- [ ] Dentro do mundo, `ESC` solta o mouse e mostra **Jogo pausado** com
+      `Voltar ao jogo`, `Opções…` e `Salvar e sair para os mundos`.
+- [ ] `Opções…` abre a grade; **arrastar** a barra de campo de visão muda a
+      câmera na hora, sem fechar a tela.
+- [ ] Sensibilidade e volume também valem na hora; **Gráficos** muda a resolução
+      igual ao `F4`.
+- [ ] `Distância de render` mostra o valor novo, mas só muda o mundo no próximo
+      que você entrar (o próprio painel avisa).
+- [ ] `Tab` percorre as opções e as setas mudam o valor; `ESC` fecha a tela e
+      volta para o menu de pausa.
+- [ ] No celular, o botão **Pausar** abre o mesmo cartão e dá para arrastar as
+      barras com o dedo.
+
 ## Se algo falhar
 
 | Sintoma | Onde olhar |

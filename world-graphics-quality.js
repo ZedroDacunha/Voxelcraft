@@ -51,9 +51,10 @@ export function createWorldGraphicsQuality({ max, min = 0.5, notify = () => {} }
         }
     }
 
-    function cycle() {
-        qualityIndex = (qualityIndex + 1) % QUALITY_MODES.length;
-        const mode = QUALITY_MODES[qualityIndex];
+    // Aplica um modo já escolhido. `cycle()` e a tela de opções chegam aqui
+    // pelo mesmo caminho, senão as duas formas de trocar qualidade podiam
+    // divergir (uma zerando o histórico de FPS e a outra não).
+    function applyMode(mode, quiet = false) {
         state.noGain = 0;
         state.lastFps = null;
         state.slow = 0;
@@ -62,13 +63,30 @@ export function createWorldGraphicsQuality({ max, min = 0.5, notify = () => {} }
         if (mode === 'auto') {
             state.auto = true;
             setScale(state.max);
-            notify('Qualidade: automática');
+            if (!quiet) notify('Qualidade: automática');
             return;
         }
 
         state.auto = false;
         setScale(mode === 'max' ? state.max : mode);
-        notify('Qualidade: ' + (mode === 'max' ? 'máxima' : Math.round(mode * 100) + '%'));
+        if (!quiet) notify('Qualidade: ' + (mode === 'max' ? 'máxima' : Math.round(mode * 100) + '%'));
+    }
+
+    function cycle() {
+        qualityIndex = (qualityIndex + 1) % QUALITY_MODES.length;
+        applyMode(QUALITY_MODES[qualityIndex]);
+        return QUALITY_MODES[qualityIndex];
+    }
+
+    // Escolha direta (tela de opções). Modo desconhecido é ignorado: quem
+    // chama decide o que fazer no lugar. `quiet` é para o valor já salvo ser
+    // aplicado ao entrar no mundo sem avisar o que o jogador não mudou agora.
+    function setMode(mode, { quiet = false } = {}) {
+        const index = QUALITY_MODES.indexOf(mode);
+        if (index < 0) return false;
+        qualityIndex = index;
+        applyMode(mode, quiet);
+        return true;
     }
 
     function consumePending() {
@@ -80,8 +98,10 @@ export function createWorldGraphicsQuality({ max, min = 0.5, notify = () => {} }
     return {
         get auto() { return state.auto; },
         get scale() { return state.scale; },
+        get mode() { return QUALITY_MODES[qualityIndex]; },
         adapt,
         consumePending,
         cycle,
+        setMode,
     };
 }
