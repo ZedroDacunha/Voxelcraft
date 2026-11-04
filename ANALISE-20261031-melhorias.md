@@ -453,6 +453,10 @@ Os 62 testes existentes passaram, mas ainda não cobrem bem:
 - **Higiene automatizada em 04/11** (`tests/hygiene.test.mjs`, 6 testes): import
   órfão, `console.log` esquecido, `debugger`, módulo sem importador e constante de
   debug fixa. São sobras que não dão erro — só teste pega.
+- ~~Retry do save (`scheduleSaveRetry`, falha permanente, disco cheio).~~
+  **Coberto em 04/11** (`tests/save-retry.test.mjs`, 9 testes): aviso único, escada
+  2 s→5 s→12 s→30 s com teto, sucesso zerando a escada, `QuotaExceededError` sem
+  retry, duas falhas gerando um retry só e o flush cancelando o retry pendente.
 
 ---
 
