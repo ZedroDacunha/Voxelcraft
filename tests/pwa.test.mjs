@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 
 import {
-    APP_SHELL_FILES,
     PWA_MANIFEST_PATH,
     SERVICE_WORKER_PATH,
     isStandalone,
@@ -67,29 +66,47 @@ test('há um ícone maskable com fundo cheio e folga para o recorte', () => {
 
 // --- casca offline ------------------------------------------------------
 
-test('a casca offline tem o essencial e todo arquivo citado existe', () => {
-    for (const url of APP_SHELL_FILES) {
+test('todo arquivo de entrada da casca existe e não está vazio', () => {
+    // O mínimo do worker (o que entra mesmo se o index.html não puder ser lido)
+    // e as imagens que só o jogo pede.
+    const start = worker.indexOf('const MINIMUM_SHELL = [');
+    const end = worker.indexOf('];', start);
+    assert.ok(start > 0 && end > start, 'service worker declara MINIMUM_SHELL');
+    const listed = [...worker.slice(start, end).matchAll(/'([^']+)'/g)].map(match => match[1]);
+    for (const url of listed) {
         const file = url.replace(/^\.\//, '');
-        if (file === '' ) continue; // './' é o próprio index.html
+        if (file === '') continue; // './' é o próprio index.html
         assert.ok(exists(file), `${url} existe no repositório`);
         assert.ok(statSync(new URL(`../${file}`, import.meta.url)).size > 0, `${url} não está vazio`);
     }
-    const files = APP_SHELL_FILES.join(' ');
-    for (const essential of ['index.html', 'styles.css', 'game.js', 'world-menu.js',
-        'vendor/three/three.module.js', 'world-terrain-worker.js', 'manifest.webmanifest']) {
-        assert.ok(files.includes(essential), `casca inclui ${essential}`);
+    for (const essential of ['index.html', 'styles.css', 'game.js', 'world-menu.js', 'manifest.webmanifest']) {
+        assert.ok(listed.join(' ').includes(essential), `casca inclui ${essential}`);
     }
     assert.equal(PWA_MANIFEST_PATH, './manifest.webmanifest');
     assert.equal(SERVICE_WORKER_PATH, './service-worker.js');
 });
 
-test('a lista do service worker não diverge da lista do módulo', () => {
-    const start = worker.indexOf('const SHELL = [');
+test('o worker monta a lista do que guardar a partir do index.html', () => {
+    assert.match(worker, /function pageFilesFromHtml/, 'o worker sabe ler a página');
+    assert.match(worker, /<script type="importmap">/, 'usa o importmap (todos os módulos, com hash)');
+    assert.ok(worker.includes('html.matchAll(/<(?:script|link)[^>]*(?:src|href)="([^"]+)"/g)'),
+        'e os src/href da página (CSS, ícones, entrada)');
+    assert.match(worker, /await fetch\(OFFLINE_DOCUMENT/, 'busca a página na instalação');
+    assert.match(worker, /cache\.put\(OFFLINE_DOCUMENT, page\)/, 'e guarda a resposta que já baixou');
+    assert.match(worker, /catch \(error\) \{\n\s+\/\/ Sem a página/, 'página ilegível não derruba a instalação');
+});
+
+test('as imagens que o jogo carrega estão na lista do worker (e batem com o game.js)', () => {
+    const start = worker.indexOf('const IMAGES = [');
     const end = worker.indexOf('];', start);
-    assert.ok(start > 0 && end > start, 'service worker declara SHELL');
+    assert.ok(start > 0 && end > start, 'service worker declara IMAGES');
     const listed = [...worker.slice(start, end).matchAll(/'([^']+)'/g)].map(match => match[1]);
-    assert.deepEqual(listed.sort(), [...APP_SHELL_FILES].sort(),
+    const game = read('game.js');
+    const inGame = [...game.matchAll(/'\.\/assets\/[^']+\.png'/g)].map(match => match[0].slice(1, -1));
+    assert.ok(inGame.length >= 3, 'o jogo carrega as texturas de capim');
+    assert.deepEqual([...new Set(inGame)].sort(), [...listed].sort(),
         'as duas listas precisam ser idênticas (teste existe para elas não divergirem em silêncio)');
+    for (const url of listed) assert.ok(exists(url.replace(/^\.\//, '')), `${url} existe no repositório`);
 });
 
 test('o service worker não é importado por nenhum módulo da página', () => {
@@ -103,12 +120,12 @@ test('o service worker não é importado por nenhum módulo da página', () => {
 test('instala guardando a casca, sem travar por causa de um arquivo', () => {
     assert.match(worker, /self\.addEventListener\('install'/);
     assert.match(worker, /caches\.open\(CACHE_NAME\)/);
-    assert.match(worker, /SHELL\.map\(\(url\) => cache\.add\(url\)\.catch\(\(\) => \{\}\)\)/,
+    assert.ok(worker.includes('[...files].map((url) => cache.add(url).catch(() => {}))'),
         'um 404 na casca não pode impedir a instalação');
     assert.match(worker, /self\.skipWaiting\(\)/, 'versão nova assume sem esperar todas as abas fecharem');
 });
 
-test('ativa limpando caches antigos e assumindo as abas abertas', () => {
+test('ativa limpando caches antigos, abas abertas e versões velhas de módulo', () => {
     assert.match(worker, /self\.addEventListener\('activate'/);
     assert.match(worker, /caches\.keys\(\)/);
     assert.match(worker, /name\.startsWith\(CACHE_PREFIX\) && name !== CACHE_NAME/);
@@ -116,6 +133,11 @@ test('ativa limpando caches antigos e assumindo as abas abertas', () => {
     assert.match(worker, /self\.clients\.claim\(\)/);
     assert.match(worker, /const CACHE_VERSION = 'v\d+'/, 'versão explícita, para poder invalidar');
     assert.match(worker, /CACHE_PREFIX\}-/, 'nome do cache derivado da versão');
+    assert.match(worker, /await dropStaleModules\(\)/, 'e não guarda versão de módulo que ninguém usa');
+    const drop = worker.slice(worker.indexOf('async function dropStaleModules'));
+    assert.match(drop, /url\.searchParams\.has\('v'\)/, 'só mexe em URL versionada');
+    assert.match(drop, /knownPaths\.has\(url\.pathname\)/, 'e só nas que são arquivo do jogo');
+    assert.match(drop, /await cache\.delete\(request\)/);
 });
 
 test('documento: rede primeiro, cache como rede de segurança', () => {
@@ -129,11 +151,19 @@ test('documento: rede primeiro, cache como rede de segurança', () => {
 
 test('arquivos: cache primeiro e atualização em segundo plano', () => {
     const body = worker.slice(worker.indexOf('async function handleAsset'));
-    assert.match(body, /const cached = await cache\.match\(request\)/);
+    assert.match(body, /const key = cacheKey\(request\)/);
+    assert.match(body, /const cached = await cache\.match\(key\)/);
     assert.match(body, /if \(cached\) \{/);
     assert.match(body, /event\.waitUntil\(network\.catch/, 'atualiza sem fazer o jogador esperar');
-    assert.match(body, /cache\.put\(request, response\.clone\(\)\)/);
+    assert.match(body, /cache\.put\(key, response\.clone\(\)\)/);
     assert.match(body, /status: 504/, 'offline sem cache: erro explícito, não página em branco');
+});
+
+test('imagem é guardada sem a versão na chave (não é código)', () => {
+    const body = worker.slice(worker.indexOf('function cacheKey'), worker.indexOf('async function dropStaleModules'));
+    assert.match(body, /url\.pathname\.includes\('\/assets\/'\)/, 'só para assets/');
+    assert.match(body, /url\.searchParams\.delete\('v'\)/, 'descarta o ?v=');
+    assert.match(body, /\|\| !url\.search\) return request;/, 'sem querystring fica a própria requisição');
 });
 
 test('o worker só mexe na própria origem', () => {

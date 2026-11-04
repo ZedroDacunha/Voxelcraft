@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 528 testes de módulos puros (node --test)
+npm test           # 533 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -176,22 +176,38 @@ cinza do menu) que aparece quando há como instalar:
 | Peça | Onde | O que faz |
 | --- | --- | --- |
 | Manifest | `manifest.webmanifest` | nome, ícones (192, 512 e maskable), `display: standalone`, cores |
-| Service worker | `service-worker.js` | guarda a casca na instalação e o resto no primeiro uso |
+| Service worker | `service-worker.js` | guarda **o jogo inteiro** na instalação (a lista sai do `index.html`) |
 | Registro | `world-pwa.js` | registra só em `http(s)`; `?sw=0` desliga |
 | Botão de instalar | `world-install-prompt.js` | decide quando mostrar e chama o convite do navegador (testado sem DOM) |
 | Ícones | `icons/` | gerados por `tools/make-icons.mjs` (PNG escrito na mão, sem dependência) |
 
-Duas estratégias, porque os dois tipos de requisição têm problemas opostos:
+**O que guardar vem do próprio `index.html`.** Na instalação o worker busca a
+página e lê duas coisas: o importmap (que já lista **todos** os módulos com o
+`?v=<hash>` do conteúdo) e os `src`/`href` dela (script de entrada, CSS, manifest
+e ícones). É exatamente a lista de URLs que o navegador vai pedir — então não
+existe segunda lista para envelhecer em silêncio, e **depois da primeira visita o
+jogo inteiro abre sem rede**, não só o menu. Se a página não puder ser lida
+(instalação sem rede no meio), fica uma casca mínima escrita no worker.
+
+Três estratégias, porque os tipos de requisição têm problemas opostos:
 
 - **documento** (`index.html`): rede primeiro — versão nova chega na hora; sem
   rede, cai na cópia guardada. Se nunca abriu online, mostra uma página dizendo
   isso em vez de tela em branco.
-- **demais arquivos**: cache primeiro com atualização em segundo plano. Como os
-  módulos já vêm com `?v=<hash>` no importmap, servir do cache nunca entrega
-  código velho: hash diferente é URL diferente.
+- **módulos e CSS**: cache primeiro com atualização em segundo plano. Como já
+  vêm com `?v=<hash>` no importmap, servir do cache nunca entrega código velho:
+  hash diferente é URL diferente. Na ativação, as versões antigas de módulo saem
+  do cache (a URL de hoje é conhecida, então dá para limpar o resto).
+- **imagens** (`assets/`): iguais às anteriores, mas a chave do cache ignora o
+  `?v=` — o jogo pede as texturas com uma versão escrita à mão, e imagem não é
+  código: o que está guardado serve para qualquer versão.
 
 Só a própria origem é cacheada — CDN de terceiros fica de fora. O `three.js` já
 está em `vendor/`, então o jogo não depende de CDN para abrir.
+
+Para conferir de verdade: abra o jogo, jogue alguns segundos, feche a aba, entre
+em modo avião (ou desligue o Wi-Fi) e abra de novo — o mundo carrega e dá para
+jogar.
 
 ## Import map e cache
 
