@@ -230,6 +230,27 @@ test('reconhece quando está rodando instalado', () => {
     assert.equal(isStandalone({ matchMedia: null }), false);
 });
 
+// --- roteiro de teste manual --------------------------------------------
+
+test('o roteiro de teste em navegador real existe e é alcançável pelo README', () => {
+    // O que o CI não vê (convite de instalação, recorte do launcher, tela sem
+    // rede) só é conferido no aparelho — e um roteiro que ninguém acha não é
+    // seguido por ninguém.
+    assert.ok(exists('TESTE-EM-NAVEGADOR.md'), 'roteiro no repositório');
+    const readme = read('README.md');
+    assert.match(readme, /\[TESTE-EM-NAVEGADOR\.md\]\(TESTE-EM-NAVEGADOR\.md\)/, 'link no README');
+
+    const guide = read('TESTE-EM-NAVEGADOR.md');
+    for (const alvo of ['Chrome desktop', 'Android', 'iPhone', 'Offline', 'Atualização']) {
+        assert.ok(guide.includes(alvo), `o roteiro cobre ${alvo}`);
+    }
+    // O teste que pegou os furos do offline precisa continuar mandando entrar no
+    // mundo, e não só chegar ao menu.
+    assert.match(guide, /Entrar no mundo/, 'offline tem que chegar ao mundo, não só ao menu');
+    assert.match(guide, /iframe/, 'e avisa que iframe nunca mostra o convite de instalação');
+    assert.match(guide, /\?sw=0/, 'e ensina a despistar cache antigo');
+});
+
 // --- ligação com a página -----------------------------------------------
 
 test('o index.html aponta o manifest, o tema e os ícones', () => {
