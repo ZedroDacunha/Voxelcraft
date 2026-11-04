@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 289 testes de módulos puros (node --test)
+npm test           # 292 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -94,7 +94,8 @@ cadência é por distância andada — andar devagar espaça os passos, correr
 aumenta a frequência; no ar e na água não há passo. **Quebrar** e **colocar**
 bloco usam a mesma família de material (ruído + baque grave), com tom variando a
 cada golpe. Durante a mineração, a **batida** de cada golpe sai no ritmo do braço
-(a fase da animação dita o som, não um cronômetro).
+(a fase da animação dita o som, não um cronômetro). A **porta** tem som próprio
+para abrir (rangido de dobradiça) e fechar (batida no batente).
 
 Para usar um som gravado, copie o arquivo com o nome do efeito para
 `assets/sounds/` — o carregador prefere `ui-click.ogg`/`.wav` (e assim por
