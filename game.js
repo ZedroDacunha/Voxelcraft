@@ -2959,8 +2959,8 @@ function unstickPlayer() {
     return unstickInWorld(world, player.pos, player.height, PLAYER_RADIUS);
 }
 
-function moveAxis(axis, amount) {
-    return movePlayerAxis(world, player.pos, axis, amount, player.height, PLAYER_RADIUS);
+function moveAxis(axis, amount, keepOnGround = false) {
+    return movePlayerAxis(world, player.pos, axis, amount, player.height, PLAYER_RADIUS, { keepOnGround });
 }
 
 function intersectsPlayer(bx, by, bz) {
@@ -3063,8 +3063,11 @@ function updatePhysics(dt) {
         camera.updateProjectionMatrix();
     }
 
-    if (moveAxis('x', player.vel.x * dt)) player.vel.x = 0;
-    if (moveAxis('z', player.vel.z * dt)) player.vel.z = 0;
+    // Agachado e apoiado no chão, o corpo não sai andando pelo vazio: dá para
+    // espiar a beirada (e chegar perto do Mofim sem assustar) sem cair.
+    const guardEdge = isCrouching && player.onGround && !inWater;
+    if (moveAxis('x', player.vel.x * dt, guardEdge)) player.vel.x = 0;
+    if (moveAxis('z', player.vel.z * dt, guardEdge)) player.vel.z = 0;
 
     const yBefore = p.y;
     const blockedY = moveAxis('y', player.vel.y * dt);

@@ -6,7 +6,9 @@ import {
     COLLISION_EPSILON,
     MAX_MOVE_STEP,
     PLAYER_RADIUS,
+    SUPPORT_PROBE,
     collidesInWorld,
+    hasGroundSupport,
     movePlayerAxis,
     playerIntersectsBlock,
     unstickInWorld,
@@ -201,4 +203,75 @@ test('intersecção de célula trata encostar como fora', () => {
     // Altura: pés em 1 e topo em 2,8 cobrem as células 1 e 2, não a 3.
     assert.equal(playerIntersectsBlock(p, H_STAND, 1, 2, 1), true);
     assert.equal(playerIntersectsBlock(p, H_STAND, 1, 3, 1), false);
+});
+
+// ------------------------------------------------ apoio no chão (agachado)
+
+// Plataforma de 4 blocos (x = 0..3) com vazio à direita, tudo em z.
+const platform = [];
+for (let x = 0; x <= 3; x++) for (let z = -2; z <= 2; z++) platform.push([x, 0, z]);
+const plat = () => makeWorld(platform);
+
+test('tem chão embaixo dos pés, e não tem no vazio', () => {
+    const world = plat();
+    assert.equal(hasGroundSupport(world, pos(2.5, 1, 0.5), H_STAND), true, 'em cima da plataforma');
+    assert.equal(hasGroundSupport(world, pos(12.5, 1, 0.5), H_STAND), false, 'no vazio');
+    assert.equal(hasGroundSupport(world, pos(2.5, 4, 0.5), H_STAND), false, 'no ar, três blocos acima');
+    // Um canto apoiado já segura o corpo (dá para espiar a beirada).
+    assert.equal(hasGroundSupport(world, pos(4.2, 1, 0.5), H_STAND), true, 'quase todo para fora, mas um canto apoiado');
+    assert.equal(hasGroundSupport(world, pos(4.35, 1, 0.5), H_STAND), false, 'passou do último canto: sem apoio');
+    // A sonda olha um fio abaixo dos pés: um passo acima do chão já é vazio.
+    assert.equal(hasGroundSupport(world, pos(2.5, 1 + SUPPORT_PROBE * 2, 0.5), H_STAND), false);
+});
+
+test('agachado na beirada o corpo para em cima do chão, sem cair', () => {
+    const world = plat();
+    const p = pos(3.0, 1, 0.5);
+    const blocked = movePlayerAxis(world, p, 'x', 3, H_CROUCH, PLAYER_RADIUS, { keepOnGround: true });
+
+    assert.equal(blocked, true, 'o passo foi barrado pela beirada');
+    assert.ok(p.x > 4.2 && p.x < 4.31, `parou na beirada (x = ${p.x.toFixed(3)})`);
+    assert.equal(hasGroundSupport(world, p, H_CROUCH), true, 'e o corpo segue apoiado');
+});
+
+test('sem a guarda, o mesmo passo caminha para o vazio', () => {
+    const world = plat();
+    const p = pos(3.0, 1, 0.5);
+    assert.equal(movePlayerAxis(world, p, 'x', 3, H_CROUCH), false, 'nada barrou');
+    assert.equal(p.x, 3.0 + 3, 'andou 3 blocos, agora no ar');
+    assert.equal(hasGroundSupport(world, p, H_CROUCH), false);
+});
+
+test('agachado, andar para dentro da plataforma continua normal', () => {
+    const world = plat();
+    const p = pos(3.0, 1, 0.5);
+    const blocked = movePlayerAxis(world, p, 'x', -2, H_CROUCH, PLAYER_RADIUS, { keepOnGround: true });
+    assert.equal(blocked, false, 'nada a barrar');
+    assert.equal(p.x, 1.0, 'distância exata em campo livre');
+});
+
+test('num pilar de 1 bloco agachado anda até o último canto apoiado', () => {
+    const world = makeWorld([[0, 0, 0]]);
+    // O corpo tem 0,6 de lado e basta um canto apoiado: no bloco (0..1) o centro
+    // vai de −0,3 a +1,3 sem cair. É o mesmo "espiar a beirada" da plataforma,
+    // só que aqui as duas bordas estão a um passo.
+    const p = pos(0.5, 1, 0.5);
+    assert.equal(movePlayerAxis(world, p, 'x', 2, H_CROUCH, PLAYER_RADIUS, { keepOnGround: true }), true);
+    assert.ok(p.x > 1.29 && p.x < 1.31, `parou na borda leste (x = ${p.x.toFixed(4)})`);
+    assert.equal(hasGroundSupport(world, p, H_CROUCH), true, 'e continua de pé');
+
+    assert.equal(movePlayerAxis(world, p, 'x', -3, H_CROUCH, PLAYER_RADIUS, { keepOnGround: true }), true);
+    assert.ok(p.x > -0.31 && p.x < -0.29, `e na borda oeste (x = ${p.x.toFixed(4)})`);
+    assert.equal(hasGroundSupport(world, p, H_CROUCH), true);
+});
+
+test('a guarda é só horizontal: cair e subir continuam iguais', () => {
+    const world = makeWorld([[0, 0, 0]]);
+    const caindo = pos(0.5, 3, 0.5);
+    assert.equal(movePlayerAxis(world, caindo, 'y', -1.5, H_STAND, PLAYER_RADIUS, { keepOnGround: true }), false);
+    assert.equal(caindo.y, 1.5, 'no ar a guarda não existe');
+
+    const apoiado = pos(0.5, 1, 0.5);
+    assert.equal(movePlayerAxis(world, apoiado, 'y', -0.4, H_STAND, PLAYER_RADIUS, { keepOnGround: true }), true);
+    assert.ok(apoiado.y >= 1 - COLLISION_EPSILON, 'e o chão continua parando o corpo');
 });
