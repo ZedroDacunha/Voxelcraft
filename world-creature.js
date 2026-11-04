@@ -53,6 +53,42 @@ export const MOFIM_HEALTH = 3;
 export const HURT_FLASH = 0.22;
 /** Empurrão do golpe, em blocos (para o bicho "sentir" o impacto). */
 export const KNOCKBACK_DISTANCE = 0.35;
+/** Noite a partir da qual o Mofim aparece (`night` = 1 - dia do céu). */
+export const NIGHT_SPAWN_THRESHOLD = 0.5;
+/** Tempo que ele leva para sumir quando o dia amanhece (segundos). */
+export const LEAVE_DURATION = 0.9;
+/** Quanto ele sobe enquanto desaparece (blocos). */
+export const LEAVE_RISE = 1.1;
+
+/**
+ * É hora de Mofim? Ele é bicho de noite: aparece quando o céu escurece e vai
+ * embora quando o sol volta. `night` vem de graça do céu (1 = noite fechada,
+ * 0 = dia claro) e o padrão é noite, para quem chama sem saber a hora.
+ */
+export function isMofimTime(night = 1) {
+    const value = Number(night);
+    return Number.isFinite(value) ? value >= NIGHT_SPAWN_THRESHOLD : true;
+}
+
+/**
+ * Brilho próprio do corpo à noite (0..~0,16): o bichinho deixa de ser uma
+ * silhueta e vira uma luzinha verde-pálida que respira devagar. De dia é zero.
+ */
+export function nightGlow(night = 1, time = 0) {
+    const value = Math.min(1, Math.max(0, Number(night) || 0));
+    if (value <= 0) return 0;
+    const t = Number.isFinite(time) ? time : 0;
+    return 0.16 * value * (0.75 + 0.25 * Math.sin(t * 2.3));
+}
+
+/** Progresso do "ir embora" (0 → 1), que encolhe e sobe o corpo. */
+export function leaveProgress(elapsed, duration = LEAVE_DURATION) {
+    if (!(duration > 0)) return 1;
+    const p = Number(elapsed) / duration;
+    if (!Number.isFinite(p)) return 1;
+    return Math.min(1, Math.max(0, p));
+}
+
 /** Chilreio: alcance, ritmo e o silêncio entre um chamado e outro. */
 export const CHIRP_RANGE = 16;
 export const CHIRP_COOLDOWN = 1.2;
@@ -97,6 +133,9 @@ export function creatureInReach(entities, origin, direction, {
     let best = null;
     let bestScore = Infinity;
     for (const entity of entities) {
+        // Sumindo ao amanhecer ele já não é alvo: bater num bicho que está
+        // desaparecendo roubaria o quadro da mineração sem acertar nada.
+        if (entity.leaving) continue;
         // O corpo do Mofim fica a ~0,45 do chão onde está a origem dele.
         const ex = entity.x - origin.x;
         const ey = entity.y + 0.45 - origin.y;
@@ -255,11 +294,12 @@ export function createCreatureSystemClass({
             const rightWing = this.addPart(group, this.materials.wing, 0.29, 0.32, -0.015, 0.24, 0.12, 0.035);
             leftWing.rotation.z = -0.25;
             rightWing.rotation.z = 0.25;
-            this.addPart(group, this.materials.glow, 0, 0.62, 0.08, 0.07, 0.07, 0.07);
-            return { group, leftWing, rightWing, bodyMaterial: body };
+            const glowMesh = this.addPart(group, this.materials.glow, 0, 0.62, 0.08, 0.07, 0.07, 0.07);
+            return { group, leftWing, rightWing, bodyMaterial: body, glowMesh };
         }
 
-        trySpawn(playerPos, at) {
+        trySpawn(playerPos, at, night = 1) {
+            if (!isMofimTime(night)) return;
             if (at < this.nextSpawnAt || this.entities.length >= CREATURE_LIMIT) return;
             this.nextSpawnAt = at + 4.5;
             const seed = this.world.seed + this.spawnAttempt++ * 7919;
@@ -281,6 +321,7 @@ export function createCreatureSystemClass({
                     lastChirpAt: -Infinity, chirpPending: null,
                     nextIdleAt: at + CHIRP_IDLE_MIN + hash2(seed, attempt, 211) * (CHIRP_IDLE_MAX - CHIRP_IDLE_MIN),
                     health: MOFIM_HEALTH, hurtUntil: 0,
+                    leaving: false, leaveT: 0, leaveFromY: y,
                     hopFrom: 0, hopTo: 0, hopT: HOP_DURATION,
                     glideFrom: y, glideT: GLIDE_DURATION, visualY: y, glidePitch: 0,
                     ...model,
@@ -389,14 +430,15 @@ export function createCreatureSystemClass({
             return false;
         }
 
-        update(dt, player, active) {
+        update(dt, player, active, { night = 1 } = {}) {
             if (!active) return;
             const at = now();
+            const nightNow = Number.isFinite(Number(night)) ? Number(night) : 1;
             const playerPos = player.pos;
             const playerSpeed = Math.hypot(player.vel?.x ?? 0, player.vel?.z ?? 0);
             const crouching = Boolean(player.crouching);
 
-            this.trySpawn(playerPos, at);
+            this.trySpawn(playerPos, at, nightNow);
 
             for (let i = this.entities.length - 1; i >= 0; i--) {
                 const e = this.entities[i];
@@ -404,6 +446,27 @@ export function createCreatureSystemClass({
                 const distanceToPlayer = Math.hypot(dxp, dzp);
                 if (distanceToPlayer > DESPAWN_DISTANCE) {
                     this.removeEntity(e);
+                    continue;
+                }
+
+                // Amanheceu: ele sobe, encolhe e some — sem pó, porque não foi
+                // abatido. A saída corre em vez de sumir de um quadro para o
+                // outro, senão parece bug.
+                if (!isMofimTime(nightNow) && !e.leaving) {
+                    e.leaving = true;
+                    e.leaveT = 0;
+                    e.leaveFromY = e.visualY;
+                }
+                if (e.leaving) {
+                    e.leaveT = Math.min(LEAVE_DURATION, e.leaveT + dt);
+                    const gone = leaveProgress(e.leaveT);
+                    e.group.position.set(e.x, e.leaveFromY + LEAVE_RISE * gone, e.z);
+                    e.group.scale.setScalar(Math.max(0.02, 1 - gone));
+                    e.group.rotation.x = -0.4 * gone;
+                    const flap = Math.sin(at * 30 + e.phase) * 0.55;
+                    e.leftWing.rotation.z = -0.1 + flap;
+                    e.rightWing.rotation.z = 0.1 - flap;
+                    if (gone >= 1) this.removeEntity(e);
                     continue;
                 }
 
@@ -460,9 +523,17 @@ export function createCreatureSystemClass({
                 if (hopping) e.visualY = hopHeightAt(e.hopFrom, e.y, e.hopT / HOP_DURATION);
                 else if (gliding) e.visualY = glideHeightAt(e.glideFrom, e.y, e.glideT / GLIDE_DURATION);
                 else e.visualY = e.y;
-                // Clarão do dano: o corpo acende por um instante e apaga sozinho.
+                // Clarão do dano (laranja) e brilho próprio da noite (verde-pálido)
+                // dividem o mesmo emissive: o golpe manda enquanto dura.
                 const flash = Math.max(0, (e.hurtUntil - at) / HURT_FLASH);
-                e.bodyMaterial.emissive.setRGB(flash * 0.85, flash * 0.45, flash * 0.12);
+                const glow = nightGlow(nightNow, at + e.phase);
+                e.bodyMaterial.emissive.setRGB(
+                    flash * 0.85 + glow * 0.35,
+                    flash * 0.45 + glow * 0.75,
+                    flash * 0.12 + glow * 0.45,
+                );
+                // A luzinha das costas cresce no escuro: de dia ele é silhueta.
+                e.glowMesh.scale.setScalar(0.07 * (1 + 1.3 * glow / 0.16));
                 e.group.position.set(e.x, e.visualY + Math.sin(at * 3 + e.phase) * bob, e.z);
                 e.group.rotation.y = e.heading;
                 // Planando, o corpo inclina um pouco para a frente e as asas

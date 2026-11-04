@@ -3799,7 +3799,10 @@ function animate() {
 
     if (playing()) {
         updatePhysics(dt);
-        creatureSystem.update(dt, { pos: player.pos, vel: player.vel, crouching: isCrouching }, true);
+        // O Mofim é bicho de noite: o céu diz a hora (1 = noite fechada) e ele
+        // aparece ao anoitecer / vai embora ao amanhecer.
+        creatureSystem.update(dt, { pos: player.pos, vel: player.vel, crouching: isCrouching }, true,
+            { night: 1 - worldSky.day });
         updateTarget();
         if (!strikeCreature()) updateMining(dt);
         updateEating(dt);

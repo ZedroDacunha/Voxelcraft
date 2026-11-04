@@ -15,7 +15,9 @@ import {
     HOP_HEIGHT,
     HURT_FLASH,
     KNOCKBACK_DISTANCE,
+    LEAVE_DURATION,
     MOFIM_HEALTH,
+    NIGHT_SPAWN_THRESHOLD,
     SCARE_DURATION,
     SCARE_RADIUS,
     SCARE_SPEED,
@@ -24,6 +26,9 @@ import {
     createCreatureSystemClass,
     creatureInReach,
     glideHeightAt,
+    isMofimTime,
+    leaveProgress,
+    nightGlow,
     shouldFlee,
 } from '../world-creature.js';
 
@@ -240,7 +245,9 @@ test('o dano acende o corpo do Mofim e apaga sozinho', () => {
     creature.x = 2; creature.z = 0; creature.y = GROUND + 1;
     clock.t = 60;
     system.update(0.016, player, true);
-    assert.equal(creature.bodyMaterial.emissive.r, 0, 'sem levar golpe fica apagado');
+    const descansando = creature.bodyMaterial.emissive.r;
+    assert.ok(descansando < 0.12, 'sem levar golpe fica só com o brilho da noite');
+    assert.ok(creature.bodyMaterial.emissive.g > descansando, 'e esse brilho é verde');
 
     system.hitFrom({ x: 0, y: GROUND + 1.45, z: 0 }, { x: 1, y: 0, z: 0 });
     system.update(0.016, player, true);
@@ -248,7 +255,7 @@ test('o dano acende o corpo do Mofim e apaga sozinho', () => {
 
     clock.t += HURT_FLASH + 0.01;
     system.update(0.016, player, true);
-    assert.equal(creature.bodyMaterial.emissive.r, 0, 'e apaga sozinho');
+    assert.ok(creature.bodyMaterial.emissive.r < 0.12, 'e volta ao brilho da noite');
 });
 
 test('três golpes derrubam o Mofim e avisam quem chamou', () => {
@@ -650,4 +657,89 @@ test('mirar de raspão não rouba o golpe do bloco', () => {
     // ~35° fora da mira: dentro do cone antigo (44°), fora do novo (31°).
     const aside = entityAt(Math.cos(0.61) * 2, 1, Math.sin(0.61) * 2);
     assert.equal(creatureInReach([aside], origin, aim), null);
+});
+
+// ------------------------------------------------ noite (aparição)
+
+test('o Mofim é bicho de noite: a regra da hora', () => {
+    assert.equal(isMofimTime(1), true, 'noite fechada');
+    assert.equal(isMofimTime(NIGHT_SPAWN_THRESHOLD), true, 'no limite já é noite');
+    assert.equal(isMofimTime(NIGHT_SPAWN_THRESHOLD - 0.01), false, 'um tico mais claro e ele não vem');
+    assert.equal(isMofimTime(0), false, 'dia claro, nenhum Mofim');
+    assert.equal(isMofimTime(), true, 'sem saber a hora, assume noite');
+    assert.equal(isMofimTime(NaN), true);
+});
+
+test('o brilho da noite cresce com o escuro e é zero de dia', () => {
+    assert.equal(nightGlow(0, 5), 0, 'de dia ele não brilha');
+    assert.ok(nightGlow(1, 5) > nightGlow(0.5, 5), 'quanto mais escuro, mais brilho');
+    assert.ok(nightGlow(1, 5) < 0.2, 'é brilho, não holofote');
+    assert.notEqual(nightGlow(1, 0), nightGlow(1, 1.2), 'e respira');
+    assert.equal(nightGlow(2, 5), nightGlow(1, 5), 'satura na noite fechada');
+});
+
+test('o sumiço tem progresso 0 → 1 e trava nas pontas', () => {
+    assert.equal(leaveProgress(0), 0);
+    const meio = leaveProgress(LEAVE_DURATION / 2);
+    assert.ok(meio > 0.4 && meio < 0.6, 'meio encolhido na metade do tempo');
+    assert.equal(leaveProgress(LEAVE_DURATION), 1);
+    assert.equal(leaveProgress(LEAVE_DURATION * 3), 1, 'não passa de 1');
+    assert.equal(leaveProgress(-1), 0);
+    assert.equal(leaveProgress(1, 0), 1, 'duração inválida não trava o jogo');
+});
+
+test('com o sol alto ele não nasce', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    for (let i = 0; i < 40; i++) {
+        clock.t += 5;
+        system.update(0.016, player, true, { night: 0.1 });
+    }
+    assert.equal(system.entities.length, 0, 'nenhum Mofim durante o dia');
+});
+
+test('ao amanhecer ele sobe, encolhe e some — e não deixa pó', () => {
+    const clock = { t: 0 };
+    const deaths = [];
+    const world = makeWorld();
+    const system = makeSystem(world, clock, { onDeath: entity => deaths.push(entity) });
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    const creature = spawnOne(system, world, clock, player);
+    const cenas = world.scene.children.length;
+
+    clock.t += 1;
+    system.update(0.1, player, true, { night: 0.9 });
+    assert.equal(creature.leaving, false, 'de noite ele fica');
+
+    const yAntes = creature.group.position.y;
+    const xAntes = creature.x;
+    system.update(0.1, player, true, { night: 0 });
+    assert.equal(creature.leaving, true, 'o dia chegou e ele começou a ir embora');
+    assert.ok(creature.group.position.y > yAntes, 'subindo');
+    assert.ok(creature.group.scale.x < 1, 'e encolhendo');
+    assert.equal(creature.x, xAntes, 'sem andar para o lado');
+    assert.equal(system.entities.length, 1, 'ainda não sumiu de vez');
+
+    for (let i = 0; i < 20 && system.entities.length; i++) system.update(0.1, player, true, { night: 0 });
+    assert.equal(system.entities.length, 0, 'passado o sumiço, sai da lista');
+    assert.equal(world.scene.children.length, cenas - 1, 'e da cena');
+    assert.deepEqual(deaths, [], 'não morreu: foi embora');
+});
+
+test('quem está indo embora não leva golpe', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    const creature = spawnOne(system, world, clock, player);
+    creature.x = 2; creature.z = 0; creature.y = GROUND + 1;
+
+    system.update(0.016, player, true, { night: 0 });
+    assert.equal(creature.leaving, true);
+
+    const origin = { x: 0, y: GROUND + 1.45, z: 0 };
+    assert.equal(creatureInReach(system.entities, origin, { x: 1, y: 0, z: 0 }), null);
+    assert.equal(system.hitFrom(origin, { x: 1, y: 0, z: 0 }), null, 'e o golpe atravessa');
 });
