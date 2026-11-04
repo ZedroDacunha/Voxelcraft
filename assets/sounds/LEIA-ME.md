@@ -20,6 +20,7 @@ existir, usa a síntese.
 | `step-wood.ogg` / `.wav` | passo em madeira, tábuas, baú, bancada e portas | ruído 950→480 Hz com ressonância, 90 ms |
 | `step-sand.ogg` / `.wav` | passo em areia | ruído 2600→2300 Hz, 120 ms |
 | `break-*.ogg` / `.wav` | bloco quebrado (um por material: grass, dirt, stone, wood, sand) | ruído 0,11–0,18 s + baque grave |
+| `hit-*.ogg` / `.wav` | batida de cada golpe enquanto minera (um por material) | ruído 0,04–0,06 s |
 | `place-*.ogg` / `.wav` | bloco colocado (um por material) | ruído 0,05–0,08 s + baque curto |
 
 A busca é feita uma vez por som e o resultado fica em cache: se você adicionar o
@@ -28,8 +29,8 @@ arquivo depois de abrir a página, recarregue (Ctrl+F5) para ouvir.
 ## O que enviar
 
 - Formato: **ogg (Vorbis)** ou **wav** PCM. MP3 não é lido por esta ponte.
-- Curtos: clique ≤ 150 ms, hover ≤ 60 ms, passo ≤ 150 ms, quebrar ≤ 200 ms.
-  Sons longos atrasam a sensação de resposta.
+- Curtos: clique ≤ 150 ms, hover ≤ 60 ms, passo ≤ 150 ms, batida ≤ 70 ms,
+  quebrar ≤ 200 ms. Sons longos atrasam a sensação de resposta.
 - Mono, 44,1 kHz. O volume final vem do controle **Volume** nas opções.
 - Minere o "clique" com um fade-out até o zero — um corte seco produz um estalo.
 

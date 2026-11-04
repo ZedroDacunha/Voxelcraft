@@ -147,6 +147,7 @@ test('todas as receitas são válidas e os nomes de arquivo são previsíveis', 
         'ui-click', 'ui-hover',
         'step-grass', 'step-dirt', 'step-stone', 'step-wood', 'step-sand',
         'break-grass', 'break-dirt', 'break-stone', 'break-wood', 'break-sand',
+        'hit-grass', 'hit-dirt', 'hit-stone', 'hit-wood', 'hit-sand',
         'place-grass', 'place-dirt', 'place-stone', 'place-wood', 'place-sand',
     ]);
     for (const name of SOUND_NAMES) {

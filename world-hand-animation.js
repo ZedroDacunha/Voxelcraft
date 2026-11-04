@@ -40,6 +40,20 @@ export function handSwingAmount(hand) {
     return { mining, punch, swing: Math.max(mining, punch), dip };
 }
 
+// A fase do laço de mineração avança em radianos; o braço chega ao fim de cada
+// golpe em `π/2 + kπ`. Contar essas passagens é o que dita o som da batida —
+// assim o som acompanha exatamente o movimento, e não um cronômetro paralelo.
+const STRIKE_PEAK = Math.PI / 2;
+
+export function countStrikes(fromPhase, toPhase) {
+    if (!Number.isFinite(fromPhase) || !Number.isFinite(toPhase)) return 0;
+    if (!(toPhase > fromPhase)) return 0;
+    const peaks = phase => Math.floor((phase - STRIKE_PEAK) / Math.PI);
+    const count = peaks(toPhase) - peaks(fromPhase);
+    // quadro muito longo não pode virar rajada de batidas
+    return Math.max(0, Math.min(2, count));
+}
+
 // Dispara um golpe (idempotente: repetir só reinicia o balanço).
 export function startPunch(hand) {
     hand.punch = 1;

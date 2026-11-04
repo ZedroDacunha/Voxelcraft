@@ -41,7 +41,7 @@ import { configureTorchFlicker, configureTorchFlameAnimation, updateWorldLightin
 import { FurnaceSmokeSystem } from './world-furnace-effects.js';
 import { canHarvest, damageTool as damageToolStack, getBreakTime } from './world-tool-rules.js';
 import { boxOverlapsXZ, woodDoorCollision, woodDoorPart, woodDoorShape, woodDoorType } from './world-door.js';
-import { advanceHandAnimation, createHandAnimation, handSwingAmount, startPunch } from './world-hand-animation.js';
+import { advanceHandAnimation, countStrikes, createHandAnimation, handSwingAmount, startPunch } from './world-hand-animation.js';
 import { advanceStepTracker, createStepTracker, stepDistanceThisFrame, stepPitch, stepSoundFor } from './world-step-sounds.js';
 import { materialSoundName } from './world-block-materials.js';
 import { getSharedAudio } from './world-audio.js';
@@ -1989,7 +1989,9 @@ function updateHand(dt) {
     refreshHeldItem();
     updateHeldTorchLight();
     const miningNow = Boolean(leftHeld && currentHit && currentHit.y !== 0);
+    const phaseBefore = handAnim.phase;
     advanceHandAnimation(handAnim, dt, { mining: miningNow });
+    if (miningNow) playMiningHits(countStrikes(phaseBefore, handAnim.phase));
     const { swing, dip } = handSwingAmount(handAnim);
     const heldToolKind = ITEMS[heldId]?.sprite?.kind;
     if (HELD_TOOL_KINDS.has(heldToolKind)) {
@@ -3067,6 +3069,17 @@ function updatePhysics(dt) {
     else bobTimer += (0 - bobTimer) * Math.min(1, 5 * dt);
 
     playFootsteps(dt, inWater);
+}
+
+// Batida de cada golpe enquanto o bloco não cai. A cadência vem da fase do
+// braço (countStrikes), então o som casa com o movimento sem cronômetro extra.
+function playMiningHits(strikes) {
+    if (!strikes || !currentHit) return;
+    // Grama alta cai no primeiro quadro: a batida só atrapalharia o som de quebra.
+    if (currentHit.type === ID.TALL_GRASS) return;
+    const sound = materialSoundName(currentHit.type, 'hit');
+    if (!sound) return;
+    for (let i = 0; i < strikes; i++) audio.play(sound, { rate: stepPitch() });
 }
 
 // Passos: o som vem do bloco sob os pés e a cadência do deslocamento real.

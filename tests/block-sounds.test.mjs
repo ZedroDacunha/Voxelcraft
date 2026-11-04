@@ -62,6 +62,31 @@ test('material duro soa mais brilhante e seco que material macio', () => {
     assert.ok(SOUND_RECIPES['break-wood'].q > 2, 'madeira ressoa');
 });
 
+test('a batida de cada golpe é mais curta e discreta que a quebra', () => {
+    for (const material of BLOCK_MATERIALS) {
+        const hit = SOUND_RECIPES[`hit-${material}`];
+        const breaking = SOUND_RECIPES[`break-${material}`];
+        assert.ok(hit, `falta a receita hit-${material}`);
+        assert.ok(hit.duration < breaking.duration, `${material}: batida dura menos`);
+        assert.ok(hit.gain <= breaking.gain, `${material}: batida é mais discreta`);
+        assert.ok(hit.duration <= 0.06, `${material}: batida é percussiva`);
+        // o grave fica reservado para o impacto final da quebra
+        assert.ok(!hit.thump || hit.thump.gain < breaking.thump.gain, `${material}: baque da batida é mínimo`);
+    }
+});
+
+test('game.js toca a batida no ritmo do braço e ignora a grama alta', () => {
+    const source = readFileSync(new URL('../game.js', import.meta.url), 'utf8');
+    assert.match(source, /const phaseBefore = handAnim\.phase/);
+    assert.match(source, /if \(miningNow\) playMiningHits\(countStrikes\(phaseBefore, handAnim\.phase\)\)/);
+
+    const fn = source.slice(source.indexOf('function playMiningHits('));
+    const body = fn.slice(0, fn.indexOf('\n}'));
+    assert.match(body, /materialSoundName\(currentHit\.type, 'hit'\)/);
+    assert.match(body, /currentHit\.type === ID\.TALL_GRASS\) return/,
+        'quem cai no primeiro quadro não precisa de batida');
+});
+
 test('game.js toca quebrar e colocar no material certo, uma vez só', () => {
     const source = readFileSync(new URL('../game.js', import.meta.url), 'utf8');
 
