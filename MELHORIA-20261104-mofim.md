@@ -62,21 +62,31 @@ viraria zumbido — a ideia é o jogador ouvir o bicho antes de vê-lo.
 O grito não fica guardado: se o Mofim está longe demais para ser ouvido, o susto
 não toca depois quando o jogador se aproxima.
 
-## 3. Pulo de degrau
+## 3. Degraus: pula para subir, planeia para descer
 
-Ele **já atravessava degrau de 1 bloco**, mas o corpo subia instantaneamente
-(teleporte) — o famoso "deslizar para cima". Agora:
+Ele **já atravessava** degrau de 1 bloco, mas o corpo mudava de nível
+instantaneamente (teleporte) — o famoso "deslizar" para cima e para baixo. Agora o
+nível lógico continua mudando na hora (é ele que anda); **o desenho é que faz o
+movimento**, e nenhuma regra de terreno muda por causa da animação.
 
-- subir até **1 bloco** é permitido e desenhado como **pulo**: o corpo acompanha um
-  arco que sobe acima do destino e desce até pousar (`hopHeightAt`), em 0,26 s;
-- a rampa linear + seno que eu tentei primeiro levantava só ~9 cm e ficava
-  invisível — por isso o arco tem duas fases (sobe até `destino + 0,42`, desce até
-  o destino), que é o que um salto parece;
-- **degrau de 2 blocos continua barrado**: ele desvia (fugindo) ou sorteia outro
-  alvo (passeando). Subir 2 seria outra decisão de jogo, não um ajuste.
+**Subindo (pulo, 0,26 s):** o corpo acompanha um arco que sobe acima do destino e
+desce até pousar (`hopHeightAt`). A rampa linear + seno que eu tentei primeiro
+levantava só ~9 cm e ficava invisível — por isso o arco tem duas fases (sobe até
+`destino + 0,42`, desce até o destino), que é o que um salto parece.
 
-O `y` lógico é atualizado na hora (é ele que anda); só o desenho faz o arco. Assim
-nenhuma regra de terreno muda por causa da animação.
+**Descendo (planeio, 0,42 s):** ele tem asas, então cai planando em vez de cair
+seco. A curva é `to + (from - to) * (1 - p)²` — desce rápido no começo e **pousa
+devagar**, sem quique e sem passar do chão. Durante o planeio:
+
+- as asas ficam **abertas na horizontal** (base 0,03 em vez de 0,25) e batem devagar
+  (amplitude 0,07, velocidade 5 — contra 0,18/8 do passeio);
+- o corpo **inclina ~0,2 rad para a frente**, com transição suave (não é um corte);
+- se ele descer outro degrau no meio do planeio, a descida continua **de onde o
+  corpo está**, não do chão — dois degraus seguidos encadeiam sem solavanco (o
+  mesmo vale para subir logo depois de descer).
+
+**Degrau de 2 blocos continua barrado**: ele desvia (fugindo) ou sorteia outro alvo
+(passeando). Subir ou descer 2 seria outra decisão de jogo, não um ajuste.
 
 ## O golpe
 
@@ -94,7 +104,7 @@ Vale para mouse **e** toque, porque os dois caminhos usam o mesmo `leftHeld`.
 
 ## Testes
 
-`tests/creature.test.mjs` — **22 testes**, sem navegador:
+`tests/creature.test.mjs` — **25 testes**, sem navegador:
 
 - **medo (puro):** correndo perto assusta; agachado nunca; andar devagar não; longe
   não; parado não; o limite do raio é exato;
@@ -107,7 +117,10 @@ Vale para mouse **e** toque, porque os dois caminhos usam o mesmo `leftHeld`.
   respeita o cooldown; golpe faz **gritar** (`startle`) e o chilreio tem espera
   própria; longe não chia e o grito não fica guardado; susto expira; despawn sai
   da lista **e da cena**; pausado nada se move; **degrau de 1 sobe com arco
-  visível** e **degrau de 2 continua barrado**.
+  visível**, **desce planando** (corpo no ar, asas abertas, corpo inclinado e
+  pouso suave), **subir e descer em sequência não teleporta** (a maior variação de
+  altura entre quadros fica em 0,35 contra os 0,72 de antes) e **degrau de 2
+  continua barrado**.
 
 Em `tests/audio-ui.test.mjs`, +1 teste para o trinado (duas notas, com o intervalo
 da receita) e a lista de nomes atualizada.
@@ -133,10 +146,11 @@ conecta as peças e decide o volume/tom do chilreio (o módulo não conhece áud
 ## Validação
 
 ```bash
-npm test        # 444 testes (22 de criatura + 1 de áudio neste recorte)
+npm test        # 447 testes (25 de criatura + 1 de áudio neste recorte)
 npm run check   # sintaxe 114/114 + importmap em dia
 ```
 
 **Validação manual pendente no aparelho do usuário**: aproximar andando (foge e
 chia), aproximar agachado (continua passeando, sem chilreio de susto), dar um golpe
-(grita e foge, sem minerar o bloco atrás) e ver o pulo ao subir um degrau de terra.
+(grita e foge, sem minerar o bloco atrás), ver o pulo ao subir um degrau de terra e
+o **planeio de asas abertas** ao descer.
