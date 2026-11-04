@@ -6,8 +6,8 @@ import {
     AMBIENT_FADE_SECONDS,
     AMBIENT_LAYERS,
     AMBIENT_RECIPES,
-    createAudioSystem,
 } from '../world-audio.js';
+import { createFakeAudio, lastTarget } from './helpers/fake-audio.mjs';
 import {
     AMBIENT_AVAILABILITY_FLOOR,
     AMBIENT_MODES,
@@ -187,82 +187,10 @@ test('em dez minutos há silêncio, vento e grilos — e os dois juntos são a e
 
 // --- áudio: camadas em laço ---------------------------------------------
 
-function makeParam(value = 0) {
-    return {
-        value,
-        events: [],
-        setValueAtTime(v, t) { this.events.push(['set', v, t]); this.value = v; return this; },
-        linearRampToValueAtTime(v, t) { this.events.push(['linear', v, t]); return this; },
-        exponentialRampToValueAtTime(v, t) { this.events.push(['exp', v, t]); return this; },
-        setTargetAtTime(v, t, constant) { this.events.push(['target', v, t, constant]); this.value = v; return this; },
-    };
-}
 
-function withConnect(node) {
-    node.connections = [];
-    node.connect = target => { node.connections.push(target); return target; };
-    node.disconnect = () => {};
-    return node;
-}
-
-function makeFactory() {
-    const created = [];
-    const Factory = function () {
-        const context = withConnect({
-            state: 'running',
-            currentTime: 0,
-            sampleRate: 48000,
-            destination: { name: 'destination' },
-            sources: [],
-            gains: [],
-            filters: [],
-        });
-        context.resume = async () => { context.state = 'running'; };
-        context.close = async () => { context.state = 'closed'; };
-        context.createGain = () => { const node = withConnect({ gain: makeParam(1) }); context.gains.push(node); return node; };
-        context.createBiquadFilter = () => {
-            const node = withConnect({ type: 'lowpass', frequency: makeParam(350), Q: makeParam(1) });
-            context.filters.push(node);
-            return node;
-        };
-        context.createBufferSource = () => {
-            const node = withConnect({
-                buffer: null,
-                loop: false,
-                playbackRate: makeParam(1),
-                started: [],
-                start(t) { this.started.push(t); },
-                stop(t) { this.stopped = (this.stopped ?? 0) + 1; this.stoppedAt = t; },
-            });
-            context.sources.push(node);
-            return node;
-        };
-        context.createBuffer = (channels, length, rate) => {
-            const data = new Float32Array(length);
-            return { channels, length, sampleRate: rate, getChannelData: () => data, data };
-        };
-        context.decodeAudioData = (data, resolve) => { resolve?.({ data }); return Promise.resolve({ data }); };
-        created.push(context);
-        return context;
-    };
-    return { Factory, created, get context() { return created.at(-1); } };
-}
-
-function makeAudio() {
-    const factory = makeFactory();
-    const warnings = [];
-    const audio = createAudioSystem({
-        AudioContextClass: factory.Factory,
-        fetchImpl: null,
-        warn: (...args) => warnings.push(args.join(' ')),
-    });
-    return { audio, factory, warnings };
-}
-
-const lastTarget = param => param.events.filter(event => event[0] === 'target').at(-1);
 
 test('as camadas são laços de buffer, um nó por camada e por página', () => {
-    const { audio, factory } = makeAudio();
+    const { audio, factory } = createFakeAudio();
     audio.setAmbientLevels({ wind: 1, crickets: 0 });
     audio.setAmbientLevels({ wind: 1, crickets: 1 });
 
@@ -278,7 +206,7 @@ test('as camadas são laços de buffer, um nó por camada e por página', () => 
 });
 
 test('o volume da camada entra por fade, nunca em degrau', () => {
-    const { audio, factory } = makeAudio();
+    const { audio, factory } = createFakeAudio();
     audio.setAmbientLevels({ wind: 1 });
     const context = factory.context;
     const gain = context.gains.at(-1);
@@ -293,7 +221,7 @@ test('o volume da camada entra por fade, nunca em degrau', () => {
 });
 
 test('pedir silêncio antes de existir som não cria AudioContext', () => {
-    const { audio, factory } = makeAudio();
+    const { audio, factory } = createFakeAudio();
     assert.equal(audio.setAmbientLevels({ wind: 0, crickets: 0 }), false);
     assert.equal(factory.created.length, 0, 'nada de contexto antes de um gesto');
     assert.equal(audio.setAmbientLevels({}), false);
@@ -303,14 +231,14 @@ test('pedir silêncio antes de existir som não cria AudioContext', () => {
 });
 
 test('nível inválido não estoura o ganho', () => {
-    const { audio, factory } = makeAudio();
+    const { audio, factory } = createFakeAudio();
     audio.setAmbientLevels({ wind: NaN, crickets: '0.5' });
     const context = factory.context;
     assert.equal(lastTarget(context.gains.at(-1).gain)[1], AMBIENT_RECIPES.crickets.gain * 0.5);
 });
 
 test('stopAmbient para as fontes e limpa o estado', () => {
-    const { audio, factory } = makeAudio();
+    const { audio, factory } = createFakeAudio();
     audio.setAmbientLevels({ wind: 1, crickets: 1 });
     const context = factory.context;
     audio.stopAmbient();
