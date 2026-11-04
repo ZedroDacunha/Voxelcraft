@@ -494,7 +494,10 @@ Faltam ou estão simples:
   ([MELHORIA-20261104](MELHORIA-20261104-mofim.md)) — foge de quem chega
   andando/correndo e de quem bate, e não percebe quem chega agachado, com a IA
   extraída para `world-creature.js` e testada; **chilreio** (dois trinados, com
-  falloff por distância), **pulo de degrau** e **planeio na descida** vieram junto. Falta ainda
+  falloff por distância), **pulo de degrau** e **planeio na descida** vieram junto;
+  dois bugs do primeiro uso corrigidos em 04/11
+  ([BUG-20261104](BUG-20261104-mofim-preso-e-golpe.md)): preso na grama alta e
+  blocos que não quebravam perto dele. Falta ainda
   **drop/recurso** e vida própria (hoje o golpe assusta, não machuca).
 - Estruturas: ruínas, vilas, dungeons.
 - Vegetação/clima mais variados.

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import * as THREE from '../vendor/three/three.module.js';
-import { ID } from '../world-catalog.js';
+import { BLOCKS, ID } from '../world-catalog.js';
 import {
     CHIRP_COOLDOWN,
     CHIRP_RANGE,
@@ -29,20 +29,26 @@ const GROUND = 10; // `heightAt` devolve o bloco do topo; o Mofim anda em GROUND
 
 // Mundo plano de grama com um relógio controlado pelo teste. `heightAt` pode ser
 // trocado para montar degraus.
-function makeWorld({ heightAt = () => GROUND } = {}) {
+function makeWorld({ heightAt = () => GROUND, groundType = () => ID.GRASS, above = () => 0 } = {}) {
     const groundAt = (x, z) => heightAt(Math.floor(x), Math.floor(z));
     return {
         seed: 4242,
         scene: new THREE.Scene(),
         getChunk: () => ({}),
         generator: { heightAt: (x, z) => heightAt(x, z) },
-        getBlock: (x, y, z) => (y === groundAt(x, z) ? ID.GRASS : 0),
+        getBlock: (x, y, z) => {
+            const gx = Math.floor(x), gz = Math.floor(z);
+            const ground = groundAt(gx, gz);
+            if (y === ground) return groundType(gx, gz);
+            if (y === ground + 1) return above(gx, gz);
+            return 0;
+        },
     };
 }
 
 function makeSystem(world, clock, { onChirp = () => {} } = {}) {
     const CreatureSystem = createCreatureSystemClass({
-        THREE, ID, CHUNK_SIZE, now: () => clock.t, onChirp,
+        THREE, ID, BLOCKS, CHUNK_SIZE, now: () => clock.t, onChirp,
     });
     return new CreatureSystem(world);
 }
@@ -456,4 +462,111 @@ test('subir e descer em sequência não teleporta o corpo', () => {
     }
 
     assert.ok(biggestJump < 0.35, `sem salto seco no desenho (maior variação ${biggestJump.toFixed(2)})`);
+});
+
+// ------------------------------------------------ obstáculos no caminho
+
+test('grama alta não prende: fugindo, ele atravessa a touceira', () => {
+    const clock = { t: 0 };
+    // Toda a área tem grama alta em cima do chão — era o que travava a fuga.
+    const world = makeWorld({ above: (x) => (x >= 2 ? ID.TALL_GRASS : 0) });
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    const creature = spawnOne(system, world, clock, player);
+
+    creature.x = 2; creature.z = 0; creature.y = GROUND + 1;
+    const runner = walkerPlayer({ x: 0, y: GROUND + 1, z: 0 });
+    const before = creature.x;
+
+    for (let i = 0; i < 12; i++) {
+        clock.t += 0.05;
+        system.update(0.05, runner, true);
+    }
+
+    assert.ok(creature.scaredUntil > clock.t, 'continuou assustado');
+    assert.ok(creature.x > before + 1, `correu através da grama (${before} → ${creature.x.toFixed(2)})`);
+});
+
+test('num campo todo de grama alta ele ainda nasce e passeia', () => {
+    const clock = { t: 0 };
+    const world = makeWorld({ above: () => ID.TALL_GRASS });
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+
+    const creature = spawnOne(system, world, clock, player);
+    const before = { x: creature.x, z: creature.z };
+    for (let i = 0; i < 80; i++) {
+        clock.t += 0.1;
+        system.update(0.1, player, true);
+    }
+    assert.ok(
+        Math.hypot(creature.x - before.x, creature.z - before.z) > 0.5,
+        'não ficou parado no capim',
+    );
+});
+
+test('água barra o passo: fugindo para o lado do lago, ele desvia', () => {
+    const clock = { t: 0 };
+    // Água na célula acima do chão a partir de x = 3 (o lado para onde fugiria).
+    const world = makeWorld({ above: (x) => (x >= 3 ? ID.WATER : 0) });
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    const creature = spawnOne(system, world, clock, player);
+
+    creature.x = 2; creature.z = 0; creature.y = GROUND + 1;
+    const runner = walkerPlayer({ x: 0, y: GROUND + 1, z: 0 });
+
+    for (let i = 0; i < 20; i++) {
+        clock.t += 0.05;
+        system.update(0.05, runner, true);
+    }
+
+    assert.ok(creature.x < 3, `não entrou na água (x = ${creature.x.toFixed(2)})`);
+    assert.ok(Math.abs(creature.z) > 0.3, `desviou para o lado (z = ${creature.z.toFixed(2)})`);
+});
+
+test('ele anda em areia e pedra, não só em grama', () => {
+    const clock = { t: 0 };
+    // Chão de areia a partir de x = 2: antes a coluna era recusada e ele parava ali.
+    const world = makeWorld({ groundType: x => (x >= 2 ? ID.SAND : ID.GRASS) });
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    const creature = spawnOne(system, world, clock, player);
+
+    creature.x = 1.5; creature.z = 0; creature.y = GROUND + 1;
+    for (let i = 0; i < 40; i++) {
+        clock.t += 0.05;
+        creature.targetX = 5; creature.targetZ = 0;
+        system.update(0.05, player, true);
+    }
+    assert.ok(creature.x > 2, `andou na areia (x = ${creature.x.toFixed(2)})`);
+    assert.equal(creature.y, GROUND + 1);
+});
+
+// ------------------------------------------------ golpe x bloco na mira
+
+test('bloco mais perto na mira: o Mofim atrás não leva o golpe', () => {
+    const origin = { x: 0, y: 1.45, z: 0 };
+    const aim = { x: 1, y: 0, z: 0 };
+    const creature = entityAt(3, 1, 0);
+
+    assert.equal(
+        creatureInReach([creature], origin, aim, { maxDistance: 2 }),
+        null,
+        'bloco a 2 blocos: o bicho a 3 está atrás dele',
+    );
+    assert.equal(
+        creatureInReach([creature], origin, aim, { maxDistance: 3.5 }),
+        creature,
+        'bloco além do bicho: o golpe é do bicho',
+    );
+    assert.equal(creatureInReach([creature], origin, aim), creature, 'sem bloco na mira, vale a distância');
+});
+
+test('mirar de raspão não rouba o golpe do bloco', () => {
+    const origin = { x: 0, y: 1.45, z: 0 };
+    const aim = { x: 1, y: 0, z: 0 };
+    // ~35° fora da mira: dentro do cone antigo (44°), fora do novo (31°).
+    const aside = entityAt(Math.cos(0.61) * 2, 1, Math.sin(0.61) * 2);
+    assert.equal(creatureInReach([aside], origin, aim), null);
 });

@@ -1249,7 +1249,7 @@ class World {
 // Modelo, spawn, vagar e medo vivem em world-creature.js; aqui só se conectam
 // os pedaços do jogo que o módulo não conhece (Three, catálogo, chunk, hash).
 const CreatureSystem = createCreatureSystemClass({
-    THREE, ID, CHUNK_SIZE, floorDiv, hash2,
+    THREE, ID, BLOCKS, CHUNK_SIZE, floorDiv, hash2,
     // O chilreio chega mais fraco com a distância; `startle` (levou golpe ou viu
     // o jogador de perto) sai mais alto e mais agudo que o chamado de passeio.
     onChirp: ({ reason, distance }) => {
@@ -1728,10 +1728,15 @@ function breakBlock(x, y, z) {
 function strikeCreature() {
     if (!leftHeld) return false;
     camera.getWorldDirection(creatureAim);
-    if (!creatureInReach(creatureSystem.entities, camera.position, creatureAim)) return false;
-    // O golpe em si tem cooldown: segurar o botão assusta uma vez, não a cada
-    // quadro. Mas enquanto a mira estiver no bicho, o bloco atrás não é minerado.
-    if (creatureSystem.hitFrom(camera.position, creatureAim)) startPunch(handAnim);
+    // O bloco na mira limita o alcance do golpe: se ele está mais perto, o Mofim
+    // está atrás dele. Sem isso, qualquer bicho no raio de 3,5 blocos travava a
+    // mineração e não dava para quebrar nada em volta.
+    const aim = { maxDistance: currentHit ? currentHit.dist : Infinity };
+    if (!creatureInReach(creatureSystem.entities, camera.position, creatureAim, aim)) return false;
+    // Só rouba o quadro da mineração quando o golpe realmente acontece; no
+    // cooldown, minerar continua normalmente.
+    if (!creatureSystem.hitFrom(camera.position, creatureAim, aim)) return false;
+    startPunch(handAnim);
     resetMining();
     return true;
 }
