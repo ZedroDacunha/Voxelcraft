@@ -490,7 +490,11 @@ Faltam ou estão simples:
   [forno](MELHORIA-20261104-som-de-forno.md)) e o **ambiente em 04/11**
   ([MELHORIA-20261104](MELHORIA-20261104-ambiente.md)) — **áudio do item 13
   completo**.
-- Mobs: hoje há apenas criatura passiva sem drop/interação relevante.
+- Mobs: o **Mofim passivo ganhou medo em 04/11**
+  ([MELHORIA-20261104](MELHORIA-20261104-mofim-medo.md)) — foge de quem chega
+  andando/correndo e de quem bate, e não percebe quem chega agachado, com a IA
+  extraída para `world-creature.js` e testada. Falta ainda **drop/recurso** e
+  vida própria (hoje o golpe assusta, não machuca).
 - Estruturas: ruínas, vilas, dungeons.
 - Vegetação/clima mais variados.
 - ~~Controles de toque~~ (pronto em 04/11: joystick, olhar por arrasto e botões).
@@ -563,7 +567,7 @@ Também foi executado um smoke em Chromium headless:
 ### Sprint 4 — polish e conteúdo
 
 1. Áudio básico.
-2. Interação/drops de mobs.
+2. Interação/drops de mobs (medo do Mofim pronto em 04/11; falta o drop).
 3. Estruturas e vegetação.
 4. ~~PWA/offline~~ (pronto em 04/11).
 

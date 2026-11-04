@@ -355,7 +355,9 @@ quadro ou nuvens por `InstancedMesh`/shader.
   aviso aparece ao entrar nas faixas de alerta e a tela de morte diz a causa
   ("Você morreu de fome"). Regras puras em `world-survival-rules.js`.
 - **Mobs**: só o "Mofim" passivo, sem drop nem interação. Ou ele vira um recurso
-  (lã/carne), ou entra um inimigo noturno com spawn por luz.
+  (lã/carne), ou entra um inimigo noturno com spawn por luz. **Medo em 04/11**
+  ([MELHORIA-20261104](MELHORIA-20261104-mofim-medo.md)): ele foge de quem chega
+  andando/correndo e de quem bate; agachado passa desapercebido. Falta o recurso.
 - **Conteúdo de mundo**: cavernas, rios, praias e minérios já existem; faltam
   estruturas (ruínas, vilas), vegetação variada e clima.
 - **Água infinita ao minerar**: `breakBlock()` troca o bloco quebrado por

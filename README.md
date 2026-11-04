@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 421 testes de módulos puros (node --test)
+npm test           # 438 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -45,6 +45,7 @@ O `check` é o que o CI (`.github/workflows/ci.yml`) roda em todo PR para `main`
 | Entrada | `world-menu.js` (menu, seleção/criação de mundo, opções) |
 | Loop e estado do jogo | `game.js` (mundo, HUD, interação, save) |
 | Física e colisão do jogador | `player-physics.js` (AABB × voxels, passo subdividido, destravar, ocupação de célula) |
+| Criaturas | `world-creature.js` (Mofim: spawn, passeio, medo e golpe) |
 | Catálogo de blocos e receitas | `world-catalog.js`, `inventory-recipe-book.js` |
 | Geração de terreno | `world-terrain.js`, `world-terrain-worker.js`, `world-ore-generation.js`, `world-math.js` |
 | Malha e render | `world-grid.js`, `world-instanced-manager.js`, `world-mesh-buffers.js`, `world-textures.js`, `world-sky.js`, `world-clouds.js`, `world-water.js` |
