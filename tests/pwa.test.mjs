@@ -213,9 +213,26 @@ test('o index.html aponta o manifest, o tema e os ícones', () => {
 
 test('o menu registra o service worker sem travar a abertura', () => {
     const menu = read('world-menu.js');
-    assert.match(menu, /import \{ registerServiceWorker \} from '\.\/world-pwa\.js';/);
+    assert.match(menu, /import \{[^}]*registerServiceWorker[^}]*\} from '\.\/world-pwa\.js';/);
     assert.match(menu, /registerServiceWorker\(\)\.catch/, 'registro é assíncrono e não bloqueia o menu');
     assert.match(pwaModule, /export async function registerServiceWorker/);
+});
+
+test('a tela inicial tem o botão de instalar no padrão de botões do menu', () => {
+    // UI nova segue o padrão cinza do menu (2px, sem raio) — nada de botão solto.
+    assert.match(html, /class="classic-btn classic-btn-wide" id="btn-install"[^>]*hidden/, 'nasce escondido');
+    assert.match(html, /id="install-hint"/, 'e tem onde explicar a instalação');
+    assert.match(html, /<p id="install-hint"[^>]*aria-live="polite"/, 'o aviso é anunciado');
+});
+
+test('o menu guarda o convite do navegador para o clique poder instalar', () => {
+    const menu = read('world-menu.js');
+    assert.match(menu, /addEventListener\('beforeinstallprompt'/, 'sem isso o convite do Chrome passa e não volta');
+    assert.match(menu, /event\.preventDefault\(\)/, 'preventDefault tira o mini-aviso do Chrome e mantém o evento');
+    assert.match(menu, /capturePromptEvent\(event\)/);
+    assert.match(menu, /addEventListener\('appinstalled'/, 'instalou: o botão sai');
+    assert.match(menu, /installPrompt\.prompt\(\)/, 'o clique chama o convite guardado');
+    assert.match(menu, /createInstallPrompt\(/, 'a decisão vem do módulo de instalação');
 });
 
 test('o servidor de desenvolvimento entrega o manifest com o tipo certo', () => {

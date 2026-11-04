@@ -51,6 +51,7 @@
     "./world-graphics-quality.js": "./world-graphics-quality.js?v=f20063e81a",
     "./world-grid.js": "./world-grid.js?v=be11481d71",
     "./world-hand-animation.js": "./world-hand-animation.js?v=5db4d45ae7",
+    "./world-install-prompt.js": "./world-install-prompt.js?v=bedfbf7894",
     "./world-instanced-manager.js": "./world-instanced-manager.js?v=65840e2b5d",
     "./world-interaction-rules.js": "./world-interaction-rules.js?v=272fa345fc",
     "./world-light-region.js": "./world-light-region.js?v=dd22bd5219",
@@ -58,7 +59,7 @@
     "./world-list-store.js": "./world-list-store.js?v=cc5476e288",
     "./world-list-view.js": "./world-list-view.js?v=9ec40da58c",
     "./world-math.js": "./world-math.js?v=ce4a6d9232",
-    "./world-menu.js": "./world-menu.js?v=e6d952859e",
+    "./world-menu.js": "./world-menu.js?v=848a925210",
     "./world-mesh-buffers.js": "./world-mesh-buffers.js?v=ceba787639",
     "./world-mineral-blocks.js": "./world-mineral-blocks.js?v=4c39bc041e",
     "./world-mineral-textures.js": "./world-mineral-textures.js?v=ab422ad968",
@@ -119,6 +120,8 @@
                 <button class="classic-btn" id="btn-open-options">Opções...</button>
                 <button class="classic-btn" id="btn-quit-game">Sair do jogo</button>
             </div>
+            <button class="classic-btn classic-btn-wide" id="btn-install" type="button" hidden>Instalar app</button>
+            <p id="install-hint" class="quit-hint" role="status" aria-live="polite" hidden></p>
             <p id="quit-hint" class="quit-hint" hidden>Para sair, feche esta aba do navegador.</p>
         </div>
     </section>
@@ -332,6 +335,6 @@
     </div>
     <p id="touch-hint">Arraste na tela para olhar · empurre o joystick até o fim para correr</p>
 </div>
-<script type="module" src="world-menu.js?v=e6d952859e"></script>
+<script type="module" src="world-menu.js?v=848a925210"></script>
 </body>
 </html>

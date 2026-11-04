@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 487 testes de módulos puros (node --test)
+npm test           # 501 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -140,15 +140,23 @@ diante) e cai na síntese quando o arquivo não existe. Lista completa em
 
 ## Instalar e jogar sem rede (PWA)
 
-O jogo é um **PWA**: dá para instalar pelo próprio navegador (menu do Chrome/Edge →
-"Instalar", ou ícone de compartilhar → "Adicionar à Tela de Início" no Safari) e
-jogar offline depois da primeira visita.
+O jogo é um **PWA**: dá para instalar pelo próprio navegador e jogar offline
+depois da primeira visita. A tela inicial tem um botão **Instalar app** (padrão
+cinza do menu) que aparece quando há como instalar:
+
+- **Chrome/Edge**: o navegador dispara `beforeinstallprompt`, o jogo guarda o
+  evento e o botão abre o convite nativo no clique;
+- **Safari (iPhone/iPad)**: não existe convite programático, então o botão
+  revela o caminho manual — Compartilhar → "Adicionar à Tela de Início";
+- **já instalado** (janela própria) ou navegador sem nenhum dos dois: o botão
+  simplesmente não aparece.
 
 | Peça | Onde | O que faz |
 | --- | --- | --- |
 | Manifest | `manifest.webmanifest` | nome, ícones (192, 512 e maskable), `display: standalone`, cores |
 | Service worker | `service-worker.js` | guarda a casca na instalação e o resto no primeiro uso |
 | Registro | `world-pwa.js` | registra só em `http(s)`; `?sw=0` desliga |
+| Botão de instalar | `world-install-prompt.js` | decide quando mostrar e chama o convite do navegador (testado sem DOM) |
 | Ícones | `icons/` | gerados por `tools/make-icons.mjs` (PNG escrito na mão, sem dependência) |
 
 Duas estratégias, porque os dois tipos de requisição têm problemas opostos:
