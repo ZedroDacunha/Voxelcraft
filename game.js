@@ -48,6 +48,14 @@ import { materialSoundName } from './world-block-materials.js';
 import { createWaterAudioState, waterSoundFor } from './world-water-sounds.js';
 import { damageSoundFor } from './world-damage-sounds.js';
 import { ambientAvailability, createAmbientState, stepAmbient } from './world-ambient-sounds.js';
+import {
+    TOUCH_LOOK_SENSITIVITY,
+    TOUCH_STICK_RADIUS,
+    isTouchDevice,
+    lookAfterDrag,
+    movementFromStick,
+    stickVector,
+} from './world-touch-controls.js';
 import { getSharedAudio } from './world-audio.js';
 import { rightClickIntent } from './world-interaction-rules.js';
 import { loadGameSettings } from './world-game-settings.js';
@@ -1700,7 +1708,7 @@ function updateItemEntities(dt) {
 }
 
 function dropSelectedItem() {
-    if (!controls.isLocked) return;
+    if (!playing()) return;
     const s = inventory.slots[selectedSlot];
     if (!s) return;
     const id = s.id, damage = s.damage || 0;
@@ -1916,7 +1924,7 @@ function createHand() {
 }
 
 function adjustHeldTransform(event) {
-    if (!HELD_DEBUG || !controls?.isLocked || heldId < 0 || !HELD_TOOL_KINDS.has(ITEMS[heldId]?.sprite?.kind)) return;
+    if (!HELD_DEBUG || !playing() || heldId < 0 || !HELD_TOOL_KINDS.has(ITEMS[heldId]?.sprite?.kind)) return;
     let changed = false;
     const step = event.shiftKey ? 0.1 : 0.02;
     const angle = event.shiftKey ? 5 : 2;
@@ -2114,8 +2122,9 @@ let craftResult = null;
 let recipeBook = null;
 
 function syncPauseMenu(overrides = {}) {
+    syncTouchUi();
     document.getElementById('menu').style.display = pauseMenuDisplay({
-        locked: !!controls?.isLocked,
+        locked: playing(),
         inventoryOpen,
         dead,
         ...overrides,
@@ -2428,7 +2437,7 @@ function activateSlot(el, { button = 0, shiftKey = false } = {}) {
 }
 
 function openInventory(st = null, { focusFirst = false } = {}) {
-    if (!controls.isLocked || inventoryOpen) return;
+    if (!playing() || inventoryOpen) return;
     setRecipeBookOpen(false);
     station = st;
     craftN = st && st.type === 'crafting' ? 3 : 2;
@@ -2448,6 +2457,7 @@ function openInventory(st = null, { focusFirst = false } = {}) {
     inventoryUnlockPending = true;
     controls.unlock();
     setTimeout(() => { inventoryUnlockPending = false; }, 300);
+    syncTouchUi();
 }
 
 function giveBack(s) {
@@ -2476,6 +2486,12 @@ function closeInventory(relock) {
     updateHotbarUI();
     saveGame(true);
 
+    syncTouchUi();
+    // No toque não há lock para reaver: o menu já fica escondido por playing().
+    if (touchMode) {
+        syncPauseMenu();
+        return;
+    }
     syncPauseMenu({ locked: false });
     if (relock) {
         requestLock().then(ok => {
@@ -2545,7 +2561,7 @@ function applyAmbientLevels(levels) {
 function updateAmbient(dt) {
     // menu, pausa, morte e aba escondida: silêncio. A fase congela, então voltar
     // não recomeça o sorteio do zero.
-    if (!controls.isLocked || dead || document.hidden) {
+    if (!playing() || dead || document.hidden) {
         applyAmbientLevels({ wind: 0, crickets: 0 });
         return;
     }
@@ -2579,6 +2595,72 @@ let currentHit = null;
 const tmpDir = new THREE.Vector3();
 const yawEuler = new THREE.Euler(0, 0, 0, 'YXZ');
 const look = { yaw: 0, pitch: 0, spikes: 0, maxDelta: 0 };
+
+// =====================================================================
+// 4F. TOQUE (SEM POINTER LOCK)
+// =====================================================================
+// No desktop o jogo começa quando o mouse é capturado; no toque não existe
+// pointer lock, então `touchActive` faz o papel de "estou jogando". Um único
+// `playing()` decide o que antes era `controls.isLocked`, para não haver duas
+// verdades espalhadas pelo arquivo.
+const urlParams = new URLSearchParams(location.search);
+const touchMode = urlParams.has('touch')
+    ? urlParams.get('touch') !== '0'
+    : isTouchDevice({
+        maxTouchPoints: navigator.maxTouchPoints ?? 0,
+        coarsePointer: matchMedia('(pointer: coarse)').matches,
+        touchEvent: 'ontouchstart' in window,
+    });
+let touchActive = false;
+// Último tipo de ponteiro usado: decide se "Jogar" pede lock ou vira toque.
+let lastPointerKind = 'touch';
+if (touchMode) {
+    document.body.classList.add('touch-mode');
+    const touchHint = document.getElementById('menu-touch-hint');
+    if (touchHint) touchHint.style.display = 'block';
+}
+// Estado do joystick: onde o dedo começou e onde está agora.
+const touchStick = { pointerId: null, centerX: 0, centerY: 0, x: 0, y: 0 };
+// Arrasto de olhar: um dedo na tela (fora dos controles) gira a câmera.
+const touchLook = { pointerId: null, lastX: 0, lastY: 0 };
+
+function playing() {
+    return Boolean(controls?.isLocked) || touchActive;
+}
+
+// Zera os mesmos botões lógicos que o teclado controla. Usado ao sair do jogo,
+// pausar, abrir inventário e morrer — em qualquer caminho ninguém fica andando
+// sozinho com um dedo que já saiu da tela.
+function resetInputFlags() {
+    moveForward = moveBackward = moveLeft = moveRight = false;
+    jumpHeld = swimStrokeLocked = isSprinting = wantToCrouch = false;
+    leftHeld = false;
+    touchStick.pointerId = null;
+    touchStick.x = touchStick.y = 0;
+    touchLook.pointerId = null;
+    resetMining();
+    cancelEating();
+    resetTouchStickVisual();
+}
+
+function resetTouchStickVisual() {
+    const knob = document.getElementById('touch-stick-knob');
+    if (knob) knob.style.transform = '';
+}
+
+// A UI de toque só aparece quando o jogador está de fato jogando por toque —
+// menu de pausa, inventário e tela de morte continuam sendo telas de dedo, mas
+// sem joystick por cima.
+function syncTouchUi() {
+    const ui = document.getElementById('touch-ui');
+    if (!ui) return;
+    const visible = touchMode && touchActive && !inventoryOpen && !dead;
+    if (ui.hidden !== !visible) ui.hidden = !visible;
+    if (!visible) return;
+    if (ui.dataset.hintShown) return;
+    ui.dataset.hintShown = '1';
+    setTimeout(() => ui.classList.add('hint-hidden'), 7000);
+}
 const MAX_EVENT_DELTA = 350;
 const lookEuler = new THREE.Euler(0, 0, 0, 'YXZ');
 const LOOK_SPEED = 0.002;
@@ -2752,6 +2834,8 @@ function takeDamage(amount, source = 'generic') {
 function die(source = 'generic') {
     if (inventoryOpen) closeInventory(false);
     dead = true;
+    touchActive = false;
+    resetInputFlags();
     cancelEating();
     const dx = Math.floor(player.pos.x), dy = Math.floor(player.pos.y), dz = Math.floor(player.pos.z);
     const origin = new THREE.Vector3(player.pos.x, player.pos.y + 0.8, player.pos.z);
@@ -3242,6 +3326,38 @@ function onLookMove(e) {
 
 let pointerLockRequester = null;
 let pendingLockRequest = null;
+function beginTouchPlay() {
+    touchActive = true;
+    document.body.classList.add('touch-mode');
+    syncPauseMenu();
+}
+
+// Caminho único de "começar a jogar": toque entra direto, mouse pede lock.
+//
+// `preferMouse` existe para o notebook com tela de toque: se o jogador apertou
+// Jogar com o mouse, ele quer o mouse capturado; se tocou com o dedo, quer o
+// joystick. Se o lock falhar mesmo assim, cai no toque em vez de ficar parado.
+function startPlay({ preferMouse = false } = {}) {
+    if (!touchMode || preferMouse) {
+        return requestLock().then(ok => {
+            if (ok) return true;
+            if (touchMode) { beginTouchPlay(); return true; }
+            syncPauseMenu();
+            return false;
+        });
+    }
+    beginTouchPlay();
+    return Promise.resolve(true);
+}
+
+function pauseTouchPlay() {
+    if (!touchActive) return;
+    touchActive = false;
+    resetInputFlags();
+    syncPauseMenu();
+    saveGame(true);
+}
+
 function requestLock() {
     if (pendingLockRequest) return pendingLockRequest;
     pointerLockRequester ??= createPointerLockRequester({
@@ -3419,9 +3535,7 @@ async function init() {
     const btnPlay = document.getElementById('btn-play');
 
     btnPlay.addEventListener('click', () => {
-        requestLock().then(ok => {
-            if (!ok) syncPauseMenu();
-        });
+        startPlay({ preferMouse: lastPointerKind === 'mouse' });
     });
     const btnWorlds = document.getElementById('btn-worlds');
     btnWorlds.addEventListener('click', async () => {
@@ -3445,28 +3559,21 @@ async function init() {
     });
     controls.addEventListener('lock', () => syncPauseMenu({ locked: true }));
     renderer.domElement.addEventListener('click', () => {
-        if (!controls.isLocked && !inventoryOpen && !dead && menu.style.display === 'none') {
-            requestLock().then(ok => {
-                if (!ok) syncPauseMenu();
-            });
+        if (!playing() && !inventoryOpen && !dead && menu.style.display === 'none') {
+            startPlay({ preferMouse: lastPointerKind === 'mouse' });
         }
     });
     document.getElementById('btn-respawn').addEventListener('click', () => {
         dead = false;
         deathEl.style.display = 'none';
         syncPauseMenu();
-        requestLock().then(ok => {
-            if (!ok) syncPauseMenu();
-        });
+        startPlay();
     });
     controls.addEventListener('unlock', () => {
         const inventoryExit = inventoryOpen || inventoryUnlockPending;
         inventoryUnlockPending = false;
         syncPauseMenu({ locked: false });
-        moveForward = moveBackward = moveLeft = moveRight = jumpHeld = swimStrokeLocked = isSprinting = wantToCrouch = false;
-        leftHeld = false;
-        resetMining();
-        cancelEating();
+        resetInputFlags();
         saveGame(true);
         if (inventoryExit) return;
         btnPlay.disabled = true;
@@ -3526,19 +3633,22 @@ async function init() {
         selectSlot((selectedSlot + (event.deltaY > 0 ? 1 : 8)) % 9);
     });
 
+    document.addEventListener('pointerdown', (event) => {
+        lastPointerKind = event.pointerType || 'mouse';
+    }, true);
+
     document.addEventListener('contextmenu', (e) => e.preventDefault());
 
-    document.addEventListener('mousedown', (event) => {
-        if (!controls.isLocked) return;
-        if (event.button === 0) { leftHeld = true; return; }
-        if (event.button !== 2) return;
+    // Ação do "usar": o botão direito do mouse e o botão Usar do toque precisam
+    // fazer exatamente a mesma coisa — estação, porta, comida ou colocar bloco.
+    function useHeldItem({ sneaking = false } = {}) {
         updateTarget();
 
         const held = inventory.slots[selectedSlot];
         const station = currentHit && BLOCKS[currentHit.type].station;
         const door = Boolean(currentHit && woodDoorPart(currentHit.type));
         const food = Boolean(held && ITEMS[held.id].food);
-        const intent = rightClickIntent({ sneaking: event.shiftKey || wantToCrouch, station, door, food });
+        const intent = rightClickIntent({ sneaking, station, door, food });
 
         if (intent === 'station') { openStation(station, currentHit); return; }
         if (intent === 'door') { toggleWoodDoor(currentHit); return; }
@@ -3564,11 +3674,11 @@ async function init() {
             else if (nz > 0) placedType = ID.TORCH_WALL_ZP;
             else if (nz < 0) placedType = ID.TORCH_WALL_ZN;
         }
-        
+
         // Se a posição para colocar o bloco contiver água, o bloco irá substituí-la normalmente!
         const blockAtTarget = world.getBlock(px, py, pz);
         if (blockAtTarget !== 0 && !WaterSystem.isBlock(blockAtTarget) && BLOCKS[blockAtTarget]?.solid !== false) return;
-        
+
         if (intersectsPlayer(px, py, pz)) return;
         const facing = BLOCKS[placedType]?.tiles.front !== undefined
             ? facingTowardPlayer(px + 0.5, pz + 0.5, player.pos.x, player.pos.z)
@@ -3585,6 +3695,13 @@ async function init() {
         } else if (placedType === ID.WOOD_DOOR_BOTTOM) {
             showToast('A porta precisa de apoio sólido e de dois blocos livres');
         }
+    }
+
+    document.addEventListener('mousedown', (event) => {
+        if (!playing()) return;
+        if (event.button === 0) { leftHeld = true; return; }
+        if (event.button !== 2) return;
+        useHeldItem({ sneaking: event.shiftKey || wantToCrouch });
     });
 
     document.addEventListener('mouseup', (event) => {
@@ -3592,7 +3709,135 @@ async function init() {
         if (event.button === 2) cancelEating();
     });
 
-    setInterval(() => { if (controls.isLocked) saveGame(true); }, 30000);
+    // --- controles de toque ---------------------------------------------
+    // Um dedo no joystick move (mesmos botões do WASD), um dedo arrastando na
+    // tela olha (mesmo `look` do mouse) e os botões da direita fazem o resto.
+    function setupTouchControls() {
+        const ui = document.getElementById('touch-ui');
+        const stick = document.getElementById('touch-stick');
+        const knob = document.getElementById('touch-stick-knob');
+        const canvas = renderer.domElement;
+        if (!ui || !stick || !knob) return;
+
+        function applyStick(dx, dy) {
+            const vector = stickVector(dx, dy, TOUCH_STICK_RADIUS);
+            touchStick.x = vector.x;
+            touchStick.y = vector.y;
+            const move = movementFromStick(vector);
+            moveForward = move.forward;
+            moveBackward = move.backward;
+            moveLeft = move.left;
+            moveRight = move.right;
+            isSprinting = move.sprint;
+            knob.style.transform =
+                `translate(${(vector.x * TOUCH_STICK_RADIUS).toFixed(1)}px, ${(vector.y * TOUCH_STICK_RADIUS).toFixed(1)}px)`;
+        }
+
+        function releaseStick() {
+            touchStick.pointerId = null;
+            touchStick.x = touchStick.y = 0;
+            moveForward = moveBackward = moveLeft = moveRight = isSprinting = false;
+            resetTouchStickVisual();
+        }
+
+        stick.addEventListener('pointerdown', (event) => {
+            if (!playing() || inventoryOpen || touchStick.pointerId !== null) return;
+            event.preventDefault();
+            touchStick.pointerId = event.pointerId;
+            // o centro é onde o dedo encostou: um toque no meio do disco não anda
+            touchStick.centerX = event.clientX;
+            touchStick.centerY = event.clientY;
+            stick.setPointerCapture?.(event.pointerId);
+            applyStick(0, 0);
+        });
+        stick.addEventListener('pointermove', (event) => {
+            if (event.pointerId !== touchStick.pointerId) return;
+            event.preventDefault();
+            applyStick(event.clientX - touchStick.centerX, event.clientY - touchStick.centerY);
+        });
+        for (const type of ['pointerup', 'pointercancel']) {
+            stick.addEventListener(type, (event) => {
+                if (event.pointerId !== touchStick.pointerId) return;
+                releaseStick();
+            });
+        }
+
+        // Olhar: arrastar em qualquer ponto livre da tela (os controles têm
+        // `pointer-events: auto` e consomem o próprio dedo).
+        canvas.addEventListener('pointerdown', (event) => {
+            if (!playing() || event.pointerType === 'mouse' || touchLook.pointerId !== null) return;
+            event.preventDefault();
+            touchLook.pointerId = event.pointerId;
+            touchLook.lastX = event.clientX;
+            touchLook.lastY = event.clientY;
+            canvas.setPointerCapture?.(event.pointerId);
+        });
+        canvas.addEventListener('pointermove', (event) => {
+            if (event.pointerId !== touchLook.pointerId) return;
+            event.preventDefault();
+            const next = lookAfterDrag(look, event.clientX - touchLook.lastX, event.clientY - touchLook.lastY, {
+                sensitivity: TOUCH_LOOK_SENSITIVITY * LOOK_SENSITIVITY,
+                maxPitch: MAX_PITCH,
+            });
+            touchLook.lastX = event.clientX;
+            touchLook.lastY = event.clientY;
+            look.yaw = next.yaw;
+            look.pitch = next.pitch;
+            applyLook();
+        });
+        for (const type of ['pointerup', 'pointercancel']) {
+            canvas.addEventListener(type, (event) => {
+                if (event.pointerId === touchLook.pointerId) touchLook.pointerId = null;
+            });
+        }
+
+        // Botões de ação.
+        function pressButton(id, pressed) {
+            const button = ui.querySelector(`[data-touch="${id}"]`);
+            if (!button) return;
+            button.classList.toggle('pressed', pressed);
+            button.setAttribute('aria-pressed', String(pressed));
+        }
+        for (const button of ui.querySelectorAll('[data-touch]')) {
+            const id = button.dataset.touch;
+            const hold = id === 'jump' || id === 'break';
+            button.addEventListener('pointerdown', (event) => {
+                event.preventDefault();
+                if (!playing()) return;
+                button.setPointerCapture?.(event.pointerId);
+                if (id === 'jump') { jumpHeld = true; pressButton(id, true); return; }
+                if (id === 'break') { leftHeld = true; pressButton(id, true); return; }
+                if (id === 'use') useHeldItem({ sneaking: wantToCrouch });
+                else if (id === 'crouch') {
+                    wantToCrouch = !wantToCrouch;
+                    pressButton(id, wantToCrouch);
+                } else if (id === 'inventory') openInventory(null);
+                else if (id === 'pause') pauseTouchPlay();
+            });
+            if (!hold) continue;
+            for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
+                button.addEventListener(type, () => {
+                    if (id === 'jump') { jumpHeld = false; swimStrokeLocked = false; }
+                    else leftHeld = false;
+                    pressButton(id, false);
+                });
+            }
+        }
+
+        // Hotbar: no toque não existe roda do mouse, então cada casa é um botão.
+        for (let i = 0; i < 9; i++) {
+            const slot = document.getElementById(`slot-${i}`);
+            slot?.addEventListener('pointerdown', (event) => {
+                if (!playing() || inventoryOpen) return;
+                event.preventDefault();
+                selectSlot(i);
+            });
+        }
+    }
+
+    if (touchMode) setupTouchControls();
+
+    setInterval(() => { if (playing()) saveGame(true); }, 30000);
     document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(true, true); });
 
     if (new URLSearchParams(location.search).has('debug')) {
@@ -3639,7 +3884,7 @@ function animate() {
     const dt = Math.min(rawDt, 0.05);
     applyLook();
 
-    if (controls.isLocked) {
+    if (playing()) {
         updatePhysics(dt);
         creatureSystem.update(dt, player.pos, true);
         updateTarget();
@@ -3652,7 +3897,7 @@ function animate() {
     world.water.updateSubmersion(world, player);
     world.water.update(world, dt, now);
 
-    if (controls.isLocked || inventoryOpen) {
+    if (playing() || inventoryOpen) {
         updateWorldClock(dt);
         updateFurnaces(dt);
         world.furnaceSmoke.update(dt, furnaces, world, player.pos);
@@ -3671,7 +3916,7 @@ function animate() {
         scene.background.setHex(0x113366); 
     }
     
-    if (controls.isLocked || inventoryOpen) worldClouds.update(dt, camera);
+    if (playing() || inventoryOpen) worldClouds.update(dt, camera);
     else worldClouds.update(0, camera);
     updateHand(dt);
     updateAmbient(dt);

@@ -225,6 +225,48 @@
     .options-controls { margin-top: 16px; padding-top: 12px; border-top: 1px solid #33465a; color: #d0d0d0; font-size: 13px; }
     .options-controls summary { color: #d6d0a4; cursor: pointer; }
     .options-controls p { margin: 8px 0 0; color: #d0d0d0; line-height: 1.55; }
+    /* --- toque: joystick à esquerda, ações à direita ---------------------- */
+    /* O bloco inteiro ignora o mouse (pointer-events:none) e cada controle
+       reativa o próprio dedo. Assim o arrasto de olhar atravessa a tela toda. */
+    #touch-ui { position: fixed; inset: 0; z-index: 7; pointer-events: none; user-select: none; -webkit-user-select: none; }
+    #touch-ui[hidden] { display: none; }
+    #touch-stick {
+        position: absolute; left: 16px; bottom: 22px; width: 132px; height: 132px; box-sizing: border-box;
+        border: 2px solid #0009; border-radius: 50%; background: #20202040;
+        box-shadow: inset 2px 2px 0 #ffffff26, 2px 3px 0 #0006;
+        pointer-events: auto; touch-action: none;
+    }
+    #touch-stick-knob {
+        position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px;
+        box-sizing: border-box; border: 2px solid #171717; border-radius: 50%;
+        background: linear-gradient(#a0a0a0 0%, #909090 47%, #828282 50%, #929292 100%);
+        box-shadow: inset 2px 2px 0 #ffffff4d, inset -2px -2px 0 #0004, 2px 3px 0 #0008;
+        pointer-events: none;
+    }
+    #touch-actions { position: absolute; right: 14px; bottom: 20px; display: grid; grid-template-columns: repeat(2, 82px); gap: 8px;
+        pointer-events: none; }
+    .touch-btn { min-height: 46px; padding: 4px 6px; font-size: 13px; pointer-events: auto; touch-action: none; }
+    #touch-top { position: absolute; right: 14px; top: 12px; display: flex; gap: 8px; }
+    #touch-top .touch-btn { min-height: 40px; min-width: 84px; font-size: 13px; }
+    .touch-btn.pressed { background: linear-gradient(#626262, #777); box-shadow: inset 2px 2px 2px #0008; }
+    #touch-hint { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); margin: 0; padding: 4px 10px;
+        background: #1119; color: #fff; font: 12px/1.3 monospace; text-shadow: 1px 1px #000; border-radius: 3px;
+        opacity: 1; transition: opacity .6s linear; pointer-events: none; }
+    #touch-ui.hint-hidden #touch-hint { opacity: 0; }
+    /* no toque o joystick e os botões ocupam a faixa de baixo: a hotbar sobe */
+    body.touch-mode #hud-bottom { bottom: 152px; }
+    /* no toque a hotbar precisa receber o dedo: no resto do HUD ela é decorativa */
+    body.touch-mode #hud-bottom { pointer-events: auto; }
+    body.touch-mode .slot { pointer-events: auto; }
+    body.touch-mode #crosshair { opacity: .85; }
+    /* o dedo arrastando na tela não pode rolar nem dar zoom na página */
+    body.touch-mode canvas { touch-action: none; -webkit-touch-callout: none; }
+    @media (max-height: 460px) {
+        #touch-stick { width: 112px; height: 112px; left: 12px; bottom: 14px; }
+        #touch-actions { grid-template-columns: repeat(2, 72px); bottom: 12px; }
+        .touch-btn { min-height: 40px; font-size: 12px; }
+        body.touch-mode #hud-bottom { bottom: 126px; }
+    }
     @media (max-width: 520px) {
         .title-screen-footer span:last-child { display: none; }
         .title-screen-logo { margin-bottom: 34px; }

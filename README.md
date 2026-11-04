@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 330 testes de módulos puros (node --test)
+npm test           # 345 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -67,6 +67,25 @@ recuperação e importação/exportação de save.
 | `?gpu=default` | força a preferência de GPU para `default` em vez de `high-performance` |
 | `?pr=1` | limita o `devicePixelRatio` usado no render |
 | `?reset` | apaga o save do mundo atual **uma vez** (o parâmetro é consumido e removido da URL) |
+| `?touch` | força os controles de toque mesmo no desktop (útil para testar); `?touch=0` desliga num aparelho de toque |
+
+## Toque (celular e tablet)
+
+No toque não existe *pointer lock*, então o jogo entra por outro caminho: nada de
+capturar o mouse, e sim um joystick e botões na própria tela.
+
+- **Joystick** (canto inferior esquerdo): arraste a partir de onde o dedo encostou.
+  A zona morta é por eixo (tremor de dedo não anda) e empurrar até o fim **corre**.
+- **Olhar**: arraste em qualquer ponto livre da tela; a sensibilidade das opções
+  vale igual ao mouse.
+- **Botões**: `Cavar` e `Pular` seguram enquanto o dedo estiver neles; `Usar`,
+  `Agachar` (alterna), `Mochila` e `Pausar` são de um toque.
+- **Hotbar**: cada casa é um botão (não há roda do mouse).
+- **Híbrido**: notebook com tela de toque também joga com mouse — se o clique for
+  do mouse, o jogo pede *pointer lock* como sempre; se for do dedo, vira toque.
+
+A interface de toque só aparece quando o jogador entra por esse caminho, e usa os
+mesmos botões cinza do menu (`.classic-btn`).
 
 ## Acessibilidade
 

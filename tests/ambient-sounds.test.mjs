@@ -327,7 +327,7 @@ test('o jogo cala o ambiente fora do jogo e não reescreve o áudio à toa', () 
     const fn = source.slice(source.indexOf('function updateAmbient('));
     const body = fn.slice(0, fn.indexOf('\n}', fn.indexOf('applyAmbientLevels')));
 
-    assert.match(body, /!controls\.isLocked \|\| dead \|\| document\.hidden/);
+    assert.match(body, /!playing\(\) \|\| dead \|\| document\.hidden/, 'silencio tambem fora do modo toque');
     assert.match(body, /applyAmbientLevels\(\{ wind: 0, crickets: 0 \}\)/);
     assert.match(body, /ambientAvailability\(\{/);
     assert.match(body, /night: worldSky\.day < 0\.35/);
