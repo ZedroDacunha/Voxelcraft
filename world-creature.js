@@ -38,7 +38,7 @@ export const SCARE_SPEED = 2.2;
 export const SCARE_DURATION = 4.5;
 /** Alcance e abertura do golpe: o corpo cabe numa caixa de ~1 bloco a 3,5. */
 export const HIT_REACH = 3.5;
-export const HIT_MIN_DOT = 0.72; // ~44° de abertura a partir da mira
+export const HIT_MIN_DOT = 0.86; // ~31° de abertura: mirar no bicho, não "perto dele"
 /** Um mesmo Mofim não leva dois golpes no mesmo instante (evita spam com o botão segurado). */
 export const HIT_COOLDOWN = 0.35;
 /** Altura que ele pula para subir um degrau e duração do pulo (visual e curto). */
@@ -81,6 +81,9 @@ export function shouldFlee({
 export function creatureInReach(entities, origin, direction, {
     reach = HIT_REACH,
     minDot = HIT_MIN_DOT,
+    // Quem estiver mais longe que isso não leva o golpe: no jogo é a distância
+    // do bloco na mira — se o bloco está na frente, o Mofim está atrás dele.
+    maxDistance = Infinity,
 } = {}) {
     if (!entities?.length || !direction) return null;
     const length = Math.hypot(direction.x, direction.y, direction.z) || 1;
@@ -93,7 +96,7 @@ export function creatureInReach(entities, origin, direction, {
         const ey = entity.y + 0.45 - origin.y;
         const ez = entity.z - origin.z;
         const distance = Math.hypot(ex, ey, ez);
-        if (distance > reach || distance === 0) continue;
+        if (distance > reach || distance > maxDistance || distance === 0) continue;
         const dot = (ex * dx + ey * dy + ez * dz) / distance;
         if (dot < minDot) continue;
         // Mais perto e mais alinhado ganha; distância domina.
@@ -169,6 +172,7 @@ function rotate2(x, z, angle) {
 export function createCreatureSystemClass({
     THREE,
     ID,
+    BLOCKS = {},
     CHUNK_SIZE,
     floorDiv = defaultFloorDiv,
     hash2 = defaultHash2,
@@ -192,13 +196,31 @@ export function createCreatureSystemClass({
             };
         }
 
+        /** Chão serve se for sólido: grama, terra, areia, pedra, neve… */
+        isGround(type) {
+            return type !== 0 && (BLOCKS[type]?.solid ?? true);
+        }
+
+        /**
+         * Ele atravessa o que não é sólido — grama alta, tocha, flor — mas não
+         * água: sem isso ficava preso na primeira touceira do caminho (a grama
+         * alta ocupava a célula de cima e a coluna era recusada) e, num campo
+         * cheio dela, nem nascia.
+         */
+        isClear(type) {
+            if (type === 0) return true;
+            const block = BLOCKS[type];
+            if (!block) return true;
+            return !(block.solid ?? true) && block.render !== 'liquid';
+        }
+
         surfaceAt(x, z) {
             const bx = Math.floor(x), bz = Math.floor(z);
             if (!this.world.getChunk(floorDiv(bx, CHUNK_SIZE), floorDiv(bz, CHUNK_SIZE))) return null;
             const y = this.world.generator.heightAt(bx, bz);
-            const top = this.world.getBlock(bx, y, bz);
-            if (top !== ID.GRASS && top !== ID.DIRT) return null;
-            if (this.world.getBlock(bx, y + 1, bz) !== 0 || this.world.getBlock(bx, y + 2, bz) !== 0) return null;
+            if (!this.isGround(this.world.getBlock(bx, y, bz))) return null;
+            if (!this.isClear(this.world.getBlock(bx, y + 1, bz))) return null;
+            if (!this.isClear(this.world.getBlock(bx, y + 2, bz))) return null;
             return y + 1;
         }
 
@@ -279,12 +301,60 @@ export function createCreatureSystemClass({
          * Chamar a cada quadro com o botão apertado é seguro: `HIT_COOLDOWN`
          * impede que um clique vire vários golpes.
          */
-        hitFrom(origin, direction) {
+        hitFrom(origin, direction, options = {}) {
             const at = now();
-            const target = creatureInReach(this.entities, origin, direction);
+            const target = creatureInReach(this.entities, origin, direction, options);
             if (!target || at - target.lastHitAt < HIT_COOLDOWN) return null;
             this.scare(target, at, origin);
             return target;
+        }
+
+        /**
+         * Dá um passo na direção pedida, se o chão à frente servir. Devolve
+         * `false` quando o caminho está barrado (encosta, água, buraco) — quem
+         * chama decide o que fazer, e o passo nunca é dado "no escuro".
+         */
+        stepToward(e, dirX, dirZ, speed, dt) {
+            const length = Math.hypot(dirX, dirZ);
+            if (!(length > 1e-6)) return false;
+            const step = speed * dt;
+            const nx = e.x + (dirX / length) * step;
+            const nz = e.z + (dirZ / length) * step;
+            const ny = this.surfaceAt(nx, nz);
+            if (ny === null || Math.abs(ny - e.y) > STEP_UP) return false;
+            if (ny > e.y) {
+                e.hopFrom = e.visualY;
+                e.hopTo = ny;
+                e.hopT = 0;
+            } else if (ny < e.y) {
+                e.glideFrom = e.visualY;
+                e.glideT = 0;
+            }
+            e.x = nx; e.z = nz; e.y = ny;
+            e.heading = Math.atan2(dirX, dirZ);
+            return true;
+        }
+
+        /**
+         * Fuga: reto para longe e, se o chão barra, diagonais cada vez mais
+         * abertas. Antes o alvo de fuga era recalculado a cada quadro e o desvio
+         * se perdia — ele ficava parado, tremendo contra a grama alta.
+         */
+        fleeStep(e, awayX, awayZ, dt) {
+            const away = Math.hypot(awayX, awayZ);
+            const ax = away > 1e-4 ? awayX / away : 1;
+            const az = away > 1e-4 ? awayZ / away : 0;
+            const side = e.id % 2 ? 1 : -1;
+            // Leque de 0° a ~109°: os ângulos grandes importam porque, encostado
+            // num lago ou numa encosta, todas as direções "para longe" ainda
+            // apontam para dentro do obstáculo — ele precisa poder correr ao
+            // longo dele.
+            const angles = [0, side * 0.7, -side * 0.7, side * 1.3, -side * 1.3, side * 1.9, -side * 1.9];
+            for (const angle of angles) {
+                const dir = rotate2(ax, az, angle);
+                if (this.stepToward(e, dir.x, dir.z, FLEE_SPEED, dt)) return true;
+            }
+            return false;
         }
 
         update(dt, player, active) {
@@ -335,54 +405,20 @@ export function createCreatureSystemClass({
                 }
 
                 if (fleeing) {
-                    // Fugir é recalculado a cada quadro: o jogador pode estar
-                    // perseguindo, e o alvo do vagar ficaria para trás.
-                    const away = Math.hypot(dxp, dzp);
-                    if (away > 1e-4) {
-                        e.targetX = e.x + (dxp / away) * 3;
-                        e.targetZ = e.z + (dzp / away) * 3;
+                    this.fleeStep(e, dxp, dzp, dt);
+                } else {
+                    if (at >= e.turnAt) {
+                        const seed = this.world.seed + e.id * 104729 + Math.floor(at * 0.2);
+                        const angle = hash2(seed, e.id, 7) * Math.PI * 2;
+                        const distancia = 1.5 + hash2(seed, e.id, 13) * 3;
+                        e.targetX = e.x + Math.cos(angle) * distancia;
+                        e.targetZ = e.z + Math.sin(angle) * distancia;
+                        e.turnAt = at + 2 + hash2(seed, e.id, 23) * 3;
                     }
-                } else if (at >= e.turnAt) {
-                    const seed = this.world.seed + e.id * 104729 + Math.floor(at * 0.2);
-                    const angle = hash2(seed, e.id, 7) * Math.PI * 2;
-                    const distance = 1.5 + hash2(seed, e.id, 13) * 3;
-                    e.targetX = e.x + Math.cos(angle) * distance;
-                    e.targetZ = e.z + Math.sin(angle) * distance;
-                    e.turnAt = at + 2 + hash2(seed, e.id, 23) * 3;
-                }
-
-                const dx = e.targetX - e.x, dz = e.targetZ - e.z;
-                const distance = Math.hypot(dx, dz);
-                if (distance > 0.08) {
-                    const speed = fleeing ? FLEE_SPEED : WANDER_SPEED;
-                    const step = Math.min(distance, speed * dt);
-                    const nx = e.x + dx / distance * step, nz = e.z + dz / distance * step;
-                    const ny = this.surfaceAt(nx, nz);
-                    if (ny !== null && Math.abs(ny - e.y) <= STEP_UP) {
-                        // O corpo muda de nível na hora (é ele que anda); o desenho é
-                        // que faz o movimento: pula para cima, planeia para baixo.
-                        if (ny > e.y) {
-                            // Sai do desenho atual (não do chão): se ele ainda está
-                            // no ar de um planeio, o pulo continua de onde o corpo
-                            // está, em vez de voltar ao chão e saltar de novo.
-                            e.hopFrom = e.visualY;
-                            e.hopTo = ny;
-                            e.hopT = 0;
-                        } else if (ny < e.y) {
-                            e.glideFrom = e.visualY;
-                            e.glideT = 0;
-                        }
-                        e.x = nx; e.z = nz; e.y = ny;
-                        e.heading = Math.atan2(dx, dz);
-                    } else if (fleeing) {
-                        // Bateu numa encosta fugindo: desvia em diagonal em vez de
-                        // ficar parado encarando o obstáculo até o medo passar.
-                        const turned = rotate2(dx, dz, (e.id % 2 ? 1 : -1) * 1.1);
-                        e.targetX = e.x + turned.x;
-                        e.targetZ = e.z + turned.z;
-                    } else {
-                        e.turnAt = at;
-                    }
+                    const dx = e.targetX - e.x, dz = e.targetZ - e.z;
+                    const distance = Math.hypot(dx, dz);
+                    // Barrado passeando: sorteia outro alvo em vez de insistir.
+                    if (distance > 0.08 && !this.stepToward(e, dx, dz, WANDER_SPEED, dt)) e.turnAt = at;
                 }
 
                 const bob = fleeing ? 0.02 : 0.035;

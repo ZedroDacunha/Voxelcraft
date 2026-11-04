@@ -37,8 +37,15 @@ decisão de jogo ("agachar esconde"), não efeito colateral da matemática.
 
 Comportamento: o susto dura **4,5 s** e se renova enquanto o jogador ameaça;
 fugindo, ele anda a **3,1 blocos/s** (vagando: 0,72) com o alvo recalculado a cada
-quadro **para longe do jogador**; se bater numa encosta, **desvia em diagonal** em
-vez de ficar parado encarando o obstáculo.
+quadro **para longe do jogador**. Se o chão barra o caminho, ele **varre um leque de
+direções** (reto e diagonais até ~109°) — encostado numa encosta ou num lago, as
+direções "para longe" ainda apontam para dentro do obstáculo, então ele precisa
+poder correr **ao longo** dele.
+
+Correções de 04/11 ([BUG-20261104](BUG-20261104-mofim-preso-e-golpe.md)): ele
+**atravessa grama alta** (antes cada touceira era uma parede e ele ficava preso,
+tremendo no lugar), anda em **areia e pedra** além de grama/terra, e nasce em campo
+cheio de capim.
 
 ## 2. Chilreio
 
@@ -94,10 +101,14 @@ Antes o clique só existia para blocos: a mira é um raycast de voxels, então a
 criatura era **literalmente inalcançável**. Agora `strikeCreature()`, no laço
 principal:
 
-- alcance de **3,5 blocos** e abertura de ~44° a partir da mira;
+- alcance de **3,5 blocos** e abertura de ~31° a partir da mira;
+- **oclusão:** só vale se o Mofim estiver mais perto que o bloco na mira — se o
+  bloco está na frente, o golpe é do bloco (era o que travava a mineração perto
+  dele, ver [BUG-20261104](BUG-20261104-mofim-preso-e-golpe.md));
 - entre dois na mira, acerta **o mais próximo**;
-- **cooldown de 0,35 s** — segurar o botão assusta uma vez, não a cada quadro;
-- enquanto a mira está no bicho, **o bloco atrás não é minerado**;
+- **cooldown de 0,35 s** — segurar o botão assusta uma vez, não a cada quadro, e
+  minerar segue normal durante o cooldown;
+- no quadro do golpe, **o bloco atrás não é minerado**;
 - o braço dá o golpe (`startPunch`), para o clique não parecer vazio.
 
 Vale para mouse **e** toque, porque os dois caminhos usam o mesmo `leftHeld`.
@@ -146,7 +157,7 @@ conecta as peças e decide o volume/tom do chilreio (o módulo não conhece áud
 ## Validação
 
 ```bash
-npm test        # 447 testes (25 de criatura + 1 de áudio neste recorte)
+npm test        # 453 testes (31 de criatura + 1 de áudio neste recorte)
 npm run check   # sintaxe 114/114 + importmap em dia
 ```
 
