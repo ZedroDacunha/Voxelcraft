@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { ID } from '../world-catalog.js';
 import {
+    AUTO_STEP_HEIGHT,
     COLLISION_EPSILON,
     MAX_MOVE_STEP,
     PLAYER_RADIUS,
@@ -11,8 +13,11 @@ import {
     hasGroundSupport,
     movePlayerAxis,
     playerIntersectsBlock,
+    stepUpInWorld,
     unstickInWorld,
 } from '../player-physics.js';
+
+const gameSource = readFileSync(new URL('../game.js', import.meta.url), 'utf8');
 
 const H_STAND = 1.8;
 const H_CROUCH = 1.5;
@@ -274,4 +279,73 @@ test('a guarda é só horizontal: cair e subir continuam iguais', () => {
     const apoiado = pos(0.5, 1, 0.5);
     assert.equal(movePlayerAxis(world, apoiado, 'y', -0.4, H_STAND, PLAYER_RADIUS, { keepOnGround: true }), true);
     assert.ok(apoiado.y >= 1 - COLLISION_EPSILON, 'e o chão continua parando o corpo');
+});
+
+// ------------------------------------------------ degrau automático
+
+test('sobe um degrau de um bloco e o passo seguinte passa', () => {
+    // Chão embaixo do jogador e um degrau de um bloco à frente (em x = 1).
+    const world = makeWorld([[0, 0, 0], [1, 1, 0]]);
+    const p = pos(0.7, 1, 0.5); // encostado na face do degrau
+
+    assert.equal(movePlayerAxis(world, p, 'x', 0.07, H_STAND), true, 'andando, o degrau barra');
+    assert.ok(p.y === 1, 'e o corpo continua na altura de baixo');
+
+    assert.equal(stepUpInWorld(world, p, 0.07, 0, H_STAND), true, 'apoiado, o degrau é vencido');
+    assert.equal(p.y, 1 + AUTO_STEP_HEIGHT, 'subiu exatamente um bloco');
+
+    // No mesmo quadro o passo é repetido: agora passa e há chão embaixo.
+    assert.equal(movePlayerAxis(world, p, 'x', 0.07, H_STAND), false, 'o caminho abriu');
+    assert.equal(hasGroundSupport(world, p, H_STAND), true, 'e o corpo fica apoiado no degrau');
+});
+
+test('parede de dois blocos não é degrau: precisa pular', () => {
+    const world = makeWorld([[0, 0, 0], [1, 1, 0], [1, 2, 0]]);
+    const p = pos(0.7, 1, 0.5);
+
+    assert.equal(stepUpInWorld(world, p, 0.07, 0, H_STAND), false);
+    assert.equal(p.y, 1, 'não subiu nada');
+});
+
+test('teto baixo não deixa subir (nem que o degrau exista)', () => {
+    // Teto em y = 3: com o corpo em pé (1,8) não cabe em cima do degrau.
+    const world = makeWorld([[0, 0, 0], [1, 1, 0], [0, 3, 0]]);
+    const p = pos(0.7, 1, 0.5);
+
+    assert.equal(stepUpInWorld(world, p, 0.07, 0, H_STAND), false, 'sem espaço para a cabeça');
+    assert.equal(p.y, 1);
+});
+
+test('não sobe para o que não é chão (painel de porta)', () => {
+    // A porta colide pelo painel, mas não é sólida: subir ali seria subir para o
+    // vazio e cair no mesmo lugar no quadro seguinte.
+    const box = { minX: 0.4375, maxX: 0.5625, minZ: 0, maxZ: 1 };
+    const world = makeWorld([[0, 0, 0]], {
+        door: { type: ID.WOOD_DOOR_BOTTOM, test: (x, y, z) => x === 1 && y === 1 && z === 0, box: () => box },
+    });
+    const p = pos(0.7, 1, 0.5);
+
+    assert.equal(stepUpInWorld(world, p, 0.07, 0, H_STAND), false);
+    assert.equal(p.y, 1);
+});
+
+test('sem passo horizontal não há degrau', () => {
+    const world = makeWorld([[0, 0, 0], [1, 1, 0]]);
+    const p = pos(0.7, 1, 0.5);
+
+    assert.equal(stepUpInWorld(world, p, 0, 0, H_STAND), false, 'parado no lugar não sobe');
+    assert.equal(p.y, 1);
+});
+
+test('o jogo tenta o degrau entre o passo e a gravidade', () => {
+    // A ordem importa: o degrau é decidido com o apoio do quadro anterior e o
+    // passo é repetido antes de a gravidade puxar o corpo para baixo.
+    const passoX = gameSource.indexOf("moveAxis('x', stepX");
+    const degrau = gameSource.indexOf('&& climbStep(', passoX);
+    const gravidade = gameSource.indexOf("moveAxis('y', player.vel.y * dt)", passoX);
+    assert.ok(passoX > 0, 'o passo horizontal usa o mesmo deslocamento do degrau');
+    assert.ok(degrau > passoX, 'o degrau vem depois do passo barrado');
+    assert.ok(gravidade > degrau, 'e antes do movimento vertical');
+    assert.ok(gameSource.slice(passoX, degrau).includes('player.onGround && !inWater'),
+        'só apoiado no chão e fora da água');
 });

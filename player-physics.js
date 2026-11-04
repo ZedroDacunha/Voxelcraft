@@ -17,6 +17,8 @@ export const COLLISION_EPSILON = 1e-4;
 export const MAX_MOVE_STEP = 0.25;
 /** Iterações da bisseção ao encostar: 6 deixa o erro em ~1/64 do passo. */
 export const MOVE_REFINE_STEPS = 6;
+/** Altura que o corpo sobe andando, sem pular: um bloco. */
+export const AUTO_STEP_HEIGHT = 1;
 /** Quanto abaixo dos pés se procura o chão ao testar apoio (agachado). */
 export const SUPPORT_PROBE = 0.05;
 /** Pontos do corpo checados em busca de chão: os quatro cantos e o centro. */
@@ -123,6 +125,34 @@ export function movePlayerAxis(world, pos, axis, amount, height, radius = PLAYER
         return true;
     }
     return false;
+}
+
+/**
+ * Tenta subir um degrau de um bloco depois de o passo horizontal ser barrado.
+ *
+ * Não é um pulo: só vale **apoiado no chão** (quem decide isso é quem chama) e
+ * exige três coisas, na ordem em que elas podem falhar:
+ *
+ * 1. **espaço para a cabeça** onde o corpo está — se a parede tem dois blocos ou
+ *    o teto é baixo, não há degrau, e o passo continua barrado;
+ * 2. **destino livre** já na altura de cima (o bloco que barrava fica abaixo dos
+ *    pés, então o caminho abre);
+ * 3. **chão do outro lado** — sem isso o corpo subiria para o vazio e cairia no
+ *    mesmo lugar no quadro seguinte, e o jogador veria a câmera tremer parado.
+ *
+ * `dx`/`dz` são o passo horizontal que foi barrado (o mesmo que o chamador
+ * tentou): é com ele que se sabe se o corpo já tem alguma parte sobre o degrau.
+ * Devolve `true` quando subiu (e aí `pos.y` muda).
+ */
+export function stepUpInWorld(world, pos, dx, dz, height, radius = PLAYER_RADIUS) {
+    if (!dx && !dz) return false;
+    const top = pos.y + AUTO_STEP_HEIGHT;
+    if (collidesInWorld(world, pos.x, top, pos.z, height, radius)) return false;
+    const ahead = { x: pos.x + dx, y: top, z: pos.z + dz };
+    if (collidesInWorld(world, ahead.x, ahead.y, ahead.z, height, radius)) return false;
+    if (!hasGroundSupport(world, ahead, height, radius)) return false;
+    pos.y = top;
+    return true;
 }
 
 /**
