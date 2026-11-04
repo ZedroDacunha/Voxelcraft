@@ -223,6 +223,24 @@ export function createTextureTools(THREE) {
             return (spriteCache[key] = g);
         }
     
+        if (kind === 'mofim-dust') {
+            // Poeira de vaga-lume: uns grãos acesos espalhados, com halo fraco.
+            const grains = [
+                [5, 5, 2], [10, 4, 1], [3, 9, 1], [8, 9, 2], [12, 10, 1], [6, 12, 1], [11, 13, 1],
+            ];
+            for (const [gx, gy, size] of grains) {
+                put(gx, gy, [255, 246, 190]);
+                if (size > 1) {
+                    put(gx + 1, gy, [250, 214, 118]);
+                    put(gx, gy + 1, [236, 186, 86]);
+                }
+            }
+            put(4, 6, [214, 158, 62]);
+            put(9, 10, [214, 158, 62]);
+            put(7, 13, [206, 148, 56]);
+            return (spriteCache[key] = g);
+        }
+
         if (kind === 'stick') {
             for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
                 const color = stickColors[stickPixels[y][x]];
@@ -648,6 +666,25 @@ export function createTextureTools(THREE) {
                     // maçaneta, na metade de baixo e do lado oposto às dobradiças
                     if (!upper && y >= 17 && y <= 19 && x >= 24 && x <= 26) return [232, 194, 96];
                     return plank;
+                }
+                case TILE.MOFIM_LANTERN: {
+                    // Moldura na cor do bicho (verde-musgo) com o pó aceso no
+                    // meio: o bloco tem que se ler como "lanterna" mesmo longe.
+                    const border = x < 3 || x > 28 || y < 3 || y > 28;
+                    const frame = x < 6 || x > 25 || y < 6 || y > 25;
+                    if (border) return [58 + j(5), 74 + j(5), 62 + j(4)];
+                    if (frame) return [86 + j(6), 122 + j(6), 100 + j(5)];
+                    // Cantos rebitados da moldura.
+                    if ((x < 8 || x > 23) && (y < 8 || y > 23)) return [120, 150, 128];
+                    const dx = (x - 15.5) / 10, dy = (y - 15.5) / 10;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist > 1) return [70 + j(5), 96 + j(5), 82 + j(4)];
+                    const glow = 1 - dist;
+                    const fleck = hash2(x, y, 9311);
+                    if (glow > 0.62) return [255, 246 + j(6), 190 + j(8)];
+                    if (glow > 0.3) return [250 + j(5), 214 + j(8), 118 + j(8)];
+                    const base = 168 + Math.floor(glow * 46) + (fleck > 0.9 ? 18 : 0);
+                    return [base + j(6), base - 34 + j(6), 46 + j(5)];
                 }
                 case TILE.WATER: {
                     return [45 + j(8), 110 + j(8), 215 + j(8)];

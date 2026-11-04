@@ -47,6 +47,12 @@ export const HOP_DURATION = 0.26;
 export const HOP_HEIGHT = 0.42;
 /** Descida: em vez de cair seco, ele planeja com as asas abertas. */
 export const GLIDE_DURATION = 0.42;
+/** Vida do bicho: três golpes de mão (cada golpe ainda o assusta). */
+export const MOFIM_HEALTH = 3;
+/** Tempo que o corpo fica aceso depois de levar dano (segundos). */
+export const HURT_FLASH = 0.22;
+/** Empurrão do golpe, em blocos (para o bicho "sentir" o impacto). */
+export const KNOCKBACK_DISTANCE = 0.35;
 /** Chilreio: alcance, ritmo e o silêncio entre um chamado e outro. */
 export const CHIRP_RANGE = 16;
 export const CHIRP_COOLDOWN = 1.2;
@@ -178,6 +184,7 @@ export function createCreatureSystemClass({
     hash2 = defaultHash2,
     now = () => performance.now() * 0.001,
     onChirp = () => {},
+    onDeath = () => {},
 }) {
     class CreatureSystem {
         constructor(world) {
@@ -236,9 +243,12 @@ export function createCreatureSystemClass({
 
         createModel() {
             const group = new THREE.Group();
-            this.addPart(group, this.materials.body, 0, 0.24, 0, 0.46, 0.34, 0.42);
+            // Cópia do material por criatura: o clarão do dano não pode pintar as
+            // outras (os materiais são compartilhados pelo sistema).
+            const body = this.materials.body.clone();
+            this.addPart(group, body, 0, 0.24, 0, 0.46, 0.34, 0.42);
             this.addPart(group, this.materials.belly, 0, 0.18, 0.215, 0.28, 0.18, 0.025);
-            this.addPart(group, this.materials.body, 0, 0.43, 0.105, 0.30, 0.28, 0.28);
+            this.addPart(group, body, 0, 0.43, 0.105, 0.30, 0.28, 0.28);
             this.addPart(group, this.materials.eye, -0.075, 0.46, 0.248, 0.045, 0.06, 0.025);
             this.addPart(group, this.materials.eye, 0.075, 0.46, 0.248, 0.045, 0.06, 0.025);
             const leftWing = this.addPart(group, this.materials.wing, -0.29, 0.32, -0.015, 0.24, 0.12, 0.035);
@@ -246,7 +256,7 @@ export function createCreatureSystemClass({
             leftWing.rotation.z = -0.25;
             rightWing.rotation.z = 0.25;
             this.addPart(group, this.materials.glow, 0, 0.62, 0.08, 0.07, 0.07, 0.07);
-            return { group, leftWing, rightWing };
+            return { group, leftWing, rightWing, bodyMaterial: body };
         }
 
         trySpawn(playerPos, at) {
@@ -270,6 +280,7 @@ export function createCreatureSystemClass({
                     scaredUntil: 0, lastHitAt: -Infinity,
                     lastChirpAt: -Infinity, chirpPending: null,
                     nextIdleAt: at + CHIRP_IDLE_MIN + hash2(seed, attempt, 211) * (CHIRP_IDLE_MAX - CHIRP_IDLE_MIN),
+                    health: MOFIM_HEALTH, hurtUntil: 0,
                     hopFrom: 0, hopTo: 0, hopT: HOP_DURATION,
                     glideFrom: y, glideT: GLIDE_DURATION, visualY: y, glidePitch: 0,
                     ...model,
@@ -296,8 +307,17 @@ export function createCreatureSystemClass({
             }
         }
 
+        /** Tira o Mofim do mundo e solta o material dele (não é compartilhado). */
+        removeEntity(entity) {
+            const index = this.entities.indexOf(entity);
+            if (index >= 0) this.entities.splice(index, 1);
+            this.world.scene.remove(entity.group);
+            entity.bodyMaterial?.dispose?.();
+        }
+
         /**
-         * O jogador deu um golpe? Devolve o Mofim atingido (e o assusta) ou `null`.
+         * O jogador deu um golpe? Assusta o Mofim atingido, tira-lhe um ponto de
+         * vida e devolve `{ entity, killed }` — ou `null` se não acertou ninguém.
          * Chamar a cada quadro com o botão apertado é seguro: `HIT_COOLDOWN`
          * impede que um clique vire vários golpes.
          */
@@ -306,7 +326,19 @@ export function createCreatureSystemClass({
             const target = creatureInReach(this.entities, origin, direction, options);
             if (!target || at - target.lastHitAt < HIT_COOLDOWN) return null;
             this.scare(target, at, origin);
-            return target;
+            target.health -= 1;
+            target.hurtUntil = at + HURT_FLASH;
+            // Empurrão: o bicho recua um dedo na direção do golpe. Sem isso o
+            // dano não teria resposta visível além do clarão.
+            const dx = target.x - origin.x, dz = target.z - origin.z;
+            if (Math.hypot(dx, dz) > 1e-4) {
+                this.stepToward(target, dx, dz, KNOCKBACK_DISTANCE, 1);
+            }
+            if (target.health > 0) return { entity: target, killed: false };
+            // Sem vida: some do mundo e avisa quem chamou (o jogo solta o pó).
+            this.removeEntity(target);
+            onDeath(target);
+            return { entity: target, killed: true };
         }
 
         /**
@@ -371,8 +403,7 @@ export function createCreatureSystemClass({
                 const dxp = e.x - playerPos.x, dzp = e.z - playerPos.z;
                 const distanceToPlayer = Math.hypot(dxp, dzp);
                 if (distanceToPlayer > DESPAWN_DISTANCE) {
-                    this.world.scene.remove(e.group);
-                    this.entities.splice(i, 1);
+                    this.removeEntity(e);
                     continue;
                 }
 
@@ -429,6 +460,9 @@ export function createCreatureSystemClass({
                 if (hopping) e.visualY = hopHeightAt(e.hopFrom, e.y, e.hopT / HOP_DURATION);
                 else if (gliding) e.visualY = glideHeightAt(e.glideFrom, e.y, e.glideT / GLIDE_DURATION);
                 else e.visualY = e.y;
+                // Clarão do dano: o corpo acende por um instante e apaga sozinho.
+                const flash = Math.max(0, (e.hurtUntil - at) / HURT_FLASH);
+                e.bodyMaterial.emissive.setRGB(flash * 0.85, flash * 0.45, flash * 0.12);
                 e.group.position.set(e.x, e.visualY + Math.sin(at * 3 + e.phase) * bob, e.z);
                 e.group.rotation.y = e.heading;
                 // Planando, o corpo inclina um pouco para a frente e as asas

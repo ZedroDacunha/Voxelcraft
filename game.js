@@ -1260,6 +1260,14 @@ const CreatureSystem = createCreatureSystemClass({
             rate: reason === 'startle' ? 1.22 : (reason === 'panic' ? 1.1 : 1),
         });
     },
+    // Mofim derrubado: o corpo some e deixa pó luminoso no lugar. Um punhado
+    // (ou dois, conforme o bicho) — três pós + uma tábua viram uma lanterna.
+    onDeath: entity => {
+        const count = 1 + (entity.id % 2);
+        spawnItemEntity(ID.MOFIM_DUST, count,
+            new THREE.Vector3(entity.x, entity.y + 0.35, entity.z),
+            new THREE.Vector3(0, 0.45, 0), 0.3);
+    },
 });
 
 // =====================================================================
