@@ -5,6 +5,11 @@ import { createWorldListView, formatWorldActivity } from './world-list-view.js';
 import { createOptionsView } from './world-options-view.js';
 import { bindUiSounds, getSharedAudio } from './world-audio.js';
 import { loadGameSettings } from './world-game-settings.js';
+import { registerServiceWorker } from './world-pwa.js';
+
+// Registra o service worker cedo (não bloqueia o menu): é o que permite instalar
+// o jogo e abrir sem rede depois da primeira visita.
+registerServiceWorker().catch(() => {});
 
 import('./menu-background.js').catch(error => {
     console.warn('Panorama animado indisponível; usando o cenário estático.', error);
