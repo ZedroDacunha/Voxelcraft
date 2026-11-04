@@ -22,6 +22,7 @@ import { createWorldSaveLoader } from './world-save-loader.js';
 import { createWorldSaveManager } from './world-save-manager.js';
 import { markWorldSaved } from './world-list-store.js';
 import { furnaceChunk, stepFurnace } from './world-furnace-rules.js';
+import { furnaceDistance, furnaceSoundFor } from './world-furnace-sounds.js';
 import { acquireMeshScratch, exactMeshBuffer, storeMeshScratch } from './world-mesh-buffers.js';
 import { createWorldSaveIndicator } from './world-save-indicator.js';
 import { createWorldClock } from './world-clock.js';
@@ -1390,8 +1391,17 @@ function updateFurnaces(dt) {
         const chunk = coords ? world?.getChunk(coords.cx, coords.cz) : null;
         if (!chunk) continue;
 
-        const { changed, litChanged } = stepFurnace(f, dt);
+        const { changed, litChanged, smelted } = stepFurnace(f, dt);
         if (changed && station && station.furnace === f) furnaceDirty = true;
+        if (litChanged || smelted) {
+            const sound = furnaceSoundFor({
+                lit: f.burn > 0,
+                litChanged,
+                smelted,
+                distance: furnaceDistance(key, player.pos),
+            });
+            if (sound) audio.play(sound.name, { gainScale: sound.gainScale });
+        }
         if (litChanged) {
             world.refreshLightSourceChunk(chunk.cx, chunk.cz, chunk);
             world.lightDirty.add(chunk);
