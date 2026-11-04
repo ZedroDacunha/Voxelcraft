@@ -34,12 +34,15 @@ function makeContext({ state = 'running' } = {}) {
     const context = withConnect({
         state,
         currentTime: 0,
+        sampleRate: 48000,
         destination: { name: 'destination' },
         resumed: 0,
         closed: false,
         oscillators: [],
         bufferSources: [],
         gains: [],
+        filters: [],
+        buffers: [],
     });
     context.resume = async () => { context.resumed++; context.state = 'running'; };
     context.close = async () => { context.closed = true; context.state = 'closed'; };
@@ -63,10 +66,34 @@ function makeContext({ state = 'running' } = {}) {
     context.createBufferSource = () => {
         const node = withConnect({
             buffer: null,
+            playbackRate: makeParam(1),
             started: [],
+            stopped: [],
             start(t) { this.started.push(t); },
+            stop(t) { this.stopped.push(t); },
         });
         context.bufferSources.push(node);
+        return node;
+    };
+    context.createBuffer = (channels, length, rate) => {
+        const data = new Float32Array(length);
+        const buffer = {
+            channels,
+            length,
+            sampleRate: rate,
+            getChannelData: () => data,
+            data,
+        };
+        context.buffers.push(buffer);
+        return buffer;
+    };
+    context.createBiquadFilter = () => {
+        const node = withConnect({
+            type: 'lowpass',
+            frequency: makeParam(350),
+            Q: makeParam(1),
+        });
+        context.filters.push(node);
         return node;
     };
     context.decodeAudioData = (data, resolve) => {
@@ -116,16 +143,25 @@ function makeAudio({ volume, ...overrides } = {}) {
 // --- receitas e nomes ---------------------------------------------------
 
 test('todas as receitas são válidas e os nomes de arquivo são previsíveis', () => {
-    assert.deepEqual(SOUND_NAMES, ['ui-click', 'ui-hover']);
+    assert.deepEqual(SOUND_NAMES, [
+        'ui-click', 'ui-hover',
+        'step-grass', 'step-dirt', 'step-stone', 'step-wood', 'step-sand',
+    ]);
     for (const name of SOUND_NAMES) {
         const recipe = SOUND_RECIPES[name];
-        assert.ok(['sine', 'triangle', 'square', 'sawtooth'].includes(recipe.wave), `${name}: onda`);
-        assert.ok(recipe.from >= 80 && recipe.from <= 8000, `${name}: frequência audível`);
-        assert.ok(recipe.to >= 80 && recipe.to <= 8000, `${name}: frequência final`);
         assert.ok(recipe.duration > 0 && recipe.duration <= 0.5, `${name}: duração curta`);
         assert.ok(recipe.gain > 0 && recipe.gain <= 1, `${name}: ganho`);
         assert.ok(recipe.attack >= 0 && recipe.attack < recipe.duration, `${name}: ataque antes do fim`);
         assert.ok(Object.isFrozen(recipe), `${name}: receita imutável`);
+        if (recipe.kind === 'noise') {
+            assert.ok(recipe.cut >= 200 && recipe.cut <= 8000, `${name}: corte audível`);
+            assert.ok(!recipe.cutTo || recipe.cutTo <= recipe.cut, `${name}: o corte só desce`);
+            assert.ok(recipe.gain <= 0.12, `${name}: passos são discretos`);
+        } else {
+            assert.ok(['sine', 'triangle', 'square', 'sawtooth'].includes(recipe.wave), `${name}: onda`);
+            assert.ok(recipe.from >= 80 && recipe.from <= 8000, `${name}: frequência audível`);
+            assert.ok(recipe.to >= 80 && recipe.to <= 8000, `${name}: frequência final`);
+        }
     }
     assert.deepEqual(soundAssetCandidates('ui-click'), [
         'assets/sounds/ui-click.ogg',
@@ -225,6 +261,54 @@ test('a síntese usa a receita: onda, frequência e envelope', () => {
     const gainParam = oscillator.connections[0].gain;
     assert.equal(gainParam.events[0][1], 0.0001, 'começa no silêncio (sem clique)');
     assert.equal(gainParam.events.at(-1)[0], 'exp', 'decai exponencialmente');
+});
+
+test('passo é ruído filtrado, com um único buffer reaproveitado', () => {
+    const { audio, factory } = makeAudio();
+    const recipe = SOUND_RECIPES['step-grass'];
+
+    audio.play('step-grass');
+    const context = factory.context;
+    assert.equal(context.buffers.length, 1, 'cria o ruído uma vez');
+    assert.equal(context.buffers[0].channels, 1);
+    assert.equal(context.buffers[0].sampleRate, 48000);
+    assert.equal(context.buffers[0].length, 24000, 'meio segundo de ruído');
+    const data = context.buffers[0].data;
+    assert.ok(data.some(value => value !== 0), 'o buffer tem amostras');
+
+    const [source] = context.bufferSources;
+    assert.equal(source.buffer, context.buffers[0]);
+    const [filter] = context.filters;
+    assert.equal(filter.type, 'lowpass');
+    assert.equal(filter.frequency.events[0][1], recipe.cut);
+    assert.equal(filter.frequency.events.at(-1)[0], 'exp', 'o corte desce até o fim do passo');
+
+    const gainParam = filter.connections[0].gain;
+    assert.equal(gainParam.events.at(-1)[0], 'exp', 'o passo também decai');
+
+    audio.play('step-dirt');
+    assert.equal(context.buffers.length, 1, 'o segundo passo reaproveita o ruído');
+    assert.equal(context.bufferSources.length, 2);
+});
+
+test('o tom de cada passo pode variar sem criar buffer novo', () => {
+    const { audio, factory } = makeAudio();
+    audio.play('step-stone', { rate: 0.9 });
+    audio.play('step-stone', { rate: 1.1 });
+    const [first, second] = factory.context.bufferSources;
+    assert.equal(first.playbackRate.value, 0.9);
+    assert.equal(second.playbackRate.value, 1.1);
+    // a variação também mexe no filtro, senão o timbre fica igual
+    const [filterA, filterB] = factory.context.filters;
+    assert.ok(filterA.frequency.value !== filterB.frequency.value);
+    assert.equal(factory.context.buffers.length, 1);
+});
+
+test('rate também transpõe os sons de interface', () => {
+    const { audio, factory } = makeAudio();
+    audio.play('ui-click', { rate: 2 });
+    const [oscillator] = factory.context.oscillators;
+    assert.equal(oscillator.frequency.events[0][1], SOUND_RECIPES['ui-click'].from * 2);
 });
 
 test('som desconhecido não toca e avisa uma vez só', () => {
@@ -420,7 +504,7 @@ test('bindUiSounds sem documento devolve um dispose seguro', () => {
 
 test('o menu cria o áudio com o volume salvo e a tela de opções aplica na hora', () => {
     const menu = readFileSync(new URL('../world-menu.js', import.meta.url), 'utf8');
-    assert.match(menu, /createAudioSystem\(\{ volume: loadGameSettings\(\)\.volume \}\)/);
+    assert.match(menu, /getSharedAudio\(\{ volume: loadGameSettings\(\)\.volume \}\)/);
     assert.match(menu, /bindUiSounds\(uiAudio, document\)/);
     assert.match(menu, /onChange: settings => uiAudio\.setVolume\(settings\.volume\)/);
 

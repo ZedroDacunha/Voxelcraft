@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 265 testes de módulos puros (node --test)
+npm test           # 279 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -51,6 +51,7 @@ O `check` é o que o CI (`.github/workflows/ci.yml`) roda em todo PR para `main`
 | Save e armazenamento | `world-save-*.js`, `world-storage.js`, `world-list-store.js` |
 | Inventário | `inventory-*.js`, `inventory.css` |
 | Áudio | `world-audio.js` (síntese em WebAudio; arquivos opcionais em `assets/sounds/`) |
+| Passos | `world-step-sounds.js` (material do bloco × cadência por distância) |
 | Mão em primeira pessoa | `world-hand-animation.js` (laço de mineração + golpe) |
 | Ferramentas | `tools/serve.mjs`, `tools/check.mjs`, `tools/stamp-importmap.mjs` |
 | Testes | `tests/*.test.mjs` |
@@ -87,6 +88,10 @@ Detalhes em [`MELHORIA-20261102-acessibilidade.md`](MELHORIA-20261102-acessibili
 Não há arquivos de som no repositório: cada efeito é **sintetizado** em WebAudio
 (`world-audio.js`) e o áudio só é criado no primeiro clique/tecla, como os
 navegadores exigem. O volume fica nas opções (0% = mudo) e vale na hora.
+
+Os **passos** vêm do bloco sob os pés (grama, terra, pedra, madeira, areia) e a
+cadência é por distância andada — andar devagar espaça os passos, correr
+aumenta a frequência; no ar e na água não há passo.
 
 Para usar um som gravado, copie o arquivo com o nome do efeito para
 `assets/sounds/` — o carregador prefere `ui-click.ogg`/`.wav` (e assim por

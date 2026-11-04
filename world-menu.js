@@ -3,7 +3,7 @@ import { createWorldRecord, deleteWorldRecord, getWorlds, markWorldSaved, rename
 import { createWorldSaveOptions } from './world-save-options.js';
 import { createWorldListView, formatWorldActivity } from './world-list-view.js';
 import { createOptionsView } from './world-options-view.js';
-import { bindUiSounds, createAudioSystem } from './world-audio.js';
+import { bindUiSounds, getSharedAudio } from './world-audio.js';
 import { loadGameSettings } from './world-game-settings.js';
 
 import('./menu-background.js').catch(error => {
@@ -189,7 +189,7 @@ document.getElementById('btn-back-title').addEventListener('click', () => {
 });
 // Sons da interface: síntese em WebAudio (sem arquivos), cobrindo menu,
 // diálogos e inventário por delegação no documento.
-const uiAudio = createAudioSystem({ volume: loadGameSettings().volume });
+const uiAudio = getSharedAudio({ volume: loadGameSettings().volume });
 bindUiSounds(uiAudio, document);
 
 createOptionsView(document.getElementById('options-dialog'), {

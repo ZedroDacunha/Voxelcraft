@@ -14,6 +14,11 @@ existir, usa a síntese.
 | --- | --- | --- |
 | `ui-click.ogg` / `.wav` | clique em qualquer botão (menu, diálogos, inventário) | triângulo 640→420 Hz, 80 ms |
 | `ui-hover.ogg` / `.wav` | passada de mouse sobre um botão | seno 940→900 Hz, 35 ms |
+| `step-grass.ogg` / `.wav` | passo em grama, folhas e grama alta | ruído 1900→800 Hz, 90 ms |
+| `step-dirt.ogg` / `.wav` | passo em terra | ruído 1150→520 Hz, 100 ms |
+| `step-stone.ogg` / `.wav` | passo em pedra, pedregulho, minérios e forno | ruído 3200→1500 Hz, 70 ms |
+| `step-wood.ogg` / `.wav` | passo em madeira, tábuas, baú, bancada e portas | ruído 950→480 Hz com ressonância, 90 ms |
+| `step-sand.ogg` / `.wav` | passo em areia | ruído 2600→2300 Hz, 120 ms |
 
 A busca é feita uma vez por som e o resultado fica em cache: se você adicionar o
 arquivo depois de abrir a página, recarregue (Ctrl+F5) para ouvir.
@@ -21,7 +26,8 @@ arquivo depois de abrir a página, recarregue (Ctrl+F5) para ouvir.
 ## O que enviar
 
 - Formato: **ogg (Vorbis)** ou **wav** PCM. MP3 não é lido por esta ponte.
-- Curtos: clique ≤ 150 ms, hover ≤ 60 ms. Sons longos atrasam a sensação de resposta.
+- Curtos: clique ≤ 150 ms, hover ≤ 60 ms, passo ≤ 150 ms. Sons longos atrasam a
+  sensação de resposta.
 - Mono, 44,1 kHz. O volume final vem do controle **Volume** nas opções.
 - Minere o "clique" com um fade-out até o zero — um corte seco produz um estalo.
 

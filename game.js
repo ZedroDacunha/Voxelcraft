@@ -42,6 +42,8 @@ import { FurnaceSmokeSystem } from './world-furnace-effects.js';
 import { canHarvest, damageTool as damageToolStack, getBreakTime } from './world-tool-rules.js';
 import { boxOverlapsXZ, woodDoorCollision, woodDoorPart, woodDoorShape, woodDoorType } from './world-door.js';
 import { advanceHandAnimation, createHandAnimation, handSwingAmount, startPunch } from './world-hand-animation.js';
+import { advanceStepTracker, createStepTracker, stepDistanceThisFrame, stepPitch, stepSoundFor } from './world-step-sounds.js';
+import { getSharedAudio } from './world-audio.js';
 import { rightClickIntent } from './world-interaction-rules.js';
 import { loadGameSettings } from './world-game-settings.js';
 import { advanceStarvation, deathTitle, HUNGER_WARNINGS, hungerStage } from './world-survival-rules.js';
@@ -2543,6 +2545,8 @@ const player = {
 const spawnPoint = new THREE.Vector3();
 
 let bobTimer = 0;
+const stepTracker = createStepTracker();
+const audio = getSharedAudio();
 
 let selectedSlot = 0;
 const inventory = new Inventory(PLAYER_INVENTORY_SIZE);
@@ -3056,6 +3060,33 @@ function updatePhysics(dt) {
 
     if ((player.onGround || inWater) && hzSpeed > 2.0) bobTimer += dt * (hzSpeed * (inWater ? 0.8 : 1.2));
     else bobTimer += (0 - bobTimer) * Math.min(1, 5 * dt);
+
+    playFootsteps(dt, inWater);
+}
+
+// Passos: o som vem do bloco sob os pés e a cadência do deslocamento real.
+const footPos = { x: null, z: null };
+function playFootsteps(dt, inWater) {
+    const p = player.pos;
+    if (footPos.x === null) { footPos.x = p.x; footPos.z = p.z; return; }
+    // Distância percorrida neste quadro (não a velocidade: empurrar uma parede
+    // mantém a velocidade alta com o corpo parado).
+    const moved = Math.hypot(p.x - footPos.x, p.z - footPos.z);
+    footPos.x = p.x;
+    footPos.z = p.z;
+    const steps = advanceStepTracker(stepTracker,
+        stepDistanceThisFrame({ moved, dt, onGround: player.onGround, inWater }));
+    if (!steps) return;
+    const type = world.getBlock(
+        Math.floor(player.pos.x), Math.floor(player.pos.y - 0.05), Math.floor(player.pos.z));
+    const sound = stepSoundFor(type);
+    if (!sound) return;
+    for (let i = 0; i < steps; i++) {
+        audio.play(sound, {
+            gainScale: isSprinting ? 1.15 : (isCrouching ? 0.6 : 1),
+            rate: stepPitch(),
+        });
+    }
 }
 
 // =====================================================================
