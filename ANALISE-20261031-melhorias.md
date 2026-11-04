@@ -436,7 +436,10 @@ Os 62 testes existentes passaram, mas ainda não cobrem bem:
 - ~~Responsividade da HUD/inventário.~~ Coberto por `tests/ui-layout.test.mjs`
   (regras de layout; o comportamento visual real depende de navegador).
 - ~~Regras de água/fonte.~~ Coberto por `tests/water-source.test.mjs` e
-  `tests/water-flow-queue.test.mjs`.
+  `tests/water-flow-queue.test.mjs`; a **busca de fonte próxima** ganhou testes
+  próprios em 04/11 ([TESTES-20261104](TESTES-20261104-busca-fonte-proxima.md),
+  12 testes): limite exato de 7 passos, caminho em curva, vertical de graça,
+  limite do mundo, ciclo sem fonte e custo medido (~2,4 mil leituras num lago).
 - ~~Qualidade gráfica automática.~~ **Coberto em 03/11**: histerese de subida/descida,
   critério GPU × CPU, desligamento quando baixar a resolução não melhora o FPS,
   `cycle()` do F4 e a ligação com o loop em `game.js`.
