@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 345 testes de módulos puros (node --test)
+npm test           # 375 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -68,6 +68,7 @@ recuperação e importação/exportação de save.
 | `?pr=1` | limita o `devicePixelRatio` usado no render |
 | `?reset` | apaga o save do mundo atual **uma vez** (o parâmetro é consumido e removido da URL) |
 | `?touch` | força os controles de toque mesmo no desktop (útil para testar); `?touch=0` desliga num aparelho de toque |
+| `?sw=0` | não registra o service worker (depurar cache sem limpar os dados do site) |
 
 ## Toque (celular e tablet)
 
@@ -131,6 +132,31 @@ Para usar um som gravado, copie o arquivo com o nome do efeito para
 `assets/sounds/` — o carregador prefere `ui-click.ogg`/`.wav` (e assim por
 diante) e cai na síntese quando o arquivo não existe. Lista completa em
 [`assets/sounds/LEIA-ME.md`](assets/sounds/LEIA-ME.md).
+
+## Instalar e jogar sem rede (PWA)
+
+O jogo é um **PWA**: dá para instalar pelo próprio navegador (menu do Chrome/Edge →
+"Instalar", ou ícone de compartilhar → "Adicionar à Tela de Início" no Safari) e
+jogar offline depois da primeira visita.
+
+| Peça | Onde | O que faz |
+| --- | --- | --- |
+| Manifest | `manifest.webmanifest` | nome, ícones (192, 512 e maskable), `display: standalone`, cores |
+| Service worker | `service-worker.js` | guarda a casca na instalação e o resto no primeiro uso |
+| Registro | `world-pwa.js` | registra só em `http(s)`; `?sw=0` desliga |
+| Ícones | `icons/` | gerados por `tools/make-icons.mjs` (PNG escrito na mão, sem dependência) |
+
+Duas estratégias, porque os dois tipos de requisição têm problemas opostos:
+
+- **documento** (`index.html`): rede primeiro — versão nova chega na hora; sem
+  rede, cai na cópia guardada. Se nunca abriu online, mostra uma página dizendo
+  isso em vez de tela em branco.
+- **demais arquivos**: cache primeiro com atualização em segundo plano. Como os
+  módulos já vêm com `?v=<hash>` no importmap, servir do cache nunca entrega
+  código velho: hash diferente é URL diferente.
+
+Só a própria origem é cacheada — CDN de terceiros fica de fora. O `three.js` já
+está em `vendor/`, então o jogo não depende de CDN para abrir.
 
 ## Import map e cache
 

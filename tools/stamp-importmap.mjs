@@ -27,8 +27,14 @@ const VENDOR_MODULES = [
 const START = '<!-- importmap:start';
 const END = '<!-- importmap:end -->';
 
+// O service worker é servido ao navegador, não importado por nenhum módulo —
+// e ele nunca pode entrar no importmap (a URL dele precisa ser estável).
+const NOT_IMPORTED_BY_PAGES = new Set(['service-worker.js']);
+
 export function localModules(root = ROOT) {
-    return readdirSync(root).filter(file => file.endsWith('.js')).sort();
+    return readdirSync(root)
+        .filter(file => file.endsWith('.js') && !NOT_IMPORTED_BY_PAGES.has(file))
+        .sort();
 }
 
 export function contentHash(root, file) {
