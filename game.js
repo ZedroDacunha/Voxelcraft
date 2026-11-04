@@ -164,7 +164,6 @@ const HELD = {
     scale: 0.85,
 };
 const HELD_TOOL_KINDS = new Set(['pickaxe', 'axe', 'shovel']);
-const HELD_DEBUG = false;
 
 // =====================================================================
 // 2. SISTEMA DE ÁGUA (catálogo em world-catalog.js)
@@ -1920,29 +1919,6 @@ function createHand() {
     handPivot.add(handSleeve, handBlock, heldAnchor);
     handScene.add(handCamera);
     handCamera.add(handPivot);
-    window.addEventListener('keydown', adjustHeldTransform);
-}
-
-function adjustHeldTransform(event) {
-    if (!HELD_DEBUG || !playing() || heldId < 0 || !HELD_TOOL_KINDS.has(ITEMS[heldId]?.sprite?.kind)) return;
-    let changed = false;
-    const step = event.shiftKey ? 0.1 : 0.02;
-    const angle = event.shiftKey ? 5 : 2;
-    switch (event.code) {
-        case 'ArrowLeft': HELD.position.x -= step; changed = true; break;
-        case 'ArrowRight': HELD.position.x += step; changed = true; break;
-        case 'ArrowUp': HELD.position.y += step; changed = true; break;
-        case 'ArrowDown': HELD.position.y -= step; changed = true; break;
-        case 'KeyQ': HELD.rotation.y -= angle; changed = true; break;
-        case 'KeyE': HELD.rotation.y += angle; changed = true; break;
-        case 'KeyR': HELD.rotation.z -= angle; changed = true; break;
-        case 'KeyF': HELD.rotation.z += angle; changed = true; break;
-        case 'KeyZ': HELD.scale = Math.max(0.1, HELD.scale - 0.02); changed = true; break;
-        case 'KeyX': HELD.scale += 0.02; changed = true; break;
-        default: return;
-    }
-    event.preventDefault();
-    if (changed) console.log('HELD =', JSON.stringify(HELD, null, 2));
 }
 
 function refreshHeldItem() {

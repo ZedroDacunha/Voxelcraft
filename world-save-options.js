@@ -1,8 +1,8 @@
 import { createWorldSaveCodec } from './world-save-codec.js';
 import { MAX_SAVE_COPY_BYTES } from './world-save-settings.js';
 import {
-    importedSaveKeyFor, parseSaveCopy, readSaveCopy, rejectedSaveKeyFor,
-    restoreSaveCopy, saveBackupKeyFor, serializeSaveCopy, stageImportedSaveCopy,
+    parseSaveCopy, readSaveCopy, restoreSaveCopy,
+    serializeSaveCopy, stageImportedSaveCopy,
 } from './world-save-recovery.js';
 
 const LOCK_TTL = 30000;
