@@ -148,13 +148,16 @@ test('todas as receitas são válidas e os nomes de arquivo são previsíveis', 
         'step-grass', 'step-dirt', 'step-stone', 'step-wood', 'step-sand',
         'break-grass', 'break-dirt', 'break-stone', 'break-wood', 'break-sand',
         'hit-grass', 'hit-dirt', 'hit-stone', 'hit-wood', 'hit-sand',
+        'hurt', 'death',
         'water-splash', 'water-exit', 'water-dive', 'swim-stroke',
         'door-open', 'door-close',
         'place-grass', 'place-dirt', 'place-stone', 'place-wood', 'place-sand',
     ]);
     for (const name of SOUND_NAMES) {
         const recipe = SOUND_RECIPES[name];
-        assert.ok(recipe.duration > 0 && recipe.duration <= 0.5, `${name}: duração curta`);
+        // a morte é o único evento "final" e pode se esticar um pouco
+        const maxDuration = name === 'death' ? 0.8 : 0.5;
+        assert.ok(recipe.duration > 0 && recipe.duration <= maxDuration, `${name}: duração curta`);
         assert.ok(recipe.gain > 0 && recipe.gain <= 1, `${name}: ganho`);
         assert.ok(recipe.attack >= 0 && recipe.attack < recipe.duration, `${name}: ataque antes do fim`);
         assert.ok(Object.isFrozen(recipe), `${name}: receita imutável`);
