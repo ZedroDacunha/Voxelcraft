@@ -453,6 +453,11 @@ Os 62 testes existentes passaram, mas ainda não cobrem bem:
 - **Higiene automatizada em 04/11** (`tests/hygiene.test.mjs`, 6 testes): import
   órfão, `console.log` esquecido, `debugger`, módulo sem importador e constante de
   debug fixa. São sobras que não dão erro — só teste pega.
+- **Falha silenciosa no save em 04/11**
+  ([BUG-20261104](BUG-20261104-save-falha-silenciosa.md)): erro lançado dentro do
+  `onsuccess` do `preservePrevious` escapava do `transact()` e a transação
+  commitava sem gravar — save dado como concluído. Agora o erro aborta e rejeita,
+  e o manager cai no retry.
 - ~~Retry do save (`scheduleSaveRetry`, falha permanente, disco cheio).~~
   **Coberto em 04/11** (`tests/save-retry.test.mjs`, 9 testes): aviso único, escada
   2 s→5 s→12 s→30 s com teto, sucesso zerando a escada, `QuotaExceededError` sem

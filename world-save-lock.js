@@ -29,19 +29,26 @@ export function createWorldSaveLock({
             let failed = false;
             const request = store.get(lockKey);
 
+            // Um erro pode vir de dois lugares: da própria `action` (síncrona) ou de
+            // um request criado por ela e resolvido depois (o `preservePrevious` grava
+            // dentro de um `onsuccess`). O navegador engole exceção que escapa de um
+            // handler de evento — a transação então commita sem gravar e o save seria
+            // dado como bem-sucedido. Por isso `fail` é exposto à `action`: qualquer
+            // erro no caminho assíncrono aborta a transação e rejeita.
+            const fail = (error) => {
+                if (failed) return;
+                failed = true;
+                try { tx.abort(); } catch {}
+                try { db.close(); } catch {}
+                reject(error);
+            };
+
             request.onsuccess = () => {
-                try { value = action(store, request.result); }
-                catch (error) {
-                    failed = true;
-                    try { tx.abort(); } catch {}
-                    db.close();
-                    reject(error);
-                }
+                try { value = action(store, request.result, fail); }
+                catch (error) { fail(error); }
             };
             request.onerror = () => {
-                failed = true;
-                db.close();
-                reject(request.error || new Error('Falha ao verificar o bloqueio do save.'));
+                fail(request.error || new Error('Falha ao verificar o bloqueio do save.'));
             };
             tx.oncomplete = () => { db.close(); if (!failed) resolve(value); };
             tx.onerror = tx.onabort = () => {
@@ -100,15 +107,21 @@ export function createWorldSaveLock({
 
     async function write(data, { preservePrevious = false, deleteKey } = {}) {
         if (!owned) return false;
-        return transact((store, lease) => {
+        return transact((store, lease, fail) => {
             if (lease?.id !== tabId) return false;
             if (preservePrevious && backupKey) {
                 const previous = store.get(saveKey);
                 previous.onsuccess = () => {
-                    if (previous.result !== undefined) store.put(previous.result, backupKey);
-                    store.put(data, saveKey);
-                    if (deleteKey) store.delete(deleteKey);
-                    store.put({ id: tabId, heartbeat: Date.now() }, lockKey);
+                    try {
+                        if (previous.result !== undefined) store.put(previous.result, backupKey);
+                        store.put(data, saveKey);
+                        if (deleteKey) store.delete(deleteKey);
+                        store.put({ id: tabId, heartbeat: Date.now() }, lockKey);
+                    } catch (error) {
+                        // Sem isso a exceção sairia do handler, a transação commitaria
+                        // sem gravar e o manager registraria o save como concluído.
+                        fail(error);
+                    }
                 };
                 return true;
             }
