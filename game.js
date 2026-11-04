@@ -52,6 +52,7 @@ import { createWaterAudioState, waterSoundFor } from './world-water-sounds.js';
 import { LIGHT_POOL_RANGE, LIGHT_POOL_SIZE, heldLightFor, heldLightIntensity, pickEmitters } from './world-point-lights.js';
 import { damageSoundFor } from './world-damage-sounds.js';
 import { ambientAvailability, createAmbientState, stepAmbient } from './world-ambient-sounds.js';
+import { createWaterfallSoundState, scanWaterfall, updateWaterfallSound, waterfallGain } from './world-waterfall.js';
 import {
     TOUCH_LOOK_SENSITIVITY,
     TOUCH_STICK_RADIUS,
@@ -2533,6 +2534,37 @@ function updateAmbient(dt) {
 }
 
 // =====================================================================
+// 5E3. CACHOEIRA (O ÚNICO LAÇO QUE DEPENDE DO LUGAR)
+// =====================================================================
+// Vento e grilos são fases sorteadas; cachoeira é geografia: existe onde há
+// água caindo e o volume é a distância. A busca em volta do jogador roda ~3x por
+// segundo (alguns milhares de leituras de bloco) e o ganho entra por fade, com
+// histerese para não piscar quando o jogador anda na borda do alcance.
+const waterfallState = createWaterfallSoundState();
+let waterfallTarget = 0;
+let waterfallApplied = 0;
+let waterfallScanAt = 0;
+
+function updateWaterfall(dt) {
+    if (!world || !playing() || dead || document.hidden) {
+        waterfallTarget = 0;
+    } else {
+        const now = performance.now() * 0.001;
+        if (now >= waterfallScanAt) {
+            waterfallScanAt = now + 0.35;
+            waterfallTarget = waterfallGain(scanWaterfall(world, player.pos));
+        }
+    }
+    const step = updateWaterfallSound(waterfallState, waterfallTarget, dt);
+    // Mesma economia do ambiente: só reescreve o grafo quando o ganho muda de
+    // verdade (um `setTargetAtTime` por quadro reiniciaria o fade sem parar).
+    if (step.action === 'stop' || Math.abs(step.gain - waterfallApplied) >= 0.01) {
+        waterfallApplied = step.gain;
+        audio.setWaterfallLevel(step.gain);
+    }
+}
+
+// =====================================================================
 // 5F. NUVENS VOXEL
 // =====================================================================
 // =====================================================================
@@ -3851,6 +3883,7 @@ function animate() {
     else worldClouds.update(0, camera);
     updateHand(dt);
     updateAmbient(dt);
+    updateWaterfall(dt);
     if (hurtFlash > 0) { hurtFlash = Math.max(0, hurtFlash - dt * 2); hurtEl.style.opacity = hurtFlash; }
     world.update(player.pos.x, player.pos.z);
     updateDebug(rawDt);

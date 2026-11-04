@@ -172,6 +172,15 @@ export const AMBIENT_RECIPES = Object.freeze({
 // Fade das camadas: entrar e sair de fase nunca é um degrau (o degrau estala).
 export const AMBIENT_FADE_SECONDS = 0.9;
 
+// Cachoeira: laço próprio, ligado só quando há água caindo perto (quem decide é
+// world-waterfall.js). Mais grave e mais presente que o vento: é água batendo.
+export const WATERFALL_RECIPE = Object.freeze({
+    gain: 0.5, cut: 2600, q: 0.6, loopSeconds: 2.5,
+});
+// A cachoeira entra e sai mais devagar que o ambiente: o jogador pode estar
+// andando na beirada do alcance, e um fade curto faria o som piscar.
+export const WATERFALL_FADE_SECONDS = 1.1;
+
 export function soundAssetCandidates(name) {
     return SOUND_ASSET_EXTENSIONS.map(ext => `${SOUND_ASSET_DIR}/${name}.${ext}`);
 }
@@ -340,17 +349,49 @@ export function createAudioSystem({
     // soaria como chiado, não como inseto).
     const ambientBuffers = new WeakMap();
 
+    // Receita de um laço contínuo: ambiente (vento/grilos) ou cachoeira.
+    function loopRecipeFor(name) {
+        return AMBIENT_RECIPES[name] ?? (name === 'waterfall' ? WATERFALL_RECIPE : null);
+    }
+
     function ambientBufferFor(context, name) {
         let cache = ambientBuffers.get(context);
         if (!cache) { cache = new Map(); ambientBuffers.set(context, cache); }
         if (cache.has(name)) return cache.get(name);
-        const recipe = AMBIENT_RECIPES[name] ?? AMBIENT_RECIPES.wind;
+        const recipe = loopRecipeFor(name) ?? AMBIENT_RECIPES.wind;
         const sampleRate = context.sampleRate ?? 44100;
         const length = Math.max(1, Math.floor(sampleRate * recipe.loopSeconds));
         const buffer = context.createBuffer(1, length, sampleRate);
         const data = buffer.getChannelData(0);
         const twoPi = Math.PI * 2;
-        if (name === 'crickets') {
+        if (name === 'waterfall') {
+            // Água caindo: ruído com três pesos (grave = o volume de água,
+            // médio = o corpo, agudo = o respingo), com uma ondulação lenta que
+            // faz parecer caudal e não chuva. O fim do buffer é dobrado sobre o
+            // começo para o laço não estalar na emenda.
+            const twoPiLocal = Math.PI * 2;
+            const fade = Math.max(1, Math.floor(sampleRate * 0.08));
+            const scratch = new Float32Array(length + fade);
+            let low = 0, mid = 0, high = 0;
+            let peak = 0;
+            for (let i = 0; i < scratch.length; i++) {
+                const t = (i % length) / length;
+                const noise = Math.random() * 2 - 1;
+                low += 0.06 * (noise - low);
+                mid += 0.22 * (noise - mid);
+                high += 0.55 * (noise - high);
+                const surge = 0.82 + 0.18 * Math.sin(twoPiLocal * t * 3) * Math.sin(twoPiLocal * t * 5);
+                const value = (low * 1.8 + mid * 0.9 + high * 0.25) * surge;
+                scratch[i] = value;
+                if (Math.abs(value) > peak) peak = Math.abs(value);
+            }
+            const normalize = peak > 0 ? 0.9 / peak : 1;
+            for (let i = 0; i < length; i++) data[i] = scratch[i] * normalize;
+            for (let i = 0; i < fade; i++) {
+                const k = i / fade;
+                data[i] = (data[i] * k + scratch[length + i] * normalize * (1 - k));
+            }
+        } else if (name === 'crickets') {
             // sequência fixa de pulsos: curto, agudo, com silêncio entre eles.
             // O laço de 4 s cabe ~3 "chamados", o que soa orgânico sem repetir
             // rápido demais.
@@ -387,7 +428,7 @@ export function createAudioSystem({
         const existing = ambientNodes.get(name);
         if (existing) return existing;
         const context = state.context;
-        const recipe = AMBIENT_RECIPES[name];
+        const recipe = loopRecipeFor(name);
         if (!context || !recipe) return null;
         const when = context.currentTime ?? 0;
         const source = context.createBufferSource();
@@ -436,6 +477,28 @@ export function createAudioSystem({
         return true;
     }
 
+    /**
+     * Ganho do laço da cachoeira (0 a 1, já pronto: quem calcula é
+     * world-waterfall.js). Mesma máquina das camadas de ambiente — um nó só por
+     * laço, fade em vez de degrau —, mas fora da mixagem do ambiente.
+     */
+    function setWaterfallLevel(level) {
+        const value = Number(level);
+        const wanted = Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
+        if (wanted <= 0 && !ambientNodes.has('waterfall')) return false;
+        if (!ensureContext()) return false;
+        const when = state.context.currentTime ?? 0;
+        const ramp = Math.max(0.01, WATERFALL_FADE_SECONDS / 3);
+        const layer = wanted > 0 ? ensureAmbientLayer('waterfall') : ambientNodes.get('waterfall');
+        if (!layer) return false;
+        const target = wanted * WATERFALL_RECIPE.gain;
+        const param = layer.gain.gain;
+        if (typeof param.setTargetAtTime === 'function') param.setTargetAtTime(target, when, ramp);
+        else param.value = target;
+        return true;
+    }
+
+    /** Para todos os laços contínuos (ambiente e cachoeira) e limpa o estado. */
     function stopAmbient() {
         for (const layer of ambientNodes.values()) {
             try {
@@ -546,6 +609,7 @@ export function createAudioSystem({
         play,
         preload,
         setAmbientLevels,
+        setWaterfallLevel,
         stopAmbient,
         setMuted,
         setVolume,

@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 501 testes de módulos puros (node --test)
+npm test           # 517 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -54,6 +54,7 @@ O `check` é o que o CI (`.github/workflows/ci.yml`) roda em todo PR para `main`
 | Save e armazenamento | `world-save-*.js`, `world-storage.js`, `world-list-store.js` |
 | Inventário | `inventory-*.js`, `inventory.css` |
 | Áudio | `world-audio.js` (síntese em WebAudio; arquivos opcionais em `assets/sounds/`) |
+| Cachoeira | `world-waterfall.js` (acha água caindo perto, ganho por distância e histerese do laço) |
 | Passos e sons de bloco | `world-block-materials.js` (família por bloco), `world-step-sounds.js` (cadência por distância) |
 | Mão em primeira pessoa | `world-hand-animation.js` (laço de mineração + golpe) |
 | Ferramentas | `tools/serve.mjs`, `tools/check.mjs`, `tools/stamp-importmap.mjs` |
@@ -127,7 +128,15 @@ distância, para um forno esquecido longe não soar ao lado do jogador. O **Mofi
 chia em dois trinados curtos: um grito quando se assusta, um chiado enquanto foge
 e, de vez em quando, um chamado de passeio.
 
-O **ambiente** é o único som contínuo, e é escasso de propósito: fases de
+A **cachoeira** é o outro som contínuo, mas não é ambiente: ela só existe onde
+há água caindo (blocos de queda d'água) e o volume é a **distância** — some a 16
+blocos, cresce com o tamanho da queda (colunas × altura) e tem teto de ~55% para
+não engolir o resto. Entra e sai por fade, com histerese: andar na borda do
+alcance não faz o som piscar. O laço é um ruído gerado em JS (grave de volume,
+corpo e respingo, com emenda dobrada para não estalar), e o achado é refeito ~3
+vezes por segundo em volta do jogador.
+
+O **ambiente** é o outro som contínuo, e é escasso de propósito: fases de
 silêncio, vento, grilos (só de noite, perto do nível do mar) e, de vez em quando,
 os dois juntos — nunca a mesma fase duas vezes seguidas, sempre com pausa entre
 elas. Duas camadas em laço (um nó de áudio cada, criadas uma vez) com fade na
