@@ -18,6 +18,24 @@ export const SOUND_RECIPES = Object.freeze({
     'ui-hover': Object.freeze({
         wave: 'sine', from: 940, to: 900, attack: 0.004, duration: 0.035, gain: 0.06,
     }),
+    // Passos: ruído curto com filtro passa-baixa. O material muda o corte e a
+    // duração — grama é abafada e curta, pedra é brilhante e seca, areia é
+    // ruído puro, madeira tem ressonância (Q alto).
+    'step-grass': Object.freeze({
+        kind: 'noise', cut: 1900, cutTo: 800, q: 0.7, attack: 0.005, duration: 0.09, gain: 0.09,
+    }),
+    'step-dirt': Object.freeze({
+        kind: 'noise', cut: 1150, cutTo: 520, q: 0.8, attack: 0.005, duration: 0.10, gain: 0.10,
+    }),
+    'step-stone': Object.freeze({
+        kind: 'noise', cut: 3200, cutTo: 1500, q: 1.2, attack: 0.003, duration: 0.07, gain: 0.085,
+    }),
+    'step-wood': Object.freeze({
+        kind: 'noise', cut: 950, cutTo: 480, q: 2.4, attack: 0.004, duration: 0.09, gain: 0.10,
+    }),
+    'step-sand': Object.freeze({
+        kind: 'noise', cut: 2600, cutTo: 2300, q: 0.4, attack: 0.009, duration: 0.12, gain: 0.075,
+    }),
 });
 
 export const SOUND_NAMES = Object.freeze(Object.keys(SOUND_RECIPES));
@@ -52,6 +70,7 @@ export function createAudioSystem({
     const assets = new Map();
     // nome -> Promise em andamento, para dois pedidos não baixarem o mesmo som
     const pending = new Map();
+    const noiseCache = new WeakMap();
     const warned = new Set();
 
     const effectiveVolume = () => (state.muted ? 0 : state.volume);
@@ -99,15 +118,60 @@ export function createAudioSystem({
         return true;
     }
 
-    function playTone(recipe, gainScale = 1) {
+    // Ruído branco reaproveitado: um buffer por contexto, filtrado a cada passo.
+    function noiseBufferFor(context) {
+        let buffer = noiseCache.get(context);
+        if (buffer && buffer.length) return buffer;
+        const sampleRate = context.sampleRate ?? 44100;
+        const length = Math.max(1, Math.floor(sampleRate * 0.5));
+        buffer = context.createBuffer(1, length, sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+        noiseCache.set(context, buffer);
+        return buffer;
+    }
+
+    function playNoise(recipe, gainScale = 1, rate = 1) {
+        const context = state.context;
+        const when = context.currentTime ?? 0;
+        const source = context.createBufferSource();
+        source.buffer = noiseBufferFor(context);
+        const rateParam = source.playbackRate;
+        if (rateParam) {
+            if (typeof rateParam.setValueAtTime === 'function') rateParam.setValueAtTime(rate, when);
+            else rateParam.value = rate;
+        }
+        const filter = context.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(recipe.cut * rate, when);
+        if (recipe.cutTo) {
+            filter.frequency.exponentialRampToValueAtTime(
+                Math.max(60, recipe.cutTo * rate), when + recipe.duration);
+        }
+        filter.Q?.setValueAtTime?.(recipe.q ?? 1, when);
+        const gain = context.createGain();
+        const peak = Math.max(0.0001, recipe.gain * gainScale);
+        gain.gain.setValueAtTime(0.0001, when);
+        gain.gain.linearRampToValueAtTime(peak, when + recipe.attack);
+        gain.gain.exponentialRampToValueAtTime(0.0001, when + recipe.duration);
+        source.connect(filter);
+        filter.connect(gain);
+        gain.connect(state.master);
+        source.start(when);
+        source.stop(when + recipe.duration + 0.02);
+        return true;
+    }
+
+    function playTone(recipe, gainScale = 1, rate = 1) {
         const context = state.context;
         const when = context.currentTime ?? 0;
         const oscillator = context.createOscillator();
         const gain = context.createGain();
         oscillator.type = recipe.wave;
-        oscillator.frequency.setValueAtTime(recipe.from, when);
+        oscillator.frequency.setValueAtTime(recipe.from * rate, when);
         if (recipe.to !== recipe.from) {
-            oscillator.frequency.exponentialRampToValueAtTime(Math.max(20, recipe.to), when + recipe.duration);
+            oscillator.frequency.exponentialRampToValueAtTime(
+                Math.max(20, recipe.to * rate), when + recipe.duration);
         }
         const peak = Math.max(0.0001, recipe.gain * gainScale);
         gain.gain.setValueAtTime(0.0001, when);
@@ -150,7 +214,7 @@ export function createAudioSystem({
         return task;
     }
 
-    function play(name, { gainScale = 1 } = {}) {
+    function play(name, { gainScale = 1, rate = 1 } = {}) {
         const recipe = SOUND_RECIPES[name];
         if (!recipe) {
             if (!warned.has(name)) {
@@ -161,14 +225,17 @@ export function createAudioSystem({
         }
         if (effectiveVolume() <= 0) return false;
         if (!ensureContext()) return false;
+        const synth = recipe.kind === 'noise'
+            ? () => playNoise(recipe, gainScale, rate)
+            : () => playTone(recipe, gainScale, rate);
         if (assets.has(name)) {
             const buffer = assets.get(name);
-            return buffer ? playBuffer(buffer) : playTone(recipe, gainScale);
+            return buffer ? playBuffer(buffer) : synth();
         }
         // ainda não sabe se existe arquivo: toca a síntese agora e busca em
-        // segundo plano, para o próximo clique já usar o arquivo
+        // segundo plano, para o próximo som já usar o arquivo
         if (!pending.has(name)) loadAsset(name).catch(() => {});
-        return playTone(recipe, gainScale);
+        return synth();
     }
 
     function setVolume(value) {
@@ -217,6 +284,14 @@ export function createAudioSystem({
         unlock,
         dispose,
     };
+}
+
+// Um único sistema de áudio para o jogo inteiro: o menu cria (com o volume
+// salvo) e o jogo reaproveita. Sem isso cada módulo abriria um AudioContext.
+let sharedAudio = null;
+export function getSharedAudio(options = {}) {
+    if (!sharedAudio) sharedAudio = createAudioSystem(options);
+    return sharedAudio;
 }
 
 // Elementos que "clicam": botões de menu, inventário, diálogos.
