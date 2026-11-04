@@ -100,6 +100,13 @@ export const SOUND_RECIPES = Object.freeze({
         kind: 'noise', cut: 700, cutTo: 180, q: 1.2, attack: 0.01, duration: 0.6, gain: 0.18,
         thump: Object.freeze({ from: 180, to: 55, duration: 0.55, gain: 0.16 }),
     }),
+    // Mofim: chilreio. Dois trinados curtos e agudos (como inseto), com `repeat`
+    // — um oscilador só não faz "tsi-tsi". Fica discreto porque o volume cai com
+    // a distância (`gainScale` quem cuida disso no jogo).
+    'mofim-chirp': Object.freeze({
+        wave: 'sine', from: 1850, to: 2450, attack: 0.004, duration: 0.055, gain: 0.06,
+        repeat: 2, gap: 0.085,
+    }),
     // Água: entrar (splash com corpo grave), sair (curto, escorrendo),
     // submergir (abafado, grave) e a braçada (leve e curta).
     'water-splash': Object.freeze({
@@ -295,9 +302,19 @@ export function createAudioSystem({
         return true;
     }
 
+    // Receitas de som podem pedir repetição (`repeat: 2, gap: 0.085`): o mesmo
+    // tom toca de novo depois do intervalo. É o que transforma um bip em trinado
+    // sem precisar de amostra.
     function playTone(recipe, gainScale = 1, rate = 1) {
+        const count = Math.max(1, Math.round(recipe.repeat ?? 1));
+        const gap = recipe.gap ?? 0;
+        for (let i = 0; i < count; i++) playToneOnce(recipe, gainScale, rate, i * gap);
+        return true;
+    }
+
+    function playToneOnce(recipe, gainScale, rate, offset = 0) {
         const context = state.context;
-        const when = context.currentTime ?? 0;
+        const when = (context.currentTime ?? 0) + offset;
         const oscillator = context.createOscillator();
         const gain = context.createGain();
         oscillator.type = recipe.wave;

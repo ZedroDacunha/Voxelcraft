@@ -491,10 +491,11 @@ Faltam ou estão simples:
   ([MELHORIA-20261104](MELHORIA-20261104-ambiente.md)) — **áudio do item 13
   completo**.
 - Mobs: o **Mofim passivo ganhou medo em 04/11**
-  ([MELHORIA-20261104](MELHORIA-20261104-mofim-medo.md)) — foge de quem chega
+  ([MELHORIA-20261104](MELHORIA-20261104-mofim.md)) — foge de quem chega
   andando/correndo e de quem bate, e não percebe quem chega agachado, com a IA
-  extraída para `world-creature.js` e testada. Falta ainda **drop/recurso** e
-  vida própria (hoje o golpe assusta, não machuca).
+  extraída para `world-creature.js` e testada; **chilreio** (dois trinados, com
+  falloff por distância) e **pulo de degrau** vieram junto. Falta ainda
+  **drop/recurso** e vida própria (hoje o golpe assusta, não machuca).
 - Estruturas: ruínas, vilas, dungeons.
 - Vegetação/clima mais variados.
 - ~~Controles de toque~~ (pronto em 04/11: joystick, olhar por arrasto e botões).

@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 438 testes de módulos puros (node --test)
+npm test           # 444 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -45,7 +45,7 @@ O `check` é o que o CI (`.github/workflows/ci.yml`) roda em todo PR para `main`
 | Entrada | `world-menu.js` (menu, seleção/criação de mundo, opções) |
 | Loop e estado do jogo | `game.js` (mundo, HUD, interação, save) |
 | Física e colisão do jogador | `player-physics.js` (AABB × voxels, passo subdividido, destravar, ocupação de célula) |
-| Criaturas | `world-creature.js` (Mofim: spawn, passeio, medo e golpe) |
+| Criaturas | `world-creature.js` (Mofim: spawn, passeio, medo, chilreio e pulo de degrau) |
 | Catálogo de blocos e receitas | `world-catalog.js`, `inventory-recipe-book.js` |
 | Geração de terreno | `world-terrain.js`, `world-terrain-worker.js`, `world-ore-generation.js`, `world-math.js` |
 | Malha e render | `world-grid.js`, `world-instanced-manager.js`, `world-mesh-buffers.js`, `world-textures.js`, `world-sky.js`, `world-clouds.js`, `world-water.js` |
@@ -122,7 +122,9 @@ soa na transição — splash ao entrar (mais forte quanto maior a queda), saíd
 mergulho abafado e braçada — sem laço contínuo. **Dano** tem gemido grave que
 cresce com o tamanho do golpe, e a morte tem som próprio. **Forno** crepita ao
 acender, sopra ao apagar e avisa quando a peça fica pronta — e o som afina com a
-distância, para um forno esquecido longe não soar ao lado do jogador.
+distância, para um forno esquecido longe não soar ao lado do jogador. O **Mofim**
+chia em dois trinados curtos: um grito quando se assusta, um chiado enquanto foge
+e, de vez em quando, um chamado de passeio.
 
 O **ambiente** é o único som contínuo, e é escasso de propósito: fases de
 silêncio, vento, grilos (só de noite, perto do nível do mar) e, de vez em quando,

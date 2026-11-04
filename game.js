@@ -1248,7 +1248,19 @@ class World {
 // =====================================================================
 // Modelo, spawn, vagar e medo vivem em world-creature.js; aqui só se conectam
 // os pedaços do jogo que o módulo não conhece (Three, catálogo, chunk, hash).
-const CreatureSystem = createCreatureSystemClass({ THREE, ID, CHUNK_SIZE, floorDiv, hash2 });
+const CreatureSystem = createCreatureSystemClass({
+    THREE, ID, CHUNK_SIZE, floorDiv, hash2,
+    // O chilreio chega mais fraco com a distância; `startle` (levou golpe ou viu
+    // o jogador de perto) sai mais alto e mais agudo que o chamado de passeio.
+    onChirp: ({ reason, distance }) => {
+        const falloff = clamp01(1 - distance / 16);
+        if (falloff < 0.12) return;
+        audio.play('mofim-chirp', {
+            gainScale: falloff * (reason === 'idle' ? 0.55 : 0.95),
+            rate: reason === 'startle' ? 1.22 : (reason === 'panic' ? 1.1 : 1),
+        });
+    },
+});
 
 // =====================================================================
 // 5B. INVENTÁRIO E FERRAMENTAS

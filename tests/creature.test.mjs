@@ -4,14 +4,19 @@ import assert from 'node:assert/strict';
 import * as THREE from '../vendor/three/three.module.js';
 import { ID } from '../world-catalog.js';
 import {
+    CHIRP_COOLDOWN,
+    CHIRP_RANGE,
     CREATURE_LIMIT,
     DESPAWN_DISTANCE,
     FLEE_SPEED,
     HIT_COOLDOWN,
+    HOP_DURATION,
+    HOP_HEIGHT,
     SCARE_DURATION,
     SCARE_RADIUS,
     SCARE_SPEED,
     WANDER_SPEED,
+    chirpFor,
     createCreatureSystemClass,
     creatureInReach,
     shouldFlee,
@@ -20,20 +25,22 @@ import {
 const CHUNK_SIZE = 16;
 const GROUND = 10; // `heightAt` devolve o bloco do topo; o Mofim anda em GROUND + 1
 
-// Mundo plano de grama com um relógio controlado pelo teste.
-function makeWorld() {
+// Mundo plano de grama com um relógio controlado pelo teste. `heightAt` pode ser
+// trocado para montar degraus.
+function makeWorld({ heightAt = () => GROUND } = {}) {
+    const groundAt = (x, z) => heightAt(Math.floor(x), Math.floor(z));
     return {
         seed: 4242,
         scene: new THREE.Scene(),
         getChunk: () => ({}),
-        generator: { heightAt: () => GROUND },
-        getBlock: (x, y) => (y === GROUND ? ID.GRASS : 0),
+        generator: { heightAt: (x, z) => heightAt(x, z) },
+        getBlock: (x, y, z) => (y === groundAt(x, z) ? ID.GRASS : 0),
     };
 }
 
-function makeSystem(world, clock) {
+function makeSystem(world, clock, { onChirp = () => {} } = {}) {
     const CreatureSystem = createCreatureSystemClass({
-        THREE, ID, CHUNK_SIZE, now: () => clock.t,
+        THREE, ID, CHUNK_SIZE, now: () => clock.t, onChirp,
     });
     return new CreatureSystem(world);
 }
@@ -247,4 +254,116 @@ test('pausado (menu/inventário), nada se move nem nasce', () => {
         system.update(0.016, player, false);
     }
     assert.equal(system.entities.length, 0);
+});
+
+// ------------------------------------------------ chilreio
+
+test('chilreio só acontece perto, respeitando a espera entre chamados', () => {
+    const base = { at: 100, distance: 5 };
+    assert.equal(chirpFor({ ...base, lastChirpAt: 99.9 }), null, 'espera entre chamados');
+    assert.equal(chirpFor({ at: 100, distance: CHIRP_RANGE + 1, nextIdleAt: 0 }), null, 'longe demais');
+
+    assert.equal(chirpFor({ ...base, pending: 'startle' }), 'startle', 'o grito do susto');
+    assert.equal(chirpFor({ ...base, scared: true }), 'panic', 'chiado de quem está fugindo');
+    assert.equal(chirpFor({ ...base, nextIdleAt: 50 }), 'idle', 'chamado de passeio na hora sorteada');
+    assert.equal(chirpFor({ ...base, nextIdleAt: 500 }), null, 'fora da hora sorteada fica calado');
+    assert.equal(chirpFor({ ...base, lastChirpAt: 100 - CHIRP_COOLDOWN }), null, 'no limite da espera ainda cala');
+});
+
+test('levar um golpe faz o Mofim gritar, e não repete no mesmo instante', () => {
+    const clock = { t: 0 };
+    const chirps = [];
+    const world = makeWorld();
+    const system = makeSystem(world, clock, { onChirp: info => chirps.push(info) });
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    const creature = spawnOne(system, world, clock, player);
+
+    creature.x = 2; creature.z = 0; creature.y = GROUND + 1;
+    clock.t = 40;
+    system.hitFrom({ x: 0, y: GROUND + 1.45, z: 0 }, { x: 1, y: 0, z: 0 });
+    clock.t += 0.02;
+    system.update(0.02, player, true);
+
+    assert.equal(chirps.length, 1, 'um chilreio');
+    assert.equal(chirps[0].reason, 'startle', 'e é o grito, não o chamado de passeio');
+
+    // Segurando o botão o golpe se repete a cada cooldown, mas o chilreio tem o
+    // seu próprio intervalo: sem dois bipes seguidos.
+    clock.t += 0.4;
+    system.hitFrom({ x: 0, y: GROUND + 1.45, z: 0 }, { x: 1, y: 0, z: 0 });
+    clock.t += 0.02;
+    system.update(0.02, player, true);
+    assert.equal(chirps.length, 1, 'o chilreio tem espera própria');
+
+    clock.t += CHIRP_COOLDOWN;
+    system.update(0.02, player, true);
+    assert.equal(chirps.length, 2, 'passada a espera, ele chia de novo');
+    assert.equal(chirps[1].reason, 'startle', 'o novo golpe é um grito novo');
+});
+
+test('longe do jogador o Mofim não chia', () => {
+    const clock = { t: 0 };
+    const chirps = [];
+    const world = makeWorld();
+    const system = makeSystem(world, clock, { onChirp: info => chirps.push(info) });
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    const creature = spawnOne(system, world, clock, player);
+
+    creature.x = CHIRP_RANGE + 5; creature.z = 0;
+    clock.t = 40;
+    system.scare(creature, clock.t, { x: 0, z: 0 });
+    for (let i = 0; i < 20; i++) { clock.t += 0.1; system.update(0.1, player, true); }
+
+    assert.deepEqual(chirps, [], 'fora do alcance, silêncio');
+    assert.equal(creature.chirpPending, null, 'e o grito não fica guardado para depois');
+});
+
+// ------------------------------------------------ degrau
+
+test('degrau de um bloco: ele sobe pulando, com arco visível', () => {
+    const clock = { t: 0 };
+    // Chão em 10 (pé em 11) até x = 2; a partir de x = 3 o chão sobe um bloco.
+    const world = makeWorld({ heightAt: x => (x >= 3 ? GROUND + 1 : GROUND) });
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    const creature = spawnOne(system, world, clock, player);
+
+    creature.x = 1.5; creature.z = 0; creature.y = GROUND + 1;
+    let highest = -Infinity;
+    for (let i = 0; i < 60; i++) {
+        clock.t += 0.05;
+        creature.targetX = 6; creature.targetZ = 0; // empurra o passeio degrau acima
+        system.update(0.05, player, true);
+        highest = Math.max(highest, creature.group.position.y);
+    }
+
+    assert.equal(creature.y, GROUND + 2, 'subiu o degrau');
+    assert.ok(creature.x > 3, `atravessou o degrau (x = ${creature.x.toFixed(2)})`);
+    assert.ok(
+        highest > GROUND + 2 + HOP_HEIGHT * 0.6,
+        `o pulo aparece no desenho (máximo ${highest.toFixed(2)})`,
+    );
+    // Depois do pulo ele volta ao chão (fora da janela do arco).
+    clock.t += HOP_DURATION;
+    system.update(HOP_DURATION, player, true);
+    assert.ok(Math.abs(creature.group.position.y - creature.y) < 0.1, 'assentou no chão');
+});
+
+test('degrau de dois blocos: continua barrado', () => {
+    const clock = { t: 0 };
+    // Chão sobe dois blocos de uma vez a partir de x = 3.
+    const world = makeWorld({ heightAt: x => (x >= 3 ? GROUND + 2 : GROUND) });
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    const creature = spawnOne(system, world, clock, player);
+
+    creature.x = 1.5; creature.z = 0; creature.y = GROUND + 1;
+    for (let i = 0; i < 60; i++) {
+        clock.t += 0.05;
+        creature.targetX = 6; creature.targetZ = 0;
+        system.update(0.05, player, true);
+    }
+
+    assert.equal(creature.y, GROUND + 1, 'não subiu');
+    assert.ok(creature.x < 3, `parou antes da parede (x = ${creature.x.toFixed(2)})`);
 });

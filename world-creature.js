@@ -41,6 +41,15 @@ export const HIT_REACH = 3.5;
 export const HIT_MIN_DOT = 0.72; // ~44° de abertura a partir da mira
 /** Um mesmo Mofim não leva dois golpes no mesmo instante (evita spam com o botão segurado). */
 export const HIT_COOLDOWN = 0.35;
+/** Altura que ele pula para subir um degrau e duração do pulo (visual e curto). */
+export const STEP_UP = 1;
+export const HOP_DURATION = 0.26;
+export const HOP_HEIGHT = 0.42;
+/** Chilreio: alcance, ritmo e o silêncio entre um chamado e outro. */
+export const CHIRP_RANGE = 16;
+export const CHIRP_COOLDOWN = 1.2;
+export const CHIRP_IDLE_MIN = 7;
+export const CHIRP_IDLE_MAX = 15;
 
 /**
  * O jogador assusta o Mofim agora?
@@ -92,6 +101,49 @@ export function creatureInReach(entities, origin, direction, {
     return best;
 }
 
+/**
+ * Vale um chilreio agora? Devolve o motivo (`'startle'`, `'panic'`, `'idle'`) ou
+ * `null`.
+ *
+ * O silêncio é o padrão: chilreio de criatura é enfeite, e três bichos chilreando
+ * sem parada viram zumbido. Por isso há alcance, espera entre chamados e um
+ * sorteio longo para o chamado de quem está só passeando.
+ */
+export function chirpFor({
+    at,
+    distance,
+    scared = false,
+    pending = null,
+    lastChirpAt = -Infinity,
+    nextIdleAt = Infinity,
+    cooldown = CHIRP_COOLDOWN,
+    range = CHIRP_RANGE,
+} = {}) {
+    if (!(distance <= range)) return null;
+    if (at - lastChirpAt < cooldown) return null;
+    if (pending) return pending;
+    if (scared) return 'panic';
+    if (at >= nextIdleAt) return 'idle';
+    return null;
+}
+
+/**
+ * Altura do corpo durante o pulo do degrau.
+ *
+ * Sobe até `altura` acima do destino e desce até pousar nele — um arco de salto,
+ * não uma rampa. Rampa (linear + seno) quase não levanta o corpo quando o degrau
+ * é de 1 bloco, e o pulo fica invisível.
+ */
+export function hopHeightAt(from, to, progress, altura = HOP_HEIGHT) {
+    if (!(progress > 0)) return from;
+    if (progress >= 1) return to;
+    const peak = to + altura;
+    const subida = 0.6;
+    return progress < subida
+        ? from + (peak - from) * (progress / subida)
+        : peak + (to - peak) * ((progress - subida) / (1 - subida));
+}
+
 /** Gira um vetor 2D: usado para desviar de encostas enquanto foge. */
 function rotate2(x, z, angle) {
     const c = Math.cos(angle), s = Math.sin(angle);
@@ -105,6 +157,7 @@ export function createCreatureSystemClass({
     floorDiv = defaultFloorDiv,
     hash2 = defaultHash2,
     now = () => performance.now() * 0.001,
+    onChirp = () => {},
 }) {
     class CreatureSystem {
         constructor(world) {
@@ -177,6 +230,9 @@ export function createCreatureSystemClass({
                     id: this.nextId++, x, y, z, targetX: x, targetZ: z, turnAt: at,
                     phase: hash2(seed, attempt, 131) * Math.PI * 2, heading: 0,
                     scaredUntil: 0, lastHitAt: -Infinity,
+                    lastChirpAt: -Infinity, chirpPending: null,
+                    nextIdleAt: at + CHIRP_IDLE_MIN + hash2(seed, attempt, 211) * (CHIRP_IDLE_MAX - CHIRP_IDLE_MIN),
+                    hopFrom: 0, hopTo: 0, hopT: HOP_DURATION,
                     ...model,
                 });
                 return;
@@ -187,6 +243,9 @@ export function createCreatureSystemClass({
         scare(entity, at, from) {
             entity.scaredUntil = at + SCARE_DURATION;
             entity.lastHitAt = at;
+            // O primeiro chilreio do susto é diferente do resto: é o grito, não o
+            // chiado de quem está correndo.
+            entity.chirpPending = 'startle';
             // Alvo imediato para longe de quem assustou: sem isso ele levaria
             // até 5 s (o sorteio do vagar) para começar a correr.
             const dx = entity.x - (from?.x ?? entity.x);
@@ -235,6 +294,29 @@ export function createCreatureSystemClass({
                 }
                 const fleeing = at < e.scaredUntil;
 
+                const reason = chirpFor({
+                    at,
+                    distance: distanceToPlayer,
+                    scared: fleeing,
+                    pending: e.chirpPending,
+                    lastChirpAt: e.lastChirpAt,
+                    nextIdleAt: e.nextIdleAt,
+                });
+                if (reason) {
+                    e.lastChirpAt = at;
+                    e.chirpPending = null;
+                    if (reason === 'idle') {
+                        const seed = this.world.seed + e.id * 7919 + Math.floor(at);
+                        e.nextIdleAt = at + CHIRP_IDLE_MIN
+                            + hash2(seed, e.id, 307) * (CHIRP_IDLE_MAX - CHIRP_IDLE_MIN);
+                    }
+                    onChirp({ reason, distance: distanceToPlayer, entity: e });
+                } else if (distanceToPlayer > CHIRP_RANGE) {
+                    // Longe demais para ser ouvido: o grito não fica guardado
+                    // para tocar depois, quando o jogador se aproximar.
+                    e.chirpPending = null;
+                }
+
                 if (fleeing) {
                     // Fugir é recalculado a cada quadro: o jogador pode estar
                     // perseguindo, e o alvo do vagar ficaria para trás.
@@ -259,7 +341,14 @@ export function createCreatureSystemClass({
                     const step = Math.min(distance, speed * dt);
                     const nx = e.x + dx / distance * step, nz = e.z + dz / distance * step;
                     const ny = this.surfaceAt(nx, nz);
-                    if (ny !== null && Math.abs(ny - e.y) <= 1) {
+                    if (ny !== null && Math.abs(ny - e.y) <= STEP_UP) {
+                        // Degrau para cima: o corpo sobe na hora (é ele que anda),
+                        // mas o desenho faz um pulo curto em vez de teletransportar.
+                        if (ny > e.y) {
+                            e.hopFrom = e.y;
+                            e.hopTo = ny;
+                            e.hopT = 0;
+                        }
                         e.x = nx; e.z = nz; e.y = ny;
                         e.heading = Math.atan2(dx, dz);
                     } else if (fleeing) {
@@ -274,7 +363,9 @@ export function createCreatureSystemClass({
                 }
 
                 const bob = fleeing ? 0.02 : 0.035;
-                e.group.position.set(e.x, e.y + Math.sin(at * 3 + e.phase) * bob, e.z);
+                e.hopT = Math.min(HOP_DURATION, e.hopT + dt);
+                const hopY = hopHeightAt(e.hopFrom, e.y, e.hopT / HOP_DURATION);
+                e.group.position.set(e.x, hopY + Math.sin(at * 3 + e.phase) * bob, e.z);
                 e.group.rotation.y = e.heading;
                 const flapSpeed = fleeing ? 22 : 8;
                 const flap = Math.sin(at * flapSpeed + e.phase) * (fleeing ? 0.36 : 0.18);

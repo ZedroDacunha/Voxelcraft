@@ -150,6 +150,7 @@ test('todas as receitas são válidas e os nomes de arquivo são previsíveis', 
         'hit-grass', 'hit-dirt', 'hit-stone', 'hit-wood', 'hit-sand',
         'furnace-light', 'furnace-out', 'furnace-done',
         'hurt', 'death',
+        'mofim-chirp',
         'water-splash', 'water-exit', 'water-dive', 'swim-stroke',
         'door-open', 'door-close',
         'place-grass', 'place-dirt', 'place-stone', 'place-wood', 'place-sand',
@@ -275,6 +276,23 @@ test('a síntese usa a receita: onda, frequência e envelope', () => {
     const gainParam = oscillator.connections[0].gain;
     assert.equal(gainParam.events[0][1], 0.0001, 'começa no silêncio (sem clique)');
     assert.equal(gainParam.events.at(-1)[0], 'exp', 'decai exponencialmente');
+});
+
+test('chilreio do Mofim é trinado: duas notas curtas e separadas', () => {
+    const { audio, factory } = makeAudio();
+    const recipe = SOUND_RECIPES['mofim-chirp'];
+
+    audio.play('mofim-chirp');
+    const { oscillators } = factory.context;
+    assert.equal(oscillators.length, 2, 'dois trinados, como inseto não faz com um tom só');
+    const [first, second] = oscillators;
+    assert.ok(second.started[0] > first.started[0], 'a segunda nota começa depois da primeira');
+    assert.ok(
+        Math.abs((second.started[0] - first.started[0]) - recipe.gap) < 1e-9,
+        'o intervalo entre as notas é o da receita',
+    );
+    assert.ok(recipe.gain <= 0.08, 'chilreio é enfeite: fica discreto');
+    assert.ok(recipe.from > 1200, 'agudo, para cortar o vento e os grilos');
 });
 
 test('passo é ruído filtrado, com um único buffer reaproveitado', () => {

@@ -41,6 +41,7 @@ existir, usa a síntese.
 | `door-open.ogg` / `.wav` | porta de madeira abrindo | rangido 0,26 s + baque grave |
 | `door-close.ogg` / `.wav` | porta de madeira fechando | rangido 0,14 s + baque no batente |
 | `place-*.ogg` / `.wav` | bloco colocado (um por material) | ruído 0,05–0,08 s + baque curto |
+| `mofim-chirp.ogg` / `.wav` | chilreio do Mofim (susto, fuga e chamado de passeio) | seno 1850→2450 Hz, dois trinados de 55 ms |
 
 A busca é feita uma vez por som e o resultado fica em cache: se você adicionar o
 arquivo depois de abrir a página, recarregue (Ctrl+F5) para ouvir.
