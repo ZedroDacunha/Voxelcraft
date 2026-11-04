@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 548 testes de módulos puros (node --test)
+npm test           # 542 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -45,7 +45,7 @@ O `check` é o que o CI (`.github/workflows/ci.yml`) roda em todo PR para `main`
 | Entrada | `world-menu.js` (menu, seleção/criação de mundo, opções) |
 | Panorama do menu | `menu-background.js` (a câmera que gira e o céu) e `menu-panorama.js` (a ilha em malha única, com sombra de canto) |
 | Loop e estado do jogo | `game.js` (mundo, HUD, interação, save) |
-| Física e colisão do jogador | `player-physics.js` (AABB × voxels, passo subdividido, destravar, ocupação de célula, apoio no chão agachado, degrau automático de um bloco), `player-jump.js` (janela do pulo tardio) |
+| Física e colisão do jogador | `player-physics.js` (AABB × voxels, passo subdividido, destravar, ocupação de célula, apoio no chão agachado), `player-jump.js` (janela do pulo tardio) |
 | Criaturas | `world-creature.js` (Mofim: spawn **só de noite**, passeio, medo, chilreio, pulo de degrau, planeio na descida, brilho noturno e o pó luminoso que o corpo derrubado solta) |
 | Catálogo de blocos e receitas | `world-catalog.js`, `inventory-recipe-book.js` |
 | Geração de terreno | `world-terrain.js`, `world-terrain-worker.js`, `world-ore-generation.js`, `world-math.js` |

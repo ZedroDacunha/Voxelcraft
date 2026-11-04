@@ -42,7 +42,7 @@ import { configureTorchFlicker, configureTorchFlameAnimation, updateWorldLightin
 import { FurnaceSmokeSystem } from './world-furnace-effects.js';
 import { canHarvest, damageTool as damageToolStack, getBreakTime } from './world-tool-rules.js';
 import { boxOverlapsXZ, woodDoorCollision, woodDoorPart, woodDoorShape, woodDoorType } from './world-door.js';
-import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, stepUpInWorld, unstickInWorld } from './player-physics.js';
+import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld } from './player-physics.js';
 import { canJumpFrom, createJumpState, updateJumpWindow } from './player-jump.js';
 import { createCreatureSystemClass, creatureInReach } from './world-creature.js';
 import { advanceHandAnimation, countStrikes, createHandAnimation, handSwingAmount, startPunch } from './world-hand-animation.js';
@@ -2998,11 +2998,6 @@ function moveAxis(axis, amount, keepOnGround = false) {
     return movePlayerAxis(world, player.pos, axis, amount, player.height, PLAYER_RADIUS, { keepOnGround });
 }
 
-// Degrau automático: subir um bloco sem pular (o pulo continua sendo para dois).
-function climbStep(dx, dz) {
-    return stepUpInWorld(world, player.pos, dx, dz, player.height, PLAYER_RADIUS);
-}
-
 function intersectsPlayer(bx, by, bz) {
     return playerIntersectsBlock(player.pos, player.height, bx, by, bz, PLAYER_RADIUS);
 }
@@ -3110,23 +3105,8 @@ function updatePhysics(dt) {
     // Agachado e apoiado no chão, o corpo não sai andando pelo vazio: dá para
     // espiar a beirada (e chegar perto do Mofim sem assustar) sem cair.
     const guardEdge = isCrouching && player.onGround && !inWater;
-    const stepX = player.vel.x * dt;
-    const stepZ = player.vel.z * dt;
-    let blockedX = moveAxis('x', stepX, guardEdge);
-    let blockedZ = moveAxis('z', stepZ, guardEdge);
-
-    // Degrau de um bloco: o passo bateu numa parede e o corpo está apoiado?
-    // Tenta subir e repetir o passo no mesmo quadro — sem isso o jogador teria
-    // que pular toda elevação de um bloco do terreno (e o pulo tem folga para
-    // dois, então sobrava altura demais).
-    if ((blockedX || blockedZ) && player.onGround && !inWater
-        && climbStep(blockedX ? stepX : 0, blockedZ ? stepZ : 0)) {
-        blockedX = moveAxis('x', stepX, guardEdge);
-        blockedZ = moveAxis('z', stepZ, guardEdge);
-    }
-
-    if (blockedX) player.vel.x = 0;
-    if (blockedZ) player.vel.z = 0;
+    if (moveAxis('x', player.vel.x * dt, guardEdge)) player.vel.x = 0;
+    if (moveAxis('z', player.vel.z * dt, guardEdge)) player.vel.z = 0;
 
     const yBefore = p.y;
     const blockedY = moveAxis('y', player.vel.y * dt);
