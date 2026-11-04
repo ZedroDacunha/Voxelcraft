@@ -3,9 +3,9 @@
 // A cadência é por **distância**, não por tempo: andar devagar dá passos
 // espaçados, correr dá o dobro de passos por segundo (mesma passada, mais
 // metros). Assim o som acompanha o corpo em vez de brigar com a animação.
-import { ID } from './world-catalog.js';
+import { BLOCK_MATERIALS, blockMaterialFor, materialSoundName } from './world-block-materials.js';
 
-export const STEP_MATERIALS = Object.freeze(['grass', 'dirt', 'stone', 'wood', 'sand']);
+export const STEP_MATERIALS = BLOCK_MATERIALS;
 
 // Distância entre dois passos, em metros (≈ duas passadas curtas).
 export const STEP_STRIDE = 1.7;
@@ -13,29 +13,14 @@ export const STEP_STRIDE = 1.7;
 // Abaixo disso o jogador está "parado" e não faz barulho.
 export const STEP_MIN_SPEED = 0.1;
 
-const MATERIAL_BY_BLOCK = new Map();
-
-const assign = (material, ids) => {
-    for (const id of ids) MATERIAL_BY_BLOCK.set(id, material);
-};
-
-assign('grass', [ID.GRASS, ID.TALL_GRASS, ID.LEAVES]);
-assign('dirt', [ID.DIRT]);
-assign('stone', [ID.STONE, ID.COBBLE, ID.FURNACE,
-    ID.COAL_ORE, ID.IRON_ORE, ID.GOLD_ORE, ID.DIAMOND_ORE, ID.COPPER_ORE]);
-assign('wood', [ID.LOG, ID.PLANKS, ID.CRAFTING_TABLE, ID.CHEST,
-    ID.WOOD_DOOR_BOTTOM, ID.WOOD_DOOR_TOP,
-    ID.WOOD_DOOR_BOTTOM_OPEN, ID.WOOD_DOOR_TOP_OPEN]);
-assign('sand', [ID.SAND]);
-
 // Material pisado, ou null quando o bloco não produz passo (ar, tocha, água).
+// A família do bloco é a mesma usada pelos sons de quebrar e colocar.
 export function stepMaterialFor(blockType) {
-    return MATERIAL_BY_BLOCK.get(blockType) ?? null;
+    return blockMaterialFor(blockType);
 }
 
 export function stepSoundFor(blockType) {
-    const material = stepMaterialFor(blockType);
-    return material ? `step-${material}` : null;
+    return materialSoundName(blockType, 'step');
 }
 
 export function createStepTracker() {

@@ -43,6 +43,7 @@ import { canHarvest, damageTool as damageToolStack, getBreakTime } from './world
 import { boxOverlapsXZ, woodDoorCollision, woodDoorPart, woodDoorShape, woodDoorType } from './world-door.js';
 import { advanceHandAnimation, createHandAnimation, handSwingAmount, startPunch } from './world-hand-animation.js';
 import { advanceStepTracker, createStepTracker, stepDistanceThisFrame, stepPitch, stepSoundFor } from './world-step-sounds.js';
+import { materialSoundName } from './world-block-materials.js';
 import { getSharedAudio } from './world-audio.js';
 import { rightClickIntent } from './world-interaction-rules.js';
 import { loadGameSettings } from './world-game-settings.js';
@@ -1790,6 +1791,10 @@ function breakBlock(x, y, z) {
     // Quebra instantânea (grama alta) dura um quadro: o laço de mineração não
     // chega a aparecer, então o golpe é o que mostra o braço batendo.
     startPunch(handAnim);
+    // Tom variando a cada golpe (mesma faixa dos passos): sem isso dois blocos
+    // iguais seguidos soam como um clique repetido.
+    const breakSound = materialSoundName(type, 'break');
+    if (breakSound) audio.play(breakSound, { rate: stepPitch() });
 }
 
 function updateMining(dt) {
@@ -3501,6 +3506,8 @@ async function init() {
             inventory.removeOne(selectedSlot);
             updateHotbarUI();
             startPunch(handAnim);
+            const placeSound = materialSoundName(placedType, 'place');
+            if (placeSound) audio.play(placeSound, { rate: stepPitch() });
         } else if (placedType === ID.WOOD_DOOR_BOTTOM) {
             showToast('A porta precisa de apoio sólido e de dois blocos livres');
         }

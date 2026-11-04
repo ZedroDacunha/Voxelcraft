@@ -36,6 +36,49 @@ export const SOUND_RECIPES = Object.freeze({
     'step-sand': Object.freeze({
         kind: 'noise', cut: 2600, cutTo: 2300, q: 0.4, attack: 0.009, duration: 0.12, gain: 0.075,
     }),
+    // Quebrar: ruído com baque grave embaixo. Material duro tem corte mais
+    // brilhante e baque mais curto/seco; material macio é abafado e some devagar.
+    'break-grass': Object.freeze({
+        kind: 'noise', cut: 1500, cutTo: 600, q: 0.7, attack: 0.002, duration: 0.16, gain: 0.16,
+        thump: Object.freeze({ from: 180, to: 90, duration: 0.11, gain: 0.10 }),
+    }),
+    'break-dirt': Object.freeze({
+        kind: 'noise', cut: 1000, cutTo: 420, q: 0.8, attack: 0.002, duration: 0.15, gain: 0.17,
+        thump: Object.freeze({ from: 160, to: 80, duration: 0.10, gain: 0.11 }),
+    }),
+    'break-stone': Object.freeze({
+        kind: 'noise', cut: 3600, cutTo: 1200, q: 1.6, attack: 0.001, duration: 0.11, gain: 0.18,
+        thump: Object.freeze({ from: 210, to: 110, duration: 0.08, gain: 0.13 }),
+    }),
+    'break-wood': Object.freeze({
+        kind: 'noise', cut: 1700, cutTo: 700, q: 2.6, attack: 0.002, duration: 0.13, gain: 0.17,
+        thump: Object.freeze({ from: 240, to: 120, duration: 0.10, gain: 0.10 }),
+    }),
+    'break-sand': Object.freeze({
+        kind: 'noise', cut: 2400, cutTo: 1800, q: 0.4, attack: 0.004, duration: 0.18, gain: 0.14,
+        thump: Object.freeze({ from: 140, to: 80, duration: 0.12, gain: 0.07 }),
+    }),
+    // Colocar: seco, curto e mais agudo que quebrar — é o "assentar" do bloco.
+    'place-grass': Object.freeze({
+        kind: 'noise', cut: 1300, cutTo: 700, q: 0.8, attack: 0.002, duration: 0.07, gain: 0.11,
+        thump: Object.freeze({ from: 210, to: 150, duration: 0.05, gain: 0.06 }),
+    }),
+    'place-dirt': Object.freeze({
+        kind: 'noise', cut: 900, cutTo: 500, q: 0.9, attack: 0.002, duration: 0.07, gain: 0.12,
+        thump: Object.freeze({ from: 200, to: 140, duration: 0.05, gain: 0.07 }),
+    }),
+    'place-stone': Object.freeze({
+        kind: 'noise', cut: 3400, cutTo: 1600, q: 1.8, attack: 0.001, duration: 0.05, gain: 0.13,
+        thump: Object.freeze({ from: 260, to: 190, duration: 0.04, gain: 0.08 }),
+    }),
+    'place-wood': Object.freeze({
+        kind: 'noise', cut: 1500, cutTo: 650, q: 2.4, attack: 0.002, duration: 0.06, gain: 0.12,
+        thump: Object.freeze({ from: 280, to: 180, duration: 0.05, gain: 0.07 }),
+    }),
+    'place-sand': Object.freeze({
+        kind: 'noise', cut: 2500, cutTo: 2000, q: 0.4, attack: 0.004, duration: 0.08, gain: 0.10,
+        thump: Object.freeze({ from: 180, to: 120, duration: 0.05, gain: 0.05 }),
+    }),
 });
 
 export const SOUND_NAMES = Object.freeze(Object.keys(SOUND_RECIPES));
@@ -159,6 +202,17 @@ export function createAudioSystem({
         gain.connect(state.master);
         source.start(when);
         source.stop(when + recipe.duration + 0.02);
+        // Baque grave: dá corpo ao impacto, que o ruído sozinho não tem.
+        if (recipe.thump) {
+            playTone({
+                wave: 'sine',
+                from: recipe.thump.from * rate,
+                to: recipe.thump.to * rate,
+                attack: 0.002,
+                duration: recipe.thump.duration,
+                gain: recipe.thump.gain,
+            }, gainScale, 1);
+        }
         return true;
     }
 

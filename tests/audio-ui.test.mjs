@@ -146,6 +146,8 @@ test('todas as receitas são válidas e os nomes de arquivo são previsíveis', 
     assert.deepEqual(SOUND_NAMES, [
         'ui-click', 'ui-hover',
         'step-grass', 'step-dirt', 'step-stone', 'step-wood', 'step-sand',
+        'break-grass', 'break-dirt', 'break-stone', 'break-wood', 'break-sand',
+        'place-grass', 'place-dirt', 'place-stone', 'place-wood', 'place-sand',
     ]);
     for (const name of SOUND_NAMES) {
         const recipe = SOUND_RECIPES[name];
@@ -156,7 +158,12 @@ test('todas as receitas são válidas e os nomes de arquivo são previsíveis', 
         if (recipe.kind === 'noise') {
             assert.ok(recipe.cut >= 200 && recipe.cut <= 8000, `${name}: corte audível`);
             assert.ok(!recipe.cutTo || recipe.cutTo <= recipe.cut, `${name}: o corte só desce`);
-            assert.ok(recipe.gain <= 0.12, `${name}: passos são discretos`);
+            if (name.startsWith('step-')) assert.ok(recipe.gain <= 0.12, `${name}: passos são discretos`);
+            if (recipe.thump) {
+                assert.ok(recipe.thump.from > recipe.thump.to, `${name}: o baque desce`);
+                assert.ok(recipe.thump.from < recipe.cut, `${name}: o baque é grave`);
+                assert.ok(Object.isFrozen(recipe.thump), `${name}: baque imutável`);
+            }
         } else {
             assert.ok(['sine', 'triangle', 'square', 'sawtooth'].includes(recipe.wave), `${name}: onda`);
             assert.ok(recipe.from >= 80 && recipe.from <= 8000, `${name}: frequência audível`);
@@ -289,6 +296,24 @@ test('passo é ruído filtrado, com um único buffer reaproveitado', () => {
     audio.play('step-dirt');
     assert.equal(context.buffers.length, 1, 'o segundo passo reaproveita o ruído');
     assert.equal(context.bufferSources.length, 2);
+});
+
+test('quebrar bloco soma o baque grave ao ruído', () => {
+    const { audio, factory } = makeAudio();
+    const recipe = SOUND_RECIPES['break-stone'];
+    audio.play('break-stone', { rate: 1 });
+
+    const context = factory.context;
+    assert.equal(context.bufferSources.length, 1, 'ruído do impacto');
+    assert.equal(context.oscillators.length, 1, 'baque grave');
+    const [thump] = context.oscillators;
+    assert.equal(thump.type, 'sine');
+    assert.equal(thump.frequency.events[0][1], recipe.thump.from);
+    assert.equal(thump.frequency.events.at(-1)[1], recipe.thump.to);
+
+    audio.play('place-stone');
+    assert.equal(context.bufferSources.length, 2, 'colocar também tem ruído');
+    assert.equal(context.oscillators.length, 2, 'e o baquezinho de assentar');
 });
 
 test('o tom de cada passo pode variar sem criar buffer novo', () => {
