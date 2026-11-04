@@ -89,5 +89,5 @@ versão nova.
 ## O que sobrou do PWA
 
 - **Revisão dos ícones** (o maskable, o favicon e o desenho);
-- **doc de teste em navegador real** (roteiro para conferir instalação, offline e
-  atualização num Chrome e num iPhone de verdade).
+- ~~Doc de teste em navegador real~~ — feito em
+  [TESTE-EM-NAVEGADOR.md](TESTE-EM-NAVEGADOR.md).

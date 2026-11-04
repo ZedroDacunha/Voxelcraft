@@ -70,5 +70,5 @@ preto; na aba do navegador, o favicon em 16 px.
 
 ## O que sobrou do PWA
 
-- **Roteiro de teste em navegador real** (instalação, offline e atualização num
-  Chrome e num iPhone de verdade).
+- ~~Roteiro de teste em navegador real~~ — feito em
+  [TESTE-EM-NAVEGADOR.md](TESTE-EM-NAVEGADOR.md).

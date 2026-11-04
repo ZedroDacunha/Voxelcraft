@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 541 testes de módulos puros (node --test)
+npm test           # 542 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -207,7 +207,9 @@ está em `vendor/`, então o jogo não depende de CDN para abrir.
 
 Para conferir de verdade: abra o jogo, jogue alguns segundos, feche a aba, entre
 em modo avião (ou desligue o Wi-Fi) e abra de novo — o mundo carrega e dá para
-jogar.
+jogar. O passo a passo completo (Chrome, Android e iPhone, com o que olhar no
+DevTools e o que fazer quando falha) está em
+[TESTE-EM-NAVEGADOR.md](TESTE-EM-NAVEGADOR.md).
 
 ## Import map e cache
 
