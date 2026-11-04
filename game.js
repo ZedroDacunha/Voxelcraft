@@ -1487,6 +1487,8 @@ function toggleWoodDoor(hit) {
         if (!currentPart) continue;
         world.setBlock(half.x, half.y, half.z, woodDoorType(currentPart.half, open));
     }
+    // Só chega aqui se a porta realmente mudou de estado (as recusas saem antes).
+    audio.play(open ? 'door-open' : 'door-close', { rate: stepPitch() });
     startPunch(handAnim);
     return true;
 }

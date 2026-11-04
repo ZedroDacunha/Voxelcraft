@@ -78,6 +78,16 @@ export const SOUND_RECIPES = Object.freeze({
     'hit-sand': Object.freeze({
         kind: 'noise', cut: 2500, cutTo: 2000, q: 0.4, attack: 0.002, duration: 0.06, gain: 0.07,
     }),
+    // Porta: rangido de dobradiça (ruído longo com ressonância) + batente de
+    // madeira (baque). Abrir é mais lento e mais grave; fechar é um golpe seco.
+    'door-open': Object.freeze({
+        kind: 'noise', cut: 1100, cutTo: 420, q: 3.2, attack: 0.02, duration: 0.26, gain: 0.13,
+        thump: Object.freeze({ from: 170, to: 105, duration: 0.09, gain: 0.07 }),
+    }),
+    'door-close': Object.freeze({
+        kind: 'noise', cut: 900, cutTo: 380, q: 2.4, attack: 0.004, duration: 0.14, gain: 0.15,
+        thump: Object.freeze({ from: 210, to: 115, duration: 0.08, gain: 0.12 }),
+    }),
     // Colocar: seco, curto e mais agudo que quebrar — é o "assentar" do bloco.
     'place-grass': Object.freeze({
         kind: 'noise', cut: 1300, cutTo: 700, q: 0.8, attack: 0.002, duration: 0.07, gain: 0.11,

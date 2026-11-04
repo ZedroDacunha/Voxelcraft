@@ -21,6 +21,8 @@ existir, usa a síntese.
 | `step-sand.ogg` / `.wav` | passo em areia | ruído 2600→2300 Hz, 120 ms |
 | `break-*.ogg` / `.wav` | bloco quebrado (um por material: grass, dirt, stone, wood, sand) | ruído 0,11–0,18 s + baque grave |
 | `hit-*.ogg` / `.wav` | batida de cada golpe enquanto minera (um por material) | ruído 0,04–0,06 s |
+| `door-open.ogg` / `.wav` | porta de madeira abrindo | rangido 0,26 s + baque grave |
+| `door-close.ogg` / `.wav` | porta de madeira fechando | rangido 0,14 s + baque no batente |
 | `place-*.ogg` / `.wav` | bloco colocado (um por material) | ruído 0,05–0,08 s + baque curto |
 
 A busca é feita uma vez por som e o resultado fica em cache: se você adicionar o
