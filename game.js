@@ -42,6 +42,7 @@ import { configureTorchFlicker, configureTorchFlameAnimation, updateWorldLightin
 import { FurnaceSmokeSystem } from './world-furnace-effects.js';
 import { canHarvest, damageTool as damageToolStack, getBreakTime } from './world-tool-rules.js';
 import { boxOverlapsXZ, woodDoorCollision, woodDoorPart, woodDoorShape, woodDoorType } from './world-door.js';
+import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld } from './player-physics.js';
 import { advanceHandAnimation, countStrikes, createHandAnimation, handSwingAmount, startPunch } from './world-hand-animation.js';
 import { advanceStepTracker, createStepTracker, stepDistanceThisFrame, stepPitch, stepSoundFor } from './world-step-sounds.js';
 import { materialSoundName } from './world-block-materials.js';
@@ -2966,79 +2967,22 @@ Desenho: ${renderer.info.render.calls} chamadas | ${(renderer.info.render.triang
 // =====================================================================
 // 8. COLISÃO (AABB x VOXELS)
 // =====================================================================
+// O corpo do jogador é sempre o mesmo raio/altura: os wrappers abaixo só
+// completam os argumentos que a simulação carrega junto (mundo e estado atual).
 function collides(x, y, z, height) {
-    const e = 1e-4;
-    const x0 = Math.floor(x - PLAYER_RADIUS + e), x1 = Math.floor(x + PLAYER_RADIUS - e);
-    const y0 = Math.floor(y + e),                 y1 = Math.floor(y + height - e);
-    const z0 = Math.floor(z - PLAYER_RADIUS + e), z1 = Math.floor(z + PLAYER_RADIUS - e);
-    const pMinX = x - PLAYER_RADIUS, pMaxX = x + PLAYER_RADIUS;
-    const pMinZ = z - PLAYER_RADIUS, pMaxZ = z + PLAYER_RADIUS;
-    for (let bx = x0; bx <= x1; bx++)
-        for (let by = y0; by <= y1; by++)
-            for (let bz = z0; bz <= z1; bz++) {
-                const type = world.getBlock(bx, by, bz);
-                // Porta: colide só com o painel, esteja aberta ou fechada. A porta
-                // aberta é `solid: false` para não tapar o vão, então ela precisa
-                // ser tratada antes do teste de solidez.
-                if (woodDoorPart(type)) {
-                    const box = world.doorCollisionBox(bx, by, bz, type);
-                    if (box && boxOverlapsXZ(box, pMinX, pMaxX, pMinZ, pMaxZ)) return true;
-                    continue;
-                }
-                if (!world.isSolidForPhysics(bx, by, bz, type)) continue;
-                return true;
-            }
-    return false;
+    return collidesInWorld(world, x, y, z, height, PLAYER_RADIUS);
 }
 
-// Um save antigo pode ter o corpo dentro do painel de uma porta que passou a
-// colidir (ou sob areia que caiu). Em vez de nascer preso, procura o ponto
-// livre mais próximo: mesmo bloco, depois um bloco acima, com deslocamentos
-// laterais suficientes para sair do painel fino.
-const UNSTICK_OFFSETS = [
-    [0, 0], [0.45, 0], [-0.45, 0], [0, 0.45], [0, -0.45],
-    [0.45, 0.45], [-0.45, -0.45], [0.45, -0.45], [-0.45, 0.45],
-];
 function unstickPlayer() {
-    if (!collides(player.pos.x, player.pos.y, player.pos.z, player.height)) return false;
-    for (let dy = 0; dy <= 2; dy++)
-        for (const [dx, dz] of UNSTICK_OFFSETS) {
-            const x = player.pos.x + dx, y = player.pos.y + dy, z = player.pos.z + dz;
-            if (!collides(x, y, z, player.height)) { player.pos.set(x, y, z); return true; }
-        }
-    return false;
+    return unstickInWorld(world, player.pos, player.height, PLAYER_RADIUS);
 }
 
 function moveAxis(axis, amount) {
-    if (amount === 0) return false;
-    const steps = Math.max(1, Math.ceil(Math.abs(amount) / 0.25));
-    const step = amount / steps;
-    const p = player.pos;
-    for (let i = 0; i < steps; i++) {
-        const from = p[axis];
-        p[axis] = from + step;
-        if (!collides(p.x, p.y, p.z, player.height)) continue;
-        // Encostou em algo: aproxima o máximo possível da superfície em vez de
-        // voltar para a borda do voxel. Blocos comuns param no mesmo ponto de
-        // antes; a porta fina deixa o jogador encostar no painel.
-        let free = from, blocked = p[axis];
-        for (let k = 0; k < 6; k++) {
-            const mid = (free + blocked) / 2;
-            p[axis] = mid;
-            if (collides(p.x, p.y, p.z, player.height)) blocked = mid;
-            else free = mid;
-        }
-        p[axis] = free;
-        return true;
-    }
-    return false;
+    return movePlayerAxis(world, player.pos, axis, amount, player.height, PLAYER_RADIUS);
 }
 
 function intersectsPlayer(bx, by, bz) {
-    const p = player.pos;
-    return (p.x - PLAYER_RADIUS < bx + 1 && p.x + PLAYER_RADIUS > bx) &&
-           (p.y < by + 1 && p.y + player.height > by) &&
-           (p.z - PLAYER_RADIUS < bz + 1 && p.z + PLAYER_RADIUS > bz);
+    return playerIntersectsBlock(player.pos, player.height, bx, by, bz, PLAYER_RADIUS);
 }
 
 // =====================================================================

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { ID } from '../world-catalog.js';
+import { collidesInWorld } from '../player-physics.js';
 import {
     WOOD_DOOR_THICKNESS,
     boxOverlapsXZ,
@@ -10,6 +11,8 @@ import {
     woodDoorPart,
     woodDoorShape,
 } from '../world-door.js';
+
+const H_STAND = 1.8;
 
 const near = (actual, expected, message) =>
     assert.ok(Math.abs(actual - expected) < 1e-9, `${message}: ${actual} != ${expected}`);
@@ -88,11 +91,30 @@ test('boxOverlapsXZ detecta contato de borda como não-colisão', () => {
     assert.equal(boxOverlapsXZ(box, 0.1, 0.4, 0.9, 1.3), true, 'sobrepõe no eixo Z também');
 });
 
-test('game.js colide com o painel antes de descartar blocos não sólidos', () => {
+test('a colisão olha o painel da porta antes de descartar bloco não sólido', () => {
+    // A porta aberta é `solid: false`: se a colisão a descartasse antes de olhar
+    // a caixa, o jogador voltaria a atravessar o painel. Este teste era um grep
+    // no game.js; agora que a colisão é um módulo, dá para exercitar a regra.
+    const panel = { minX: 0.4375, maxX: 0.5625, minZ: 0, maxZ: 1 };
+    const doorWorld = {
+        getBlock: () => ID.WOOD_DOOR_BOTTOM,
+        isSolidForPhysics: () => false,
+        doorCollisionBox: () => panel,
+    };
+    assert.equal(collidesInWorld(doorWorld, 0.5, 1, 0.5, H_STAND), true, 'painel aberto colide');
+    assert.equal(collidesInWorld(doorWorld, 0.9, 1, 0.5, H_STAND), false, 'ao lado do painel é livre');
+
+    // Bloco não sólido que não é porta continua passável (água, grama alta).
+    const softWorld = {
+        getBlock: () => ID.WATER,
+        isSolidForPhysics: () => false,
+        doorCollisionBox: () => null,
+    };
+    assert.equal(collidesInWorld(softWorld, 0.5, 1, 0.5, H_STAND), false);
+});
+
+test('game.js mantém as regras de porta que dependem do estado do jogo', () => {
     const source = readFileSync(new URL('../game.js', import.meta.url), 'utf8');
-    // A porta aberta é `solid: false`; se o laço de colisão a descartasse antes
-    // de olhar a caixa, o jogador voltaria a atravessar o painel.
-    assert.match(source, /for \(let bz = z0; bz <= z1; bz\+\+\) \{\s+const type = world\.getBlock\(bx, by, bz\);[\s\S]{0,400}?if \(woodDoorPart\(type\)\) \{[\s\S]{0,200}?boxOverlapsXZ/);
     assert.match(source, /const targetType = woodDoorType\('bottom', open\)/);
     assert.match(source, /Saia do vão da porta para abri-la/);
     assert.match(source, /function unstickPlayer\(\)/);
