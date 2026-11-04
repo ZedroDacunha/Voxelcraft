@@ -41,6 +41,7 @@ import { configureTorchFlicker, configureTorchFlameAnimation, updateWorldLightin
 import { FurnaceSmokeSystem } from './world-furnace-effects.js';
 import { canHarvest, damageTool as damageToolStack, getBreakTime } from './world-tool-rules.js';
 import { boxOverlapsXZ, woodDoorCollision, woodDoorPart, woodDoorShape, woodDoorType } from './world-door.js';
+import { advanceHandAnimation, createHandAnimation, handSwingAmount, startPunch } from './world-hand-animation.js';
 import { rightClickIntent } from './world-interaction-rules.js';
 import { loadGameSettings } from './world-game-settings.js';
 import { advanceStarvation, deathTitle, HUNGER_WARNINGS, hungerStage } from './world-survival-rules.js';
@@ -1483,7 +1484,7 @@ function toggleWoodDoor(hit) {
         if (!currentPart) continue;
         world.setBlock(half.x, half.y, half.z, woodDoorType(currentPart.half, open));
     }
-    handAnim.punch = 1;
+    startPunch(handAnim);
     return true;
 }
 
@@ -1784,6 +1785,9 @@ function breakBlock(x, y, z) {
     }
     damageTool(selectedSlot, 1);
     addExhaustion(0.005);
+    // Quebra instantânea (grama alta) dura um quadro: o laço de mineração não
+    // chega a aparecer, então o golpe é o que mostra o braço batendo.
+    startPunch(handAnim);
 }
 
 function updateMining(dt) {
@@ -1800,7 +1804,9 @@ function updateMining(dt) {
     if (currentHit.type === ID.TALL_GRASS) {
         breakBlock(currentHit.x, currentHit.y, currentHit.z);
         resetMining();
-        leftHeld = false;
+        // Mesmo intervalo de uma quebra normal: segurando o botão a grama cai
+        // no ritmo do braço (antes o botão era solto e o braço parava na hora).
+        mining.cooldown = 0.2;
         return;
     }
 
@@ -1855,7 +1861,7 @@ function initGameplayAssets() {
 let handScene, handCamera, handPivot, heldAnchor, handAmbient;
 let heldMesh = null, heldFlameMesh = null, heldTorchLight = null, heldId = -1;
 let handSleeve = null, handBlock = null;
-const handAnim = { mining: 0, phase: 0, punch: 0, sw: 1, eat: 0 };
+const handAnim = createHandAnimation();
 const heldGeoCache = {};
 
 function createHand() {
@@ -1975,16 +1981,9 @@ function refreshHeldItem() {
 function updateHand(dt) {
     refreshHeldItem();
     updateHeldTorchLight();
-    const miningNow = (leftHeld && currentHit && currentHit.y !== 0) ? 1 : 0;
-    handAnim.mining += (miningNow - handAnim.mining) * Math.min(1, 12 * dt);
-    if (miningNow) handAnim.phase += dt * 9;
-    handAnim.punch = Math.max(0, handAnim.punch - dt / 0.28);
-    handAnim.sw = Math.min(1, handAnim.sw + dt / 0.25);
-
-    const m = handAnim.mining * Math.abs(Math.sin(handAnim.phase));
-    const p = Math.sin((1 - handAnim.punch) * Math.PI);
-    const swing = Math.max(m, p);
-    const dip = (1 - handAnim.sw) * (1 - handAnim.sw) * 0.5;
+    const miningNow = Boolean(leftHeld && currentHit && currentHit.y !== 0);
+    advanceHandAnimation(handAnim, dt, { mining: miningNow });
+    const { swing, dip } = handSwingAmount(handAnim);
     const heldToolKind = ITEMS[heldId]?.sprite?.kind;
     if (HELD_TOOL_KINDS.has(heldToolKind)) {
         heldAnchor.position.set(HELD.position.x, HELD.position.y, HELD.position.z);
@@ -3470,7 +3469,7 @@ async function init() {
         if (placed) {
             inventory.removeOne(selectedSlot);
             updateHotbarUI();
-            handAnim.punch = 1;
+            startPunch(handAnim);
         } else if (placedType === ID.WOOD_DOOR_BOTTOM) {
             showToast('A porta precisa de apoio sólido e de dois blocos livres');
         }

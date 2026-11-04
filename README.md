@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 257 testes de módulos puros (node --test)
+npm test           # 265 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -51,6 +51,7 @@ O `check` é o que o CI (`.github/workflows/ci.yml`) roda em todo PR para `main`
 | Save e armazenamento | `world-save-*.js`, `world-storage.js`, `world-list-store.js` |
 | Inventário | `inventory-*.js`, `inventory.css` |
 | Áudio | `world-audio.js` (síntese em WebAudio; arquivos opcionais em `assets/sounds/`) |
+| Mão em primeira pessoa | `world-hand-animation.js` (laço de mineração + golpe) |
 | Ferramentas | `tools/serve.mjs`, `tools/check.mjs`, `tools/stamp-importmap.mjs` |
 | Testes | `tests/*.test.mjs` |
 
