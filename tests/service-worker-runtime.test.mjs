@@ -7,11 +7,13 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-import { APP_SHELL_FILES } from '../world-pwa.js';
-
 const SOURCE = readFileSync(new URL('../service-worker.js', import.meta.url), 'utf8');
+// A página de verdade: o worker tira dela a lista de arquivos a guardar.
+const HTML = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const IMPORT_MAP = JSON.parse(/<script type="importmap">([\s\S]*?)<\/script>/.exec(HTML)[1]);
+const MODULE_URLS = Object.values(IMPORT_MAP.imports).filter(url => !url.endsWith('/'));
 const BASE = 'https://example.test/';
-const CACHE = 'voxel-sandbox-v1';
+const CACHE = 'voxel-sandbox-v2';
 
 class FakeResponse {
     constructor(body = '', init = {}) {
@@ -26,7 +28,9 @@ class FakeResponse {
 
 const urlOf = (request) => new URL(typeof request === 'string' ? request : request.url, BASE).href;
 
-function loadWorker({ status = () => 200, body = (url) => `conteúdo de ${url}` } = {}) {
+const defaultBody = (url) => (url.endsWith('/index.html') || url === BASE ? HTML : `conteúdo de ${url}`);
+
+function loadWorker({ status = () => 200, body = defaultBody } = {}) {
     const listeners = new Map();
     const cachesByName = new Map();
     const fetched = [];
@@ -52,6 +56,8 @@ function loadWorker({ status = () => 200, body = (url) => `conteúdo de ${url}` 
                 if (!response || !response.ok) throw new Error(`não baixou ${urlOf(url)}`);
                 entries.set(urlOf(url), response);
             },
+            async keys() { return [...entries.keys()].map(url => ({ url })); },
+            async delete(request) { return entries.delete(urlOf(request)); },
         };
     }
 
@@ -112,26 +118,46 @@ const navigate = (path = './') => ({ method: 'GET', mode: 'navigate', url: new U
 
 // --- instalação e ativação ----------------------------------------------
 
-test('instala guardando a casca inteira e assume o controle', async () => {
+test('instala guardando o jogo inteiro, não só o menu', async () => {
     const worker = loadWorker();
     const install = await worker.fire('install');
     await install.waited;
 
     const cache = await worker.cache();
-    for (const url of APP_SHELL_FILES) {
+    // Todo módulo do importmap (é a lista de URLs que o navegador vai pedir)...
+    for (const url of MODULE_URLS) {
+        assert.ok(cache.entries.has(new URL(url, BASE).href), `${url} entrou no cache`);
+    }
+    // ...o CSS com a versão que a página pede, o manifest, os ícones e as imagens.
+    for (const prefix of ['/styles.css?v=', '/inventory.css?v=', '/world-menu.js?v=']) {
+        assert.ok([...cache.entries.keys()].some(href => href.includes(prefix)), `${prefix} entrou no cache`);
+    }
+    for (const url of ['./manifest.webmanifest', './icons/icon-192.png', './assets/tall-grass-short-v2.png']) {
         assert.ok(cache.entries.has(new URL(url, BASE).href), `${url} entrou no cache`);
     }
     assert.equal(worker.skipWaiting, 1, 'versão nova não espera todas as abas fecharem');
 });
 
+test('sem o index.html a instalação não trava: fica o mínimo', async () => {
+    const worker = loadWorker({ body: (url) => (url.endsWith('/index.html') || url === BASE ? '' : `conteúdo de ${url}`) });
+    const install = await worker.fire('install');
+    await install.waited;
+
+    const cache = await worker.cache();
+    for (const url of ['./index.html', './styles.css', './game.js', './world-menu.js']) {
+        assert.ok(cache.entries.has(new URL(url, BASE).href), `${url} entrou pelo mínimo`);
+    }
+    assert.equal(worker.skipWaiting, 1, 'instalação não travou');
+});
+
 test('um arquivo faltando não impede a instalação', async () => {
-    const worker = loadWorker({ status: (url) => (url.endsWith('game.js') ? 404 : 200) });
+    const worker = loadWorker({ status: (url) => (url.endsWith('game.js?v=666d234b9b') ? 404 : 200) });
     const install = await worker.fire('install');
     await install.waited;
 
     const cache = await worker.cache();
     assert.ok(cache.entries.has(new URL('./index.html', BASE).href), 'o resto foi guardado');
-    assert.ok(!cache.entries.has(new URL('./game.js', BASE).href));
+    assert.ok(!cache.entries.has(new URL('./game.js?v=666d234b9b', BASE).href));
     assert.equal(worker.skipWaiting, 1, 'instalação não travou');
 });
 
@@ -157,7 +183,7 @@ test('documento: rede primeiro e cópia offline atualizada', async () => {
 
     const result = await worker.fire('fetch', { request: navigate('./') });
     assert.ok(result.intercepted);
-    assert.match(await result.responded.text(), /conteúdo de https:\/\/example\.test\//);
+    assert.match(await result.responded.text(), /Voxel Sandbox/);
 
     const cache = await worker.cache();
     assert.ok(cache.entries.has(new URL('./index.html', BASE).href), 'guardou a página para o modo offline');
@@ -171,7 +197,7 @@ test('documento offline: serve o cache em vez de erro de rede', async () => {
     worker.setOffline(true);
     const result = await worker.fire('fetch', { request: navigate('./') });
     assert.equal(result.responded.ok, true, 'o jogo abre sem rede');
-    assert.match(result.responded.body, /index\.html|example\.test/);
+    assert.match(result.responded.body, /Voxel Sandbox/);
 });
 
 test('offline na primeira visita: página explicando, não tela em branco', async () => {
@@ -221,6 +247,36 @@ test('arquivo sem cache e sem rede: 504 explícito', async () => {
     const result = await worker.fire('fetch', { request: get('./modulo-que-nunca-viu.js') });
     assert.equal(result.responded.status, 504);
     assert.equal(result.responded.body, '');
+});
+
+test('imagem é servida do cache mesmo com outra versão escrita na URL', async () => {
+    const worker = loadWorker();
+    await (await worker.fire('install')).waited;
+    worker.setOffline(true);
+
+    // O jogo pede a imagem com `?v=`, mas ela foi guardada sem versão.
+    const result = await worker.fire('fetch', { request: get('./assets/tall-grass-tall-v2.png?v=20261029-5') });
+    assert.equal(result.responded.status, 200, 'sem rede e ainda assim desenha o capim');
+    assert.match(await result.responded.text(), /tall-grass-tall/);
+});
+
+test('versão antiga de módulo sai do cache na ativação (imagem fica)', async () => {
+    const worker = loadWorker();
+    await (await worker.fire('install')).waited;
+
+    const cache = await worker.cache();
+    const velho = new URL('./world-audio.js?v=versao-antiga', BASE).href;
+    const imagem = new URL('./assets/sounds/passo.ogg?v=1', BASE).href;
+    await cache.put(velho, new FakeResponse('código velho'));
+    await cache.put(imagem, new FakeResponse('som'));
+
+    const activate = await worker.fire('activate');
+    await activate.waited;
+
+    assert.ok(!cache.entries.has(velho), 'módulo de versão antiga não fica ocupando espaço');
+    assert.ok(cache.entries.has(imagem), 'o que não é arquivo do jogo fica');
+    const atual = new URL(MODULE_URLS[0], BASE).href;
+    assert.ok(cache.entries.has(atual), 'e a versão de hoje continua lá');
 });
 
 // --- o que fica de fora -------------------------------------------------

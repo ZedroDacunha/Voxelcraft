@@ -24,7 +24,7 @@ sem barra do navegador) e **abrir offline** depois da primeira visita.
 | --- | --- |
 | `manifest.webmanifest` | nome, `display: standalone`, `start_url`/`scope` relativos, cores, 4 ícones |
 | `service-worker.js` | guarda a casca na instalação; o resto entra no primeiro uso |
-| `world-pwa.js` | decisão de registrar + lista `APP_SHELL_FILES` |
+| `world-pwa.js` | decisão de registrar (a lista do que guardar mudou na [leva offline](MELHORIA-20261104-pwa-offline-de-verdade.md): agora sai do `index.html`) |
 | `icons/*.png` | 192, 512, maskable 512 e favicon 32 |
 
 `start_url` e `scope` são **relativos** (`./`), então o mesmo manifest funciona

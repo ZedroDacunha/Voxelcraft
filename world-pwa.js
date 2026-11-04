@@ -1,5 +1,4 @@
-// PWA: manifest, service worker e a lista de arquivos que fazem o jogo abrir
-// sem rede.
+// PWA: registrar o service worker e saber quando isso faz sentido.
 //
 // O jogo não tem build nem bundler: o service worker guarda os arquivos como
 // estão. Duas estratégias diferentes, porque os dois tipos de requisição têm
@@ -11,35 +10,13 @@
 //   (stale-while-revalidate). Os módulos já vêm com `?v=<hash>` no importmap,
 //   então "servir do cache" nunca entrega código velho — hash diferente é URL
 //   diferente.
+//
+// A lista do que guardar **não mora aqui**: o worker a lê do próprio
+// index.html na instalação (importmap + `<link>`s), que é a mesma lista de URLs
+// que o navegador vai pedir. Aqui fica só a decisão de registrar.
 
 export const PWA_MANIFEST_PATH = './manifest.webmanifest';
 export const SERVICE_WORKER_PATH = './service-worker.js';
-
-/**
- * Casca do jogo: o suficiente para abrir e chegar ao menu sem rede.
- *
- * O resto dos módulos entra no cache sozinho, na primeira visita — e essa é a
- * vantagem de não ter build: não existe lista de módulos para manter à mão.
- * Esta lista é curta de propósito, e o teste confere que ela bate com a do
- * service worker e que todo arquivo citado existe.
- */
-export const APP_SHELL_FILES = Object.freeze([
-    './',
-    './index.html',
-    './styles.css',
-    './inventory.css',
-    './manifest.webmanifest',
-    './icons/icon-192.png',
-    './icons/icon-512.png',
-    './icons/icon-maskable-512.png',
-    './icons/favicon-32.png',
-    './menu-panorama.svg',
-    './vendor/three/three.module.js',
-    './vendor/three/addons/controls/PointerLockControls.js',
-    './world-menu.js',
-    './game.js',
-    './world-terrain-worker.js',
-]);
 
 /** Dá para instalar/jogar offline neste contexto? (`file://` não tem service worker) */
 export function pwaSupported({
