@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { BLOCKS, ID } from '../world-catalog.js';
-import { BLOCK_MATERIALS, blockMaterialFor, blocksWithMaterial, materialSoundName } from '../world-block-materials.js';
+import { BLOCK_MATERIALS, blocksWithMaterial, materialSoundName } from '../world-block-materials.js';
 import { SOUND_RECIPES } from '../world-audio.js';
 
 const TORCH_IDS = [ID.TORCH, ID.TORCH_WALL_XP, ID.TORCH_WALL_XN, ID.TORCH_WALL_ZP, ID.TORCH_WALL_ZN];

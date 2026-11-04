@@ -336,8 +336,9 @@ A revisão anterior já apontava parte disso, e o código atual continua com os 
 ### 10. Arquitetura e manutenção
 
 **Prioridade:** média. **Status:** ~~aberto~~ parcialmente resolvido em 02/11 —
-`package.json`, CI, README e remoção dos assets mortos feitos; extrair módulos de
-`game.js` e limpar o código experimental seguem pendentes.
+`package.json`, CI, README e remoção dos assets mortos feitos; **limpeza de 04/11**
+tirou o sintonizador desligado do item na mão e os imports órfãos, com teste de
+higiene para não voltarem. Extrair módulos de `game.js` segue pendente.
 
 Pontos positivos: já existem muitos módulos puros (`world-*`, `inventory-*`) e testes sem DOM.
 
@@ -356,7 +357,11 @@ O que ainda pesa:
 - ~~Adicionar workflow de CI rodando esses scripts~~ — feito (`.github/workflows/ci.yml`).
 - ~~Escrever README com requisitos, comandos e arquitetura~~ — feito (`README.md`).
 - Extrair gradualmente de `game.js`: `player.js`, `mesher.js`, `hud.js`, `interaction.js`, `game-loop.js`.
-- Remover assets/código morto ou movê-los para uma área explicitamente experimental.
+- ~~Remover assets/código morto ou movê-los para uma área explicitamente experimental.~~
+  Assets removidos em 02/11; **código morto em 04/11**: o sintonizador `HELD_DEBUG`
+  (constante fixa em `false`, ouvinte de teclado e `console.log`) saiu, e
+  `tests/hygiene.test.mjs` passa a barrar import órfão, `console.log`, `debugger`,
+  arquivo sem importador e constante de debug fixa.
 
 ---
 
@@ -445,6 +450,9 @@ Os 62 testes existentes passaram, mas ainda não cobrem bem:
   e recuperação com dados corrompidos cobertos em 02/11; falta só a integração real
   entre duas abas do navegador.
 - Transformar cada bug desta análise em teste de regressão antes de corrigir.
+- **Higiene automatizada em 04/11** (`tests/hygiene.test.mjs`, 6 testes): import
+  órfão, `console.log` esquecido, `debugger`, módulo sem importador e constante de
+  debug fixa. São sobras que não dão erro — só teste pega.
 
 ---
 

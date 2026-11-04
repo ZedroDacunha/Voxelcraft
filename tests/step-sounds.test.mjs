@@ -6,7 +6,6 @@ import { BLOCKS, ID } from '../world-catalog.js';
 import {
     STEP_MATERIALS,
     STEP_MAX_MOVED,
-    STEP_MIN_SPEED,
     STEP_STRIDE,
     advanceStepTracker,
     createStepTracker,
