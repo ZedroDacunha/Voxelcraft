@@ -78,6 +78,21 @@ export const SOUND_RECIPES = Object.freeze({
     'hit-sand': Object.freeze({
         kind: 'noise', cut: 2500, cutTo: 2000, q: 0.4, attack: 0.002, duration: 0.06, gain: 0.07,
     }),
+    // Água: entrar (splash com corpo grave), sair (curto, escorrendo),
+    // submergir (abafado, grave) e a braçada (leve e curta).
+    'water-splash': Object.freeze({
+        kind: 'noise', cut: 2600, cutTo: 500, q: 0.5, attack: 0.002, duration: 0.22, gain: 0.16,
+        thump: Object.freeze({ from: 150, to: 70, duration: 0.12, gain: 0.07 }),
+    }),
+    'water-exit': Object.freeze({
+        kind: 'noise', cut: 1500, cutTo: 800, q: 0.6, attack: 0.006, duration: 0.16, gain: 0.10,
+    }),
+    'water-dive': Object.freeze({
+        kind: 'noise', cut: 700, cutTo: 260, q: 1.2, attack: 0.03, duration: 0.30, gain: 0.10,
+    }),
+    'swim-stroke': Object.freeze({
+        kind: 'noise', cut: 1200, cutTo: 620, q: 0.7, attack: 0.012, duration: 0.16, gain: 0.08,
+    }),
     // Porta: rangido de dobradiça (ruído longo com ressonância) + batente de
     // madeira (baque). Abrir é mais lento e mais grave; fechar é um golpe seco.
     'door-open': Object.freeze({

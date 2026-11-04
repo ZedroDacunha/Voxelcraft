@@ -21,6 +21,10 @@ existir, usa a síntese.
 | `step-sand.ogg` / `.wav` | passo em areia | ruído 2600→2300 Hz, 120 ms |
 | `break-*.ogg` / `.wav` | bloco quebrado (um por material: grass, dirt, stone, wood, sand) | ruído 0,11–0,18 s + baque grave |
 | `hit-*.ogg` / `.wav` | batida de cada golpe enquanto minera (um por material) | ruído 0,04–0,06 s |
+| `water-splash.ogg` / `.wav` | entrar na água (ganho cresce com a queda) | ruído 2600→500 Hz, 0,22 s + corpo grave |
+| `water-exit.ogg` / `.wav` | sair da água | ruído 1500→800 Hz, 0,16 s |
+| `water-dive.ogg` / `.wav` | afundar a cabeça | ruído abafado 700→260 Hz, 0,30 s |
+| `swim-stroke.ogg` / `.wav` | braçada (empurrar a água) | ruído 1200→620 Hz, 0,16 s |
 | `door-open.ogg` / `.wav` | porta de madeira abrindo | rangido 0,26 s + baque grave |
 | `door-close.ogg` / `.wav` | porta de madeira fechando | rangido 0,14 s + baque no batente |
 | `place-*.ogg` / `.wav` | bloco colocado (um por material) | ruído 0,05–0,08 s + baque curto |
