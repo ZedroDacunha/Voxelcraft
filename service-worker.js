@@ -24,7 +24,7 @@
 // versões antigas do cache.
 
 const CACHE_PREFIX = 'voxel-sandbox';
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
 const OFFLINE_DOCUMENT = './index.html';
 
@@ -40,6 +40,7 @@ const MINIMUM_SHELL = [
     './icons/icon-512.png',
     './icons/icon-maskable-512.png',
     './icons/favicon-32.png',
+    './icons/apple-touch-icon-180.png',
     './menu-panorama.svg',
     './world-menu.js',
     './game.js',
