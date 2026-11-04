@@ -338,13 +338,17 @@ A revisão anterior já apontava parte disso, e o código atual continua com os 
 **Prioridade:** média. **Status:** ~~aberto~~ parcialmente resolvido em 02/11 —
 `package.json`, CI, README e remoção dos assets mortos feitos; **limpeza de 04/11**
 tirou o sintonizador desligado do item na mão e os imports órfãos, com teste de
-higiene para não voltarem. Extrair módulos de `game.js` segue pendente.
+higiene para não voltarem. A extração de `game.js` começou em 04/11 pela física e
+colisão do jogador ([MELHORIA-20261104](MELHORIA-20261104-fisica-do-jogador.md));
+malha, HUD e interação seguem pendentes.
 
 Pontos positivos: já existem muitos módulos puros (`world-*`, `inventory-*`) e testes sem DOM.
 
 O que ainda pesa:
 
-- `game.js` tem **3.420 linhas** e concentra mundo, mesher, física, UI, sobrevivência, interação e save.
+- `game.js` tem **3.871 linhas** e concentra mundo, mesher, física, UI, sobrevivência, interação e save
+  (era 3.420 na análise, 3.927 antes da primeira extração; a colisão e o
+  deslocamento do jogador já saíram para `player-physics.js`).
 - Não há `package.json`, então não existe um comando padrão de projeto para testar/validar.
 - Não há CI configurado no repositório.
 - Não há README de onboarding.
@@ -356,7 +360,8 @@ O que ainda pesa:
 - ~~Criar `package.json` com scripts~~ — feito (`start`, `test`, `check`, `stamp`).
 - ~~Adicionar workflow de CI rodando esses scripts~~ — feito (`.github/workflows/ci.yml`).
 - ~~Escrever README com requisitos, comandos e arquitetura~~ — feito (`README.md`).
-- Extrair gradualmente de `game.js`: `player.js`, `mesher.js`, `hud.js`, `interaction.js`, `game-loop.js`.
+- Extrair gradualmente de `game.js`: ~~`player.js`~~ ([física](MELHORIA-20261104-fisica-do-jogador.md), etapa 1 de 4),
+  `mesher.js`, `hud.js`, `interaction.js`, `game-loop.js`.
 - ~~Remover assets/código morto ou movê-los para uma área explicitamente experimental.~~
   Assets removidos em 02/11; **código morto em 04/11**: o sintonizador `HELD_DEBUG`
   (constante fixa em `false`, ouvinte de teclado e `console.log`) saiu, e

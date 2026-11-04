@@ -1,0 +1,111 @@
+// Física de deslocamento do jogador: colisão AABB contra voxels e os
+// deslocamentos que respeitam essa colisão.
+//
+// O que mora aqui é só geometria: nada de Three, nada de áudio, nada de estado
+// global. O mundo entra por parâmetro (`world`) e o corpo do jogador entra como
+// `pos` + `height`. Assim a parte que mais erra — encostar exatamente na
+// superfície do bloco, deslizar em vez de travar, sair de dentro de uma porta —
+// pode ser testada sem navegador.
+
+import { boxOverlapsXZ, woodDoorPart } from './world-door.js';
+
+/** Raio horizontal do corpo do jogador (o voxel tem lado 1). */
+export const PLAYER_RADIUS = 0.3;
+/** Folga usada nas bordas da AABB: evita "colar" no bloco vizinho por arredondamento. */
+export const COLLISION_EPSILON = 1e-4;
+/** Maior passo por subdivisão: nada anda mais de 1/4 de bloco por vez. */
+export const MAX_MOVE_STEP = 0.25;
+/** Iterações da bisseção ao encostar: 6 deixa o erro em ~1/64 do passo. */
+export const MOVE_REFINE_STEPS = 6;
+
+// Um save antigo pode ter o corpo dentro do painel de uma porta que passou a
+// colidir (ou sob areia que caiu). Em vez de nascer preso, procura o ponto
+// livre mais próximo: mesmo bloco, depois um bloco acima, com deslocamentos
+// laterais suficientes para sair do painel fino.
+export const UNSTICK_OFFSETS = [
+    [0, 0], [0.45, 0], [-0.45, 0], [0, 0.45], [0, -0.45],
+    [0.45, 0.45], [-0.45, -0.45], [0.45, -0.45], [-0.45, 0.45],
+];
+
+/**
+ * O corpo do jogador em (x, y, z) — pés em `y`, altura `height` — encosta em
+ * algum bloco sólido?
+ *
+ * A porta é o caso especial: ela colide só com o painel, aberta ou fechada. O
+ * painel aberto é `solid: false` para não tapar o vão, então ele precisa ser
+ * tratado antes do teste de solidez.
+ */
+export function collidesInWorld(world, x, y, z, height, radius = PLAYER_RADIUS) {
+    const e = COLLISION_EPSILON;
+    const x0 = Math.floor(x - radius + e), x1 = Math.floor(x + radius - e);
+    const y0 = Math.floor(y + e),          y1 = Math.floor(y + height - e);
+    const z0 = Math.floor(z - radius + e), z1 = Math.floor(z + radius - e);
+    const pMinX = x - radius, pMaxX = x + radius;
+    const pMinZ = z - radius, pMaxZ = z + radius;
+    for (let bx = x0; bx <= x1; bx++)
+        for (let by = y0; by <= y1; by++)
+            for (let bz = z0; bz <= z1; bz++) {
+                const type = world.getBlock(bx, by, bz);
+                if (woodDoorPart(type)) {
+                    const box = world.doorCollisionBox(bx, by, bz, type);
+                    if (box && boxOverlapsXZ(box, pMinX, pMaxX, pMinZ, pMaxZ)) return true;
+                    continue;
+                }
+                if (!world.isSolidForPhysics(bx, by, bz, type)) continue;
+                return true;
+            }
+    return false;
+}
+
+/**
+ * Move `pos[axis]` em `amount`, sem atravessar bloco, em passos de no máximo
+ * `MAX_MOVE_STEP`. Devolve `true` se o movimento foi barrado.
+ */
+export function movePlayerAxis(world, pos, axis, amount, height, radius = PLAYER_RADIUS) {
+    if (amount === 0) return false;
+    const steps = Math.max(1, Math.ceil(Math.abs(amount) / MAX_MOVE_STEP));
+    const step = amount / steps;
+    for (let i = 0; i < steps; i++) {
+        const from = pos[axis];
+        pos[axis] = from + step;
+        if (!collidesInWorld(world, pos.x, pos.y, pos.z, height, radius)) continue;
+        // Encostou em algo: aproxima o máximo possível da superfície em vez de
+        // voltar para a borda do voxel. Blocos comuns param no mesmo ponto de
+        // antes; a porta fina deixa o jogador encostar no painel.
+        let free = from, blocked = pos[axis];
+        for (let k = 0; k < MOVE_REFINE_STEPS; k++) {
+            const mid = (free + blocked) / 2;
+            pos[axis] = mid;
+            if (collidesInWorld(world, pos.x, pos.y, pos.z, height, radius)) blocked = mid;
+            else free = mid;
+        }
+        pos[axis] = free;
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Tira o corpo de dentro de um bloco, se possível: mesmo lugar, depois um e dois
+ * blocos acima, tentando os deslocamentos laterais de `UNSTICK_OFFSETS` em cada
+ * altura. Devolve `true` se achou um ponto livre (e move `pos` para lá).
+ */
+export function unstickInWorld(world, pos, height, radius = PLAYER_RADIUS) {
+    if (!collidesInWorld(world, pos.x, pos.y, pos.z, height, radius)) return false;
+    for (let dy = 0; dy <= 2; dy++)
+        for (const [dx, dz] of UNSTICK_OFFSETS) {
+            const x = pos.x + dx, y = pos.y + dy, z = pos.z + dz;
+            if (!collidesInWorld(world, x, y, z, height, radius)) {
+                pos.set ? pos.set(x, y, z) : Object.assign(pos, { x, y, z });
+                return true;
+            }
+        }
+    return false;
+}
+
+/** O corpo do jogador ocupa (parcialmente) a célula (bx, by, bz)? */
+export function playerIntersectsBlock(pos, height, bx, by, bz, radius = PLAYER_RADIUS) {
+    return (pos.x - radius < bx + 1 && pos.x + radius > bx) &&
+           (pos.y < by + 1 && pos.y + height > by) &&
+           (pos.z - radius < bz + 1 && pos.z + radius > bz);
+}
