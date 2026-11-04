@@ -17,6 +17,10 @@ export const COLLISION_EPSILON = 1e-4;
 export const MAX_MOVE_STEP = 0.25;
 /** Iterações da bisseção ao encostar: 6 deixa o erro em ~1/64 do passo. */
 export const MOVE_REFINE_STEPS = 6;
+/** Quanto abaixo dos pés se procura o chão ao testar apoio (agachado). */
+export const SUPPORT_PROBE = 0.05;
+/** Pontos do corpo checados em busca de chão: os quatro cantos e o centro. */
+export const SUPPORT_POINTS = [[1, 1], [-1, 1], [1, -1], [-1, -1], [0, 0]];
 
 // Um save antigo pode ter o corpo dentro do painel de uma porta que passou a
 // colidir (ou sob areia que caiu). Em vez de nascer preso, procura o ponto
@@ -58,17 +62,53 @@ export function collidesInWorld(world, x, y, z, height, radius = PLAYER_RADIUS) 
 }
 
 /**
+ * Tem chão embaixo do corpo? Olha os quatro cantos da base e o centro um fio
+ * abaixo dos pés: basta um ponto apoiado para o corpo não cair, então dá para
+ * espiar a beirada meio para fora — mas nunca sair andando pelo vazio.
+ */
+export function hasGroundSupport(world, pos, height, radius = PLAYER_RADIUS) {
+    const edge = radius - COLLISION_EPSILON;
+    const by = Math.floor(pos.y - SUPPORT_PROBE);
+    for (const [sx, sz] of SUPPORT_POINTS) {
+        const bx = Math.floor(pos.x + sx * edge);
+        const bz = Math.floor(pos.z + sz * edge);
+        const type = world.getBlock(bx, by, bz);
+        if (world.isSolidForPhysics(bx, by, bz, type)) return true;
+    }
+    return false;
+}
+
+/**
  * Move `pos[axis]` em `amount`, sem atravessar bloco, em passos de no máximo
  * `MAX_MOVE_STEP`. Devolve `true` se o movimento foi barrado.
+ *
+ * `keepOnGround` (só faz sentido em x/z) barra o passo que deixaria o corpo sem
+ * chão embaixo — é o que impede de cair da beirada agachado. A parada é
+ * refinada por bisseção igual à da parede, senão sobraria até um quarto de
+ * bloco de folga antes da borda.
  */
-export function movePlayerAxis(world, pos, axis, amount, height, radius = PLAYER_RADIUS) {
+export function movePlayerAxis(world, pos, axis, amount, height, radius = PLAYER_RADIUS, { keepOnGround = false } = {}) {
     if (amount === 0) return false;
+    const guard = keepOnGround && axis !== 'y';
     const steps = Math.max(1, Math.ceil(Math.abs(amount) / MAX_MOVE_STEP));
     const step = amount / steps;
     for (let i = 0; i < steps; i++) {
         const from = pos[axis];
         pos[axis] = from + step;
-        if (!collidesInWorld(world, pos.x, pos.y, pos.z, height, radius)) continue;
+        if (!collidesInWorld(world, pos.x, pos.y, pos.z, height, radius)) {
+            if (!guard || hasGroundSupport(world, pos, height, radius)) continue;
+            // Andou para fora do chão: volta até a última posição apoiada.
+            let safe = from, beyond = pos[axis];
+            for (let k = 0; k < MOVE_REFINE_STEPS; k++) {
+                const mid = (safe + beyond) / 2;
+                pos[axis] = mid;
+                if (hasGroundSupport(world, pos, height, radius)
+                    && !collidesInWorld(world, pos.x, pos.y, pos.z, height, radius)) safe = mid;
+                else beyond = mid;
+            }
+            pos[axis] = safe;
+            return true;
+        }
         // Encostou em algo: aproxima o máximo possível da superfície em vez de
         // voltar para a borda do voxel. Blocos comuns param no mesmo ponto de
         // antes; a porta fina deixa o jogador encostar no painel.
