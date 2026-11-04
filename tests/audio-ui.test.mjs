@@ -148,6 +148,7 @@ test('todas as receitas são válidas e os nomes de arquivo são previsíveis', 
         'step-grass', 'step-dirt', 'step-stone', 'step-wood', 'step-sand',
         'break-grass', 'break-dirt', 'break-stone', 'break-wood', 'break-sand',
         'hit-grass', 'hit-dirt', 'hit-stone', 'hit-wood', 'hit-sand',
+        'water-splash', 'water-exit', 'water-dive', 'swim-stroke',
         'door-open', 'door-close',
         'place-grass', 'place-dirt', 'place-stone', 'place-wood', 'place-sand',
     ]);

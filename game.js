@@ -44,6 +44,7 @@ import { boxOverlapsXZ, woodDoorCollision, woodDoorPart, woodDoorShape, woodDoor
 import { advanceHandAnimation, countStrikes, createHandAnimation, handSwingAmount, startPunch } from './world-hand-animation.js';
 import { advanceStepTracker, createStepTracker, stepDistanceThisFrame, stepPitch, stepSoundFor } from './world-step-sounds.js';
 import { materialSoundName } from './world-block-materials.js';
+import { createWaterAudioState, waterSoundFor } from './world-water-sounds.js';
 import { getSharedAudio } from './world-audio.js';
 import { rightClickIntent } from './world-interaction-rules.js';
 import { loadGameSettings } from './world-game-settings.js';
@@ -2555,6 +2556,7 @@ const spawnPoint = new THREE.Vector3();
 
 let bobTimer = 0;
 const stepTracker = createStepTracker();
+const waterAudio = createWaterAudioState();
 const audio = getSharedAudio();
 
 let selectedSlot = 0;
@@ -2953,6 +2955,13 @@ function updatePhysics(dt) {
 
     world.water.updateSubmersion(world, player);
     const inWater = world.water.headInWater || world.water.feetInWater;
+    // Splash/saída/mergulho: só a transição soa, sem laço contínuo de água.
+    const waterSound = waterSoundFor(waterAudio, {
+        inWater,
+        headInWater: world.water.headInWater,
+        fallSpeed: player.vel.y,
+    });
+    if (waterSound) audio.play(waterSound.name, { gainScale: waterSound.gainScale, rate: stepPitch() });
     const atWaterSurface = world.water.feetInWater && !world.water.headInWater;
     const wantsDive = inWater && wantToCrouch;
     const wantsCrouch = !inWater && wantToCrouch;
@@ -2996,9 +3005,11 @@ function updatePhysics(dt) {
         } else if (atWaterSurface && jumpHeld && !swimStrokeLocked) {
             player.vel.y = Math.max(player.vel.y, 3.2);
             swimStrokeLocked = true;
+            audio.play('swim-stroke', { rate: stepPitch() });
         } else if (world.water.headInWater && jumpHeld && !swimStrokeLocked) {
             player.vel.y += 15.0 * dt;
             if (player.vel.y > 4.0) player.vel.y = 4.0; // Velocidade terminal subindo
+            audio.play('swim-stroke', { rate: stepPitch() });
         }
         player.vel.y *= Math.exp(-5.0 * dt); // Arrasto estável mesmo com variação no FPS
         player.vel.y -= (GRAVITY * 0.1) * dt;    // Gravidade muito fraca (simula peso d'água)
