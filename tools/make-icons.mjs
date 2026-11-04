@@ -7,6 +7,18 @@
 // Os PNGs ficam versionados junto do resto do site — o jogo não roda este script,
 // ele só existe para que os ícones sejam reproduzíveis (e para trocar cor/formato
 // sem editor de imagem).
+//
+// Três formatos, porque cada tela recorta de um jeito:
+//
+// - **`any`** (192 e 512): fundo transparente, bloco grande. É o que aparece em
+//   janela, dock e lista de apps do desktop;
+// - **`maskable`** (512): fundo cheio e bloco menor, dentro do círculo seguro de
+//   80% — o Android recorta em círculo, quadrado arredondado, gota… e o que
+//   estiver fora do círculo some. O teste confere o círculo de verdade, pixel a
+//   pixel;
+// - **`apple-touch-icon`** (180): o iOS **não** respeita transparência — alpha 0
+//   vira preto na tela de início. Por isso ele tem fundo de céu e é opaco, e o
+//   teste confere que todo pixel tem alpha 255.
 import { deflateSync } from 'node:zlib';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -71,7 +83,13 @@ const hex = (value) => [
     parseInt(value.slice(5, 7), 16),
 ];
 
-// Ruído determinístico por célula de 8 px: dá a textura de "pixel" do bloco sem
+/** Fração determinística 0..1 por coluna: dá a borda irregular da grama. */
+function jitter(value) {
+    const raw = Math.sin(value * 12.9898) * 43758.5453;
+    return raw - Math.floor(raw);
+}
+
+// Ruído determinístico por célula: dá a textura de "pixel" do bloco sem
 // depender de Math.random (o ícone precisa sair igual toda vez).
 function speckle(x, y, size) {
     const cell = Math.max(2, Math.round(size / 24));
@@ -100,51 +118,54 @@ function inPolygon(px, py, points) {
     return inside;
 }
 
+const GRASS_TOP = hex('#7cb342');
+const GRASS_SIDE = hex('#5e9134');
+const DIRT = hex('#8d6748');
+/** Quanto da lateral é grama (o resto é terra), como na textura do jogo. */
+const GRASS_BAND = 0.3;
+
 /**
  * Bloco de grama isométrico.
  * @param {number} size lado do PNG
- * @param {{ background?: string|null, blockRatio?: number }} options
+ * @param {{ background?: string|null, blockRatio?: number, texture?: boolean }} options
+ *   `background`: cor de fundo (ou `null` para transparente);
+ *   `blockRatio`: quanto do quadro o bloco ocupa;
+ *   `texture`: ruído de pixel na superfície (desligado, o ícone fica chapado e
+ *   mais legível em tamanho pequeno).
  */
-export function renderIcon(size, { background = null, blockRatio = 0.86 } = {}) {
+export function renderIcon(size, { background = null, blockRatio = 0.86, texture = true } = {}) {
     const rgba = Buffer.alloc(size * size * 4);
     const cx = size / 2;
     const cy = size / 2;
     const half = (size * blockRatio) / 2;
     const w = half * 0.92;
     const h = half * 0.52;
+    const faceHeight = h * 1.1;
 
     const top = [[cx, cy - h * 1.15], [cx + w, cy - h * 0.35], [cx, cy + h * 0.45], [cx - w, cy - h * 0.35]];
     const left = [[cx - w, cy - h * 0.35], [cx, cy + h * 0.45], [cx, cy + h * 1.55], [cx - w, cy + h * 0.75]];
     const right = [[cx + w, cy - h * 0.35], [cx, cy + h * 0.45], [cx, cy + h * 1.55], [cx + w, cy + h * 0.75]];
 
-    const grassTop = hex('#7cb342');
-    const grassSide = hex('#5e9134');
-    const dirt = hex('#8d6748');
-    const dirtDark = hex('#6f4f36');
-    const sky = hex('#87ceeb');
+    // Borda de cima de cada lateral: as duas arestas que saem do canto da frente.
+    const leftTop = (x) => cy - h * 0.35 + ((x - (cx - w)) / w) * h * 0.8;
+    const rightTop = (x) => cy + h * 0.45 - ((x - cx) / w) * h * 0.8;
 
     for (let y = 0; y < size; y++) {
         for (let x = 0; x < size; x++) {
             const index = (y * size + x) * 4;
-            let color = null;
+            let color = background ? shade(hex(background), 1 - (y / size) * 0.18) : null;
 
-            if (background) {
-                // fundo de céu levemente degradê, para o ícone maskable não ficar chapado
-                const t = (y / size) * 0.18;
-                color = shade(hex(background), 1 - t);
-            }
-
-            const noise = speckle(x, y, size);
-            const grain = 0.9 + noise * 0.2;
+            const grain = texture ? 0.9 + speckle(x, y, size) * 0.2 : 1;
+            const band = GRASS_BAND + (texture ? jitter(x) * 0.1 - 0.05 : 0);
 
             if (inPolygon(x, y, top)) {
-                color = shade(grassTop, grain * (0.96 + noise * 0.08));
+                color = shade(GRASS_TOP, grain * (texture ? 0.96 + speckle(x, y, size) * 0.08 : 1));
             } else if (inPolygon(x, y, left) || inPolygon(x, y, right)) {
-                const face = inPolygon(x, y, left) ? 1 : 0.86;
-                // faixa de grama no topo das laterais, como no bloco do jogo
-                const surface = y < cy + h * 0.45 + h * 0.22;
-                const base = surface ? grassSide : (face === 1 ? dirt : dirtDark);
-                color = shade(base, grain * face);
+                const isLeft = inPolygon(x, y, left);
+                const t = (y - (isLeft ? leftTop(x) : rightTop(x))) / faceHeight;
+                // Face da esquerda pega mais luz; a da direita é a sombra do bloco.
+                const light = isLeft ? 1 : 0.82;
+                color = shade(t < band ? GRASS_SIDE : DIRT, grain * light);
             }
 
             if (!color) {
@@ -154,23 +175,30 @@ export function renderIcon(size, { background = null, blockRatio = 0.86 } = {}) 
             rgba[index] = color[0];
             rgba[index + 1] = color[1];
             rgba[index + 2] = color[2];
-            rgba[index + 3] = background ? 255 : (background === null && color === sky ? 0 : 255);
+            rgba[index + 3] = 255;
         }
     }
     return encodePng(size, size, rgba);
 }
 
-const targets = [
+export const ICON_TARGETS = [
+    // Desktop: fundo transparente, bloco grande.
     { file: 'icon-192.png', size: 192, options: { blockRatio: 0.92 } },
     { file: 'icon-512.png', size: 512, options: { blockRatio: 0.92 } },
-    // maskable: fundo cheio e bloco menor, para o recorte circular do Android
-    { file: 'icon-maskable-512.png', size: 512, options: { background: '#87ceeb', blockRatio: 0.62 } },
-    { file: 'favicon-32.png', size: 32, options: { blockRatio: 0.98 } },
+    // Android: fundo cheio, bloco dentro do círculo seguro de 80%.
+    { file: 'icon-maskable-512.png', size: 512, options: { background: '#87ceeb', blockRatio: 0.78 } },
+    // iOS: sem transparência (alpha 0 viraria preto na tela de início).
+    { file: 'apple-touch-icon-180.png', size: 180, options: { background: '#87ceeb', blockRatio: 0.78 } },
+    // Aba do navegador: chapado, sem ruído, que em 16 px vira sujeira.
+    { file: 'favicon-32.png', size: 32, options: { blockRatio: 0.98, texture: false } },
 ];
 
-mkdirSync(OUT_DIR, { recursive: true });
-for (const { file, size, options } of targets) {
-    const png = renderIcon(size, options);
-    writeFileSync(path.join(OUT_DIR, file), png);
-    console.log(`${file}: ${size}x${size}, ${png.length} bytes`);
+const isCli = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isCli) {
+    mkdirSync(OUT_DIR, { recursive: true });
+    for (const { file, size, options } of ICON_TARGETS) {
+        const png = renderIcon(size, options);
+        writeFileSync(path.join(OUT_DIR, file), png);
+        console.log(`${file}: ${size}x${size}, ${png.length} bytes`);
+    }
 }

@@ -13,7 +13,8 @@ const HTML = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const IMPORT_MAP = JSON.parse(/<script type="importmap">([\s\S]*?)<\/script>/.exec(HTML)[1]);
 const MODULE_URLS = Object.values(IMPORT_MAP.imports).filter(url => !url.endsWith('/'));
 const BASE = 'https://example.test/';
-const CACHE = 'voxel-sandbox-v2';
+// O nome do cache sai do próprio worker: mudar CACHE_VERSION não quebra o teste.
+const CACHE = `voxel-sandbox-${/const CACHE_VERSION = '([^']+)'/.exec(SOURCE)[1]}`;
 
 class FakeResponse {
     constructor(body = '', init = {}) {

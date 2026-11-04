@@ -236,8 +236,8 @@ test('o index.html aponta o manifest, o tema e os ícones', () => {
     assert.match(html, /<link rel="manifest" href="manifest\.webmanifest">/);
     assert.match(html, /<meta name="theme-color" content="#171717">/);
     assert.match(html, /<link rel="icon" href="icons\/favicon-32\.png"/);
-    assert.match(html, /<link rel="apple-touch-icon" href="icons\/icon-192\.png">/,
-        'iOS não lê o manifest: precisa do toque na tela inicial');
+    assert.match(html, /<link rel="apple-touch-icon" href="icons\/apple-touch-icon-180\.png">/,
+        'iOS não lê o manifest: precisa do toque na tela inicial (e de um ícone opaco)');
     assert.match(html, /<meta name="apple-mobile-web-app-capable" content="yes">/);
 });
 

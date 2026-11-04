@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 533 testes de módulos puros (node --test)
+npm test           # 541 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -179,7 +179,7 @@ cinza do menu) que aparece quando há como instalar:
 | Service worker | `service-worker.js` | guarda **o jogo inteiro** na instalação (a lista sai do `index.html`) |
 | Registro | `world-pwa.js` | registra só em `http(s)`; `?sw=0` desliga |
 | Botão de instalar | `world-install-prompt.js` | decide quando mostrar e chama o convite do navegador (testado sem DOM) |
-| Ícones | `icons/` | gerados por `tools/make-icons.mjs` (PNG escrito na mão, sem dependência) |
+| Ícones | `icons/` | gerados por `tools/make-icons.mjs` (PNG escrito na mão, sem dependência): bloco transparente para desktop, maskable com fundo para o Android e um opaco de 180 para o iOS |
 
 **O que guardar vem do próprio `index.html`.** Na instalação o worker busca a
 página e lê duas coisas: o importmap (que já lista **todos** os módulos com o
