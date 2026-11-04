@@ -47,6 +47,7 @@ import { advanceStepTracker, createStepTracker, stepDistanceThisFrame, stepPitch
 import { materialSoundName } from './world-block-materials.js';
 import { createWaterAudioState, waterSoundFor } from './world-water-sounds.js';
 import { damageSoundFor } from './world-damage-sounds.js';
+import { ambientAvailability, createAmbientState, stepAmbient } from './world-ambient-sounds.js';
 import { getSharedAudio } from './world-audio.js';
 import { rightClickIntent } from './world-interaction-rules.js';
 import { loadGameSettings } from './world-game-settings.js';
@@ -2525,6 +2526,38 @@ function updateSky() {
 }
 
 // =====================================================================
+// 5E2. AMBIENTE (VENTO E GRILOS)
+// =====================================================================
+// O ambiente não é trilha: são fases curtas e espaçadas (silêncio, vento,
+// grilos, às vezes os dois). Quem decide a fase é world-ambient-sounds.js; aqui
+// só se descobre o que existe no lugar/hora e se aplica o resultado com fade.
+const ambientState = createAmbientState();
+let ambientApplied = { wind: 0, crickets: 0 };
+
+function applyAmbientLevels(levels) {
+    // evita reescrever o grafo de áudio a cada quadro: só quando muda de verdade
+    if (Math.abs(levels.wind - ambientApplied.wind) < 0.01
+        && Math.abs(levels.crickets - ambientApplied.crickets) < 0.01) return;
+    ambientApplied = { wind: levels.wind, crickets: levels.crickets };
+    audio.setAmbientLevels(ambientApplied);
+}
+
+function updateAmbient(dt) {
+    // menu, pausa, morte e aba escondida: silêncio. A fase congela, então voltar
+    // não recomeça o sorteio do zero.
+    if (!controls.isLocked || dead || document.hidden) {
+        applyAmbientLevels({ wind: 0, crickets: 0 });
+        return;
+    }
+    const availability = ambientAvailability({
+        height: player.pos.y,
+        night: worldSky.day < 0.35,
+        seaLevel: WATER_LEVEL,
+    });
+    applyAmbientLevels(stepAmbient(ambientState, dt, { availability }));
+}
+
+// =====================================================================
 // 5F. NUVENS VOXEL
 // =====================================================================
 // =====================================================================
@@ -3641,6 +3674,7 @@ function animate() {
     if (controls.isLocked || inventoryOpen) worldClouds.update(dt, camera);
     else worldClouds.update(0, camera);
     updateHand(dt);
+    updateAmbient(dt);
     if (hurtFlash > 0) { hurtFlash = Math.max(0, hurtFlash - dt * 2); hurtEl.style.opacity = hurtFlash; }
     world.update(player.pos.x, player.pos.z);
     updateDebug(rawDt);

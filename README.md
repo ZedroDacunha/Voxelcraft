@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 313 testes de módulos puros (node --test)
+npm test           # 330 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -101,6 +101,12 @@ mergulho abafado e braçada — sem laço contínuo. **Dano** tem gemido grave q
 cresce com o tamanho do golpe, e a morte tem som próprio. **Forno** crepita ao
 acender, sopra ao apagar e avisa quando a peça fica pronta — e o som afina com a
 distância, para um forno esquecido longe não soar ao lado do jogador.
+
+O **ambiente** é o único som contínuo, e é escasso de propósito: fases de
+silêncio, vento, grilos (só de noite, perto do nível do mar) e, de vez em quando,
+os dois juntos — nunca a mesma fase duas vezes seguidas, sempre com pausa entre
+elas. Duas camadas em laço (um nó de áudio cada, criadas uma vez) com fade na
+entrada e na saída, e silêncio na pausa, no menu e com a aba escondida.
 
 Para usar um som gravado, copie o arquivo com o nome do efeito para
 `assets/sounds/` — o carregador prefere `ui-click.ogg`/`.wav` (e assim por

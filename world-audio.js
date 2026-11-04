@@ -153,6 +153,18 @@ export const SOUND_ASSET_EXTENSIONS = Object.freeze(['ogg', 'wav']);
 export const SOUND_ASSET_DIR = 'assets/sounds';
 export const DEFAULT_SOUND_VOLUME = 0.7;
 
+// Ambiente: as duas camadas contínuas do jogo. São laços de ruído gerados na
+// hora (um por camada, para a página inteira) — nunca um som por quadro.
+export const AMBIENT_LAYERS = Object.freeze(['wind', 'crickets']);
+export const AMBIENT_RECIPES = Object.freeze({
+    // vento: ruído grave filtrado, com corpo
+    wind: Object.freeze({ gain: 0.055, cut: 480, q: 0.7, loopSeconds: 3 }),
+    // grilos: chiado fino e estreito, quase no limite do audível
+    crickets: Object.freeze({ gain: 0.042, cut: 4200, q: 8, loopSeconds: 4 }),
+});
+// Fade das camadas: entrar e sair de fase nunca é um degrau (o degrau estala).
+export const AMBIENT_FADE_SECONDS = 0.9;
+
 export function soundAssetCandidates(name) {
     return SOUND_ASSET_EXTENSIONS.map(ext => `${SOUND_ASSET_DIR}/${name}.${ext}`);
 }
@@ -305,6 +317,121 @@ export function createAudioSystem({
         return true;
     }
 
+    // --- ambiente -------------------------------------------------------
+    // Um buffer por camada, gerado em JS: vento é ruído com grave acumulado,
+    // grilos são pulsos curtos e agudos em ritmo irregular (ruído filtrado
+    // soaria como chiado, não como inseto).
+    const ambientBuffers = new WeakMap();
+
+    function ambientBufferFor(context, name) {
+        let cache = ambientBuffers.get(context);
+        if (!cache) { cache = new Map(); ambientBuffers.set(context, cache); }
+        if (cache.has(name)) return cache.get(name);
+        const recipe = AMBIENT_RECIPES[name] ?? AMBIENT_RECIPES.wind;
+        const sampleRate = context.sampleRate ?? 44100;
+        const length = Math.max(1, Math.floor(sampleRate * recipe.loopSeconds));
+        const buffer = context.createBuffer(1, length, sampleRate);
+        const data = buffer.getChannelData(0);
+        const twoPi = Math.PI * 2;
+        if (name === 'crickets') {
+            // sequência fixa de pulsos: curto, agudo, com silêncio entre eles.
+            // O laço de 4 s cabe ~3 "chamados", o que soa orgânico sem repetir
+            // rápido demais.
+            const bursts = [0.05, 0.62, 0.9, 1.55, 2.3, 2.35, 2.4, 3.1];
+            for (const start of bursts) {
+                const begin = Math.floor(start * sampleRate);
+                const chirp = Math.floor(sampleRate * 0.055);
+                const freq = 4100 + (start % 0.3) * 900;
+                for (let i = 0; i < chirp && begin + i < length; i++) {
+                    const t = i / sampleRate;
+                    const envelope = Math.sin(Math.PI * (i / chirp)) ** 2;
+                    data[begin + i] += Math.sin(twoPi * freq * t) * envelope * 0.5;
+                }
+            }
+        } else {
+            // vento: ruído branco passado por um passa-baixa de um polo, com o
+            // corte variando devagar (rajada) — o que dá a sensação de ar.
+            let low = 0;
+            for (let i = 0; i < length; i++) {
+                const t = i / length;
+                const gust = 0.55 + 0.45 * Math.sin(twoPi * t * 2) * Math.sin(twoPi * t);
+                const cutoff = 0.02 + 0.02 * gust;
+                low += cutoff * ((Math.random() * 2 - 1) - low);
+                data[i] = low * (1.4 + gust * 1.2);
+            }
+        }
+        cache.set(name, buffer);
+        return buffer;
+    }
+
+    const ambientNodes = new Map();
+
+    function ensureAmbientLayer(name) {
+        const existing = ambientNodes.get(name);
+        if (existing) return existing;
+        const context = state.context;
+        const recipe = AMBIENT_RECIPES[name];
+        if (!context || !recipe) return null;
+        const when = context.currentTime ?? 0;
+        const source = context.createBufferSource();
+        source.buffer = ambientBufferFor(context, name);
+        source.loop = true;
+        const filter = context.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(recipe.cut, when);
+        filter.Q?.setValueAtTime?.(recipe.q, when);
+        const gain = context.createGain();
+        gain.gain.value = 0;
+        source.connect(filter);
+        filter.connect(gain);
+        gain.connect(state.master);
+        source.start(when);
+        const layer = { source, filter, gain };
+        ambientNodes.set(name, layer);
+        return layer;
+    }
+
+    // Ganhos por camada (0 a 1). O volume final é o da receita vezes esse valor,
+    // então quem decide a mixagem é o jogo, e o timbre é daqui.
+    function setAmbientLevels(levels = {}) {
+        const wanted = {};
+        let total = 0;
+        for (const name of AMBIENT_LAYERS) {
+            const value = Number(levels?.[name]);
+            wanted[name] = Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
+            total += wanted[name];
+        }
+        // nada para tocar e nada tocando: não cria AudioContext à toa (o
+        // navegador só libera áudio depois de um gesto do jogador)
+        if (total <= 0 && ambientNodes.size === 0) return false;
+        if (!ensureContext()) return false;
+        const context = state.context;
+        const when = context.currentTime ?? 0;
+        const ramp = Math.max(0.01, AMBIENT_FADE_SECONDS / 3);
+        for (const name of AMBIENT_LAYERS) {
+            const target = wanted[name] * (AMBIENT_RECIPES[name]?.gain ?? 0);
+            const layer = target > 0 ? ensureAmbientLayer(name) : ambientNodes.get(name);
+            if (!layer) continue;
+            const param = layer.gain.gain;
+            if (typeof param.setTargetAtTime === 'function') param.setTargetAtTime(target, when, ramp);
+            else param.value = target;
+        }
+        return true;
+    }
+
+    function stopAmbient() {
+        for (const layer of ambientNodes.values()) {
+            try {
+                layer.gain.gain.value = 0;
+                layer.source.stop?.(0);
+            } catch {
+                // já parado
+            }
+        }
+        ambientNodes.clear();
+        return true;
+    }
+
     function loadAsset(name) {
         if (assets.has(name)) return Promise.resolve(assets.get(name));
         if (pending.has(name)) return pending.get(name);
@@ -387,6 +514,7 @@ export function createAudioSystem({
         } catch {
             // nada a fazer: contexto já fechado
         }
+        ambientNodes.clear();
         state.context = null;
         state.master = null;
         assets.clear();
@@ -400,6 +528,8 @@ export function createAudioSystem({
         get available() { return Boolean(AudioContextClass); },
         play,
         preload,
+        setAmbientLevels,
+        stopAmbient,
         setMuted,
         setVolume,
         unlock,

@@ -4,6 +4,14 @@ O jogo **não precisa** de arquivos aqui: todo efeito é sintetizado em WebAudio
 (`world-audio.js`). Esta pasta existe para você trocar o som de um efeito sem
 mexer em código.
 
+## Ambiente (vento e grilos)
+
+As duas camadas contínuas (`wind` e `crickets`) **não** aceitam arquivo por
+enquanto: os laços são gerados em memória na primeira vez que tocam (vento =
+ruído com grave acumulado; grilos = pulsos agudos em ritmo irregular), porque um
+laço precisa repetir sem emenda — e um `.ogg` curto em laço emenda com clique.
+Trocar por arquivo exigiria um laço já masterizado, o que é outro recorte.
+
 ## Como trocar
 
 Copie o arquivo com o nome exato do efeito. A cada clique/toque o jogo tenta
