@@ -40,7 +40,7 @@ funcionando, para o teste medir exatamente o caminho do save.
 Timers falsos (`node:test` MockTimers) permitem percorrer a escada inteira de
 espera em milissegundos, comparando "não tentou antes de X" com "tentou em X".
 
-## Achado durante os testes (não corrigido aqui)
+## Achado durante os testes (corrigido em [BUG-20261104](BUG-20261104-save-falha-silenciosa.md))
 
 Com `preservePrevious: true`, `world-save-lock.js` grava dentro do callback
 `previous.onsuccess`:
@@ -59,8 +59,9 @@ e o manager registraria o save como bem-sucedido). É raro — os saves do jogo 
 objetos simples, e `QuotaExceededError` chega por `onerror`, não por exceção —,
 mas a defesa é pequena: embrulhar o callback e abortar a transação no erro.
 
-Fica registrado como próximo recorte, para não misturar correção de comportamento
-com o PR de testes.
+Ficou registrado como recorte separado — e foi corrigido em seguida
+([BUG-20261104-save-falha-silenciosa.md](BUG-20261104-save-falha-silenciosa.md)),
+com dois testes de regressão em `tests/save-concurrency.test.mjs`.
 
 ## Validação
 

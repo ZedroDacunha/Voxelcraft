@@ -19,6 +19,7 @@ export function createFakeDatabase(initial = {}) {
         close() { db.closes++; },
         transaction() {
             let aborted = false;
+            let thrownInHandler = false;
             const ops = [];
             const store = {
                 get(key) { return enqueue(() => clone(data.get(key))); },
@@ -27,6 +28,7 @@ export function createFakeDatabase(initial = {}) {
             };
             const tx = {
                 error: null,
+                get thrownInHandler() { return thrownInHandler; },
                 abort() { aborted = true; tx.onabort?.(); },
                 objectStore() { return store; },
             };
@@ -45,7 +47,15 @@ export function createFakeDatabase(initial = {}) {
                         request.onerror?.();
                         return;
                     }
-                    request.onsuccess?.();
+                    // O navegador engole exceção que escapa de um handler de evento:
+                    // a transação segue e commita. Reproduzir isso é o que permite
+                    // testar o perigo do `preservePrevious` (gravar dentro do
+                    // `onsuccess` e falhar calado).
+                    try {
+                        request.onsuccess?.();
+                    } catch {
+                        thrownInHandler = true;
+                    }
                 }
                 if (!aborted) tx.oncomplete?.();
             };

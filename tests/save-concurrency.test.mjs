@@ -89,6 +89,69 @@ test('write sem preservePrevious não mexe no backup', async () => {
     await lock.release();
 });
 
+// Banco em que o `put` da chave pedida lança (é o que o navegador faz com valor
+// que não dá para clonar: `DataCloneError` sai como exceção síncrona).
+function createThrowingPutDatabase(initial, shouldThrow) {
+    const { data, db } = createFakeDatabase(initial);
+    const openTransaction = db.transaction.bind(db);
+    db.transaction = (name, mode) => {
+        const tx = openTransaction(name, mode);
+        const objectStore = tx.objectStore.bind(tx);
+        tx.objectStore = (storeName) => {
+            const store = objectStore(storeName);
+            const put = store.put.bind(store);
+            store.put = (value, key) => {
+                if (shouldThrow(key, value)) {
+                    const error = new Error('O valor não pôde ser clonado.');
+                    error.name = 'DataCloneError';
+                    throw error;
+                }
+                return put(value, key);
+            };
+            return store;
+        };
+        return tx;
+    };
+    return { data, db };
+}
+
+test('falha ao gravar dentro do onsuccess rejeita em vez de dar o save como feito', async () => {
+    let failing = false;
+    const { data, db } = createThrowingPutDatabase(
+        { 'world-a': { geracao: 1 } },
+        key => failing && key === 'world-a',
+    );
+    const { lock } = createLock(db);
+    await lock.acquire();
+
+    failing = true;
+    await assert.rejects(
+        lock.write({ geracao: 2 }, { preservePrevious: true }),
+        /clonado/,
+        'a gravação acontece dentro de um onsuccess: o erro não pode sumir',
+    );
+    assert.deepEqual(data.get('world-a'), { geracao: 1 }, 'o save anterior continua intacto');
+    assert.equal(lock.isOwned, true, 'falha de gravação não custa o lease (o retry depende dele)');
+
+    failing = false;
+    assert.equal(await lock.write({ geracao: 2 }, { preservePrevious: true }), true, 'a próxima tentativa funciona');
+    assert.deepEqual(data.get('world-a'), { geracao: 2 });
+    await lock.release();
+});
+
+test('falha ao gravar sem preservePrevious também rejeita', async () => {
+    const { data, db } = createThrowingPutDatabase(
+        { 'world-a': { geracao: 1 } },
+        key => key === 'world-a',
+    );
+    const { lock } = createLock(db);
+    await lock.acquire();
+
+    await assert.rejects(lock.write({ geracao: 2 }), /clonado/);
+    assert.deepEqual(data.get('world-a'), { geracao: 1 });
+    await lock.release();
+});
+
 test('write com deleteKey consome a cópia importada', async () => {
     const { data, db } = createFakeDatabase({ 'world-a-imported': { importado: true } });
     const { lock } = createLock(db);
