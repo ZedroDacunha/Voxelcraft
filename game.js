@@ -45,6 +45,7 @@ import { boxOverlapsXZ, woodDoorCollision, woodDoorPart, woodDoorShape, woodDoor
 import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld } from './player-physics.js';
 import { canJumpFrom, createJumpState, updateJumpWindow } from './player-jump.js';
 import { createCreatureSystemClass, creatureInReach } from './world-creature.js';
+import { createSheepSystemClass } from './world-sheep.js';
 import { dustScaleFor } from './world-creature-dust.js';
 import { configureWindSway, updateWindSway, windDirectionFor, windStep, windTargetFor } from './world-wind.js';
 import { advanceHandAnimation, countStrikes, createHandAnimation, handSwingAmount, startPunch } from './world-hand-animation.js';
@@ -1276,6 +1277,17 @@ const CreatureSystem = createCreatureSystemClass({
             new THREE.Vector3(entity.x, entity.y + 0.35, entity.z),
             new THREE.Vector3(0, 0.45, 0), 0.3);
     },
+});
+
+// =====================================================================
+// 5A-2. CRIATURAS DE DIA — Ovelha
+// =====================================================================
+// Modelo, nascimento no pasto e passeio vivem em world-sheep.js; aqui só se
+// conectam as peças do jogo que o módulo não conhece (Three, catálogo, chunk).
+// Neste primeiro recorte ela só existe e vaga: ainda não foge, não pasta e não
+// dá lã.
+const SheepSystem = createSheepSystemClass({
+    THREE, ID, BLOCKS, CHUNK_SIZE, floorDiv, hash2,
 });
 
 // =====================================================================
@@ -2633,7 +2645,7 @@ function updateWaterfall(dt) {
 // =====================================================================
 // 6. ESTADO GERAL
 // =====================================================================
-let camera, scene, renderer, controls, world, creatureSystem, tallGrassMaterial, tallGrassMaterials = [];
+let camera, scene, renderer, controls, world, creatureSystem, sheepSystem, tallGrassMaterial, tallGrassMaterials = [];
 const breakParticles = createBreakParticleSystem({
     THREE,
     getScene: () => scene,
@@ -3861,6 +3873,7 @@ async function init() {
 
     world = new World(scene, SEED, decorations, grassGeometries, tallGrassMaterials);
     creatureSystem = new CreatureSystem(world);
+    sheepSystem = new SheepSystem(world);
     const save = await loadGame();
     if (save) {
         world.edits = save.edits;
@@ -4364,6 +4377,9 @@ function animate() {
         // aparece ao anoitecer / vai embora ao amanhecer.
         creatureSystem.update(dt, { pos: player.pos, vel: player.vel, crouching: isCrouching }, true,
             { night: 1 - worldSky.day });
+        // A ovelha é o contrário: de dia ela está no pasto (`worldSky.day` perto
+        // de 1). Mansa por enquanto — só vaga.
+        sheepSystem.update(dt, { pos: player.pos }, true, { day: worldSky.day });
         updateTarget();
         if (!strikeCreature()) updateMining(dt);
         updateEating(dt);

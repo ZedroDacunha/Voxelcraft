@@ -14,6 +14,9 @@
 // (`creatureInReach`), para poder testar a regra sem THREE, sem mundo e sem
 // relógio de verdade.
 
+import {
+    CREATURE_HOP_HEIGHT, createCreatureBaseClass, glideHeightAt, hopHeightAt,
+} from './world-creature-base.js';
 import { floorDiv as defaultFloorDiv } from './world-grid.js';
 import { hash2 as defaultHash2 } from './world-math.js';
 import { DUST_LANDING_PUFF, createCreatureDust, dustStep } from './world-creature-dust.js';
@@ -70,10 +73,9 @@ export const HIT_REACH = 3.5;
 export const HIT_MIN_DOT = 0.86; // ~31° de abertura: mirar no bicho, não "perto dele"
 /** Um mesmo Mofim não leva dois golpes no mesmo instante (evita spam com o botão segurado). */
 export const HIT_COOLDOWN = 0.35;
-/** Altura que ele pula para subir um degrau e duração do pulo (visual e curto). */
-export const STEP_UP = 1;
 export const HOP_DURATION = 0.26;
-export const HOP_HEIGHT = 0.42;
+/** Altura do arco do pulo (mesma da base das criaturas). */
+export const HOP_HEIGHT = CREATURE_HOP_HEIGHT;
 /** Descida: em vez de cair seco, ele planeja com as asas abertas. */
 export const GLIDE_DURATION = 0.42;
 /**
@@ -274,36 +276,8 @@ export function chirpFor({
     return null;
 }
 
-/**
- * Altura do corpo durante o pulo do degrau.
- *
- * Sobe até `altura` acima do destino e desce até pousar nele — um arco de salto,
- * não uma rampa. Rampa (linear + seno) quase não levanta o corpo quando o degrau
- * é de 1 bloco, e o pulo fica invisível.
- */
-export function hopHeightAt(from, to, progress, altura = HOP_HEIGHT) {
-    if (!(progress > 0)) return from;
-    if (progress >= 1) return to;
-    const peak = to + altura;
-    const subida = 0.6;
-    return progress < subida
-        ? from + (peak - from) * (progress / subida)
-        : peak + (to - peak) * ((progress - subida) / (1 - subida));
-}
-
-/**
- * Altura do corpo ao descer um degrau, com as asas abertas.
- *
- * É o inverso do pulo: desce depressa no começo e **pousa devagar** (a curva
- * desacelera até parar no chão). Queda `to + (from - to) * (1 - p)²` — sem
- * "quique", sem passar do chão.
- */
-export function glideHeightAt(from, to, progress) {
-    if (!(progress > 0)) return from;
-    if (progress >= 1) return to;
-    const queda = 1 - progress;
-    return to + (from - to) * queda * queda;
-}
+/** O arco do pulo e o planeio do degrau moram na base (a ovelha usa os mesmos). */
+export { glideHeightAt, hopHeightAt };
 
 /**
  * Altura do corpo durante o voo curto.
@@ -420,16 +394,17 @@ export function createCreatureSystemClass({
     // (world-wind.js); aqui só se repassa ao sistema de partículas.
     wind = () => null,
 }) {
-    class CreatureSystem {
+    // Chão, passo e caixa vêm da base das criaturas: são regras do mundo, não
+    // do Mofim (a ovelha usa as mesmas).
+    const CreatureBase = createCreatureBaseClass({ THREE, BLOCKS, CHUNK_SIZE, floorDiv });
+
+    class CreatureSystem extends CreatureBase {
         constructor(world) {
-            this.world = world;
-            this.entities = [];
+            super(world);
             this.nextSpawnAt = 0;
             this.spawnAttempt = 0;
-            this.nextId = 1;
             // Lado de onde a noite inteira chega; zera quando o dia volta.
             this.arrivalBearing = null;
-            this.cube = new THREE.BoxGeometry(1, 1, 1);
             // Rastro de pó: pool fixo de cubinhos, criado no primeiro pó e nunca
             // descartado. Ele vive no sistema (não no bicho): um pool só serve
             // os três da noite.
@@ -443,44 +418,6 @@ export function createCreatureSystemClass({
                 eye: new THREE.MeshLambertMaterial({ color: 0x173b42 }),
                 glow: new THREE.MeshBasicMaterial({ color: 0xf2c86b }),
             };
-        }
-
-        /** Chão serve se for sólido: grama, terra, areia, pedra, neve… */
-        isGround(type) {
-            return type !== 0 && (BLOCKS[type]?.solid ?? true);
-        }
-
-        /**
-         * Ele atravessa o que não é sólido — grama alta, tocha, flor — mas não
-         * água: sem isso ficava preso na primeira touceira do caminho (a grama
-         * alta ocupava a célula de cima e a coluna era recusada) e, num campo
-         * cheio dela, nem nascia.
-         */
-        isClear(type) {
-            if (type === 0) return true;
-            const block = BLOCKS[type];
-            if (!block) return true;
-            return !(block.solid ?? true) && block.render !== 'liquid';
-        }
-
-        surfaceAt(x, z) {
-            const bx = Math.floor(x), bz = Math.floor(z);
-            if (!this.world.getChunk(floorDiv(bx, CHUNK_SIZE), floorDiv(bz, CHUNK_SIZE))) return null;
-            const y = this.world.generator.heightAt(bx, bz);
-            if (!this.isGround(this.world.getBlock(bx, y, bz))) return null;
-            if (!this.isClear(this.world.getBlock(bx, y + 1, bz))) return null;
-            if (!this.isClear(this.world.getBlock(bx, y + 2, bz))) return null;
-            return y + 1;
-        }
-
-        addPart(group, material, x, y, z, sx, sy, sz) {
-            const mesh = new THREE.Mesh(this.cube, material);
-            mesh.position.set(x, y, z);
-            mesh.scale.set(sx, sy, sz);
-            mesh.castShadow = false;
-            mesh.receiveShadow = false;
-            group.add(mesh);
-            return mesh;
         }
 
         /**
@@ -640,14 +577,6 @@ export function createCreatureSystemClass({
             }
         }
 
-        /** Tira o Mofim do mundo e solta o material dele (não é compartilhado). */
-        removeEntity(entity) {
-            const index = this.entities.indexOf(entity);
-            if (index >= 0) this.entities.splice(index, 1);
-            this.world.scene.remove(entity.group);
-            entity.bodyMaterial?.dispose?.();
-        }
-
         /**
          * O jogador deu um golpe? Assusta o Mofim atingido, tira-lhe um ponto de
          * vida e devolve `{ entity, killed }` — ou `null` se não acertou ninguém.
@@ -674,32 +603,6 @@ export function createCreatureSystemClass({
             this.removeEntity(target);
             onDeath(target);
             return { entity: target, killed: true };
-        }
-
-        /**
-         * Dá um passo na direção pedida, se o chão à frente servir. Devolve
-         * `false` quando o caminho está barrado (encosta, água, buraco) — quem
-         * chama decide o que fazer, e o passo nunca é dado "no escuro".
-         */
-        stepToward(e, dirX, dirZ, speed, dt) {
-            const length = Math.hypot(dirX, dirZ);
-            if (!(length > 1e-6)) return false;
-            const step = speed * dt;
-            const nx = e.x + (dirX / length) * step;
-            const nz = e.z + (dirZ / length) * step;
-            const ny = this.surfaceAt(nx, nz);
-            if (ny === null || Math.abs(ny - e.y) > STEP_UP) return false;
-            if (ny > e.y) {
-                e.hopFrom = e.visualY;
-                e.hopTo = ny;
-                e.hopT = 0;
-            } else if (ny < e.y) {
-                e.glideFrom = e.visualY;
-                e.glideT = 0;
-            }
-            e.x = nx; e.z = nz; e.y = ny;
-            e.heading = Math.atan2(dirX, dirZ);
-            return true;
         }
 
         /**

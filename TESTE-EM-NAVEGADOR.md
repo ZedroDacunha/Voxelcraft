@@ -462,6 +462,24 @@ faixa escura no meio.
 - [ ] O ícone da porta no inventário mostra a metade de baixo com batente e
       painel.
 
+## 23. Ovelha no pasto
+
+A primeira criatura de **dia**. Ela nasce longe (16–30 blocos) e chega andando, em
+vez de aparecer parada ao lado — então o teste é esperar e procurar.
+
+- [ ] De dia (céu claro) aparecem **até quatro** ovelhas no campo, brancas,
+      cinzas e pretas. De noite não aparece nenhuma.
+- [ ] Todas nascem **em grama** — nenhuma em cima de areia, pedra ou água.
+- [ ] Elas **andam devagar** e mudam de rumo sozinhas; as quatro patas se mexem
+      no passo, em diagonal, e param quando ela para.
+- [ ] Dá para ver a **cara**: focinho claro, dois olhos escuros e as duas orelhas
+      caídas para os lados.
+- [ ] Chegar correndo, de perto, agachado ou não, **não espanta** a ovelha: é
+      mansa (o susto só entra na parte 6).
+- [ ] Subir um degrau de **um** bloco ela sobe; um barranco de dois ela contorna.
+- [ ] Andar uns 44 blocos para longe faz as ovelhas mais distantes sumirem da
+      cena, e voltar traz outras.
+
 ## Se algo falhar
 
 | Sintoma | Onde olhar |
@@ -474,11 +492,14 @@ faixa escura no meio.
 | Parece a versão antiga | `?sw=0` para confirmar que é cache; depois confira se `npm run stamp` foi rodado (hash novo = URL nova). Imagem de `assets/` também tem hash: se o `?v=` da textura não mudou, o carimbo não foi rodado |
 | Capim largo/achatado ou cintilando | `world-tall-grass.js`: proporção da placa (`√2`) e filtros da textura; `tests/tall-grass.test.mjs` cobre os dois |
 | Porta com faixa escura no meio | A arte tem que ser desenhada na folha inteira (32×64) e recortada nas metades: `tests/door-texture.test.mjs` reprova costura, painel torto e ferragem do lado errado |
+| Nenhuma ovelha aparece | É dia? (`worldSky.day` acima de 0,45). O chão em volta é grama? Já existem quatro vivas? Veja `tests/sheep.test.mjs` — ele cobre nascimento, cores, passeio e o corpo caixa por caixa |
+| Ovelha flutuando ou afundada | O modelo tem o pé em `y = 0` e o grupo é posto na altura do chão: `groundTypeAt`/`surfaceAt` em `world-creature-base.js` |
+| Ovelha atravessando água ou encosta | `stepToward` (na base) recusa o passo quando o chão à frente não serve; o teste "barrada por uma encosta" cobre |
 | Offline abre o menu mas o mundo não carrega | Alguma coisa nova no jogo não está no `index.html` (importmap/`<link>`) — é de lá que o worker tira a lista |
 
 ## O que **não** precisa ser testado à mão
 
-Já coberto por `npm test` (781 testes):
+Já coberto por `npm test` (807 testes):
 
 - manifest e ícones — tamanho, opacidade, círculo seguro do maskable, favicon
   chapado (`tests/icons.test.mjs`);
