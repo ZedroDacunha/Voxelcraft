@@ -506,6 +506,27 @@ O chat é a única porta para comandos no jogo (não há console no navegador).
 - [ ] No celular, o botão de chat (topo, ao lado de Mochila) abre a linha e o
       teclado virtual aparece.
 
+## 25. Tab no chat (pré-seleção)
+
+- [ ] Abrir o chat (T) e digitar só **/** — a lista mostra os oito comandos, com
+      `/help` destacado.
+- [ ] Digitar `/gi` e apertar **Tab**: a linha vira `/give ` e a lista passa a
+      mostrar os itens.
+- [ ] Digitar `/give picareta` e apertar **Tab** várias vezes: passa por Cobre,
+      Diamante, Ferro, Madeira, Ouro, Pedra e volta ao começo. **Shift+Tab** anda
+      para trás.
+- [ ] Depois de completar, **digitar uma letra e apertar Tab de novo**: a volta
+      recomeça do primeiro candidato.
+- [ ] `/time set n` + **Tab** → `noon`; **Tab** de novo → `night`.
+- [ ] `/give PÓ` acha **Pó luminoso** (acento e maiúscula não atrapalham), e
+      `/give ter` acha **Terra**.
+- [ ] Tab em `/tp 12` não estraga a linha (não há o que completar ali).
+- [ ] Com mais de oito candidatos aparece a linha `+N — Tab percorre todas`, e o
+      candidato destacado nunca sai da lista.
+- [ ] No celular, **tocar** num nome da lista insere aquele item no lugar do que
+      estava digitado.
+- [ ] Fechar o chat (Esc) apaga a lista; abrir de novo mostra a lista limpa.
+
 ## Se algo falhar
 
 | Sintoma | Onde olhar |
@@ -524,13 +545,15 @@ O chat é a única porta para comandos no jogo (não há console no navegador).
 | T não abre o chat | O mouse está capturado? (T só vale com o jogo rodando). Alguma extensão do navegador com atalho em T? Veja `tests/chat.test.mjs` |
 | Digitar no chat anda com o jogador | O teclado tem que estar todo no chat: `if (chat.open) return;` no `keydown` — teste "a tecla T e a barra abrem o chat" cobre |
 | Menu de pausa aparece ao abrir o chat | `chatOpen` em `game-pause-menu.js`; o `unlock` do chat é ignorado em `game.js` |
+| Tab não faz nada | Foco na linha do chat? (Tab só vale ali; fora dele o navegador troca de elemento). Veja `tests/chat-completion.test.mjs` |
+| Tab completa errado o item | A lista sai do catálogo (`world-catalog.js`): nome novo de item aparece sozinho, e a comparação ignora acento/maiúscula |
 | Comando não faz nada | Digite `/help`; item errado responde em vermelho. O `/give` aceita nome do código, nome do jogo e apelidos (`dirt`, `terra`) |
 | Hora do comando não bate com a HUD | O relógio começa às 06:00 com fração 0: `formatTimeOfDay` e `world-clock.js` têm a mesma conta (teste cobre) |
 | Offline abre o menu mas o mundo não carrega | Alguma coisa nova no jogo não está no `index.html` (importmap/`<link>`) — é de lá que o worker tira a lista |
 
 ## O que **não** precisa ser testado à mão
 
-Já coberto por `npm test` (843 testes):
+Já coberto por `npm test` (862 testes):
 
 - manifest e ícones — tamanho, opacidade, círculo seguro do maskable, favicon
   chapado (`tests/icons.test.mjs`);

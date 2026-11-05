@@ -48,6 +48,7 @@ import { createCreatureSystemClass, creatureInReach } from './world-creature.js'
 import { createSheepSystemClass } from './world-sheep.js';
 import { createChatState } from './world-chat.js';
 import { COMMAND_PREFIX, runChatCommand } from './world-chat-commands.js';
+import { createChatCompleter, visibleSuggestions } from './world-chat-completion.js';
 import { dustScaleFor } from './world-creature-dust.js';
 import { configureWindSway, updateWindSway, windDirectionFor, windStep, windTargetFor } from './world-wind.js';
 import { advanceHandAnimation, countStrikes, createHandAnimation, handSwingAmount, startPunch } from './world-hand-animation.js';
@@ -2149,6 +2150,8 @@ const chat = createChatState();
 // ideia do `inventoryUnlockPending`, com o mesmo prazo de carência.
 let chatUnlockPending = false;
 let chatRenderSignature = '';
+// Tab: a lista de candidatos vem do catálogo de verdade (itens, blocos, ids).
+const chatCompleter = createChatCompleter({ catalog: { ITEMS, BLOCKS, ID } });
 
 function chatNow() {
     return performance.now() * 0.001;
@@ -2180,8 +2183,10 @@ function openChat(text = '') {
         setTimeout(() => { chatUnlockPending = false; }, 300);
     }
     resetInputFlags();
+    chatCompleter.reset();
     syncPauseMenu();
     renderChat();
+    renderChatSuggest();
 }
 
 function closeChat({ relock = true } = {}) {
@@ -2194,6 +2199,8 @@ function closeChat({ relock = true } = {}) {
         input.value = '';
         input.blur();
     }
+    chatCompleter.reset();
+    renderChatSuggest();
     renderChat();
     if (!touchMode && relock) {
         startPlay({ preferMouse: lastPointerKind === 'mouse' });
@@ -2290,6 +2297,82 @@ function renderChat() {
         return item;
     });
     log.replaceChildren(...items);
+}
+
+/**
+ * A lista de pré-seleção: os candidatos do Tab para o pedaço que está sendo
+ * digitado, com o escolhido destacado. Some sozinha quando não há o que sugerir.
+ */
+function renderChatSuggest() {
+    const list = document.getElementById('chat-suggest');
+    const input = chatInputElement();
+    if (!list || !input) return;
+    if (!chat.open) {
+        list.hidden = true;
+        list.replaceChildren();
+        return;
+    }
+    const state = chatCompleter.suggest(input.value);
+    const windowed = visibleSuggestions(state.matches, state.activeIndex);
+    if (!windowed.items.length) {
+        list.hidden = true;
+        list.replaceChildren();
+        return;
+    }
+    const items = windowed.items.map((match, offset) => {
+        const index = windowed.offset + offset;
+        const item = document.createElement('li');
+        item.className = index === state.activeIndex ? 'chat-suggestion active' : 'chat-suggestion';
+        item.dataset.index = String(index);
+        const value = document.createElement('span');
+        value.className = 'chat-suggestion-value';
+        value.textContent = match.value;
+        item.append(value);
+        if (match.hint) {
+            const hint = document.createElement('span');
+            hint.className = 'chat-suggestion-hint';
+            hint.textContent = match.hint;
+            item.append(hint);
+        }
+        return item;
+    });
+    const restantes = windowed.total - windowed.items.length;
+    if (restantes > 0) {
+        const more = document.createElement('li');
+        more.className = 'chat-suggestion-more';
+        more.textContent = `+${restantes} — Tab percorre todas`;
+        items.push(more);
+    }
+    list.hidden = false;
+    list.replaceChildren(...items);
+}
+
+/** Tab (ou Shift+Tab): põe o próximo candidato na linha, no lugar do pedaço. */
+function completeChat(backwards = false) {
+    const input = chatInputElement();
+    if (!input) return;
+    const result = chatCompleter.complete(input.value, { backwards });
+    if (result.text !== input.value) {
+        input.value = result.text;
+        chat.setDraft(result.text);
+    }
+    try { input.setSelectionRange(input.value.length, input.value.length); } catch { /* sem seleção */ }
+    renderChatSuggest();
+}
+
+/** Tocar/clicar num nome da lista insere aquele candidato. */
+function pickChatSuggestion(index) {
+    const input = chatInputElement();
+    if (!input) return;
+    const state = chatCompleter.suggest(input.value);
+    const match = state.matches[index];
+    if (!match) return;
+    const next = state.base + match.insert;
+    input.value = next;
+    chat.setDraft(next);
+    chatCompleter.reset();
+    try { input.setSelectionRange(next.length, next.length); } catch { /* sem seleção */ }
+    renderChatSuggest();
 }
 
 function syncPauseMenu(overrides = {}) {
@@ -4123,8 +4206,26 @@ async function init() {
             event.preventDefault();
             submitChat();
         });
-        chatInput.addEventListener('input', () => chat.setDraft(chatInput.value));
+        chatInput.addEventListener('input', () => {
+            chat.setDraft(chatInput.value);
+            // Digitou: a volta do Tab recomeça do primeiro candidato.
+            chatCompleter.reset();
+            renderChatSuggest();
+        });
+        // A lista é clicável (e tocável no celular). `mousedown` com
+        // preventDefault mantém o foco na linha em vez de roubá-lo para a lista.
+        document.getElementById('chat-suggest')?.addEventListener('mousedown', (event) => {
+            const item = event.target.closest?.('.chat-suggestion');
+            if (!item) return;
+            event.preventDefault();
+            pickChatSuggestion(Number(item.dataset.index));
+        });
         chatInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Tab') {
+                event.preventDefault();
+                completeChat(event.shiftKey);
+                return;
+            }
             if (event.key === 'Escape') {
                 event.preventDefault();
                 closeChat();

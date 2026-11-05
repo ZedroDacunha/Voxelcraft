@@ -196,6 +196,18 @@
     .chat-line.input { color: #d8d8d8; }
     .chat-line.say { color: #ffffff; }
     .chat-line.error { color: #ff9a9a; }
+    /* Pré-seleção do Tab: a lista fica colada na linha, com o candidato que o
+       Tab vai escolher destacado. No toque, tocar no nome insere. */
+    #chat-suggest { list-style: none; margin: 0 0 2px; padding: 0; display: flex; flex-direction: column;
+        gap: 1px; max-height: calc(8 * 1.35em + 8px); overflow: hidden; pointer-events: auto; }
+    #chat-suggest[hidden] { display: none; }
+    .chat-suggestion { display: flex; align-items: baseline; gap: 6px; padding: 1px 6px; cursor: pointer;
+        background: rgba(0, 0, 0, .5); color: #d8d8d8; text-shadow: 1px 1px 0 #000; }
+    .chat-suggestion.active { background: rgba(90, 90, 90, .78); color: #fff; }
+    .chat-suggestion-value { flex: 0 0 auto; }
+    .chat-suggestion-hint { color: #a8a8a8; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .chat-suggestion.active .chat-suggestion-hint { color: #e2e2e2; }
+    .chat-suggestion-more { padding: 1px 6px; color: #9a9a9a; background: rgba(0, 0, 0, .35); cursor: default; }
     #chat-form { margin: 4px 0 0; pointer-events: auto; }
     #chat-form[hidden] { display: none; }
     #chat-input { box-sizing: border-box; width: 100%; margin: 0; padding: 3px 6px;
