@@ -1,7 +1,9 @@
 // Preferências do jogo (não do save): sensibilidade, campo de visão, distância
-// de render, volume e qualidade gráfica. Ficam em localStorage e são lidas
-// quando `game.js` é importado (ao entrar em um mundo). A tela de opções — do
-// menu e a do ESC durante o jogo — grava aqui.
+// de render, volume, qualidade gráfica e resolução de renderização. Ficam em
+// localStorage e são lidas quando `game.js` é importado (ao entrar em um mundo).
+// A tela de opções — do menu e a do ESC durante o jogo — grava aqui.
+import { RESOLUTION_AUTO, RESOLUTION_IDS, resolutionLabel } from './world-render-resolution.js';
+
 export const GAME_SETTINGS_KEY = 'voxel-sandbox/game-settings/v1';
 
 export const GAME_SETTING_FIELDS = Object.freeze({
@@ -29,6 +31,16 @@ export const GAME_SETTING_FIELDS = Object.freeze({
         labels: Object.freeze({ auto: 'Automática', max: 'Máxima', 0.75: 'Alta', 0.5: 'Média' }),
         default: 'auto',
         format: value => GAME_SETTING_FIELDS.graphics.labels[value] ?? 'Automática',
+    }),
+    // Resolução de renderização: quantos pixels o jogo desenha antes de a
+    // imagem ser esticada para a tela (ver world-render-resolution.js). É uma
+    // lista, mas com `slider`: vinte resoluções em degraus pedem barra, não
+    // vinte cliques. `Janela (nativa)` é o comportamento de antes.
+    resolution: Object.freeze({
+        choices: RESOLUTION_IDS,
+        slider: true,
+        default: RESOLUTION_AUTO,
+        format: value => resolutionLabel(value),
     }),
     // Toque: de que lado ficam joystick e botões (canhoto troca tudo de lado) e
     // o tamanho dos controles. Valem só no modo toque; no desktop não há o que
@@ -166,8 +178,9 @@ export function settingFromFraction(key, fraction) {
 /**
  * Passo a passo (seta do teclado, clique curto): anda `direction` casas. Nos
  * campos numéricos para no limite — quem quer o outro extremo arrasta ou usa
- * Home/End. Nas listas dá a volta, porque são poucos modos e voltar ao começo é
- * o que se espera de um botão que cicla.
+ * Home/End. Nas listas de clique dá a volta, porque são poucos modos e voltar ao
+ * começo é o que se espera de um botão que cicla; nas listas com barra
+ * (`slider`, como a resolução) para no limite, igual a um campo numérico.
  */
 export function stepSetting(key, value, direction = 1) {
     const field = GAME_SETTING_FIELDS[key];
@@ -177,6 +190,7 @@ export function stepSetting(key, value, direction = 1) {
         const total = field.choices.length;
         const index = field.choices.indexOf(value);
         const from = index < 0 ? 0 : index;
+        if (field.slider) return field.choices[Math.max(0, Math.min(total - 1, from + dir))];
         return field.choices[((from + dir) % total + total) % total];
     }
     return clampField(field, Number(value) + field.step * dir);

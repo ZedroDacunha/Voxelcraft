@@ -77,6 +77,7 @@ import {
     clampOffsetPx, emptyTouchPositions, loadTouchPositions, offsetPercent, offsetPixels,
     saveTouchPositions,
 } from './world-touch-positions.js';
+import { renderAspect, renderTarget, resolutionLabel, resolutionSize } from './world-render-resolution.js';
 import { rightClickIntent } from './world-interaction-rules.js';
 import { loadGameSettings, onGameSettingsChange } from './world-game-settings.js';
 import { advanceStarvation, deathTitle, HUNGER_WARNINGS, hungerStage } from './world-survival-rules.js';
@@ -1313,12 +1314,25 @@ function damageTool(slotIndex, amount = 1) {
 }
 
 let toastTimer = 0;
-function showToast(text) {
+let optionsStatusTimer = 0;
+function showToast(text, ms = 2000) {
     const el = document.getElementById('toast');
     el.textContent = text;
     el.style.display = 'block';
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { el.style.display = 'none'; }, 2000);
+    toastTimer = setTimeout(() => { el.style.display = 'none'; }, ms);
+    // A janela de Opções é um <dialog> modal: fica na *top layer* e o #toast
+    // apareceria atrás dela — justamente quando o jogador muda uma opção. Com
+    // ela aberta, o mesmo aviso vai para a linha de status do diálogo.
+    const status = document.getElementById('options-status');
+    if (!status) return;
+    if (!document.getElementById('options-dialog')?.open) {
+        status.textContent = '';
+        return;
+    }
+    status.textContent = text;
+    clearTimeout(optionsStatusTimer);
+    optionsStatusTimer = setTimeout(() => { status.textContent = ''; }, Math.max(ms, 2600));
 }
 
 const setSaveIndicator = createWorldSaveIndicator(
@@ -2951,10 +2965,107 @@ const gfx = createWorldGraphicsQuality({
 });
 const cycleQuality = () => gfx.cycle();
 
+// Resolução de renderização (world-render-resolution.js). "Janela (nativa)"
+// devolve o canvas ao tamanho da tela com a escala de qualidade; uma resolução
+// fixa desenha exatamente aqueles pixels e o CSS estica a imagem para a tela
+// toda. O navegador não deixa a página mudar a resolução do sistema — o que dá
+// para escolher é onde o jogo desenha.
+let resolutionMode = GAME_SETTINGS.resolution;
+// Tela cheia pedida pela resolução (e não pelo jogador): só saímos dela quando
+// formos nós que entramos, para não derrubar um F11 escolhido à mão.
+let resolutionFullscreen = false;
+// O pedido de tela cheia é assíncrono; arrastar a barra dispara um por degrau,
+// e sem esta trava cada passo empilharia outro pedido.
+let resolutionFullscreenPending = false;
+
 // A tela de opções grava em world-game-settings e avisa; aqui só se aplica o
 // que dá para aplicar sem recarregar o mundo. A distância de render fica de
 // fora de propósito: mudar chunks ao vivo é outro assunto (vale no próximo).
 const QUALITY_FROM_SETTING = { auto: 'auto', max: 'max', 0.75: 0.75, 0.5: 0.5 };
+
+// Aplica a resolução escolhida no renderer. Em "Janela" é o caminho de sempre
+// (tamanho da tela × escala de qualidade); numa resolução fixa o buffer tem
+// exatamente aqueles pixels, `pixelRatio` 1, e o CSS estica para a tela toda —
+// o mesmo que trocar a resolução num jogo de PC, só que dentro do canvas.
+// Maior buffer que a GPU do aparelho aceita. Pedir mais não deixa a imagem
+// melhor: o navegador recusa e o resultado fica indefinido.
+function deviceRenderLimit() {
+    const max = Number(renderer?.capabilities?.maxTextureSize);
+    return max > 0 ? max : undefined;
+}
+
+function applyRenderResolution({ buffer = true } = {}) {
+    if (!renderer) return;
+    const target = renderTarget(resolutionMode, {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        scale: gfx.scale,
+        limit: deviceRenderLimit(),
+    });
+    const canvasEl = renderer.domElement;
+    if (buffer) renderer.setPixelRatio(target.pixelRatio);
+    if (target.auto) {
+        canvasEl.style.removeProperty('display');
+        if (buffer) renderer.setSize(target.width, target.height);
+    } else {
+        // `updateStyle = false`: o tamanho do buffer é nosso, o CSS também
+        if (buffer) renderer.setSize(target.width, target.height, false);
+        canvasEl.style.display = 'block';
+        canvasEl.style.width = `${window.innerWidth}px`;
+        canvasEl.style.height = `${window.innerHeight}px`;
+    }
+    // a câmera enxerga a proporção do buffer; o esticamento vem depois, no CSS
+    const aspect = renderAspect(target);
+    camera.aspect = aspect;
+    camera.updateProjectionMatrix();
+    // a mão é desenhada noutra cena; ela precisa da mesma proporção
+    if (handCamera) {
+        handCamera.aspect = aspect;
+        handCamera.updateProjectionMatrix();
+    }
+}
+
+// O navegador não muda a resolução da janela, mas deixa a página ocupar a tela
+// toda — então escolher uma resolução fixa pede tela cheia. Só aqui, num clique
+// do jogador (o navegador exige gesto) e só quando a escolha muda de verdade.
+function requestResolutionFullscreen(value) {
+    const fixed = resolutionSize(value) !== null;
+    try {
+        if (fixed && !document.fullscreenElement && !resolutionFullscreenPending) {
+            resolutionFullscreen = true;
+            resolutionFullscreenPending = true;
+            const request = document.documentElement.requestFullscreen?.();
+            if (request && typeof request.then === 'function') {
+                request.then(
+                    () => { resolutionFullscreenPending = false; },
+                    () => { resolutionFullscreenPending = false; resolutionFullscreen = false; },
+                );
+            } else {
+                resolutionFullscreenPending = false;
+            }
+        } else if (!fixed && resolutionFullscreen && document.fullscreenElement) {
+            resolutionFullscreen = false;
+            document.exitFullscreen?.()?.catch?.(() => {});
+        }
+    } catch {
+        // Safari de iPhone não tem requestFullscreen: a resolução vale, a tela cheia não
+        resolutionFullscreen = false;
+    }
+}
+
+document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) resolutionFullscreen = false;
+});
+
+// O aviso diz o tamanho que foi aplicado de verdade: num aparelho que não
+// aceita 4K, o jogo desenha no teto da GPU e a mensagem conta isso.
+function resolutionMessage(value) {
+    if (resolutionSize(value) === null) return `Resolução: ${resolutionLabel(value)}`;
+    const target = renderTarget(value, { limit: deviceRenderLimit() });
+    const applied = `${target.width}×${target.height}`;
+    return target.clamped ? `Resolução: ${applied} (limite do aparelho)` : `Resolução: ${applied}`;
+}
+
 let appliedRenderDistance = GAME_SETTINGS.renderDistance;
 function applyGameSettings(settings, { quiet = false } = {}) {
     GAME_SETTINGS.sensitivity = settings.sensitivity;
@@ -2967,6 +3078,16 @@ function applyGameSettings(settings, { quiet = false } = {}) {
     audio.setVolume?.(settings.volume);
     const mode = QUALITY_FROM_SETTING[settings.graphics];
     if (mode !== undefined && gfx.mode !== mode) gfx.setMode(mode, { quiet });
+    // Resolução de renderização: vale na hora, e numa resolução fixa pede tela
+    // cheia (esticar para a janela pequena não é o que o jogador escolheu).
+    const resolutionChanged = settings.resolution !== resolutionMode;
+    resolutionMode = settings.resolution;
+    GAME_SETTINGS.resolution = settings.resolution;
+    applyRenderResolution();
+    if (resolutionChanged) {
+        requestResolutionFullscreen(resolutionMode);
+        if (!quiet) showToast(resolutionMessage(resolutionMode), 3000);
+    }
     // A distância de render é a única que não muda com o mundo rodando. Em vez
     // de escrever isso na tela o tempo todo, avisa no momento em que muda.
     if (settings.renderDistance !== appliedRenderDistance) {
@@ -3265,7 +3386,7 @@ Item na mão: ${selectedItemText()}
 Vida ${health} | Fome ${hunger} | Fôlego ${breath} | Saturação ${saturation.toFixed(1)} | Exaustão ${exhaustion.toFixed(2)}
 CPU/quadro: média ${perf.avg.toFixed(1)} ms | pior ${perf.worstShown.toFixed(1)} ms | malha ${world.lastMeshMs.toFixed(1)} ms | luz ${world.lastLightMs.toFixed(1)} ms | último save: ${perf.buildMs.toFixed(1)} ms
 Última pausa >60 ms: ${perf.lastLong}
-Desenho: ${renderer.info.render.calls} chamadas | ${(renderer.info.render.triangles / 1000).toFixed(0)}k triângulos | escala de render ${gfx.scale.toFixed(2)} (${gfx.auto ? 'auto' : 'manual'}) · F4 muda`;
+Desenho: ${renderer.info.render.calls} chamadas | ${(renderer.info.render.triangles / 1000).toFixed(0)}k triângulos | escala de render ${gfx.scale.toFixed(2)} (${gfx.auto ? 'auto' : 'manual'}) · resolução ${resolutionLabel(resolutionMode)} · F4 muda`;
 }
 
 // =====================================================================
@@ -3718,16 +3839,24 @@ async function init() {
 
     renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: GPU_PREF });
     renderer.autoClear = false;
-    renderer.setPixelRatio(gfx.scale);
     renderer.info.autoReset = false;
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
+    // já nasce com a resolução escolhida nas opções (Janela = tamanho da tela)
+    applyRenderResolution();
     renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); perf.ctxLost++; showToast('Contexto WebGL perdido (driver/GPU)'); });
     renderer.domElement.addEventListener('webglcontextrestored', () => showToast('Contexto WebGL restaurado'));
     window.addEventListener('resize', () => {
+        // Resolução fixa: o buffer continua do mesmo tamanho, só a imagem
+        // esticada acompanha a janela (e a tela cheia entra/sai por aqui).
+        if (resolutionSize(resolutionMode)) {
+            // o buffer continua do mesmo tamanho; só a imagem esticada muda
+            applyRenderResolution({ buffer: false });
+            return;
+        }
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
-        handCamera.aspect = window.innerWidth / window.innerHeight;
+        handCamera.aspect = camera.aspect;
         handCamera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
     });
@@ -4306,8 +4435,10 @@ function animate() {
     world.update(player.pos.x, player.pos.z);
     updateDebug(rawDt);
 
+    // Com resolução fixa quem manda é ela: a escala automática fica guardada
+    // para quando o jogador voltar para "Janela (nativa)".
     const pendingScale = gfx.consumePending();
-    if (pendingScale !== null) renderer.setPixelRatio(pendingScale);
+    if (pendingScale !== null && !resolutionSize(resolutionMode)) renderer.setPixelRatio(pendingScale);
     renderer.info.reset();
     renderer.clear();
     renderer.render(scene, camera);

@@ -74,7 +74,9 @@ test('as opções do jogo são as mesmas do menu (uma tela só)', () => {
 
 test('opções de faixa são barras: trilho, cursor e valor no meio', () => {
     const dialog = html.slice(html.indexOf('<dialog id="options-dialog"'), html.indexOf('id="world-dialog"'));
-    const sliders = ALL_CONTROLS.filter(row => !GAME_SETTING_FIELDS[row.key].choices);
+    // barra = faixa numérica ou lista com `slider` (a resolução é uma escada)
+    const sliders = ALL_CONTROLS.filter(row => !GAME_SETTING_FIELDS[row.key].choices
+        || GAME_SETTING_FIELDS[row.key].slider === true);
 
     assert.equal((dialog.match(/class="classic-btn option-btn option-slider"/g) ?? []).length, sliders.length);
     assert.equal((dialog.match(/class="option-track"/g) ?? []).length, sliders.length, 'um trilho por barra');
