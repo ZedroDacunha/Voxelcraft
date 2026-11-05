@@ -13,7 +13,7 @@ import { stackHtml, updateSlotElement } from './inventory-view.js';
 import { createRecipeBook } from './inventory-recipe-book.js';
 import { craftGridTemplateColumns } from './inventory-layout.js';
 import { keyToSlotAction, nextSlotIndex, slotLabel, statusLabels } from './inventory-a11y.js';
-import { pauseMenuDisplay } from './game-pause-menu.js';
+import { pauseMenuDisplay, shouldShowPauseMenu } from './game-pause-menu.js';
 import { createPointerLockRequester } from './game-pointer-lock.js';
 import { createInventoryAssets } from './inventory-assets.js';
 import { createTextureTools } from './world-textures.js';
@@ -2077,14 +2077,16 @@ let invSlotEls = [], craftSlotEls = [], furnaceSlotEls = [], chestSlotEls = [], 
 let craftResult = null;
 let recipeBook = null;
 
+let pauseMenuShown = false;
+
 function syncPauseMenu(overrides = {}) {
     syncTouchUi();
-    document.getElementById('menu').style.display = pauseMenuDisplay({
-        locked: playing(),
-        inventoryOpen,
-        dead,
-        ...overrides,
-    });
+    const state = { locked: playing(), inventoryOpen, dead, ...overrides };
+    pauseMenuShown = shouldShowPauseMenu(state);
+    document.getElementById('menu').style.display = pauseMenuDisplay(state);
+    // Pausa de verdade (nem inventário, nem tela de morte): o mundo continua
+    // atrás, borrado pelo CSS, e o HUD sai da frente como no Minecraft.
+    document.body.classList.toggle('is-paused', pauseMenuShown);
 }
 
 function throwStack(id, count, damage = 0) {
@@ -3919,7 +3921,9 @@ function animate() {
     renderer.clear();
     renderer.render(scene, camera);
     renderer.clearDepth();
-    renderer.render(handScene, handCamera);
+    // Pausado, a mão sai do quadro: o fundo do menu é o mundo, sem um braço
+    // atravessado na frente.
+    if (!pauseMenuShown) renderer.render(handScene, handCamera);
 
     const cpu = performance.now() - now;
     perf.sum += cpu; perf.frames++; perf.t += rawDt;

@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 566 testes de módulos puros (node --test)
+npm test           # 570 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -166,6 +166,13 @@ título ilegível.
 `Opções…` e `Salvar e sair para os mundos` — todos no `.classic-btn` cinza do
 menu, e as teclas ficam num `Controles` recolhido. No toque, o botão `Pausar`
 abre o mesmo cartão.
+
+O fundo é **o mundo de onde você parou**, borrado e escurecido como no
+Minecraft: o `backdrop-filter` do CSS borra o canvas do jogo que continua
+pintado atrás (nada de imagem estática), e pausado o HUD e a mão em primeira
+pessoa saem da frente. Os menus crescem junto com a tela (`--ui-scale`: 1×, 1,3×,
+1,6× e 2× conforme a resolução) — as medidas deles são em `em`, então tudo
+acompanha, enquanto o HUD do jogo fica no tamanho de sempre.
 
 A tela de opções é a **mesma** do menu inicial, agora também com o jogo rodando
 atrás, no formato do Minecraft: o nome e o valor ficam **centrados** no botão

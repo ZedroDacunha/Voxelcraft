@@ -150,3 +150,51 @@ test('a grade de opções vira uma coluna no celular', () => {
     assert.match(styles, /\.option-track\s*\{[^}]*position: absolute/);
     assert.match(styles, /\.option-knob\s*\{[^}]*left:\s*var\(--option-fill/, 'o cursor segue o valor');
 });
+
+// ------------------------------------------------ fundo borrado e escala
+
+test('a pausa mostra o mundo de verdade, borrado, como no Minecraft', () => {
+    // O borrão é do que já está pintado embaixo: o canvas do jogo continua
+    // atrás, então a pausa é "de onde parou", não uma imagem fixa.
+    const menuRule = styles.match(/#menu\s*\{[^}]*\}/)[0];
+    assert.match(menuRule, /backdrop-filter:\s*blur\(/, 'falta o borrão do #menu');
+    assert.match(menuRule, /-webkit-backdrop-filter:\s*blur\(/, 'Safari precisa do prefixo');
+    assert.match(menuRule, /rgba\(0,\s*0,\s*0,\s*\.?4/, 'e uma película escura por cima');
+
+    // os dois diálogos (opções, criar mundo) borram o que está atrás também
+    assert.match(styles, /\.world-dialog::backdrop\s*\{[^}]*backdrop-filter:\s*blur\(/);
+});
+
+test('pausado, o HUD sai da frente e a mão não aparece no borrão', () => {
+    assert.match(styles, /body\.is-paused #hud-bottom[^{]*\{\s*display:\s*none/);
+    assert.match(styles, /body\.is-paused #crosshair/);
+    assert.match(gameSource, /document\.body\.classList\.toggle\('is-paused', pauseMenuShown\)/);
+    assert.match(gameSource, /if \(!pauseMenuShown\) renderer\.render\(handScene, handCamera\)/,
+        'a mão em primeira pessoa não pode aparecer no fundo do menu');
+    assert.match(gameSource, /pauseMenuShown = shouldShowPauseMenu\(state\)/);
+});
+
+test('a interface dos menus cresce com a resolução (escala de GUI)', () => {
+    assert.match(styles, /--ui-scale:\s*1/);
+    const breakpoints = styles.match(/@media \(min-width: \d+px\) and \(min-height: \d+px\)/g) ?? [];
+    assert.ok(breakpoints.length >= 2, 'a escala precisa de degraus para telas grandes');
+    assert.match(styles, /--ui-scale:\s*2;/, 'e chegar ao dobro numa tela bem grande');
+
+    // menus medidos em `em`: o tamanho da fonte manda em tudo
+    assert.match(styles, /#menu \{[^}]*font-size:\s*calc\(15px \* var\(--ui-scale\)\)/);
+    assert.match(styles, /\.options-dialog \{[^}]*font-size:\s*calc\(15px \* var\(--ui-scale\)\)/);
+    assert.match(styles, /\.pause-card \{[^}]*width:\s*min\(26em/);
+    assert.match(styles, /\.options-dialog \{[^}]*width:\s*min\(44em/);
+});
+
+test('a tela de opções é larga, translúcida e com o Concluído no meio', () => {
+    const dialogRule = styles.match(/\.options-dialog \{[^}]*width:\s*min\(44em[^}]*\}/)[0];
+    assert.match(dialogRule, /background:\s*rgba\(/, 'deixa o mundo borrado aparecer');
+    assert.match(dialogRule, /text-align:\s*center/);
+    assert.match(styles, /\.options-dialog \.world-dialog-actions \{\s*justify-content:\s*center/);
+    assert.match(styles, /\.options-dialog \[value="close"\] \{\s*min-width:/);
+
+    // sem o "CONFIGURAÇÃO" acima do título: no original o título fica sozinho
+    const dialog = html.slice(html.indexOf('<dialog id="options-dialog"'), html.indexOf('id="world-dialog"'));
+    assert.doesNotMatch(dialog, /world-menu-eyebrow/);
+});
