@@ -136,6 +136,20 @@ aparelho do jogador.
       tochas e fornalhas, e ele fica apenas com o brilho próprio.
 - [ ] Fora do alcance (~13 blocos) a luz dele cai a zero, como a das tochas.
 
+## 9. O rastro de pó
+
+- [ ] Andando de noite, ele deixa uma **fileira de pontinhos luminosos** atrás
+      (somem em ~1,5 s, subindo devagar).
+- [ ] **Parado**, não sai pó nenhum — por mais tempo que ele fique no lugar.
+- [ ] **Correndo** (assustado) o rastro fica bem mais denso, e **voando**
+      (travessia) vira uma cauda comprida atrás dele.
+- [ ] Ao **pousar** depois de um voo, sobe uma nuvenzinha no ponto do pouso.
+      Pular um degrau **não** levanta nuvem.
+- [ ] Ao amanhecer, ele sobe e some **sem deixar pó**.
+- [ ] Em **Gráficos → Baixa** não sai pó nenhum; em **Média** sai a metade.
+      Voltando de Baixa para Alta, **não** aparece um punhado de pó atrasado.
+- [ ] O jogo não engasga com três Mofins juntos (o pool é fixo: 40 partículas).
+
 ## Se algo falhar
 
 | Sintoma | Onde olhar |

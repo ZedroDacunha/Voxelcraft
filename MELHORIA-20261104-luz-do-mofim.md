@@ -100,7 +100,8 @@ Suíte: **605 testes**.
 
 ## O que ficou de fora (de propósito)
 
-- **rastro de pó luminoso**: é sistema de partículas, não luz — PR próprio;
+- **rastro de pó luminoso**: é sistema de partículas, não luz — feito depois, em
+  [próprio PR](MELHORIA-20261104-rastro-de-po.md);
 - **pool própria** para o bicho: cara e sempre ligada;
 - **halo falso** (plano aditivo): não ilumina o cenário, só engana de perto.
 
