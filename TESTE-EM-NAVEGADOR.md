@@ -28,16 +28,16 @@ aparelho do jogador.
       ícones 192, 512 e maskable carregando.
 - [ ] Clicar no botão abre o convite do navegador; aceitar abre o jogo numa
       **janela própria**, sem barra de endereço.
-- [ ] O ícone na barra de tarefas (ou no dock) é o bloco inteiro, sem borda
-      preta e sem corte.
+- [ ] O ícone na barra de tarefas (ou no dock) é o bloco de grama em pixel art
+      (com a grama caída pelas laterais), inteiro, sem borda preta e sem corte.
 - [ ] O favicon na aba lê como um bloco, não como um borrão.
 
 ## 2. Chrome no Android
 
 - [ ] O botão **Instalar app** aparece no menu inicial e instala.
-- [ ] No launcher, o ícone é o bloco inteiro **com fundo de céu**, tanto no
-      recorte circular quanto no quadrado arredondado (alguns launchers deixam
-      escolher; se der, teste os dois).
+- [ ] No launcher, o ícone é o bloco de grama **com fundo de céu**, inteiro e
+      sem corte, tanto no recorte circular quanto no quadrado arredondado (alguns
+      launchers deixam escolher; se der, teste os dois).
 - [ ] Abrir pelo ícone: sem barra do navegador (`display: standalone`).
 - [ ] Jogar uns 10 segundos: andar, quebrar um bloco, colocar outro e sair.
 
@@ -428,7 +428,7 @@ Abra o jogo e pare na tela inicial (só olhar, não precisa entrar em mundo).
 | --- | --- |
 | Botão "Instalar app" não aparece | Abriu em iframe? É Firefox/Safari de desktop (não têm convite)? Já está instalado? O *Manifest* diz "Installability: no" com algum motivo? |
 | Manifest diz "no" | Rode em HTTPS/localhost; confira as abas *Manifest* (ícones com erro) e *Service Workers* (script não ativou) |
-| Instalou, mas o ícone está cortado | Recorte do launcher maior que o esperado: refaça o desenho com `node tools/make-icons.mjs` e olhe o círculo seguro em `tests/icons.test.mjs` |
+| Instalou, mas o ícone está cortado | Recorte do launcher maior que o esperado: baixe o `blockRatio` em `tools/make-icons.mjs`, rode `node tools/make-icons.mjs` e olhe o círculo seguro em `tests/icons.test.mjs` |
 | Ícone com fundo preto no iPhone | O `apple-touch-icon` está transparente: ele precisa ser opaco (teste cobre) |
 | Offline mostra erro 504 ou tela de branco | *Cache Storage*: o arquivo está lá? A instalação falhou (veja *Network* com o filtro "service worker")? |
 | Parece a versão antiga | `?sw=0` para confirmar que é cache; depois confira se `npm run stamp` foi rodado (hash novo = URL nova) |
