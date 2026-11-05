@@ -150,3 +150,63 @@ test('sem cena, o pó não quebra: só não nasce', () => {
     assert.equal(dust.count, 0);
     dust.update(0.016); // não pode lançar
 });
+
+// ------------------------------------------------ o pó ao vento
+
+const CALMO = { x: 1, z: 0, level: 0, time: 0 };
+const SOPRANDO = { x: 1, z: 0, level: 1, time: 0 };
+
+// Deixa o pó viver `segundos` com um vento e devolve a malha viva.
+function driftar(segundos, wind) {
+    const { scene, dust } = makeDust();
+    dust.emit(0, 10, 0, 1);
+    dust.update(segundos, wind);
+    const [mesh] = visiveis(scene);
+    return { dust, mesh };
+}
+
+test('sem vento, o pó só sobe (nada de andar sozinho)', () => {
+    const { mesh } = driftar(0.5, null);
+    assert.equal(mesh.position.x, 0);
+    assert.equal(mesh.position.z, 0);
+    assert.ok(mesh.position.y > 10, 'mas continua subindo');
+});
+
+test('com vento, o pó vai para onde o vento sopra', () => {
+    const { mesh } = driftar(0.5, SOPRANDO);
+    assert.ok(mesh.position.x > 0.3, `andou a favor do vento (${mesh.position.x.toFixed(2)})`);
+
+    // Vento no outro eixo: o pó segue o mesmo.
+    const outro = driftar(0.5, { x: 0, z: 1, level: 1, time: 0 });
+    assert.ok(outro.mesh.position.z > 0.3, 'e do outro lado do mundo, para o outro lado');
+});
+
+test('vento calado empurra, mas bem menos', () => {
+    const calmo = driftar(0.5, CALMO).mesh.position.x;
+    const cheio = driftar(0.5, SOPRANDO).mesh.position.x;
+    assert.ok(calmo > 0, 'no silêncio o ar ainda se move');
+    assert.ok(cheio > calmo * 2, `com a fase de vento sopra muito mais (${calmo.toFixed(2)} → ${cheio.toFixed(2)})`);
+});
+
+test('o arrasto da partícula não freia o vento', () => {
+    // Duas metades iguais: o empurrão da partícula (que tem arrasto) cai, o do
+    // vento não. Se o vento entrasse na velocidade dela, a segunda metade andaria
+    // menos — e o pó pareceria parar no ar.
+    const { scene, dust } = makeDust();
+    dust.emit(0, 10, 0, 1);
+    const mesh = visiveis(scene)[0];
+    dust.update(0.25, SOPRANDO);
+    const primeira = mesh.position.x;
+    dust.update(0.25, SOPRANDO);
+    const segunda = mesh.position.x - primeira;
+    assert.ok(Math.abs(segunda - primeira) < 1e-9,
+        `as duas metades andam o mesmo (${primeira.toFixed(3)} vs ${segunda.toFixed(3)})`);
+});
+
+test('a rajada muda o empurrão no tempo', () => {
+    // Mesma partícula, mesmo vento: só o instante muda.
+    const calmoNoTempo = driftar(0.4, { ...SOPRANDO, time: 1.4 }).mesh.position.x;
+    const forte = driftar(0.4, { ...SOPRANDO, time: 4.1 }).mesh.position.x;
+    assert.ok(Math.abs(forte - calmoNoTempo) > 1e-3,
+        'a rajada dá ritmo ao rastro em vez de velocidade constante');
+});

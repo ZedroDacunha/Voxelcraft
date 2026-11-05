@@ -77,10 +77,11 @@ function makeWorld({ heightAt = () => GROUND, groundType = () => ID.GRASS, above
     };
 }
 
-function makeSystem(world, clock, { onChirp = () => {}, onDeath = () => {}, dustQuality } = {}) {
+function makeSystem(world, clock, { onChirp = () => {}, onDeath = () => {}, dustQuality, wind } = {}) {
     const CreatureSystem = createCreatureSystemClass({
         THREE, ID, BLOCKS, CHUNK_SIZE, now: () => clock.t, onChirp, onDeath,
         ...(dustQuality ? { dustQuality } : {}),
+        ...(wind ? { wind } : {}),
     });
     return new CreatureSystem(world);
 }
@@ -1536,4 +1537,71 @@ test('descer um degrau (planeio curto) não levanta nuvem de pouso', () => {
     clock.t += 0.016;
     system.update(0.016, player, true);
     assert.equal(system.dust.count, 0, 'degrau não é pouso: nada de nuvem');
+});
+
+// ------------------------------------------------ o pó ao vento
+
+test('o vento do mundo chega ao pó do Mofim', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    let consultas = 0;
+    const system = makeSystem(world, clock, {
+        wind: () => {
+            consultas++;
+            return { x: 1, z: 0, level: 1, time: clock.t };
+        },
+    });
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    const creature = spawnOne(system, world, clock, player);
+    freeze(creature, clock);
+    system.dust.clear();
+
+    // Um passo para soltar pó num ponto conhecido, e depois ele fica parado:
+    // o que se move daqui para a frente é só o vento.
+    creature.x += 1;
+    // O alvo vai junto: daqui para a frente ele fica **parado**, e o único
+    // movimento no teste é o do vento.
+    creature.targetX = creature.x;
+    creature.targetZ = creature.z;
+    clock.t += 0.016;
+    system.update(0.016, player, true);
+    const soltouEm = creature.x;
+    assert.ok(system.dust.count > 0, 'soltou pó ao andar');
+    assert.ok(consultas > 0, 'o vento foi consultado');
+
+    for (let i = 0; i < 20; i++) {
+        clock.t += 0.05;
+        system.update(0.05, player, true);
+    }
+
+    const vivos = system.dust.livePositions();
+    assert.ok(vivos.length > 0, 'ainda tem pó no ar');
+    const maisAtras = Math.min(...vivos.map(p => p.x));
+    assert.ok(maisAtras > soltouEm,
+        `o vento levou todo o rastro para frente (${maisAtras.toFixed(2)} > ${soltouEm.toFixed(2)})`);
+});
+
+test('sem vento (ou com vento calado), o pó fica onde foi solto', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    const creature = spawnOne(system, world, clock, player);
+    freeze(creature, clock);
+    system.dust.clear();
+
+    creature.x += 1;
+    creature.targetX = creature.x;
+    creature.targetZ = creature.z;
+    clock.t += 0.016;
+    system.update(0.016, player, true);
+    const soltouEm = creature.x;
+    for (let i = 0; i < 5; i++) {
+        clock.t += 0.05;
+        system.update(0.05, player, true);
+    }
+    const vivos = system.dust.livePositions();
+    assert.ok(vivos.length > 0, 'tem pó no ar');
+    const espalhado = Math.max(...vivos.map(p => Math.abs(p.x - soltouEm)));
+    assert.ok(espalhado < 0.25, `sem vento ele só se espalha um pouco (${espalhado.toFixed(2)})`);
 });

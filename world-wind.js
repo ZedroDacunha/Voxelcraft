@@ -36,7 +36,53 @@ export const WIND_RELEASE = 2.6;
 export const WIND_SWAY_IDLE = 0.04;
 export const WIND_SWAY_FULL = 0.16;
 
+/**
+ * Batida da rajada: `base + swing·sin(tempo·velocidade + fase)`.
+ *
+ * O capim e o pó usam **os mesmos** números — o shader recebe estes valores
+ * interpolados na string (ver `configureWindSway`), então não há como os dois
+ * saírem do compasso sem alguém apagar uma constante.
+ *
+ * Nunca fica negativo (0,5 a 1,0): vento sopra, não vibra.
+ */
+export const WIND_GUST_BASE = 0.75;
+export const WIND_GUST_SWING = 0.25;
+export const WIND_GUST_SPEED = 1.15;
+
+/** Velocidade com que o vento cheio empurra poeira, em blocos/s. */
+export const WIND_DUST_SPEED = 1.15;
+/**
+ * Fração dessa velocidade com o vento calado.
+ *
+ * É a mesma fração em que o capim ainda verga (25% da amplitude): o ar nunca
+ * está imóvel, só está devagar.
+ */
+export const WIND_DUST_IDLE = 0.25;
+
 const clamp01 = value => Math.min(1, Math.max(0, Number(value) || 0));
+
+/**
+ * A rajada num instante, em 0,5..1,0.
+ *
+ * `phase` desencontra vizinhos: dois tufos (ou duas partículas de pó) com a
+ * mesma fase batem asa juntos e o vento vira metrônomo.
+ */
+export function windGust(time, phase = 0) {
+    const t = Number(time) || 0;
+    const p = Number(phase) || 0;
+    return WIND_GUST_BASE + WIND_GUST_SWING * Math.sin(t * WIND_GUST_SPEED + p);
+}
+
+/**
+ * Velocidade do vento sobre a poeira, em blocos/s.
+ *
+ * Escala junto com o capim: no silêncio 25% da força, com a fase de vento cheia
+ * 100%. Poeira soprada no mesmo passo em que a grama verga é o que faz os dois
+ * parecerem o **mesmo** vento.
+ */
+export function windDustSpeed(level) {
+    return WIND_DUST_SPEED * (WIND_DUST_IDLE + (1 - WIND_DUST_IDLE) * clamp01(level));
+}
 
 /**
  * Direção do vento de um mundo — vetor unitário no plano XZ.
@@ -117,6 +163,8 @@ export function configureWindSway(material, { direction = { x: 1, z: 0 } } = {})
             '#include <common>',
             '#include <common>\nuniform float uWindTime;\nuniform float uWindSway;\nuniform vec2 uWindDir;'
         );
+        // Números da rajada vêm das constantes: o pó usa as mesmas em JS.
+        const gustLine = `float windPush = ${WIND_GUST_BASE} + ${WIND_GUST_SWING} * sin(uWindTime * ${WIND_GUST_SPEED} + windPhase);`;
         shader.vertexShader = shader.vertexShader.replace(
             '#include <begin_vertex>',
             `#include <begin_vertex>
@@ -126,7 +174,7 @@ export function configureWindSway(material, { direction = { x: 1, z: 0 } } = {})
     float windPhase = dot(instanceMatrix[3].xz, vec2(1.7, 2.3));
     // Empurrão sempre no mesmo sentido, com a força pulsando (rajada) e um
     // tremelizinho curto por cima — vento sopra, não vibra.
-    float windPush = 0.75 + 0.25 * sin(uWindTime * 1.15 + windPhase);
+    ${gustLine}
     float windFlutter = 0.16 * sin(uWindTime * 3.6 + windPhase * 2.1);
     float windBend = uv.y * uv.y * (0.35 + position.y) * (windPush + windFlutter) * uWindSway;
     vec3 windWorld = vec3(uWindDir.x, 0.0, uWindDir.y);
