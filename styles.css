@@ -254,7 +254,10 @@
     .options-dialog kbd { padding: 2px 5px; border: 1px solid #747474; background: #343434; color: #fff; font: .8em monospace; }
     .options-dialog .world-dialog-actions { justify-content: center; gap: .5em; }
     .options-dialog [value="close"] { min-width: 10em; }
-    .options-hint { margin: .5em 0 0; color: #b9c3cc; font-size: .82em; }
+    /* Com a tela de opções aberta, o cartão de pausa sai de cena: as duas
+       janelas juntas pareciam uma em cima da outra. O #menu (película escura +
+       borrão do mundo) continua, que é o fundo certo. */
+    body.options-open .pause-card { display: none; }
     /* Grade de opções no padrão do Minecraft: o texto fica centrado dentro do
        botão e, nas opções de faixa, um trilho escuro com o cursor em cima. A
        posição do cursor vem de --option-fill, escrita pelo world-options-view.js. */
