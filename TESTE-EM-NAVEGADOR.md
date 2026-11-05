@@ -472,8 +472,13 @@ vez de aparecer parada ao lado — então o teste é esperar e procurar.
 - [ ] Todas nascem **em grama** — nenhuma em cima de areia, pedra ou água.
 - [ ] Elas **andam devagar** e mudam de rumo sozinhas; as quatro patas se mexem
       no passo, em diagonal, e param quando ela para.
-- [ ] Dá para ver a **cara**: focinho claro, dois olhos escuros e as duas orelhas
-      caídas para os lados.
+- [ ] A lã é **fofa**: dá para ver os tufos em volta do corpo (nove), o topete
+      entre as orelhas e o rabo de lã — não é um bloco liso com pernas.
+- [ ] Dá para ver a **cara**: focinho claro, dois olhos escuros com um
+      **brilhinho branco** em cada um, e as duas orelhas caídas para os lados.
+- [ ] As quatro patas têm **casco escuro** na ponta, e o casco anda junto com a
+      pata no passo (não fica plantado no chão).
+- [ ] De perto a ovelha tem uns 1,05 bloco de altura: dá para ver por cima dela.
 - [ ] Chegar correndo, de perto, agachado ou não, **não espanta** a ovelha: é
       mansa (o susto só entra na parte 6).
 - [ ] Subir um degrau de **um** bloco ela sobe; um barranco de dois ela contorna.
@@ -540,6 +545,7 @@ O chat é a única porta para comandos no jogo (não há console no navegador).
 | Capim largo/achatado ou cintilando | `world-tall-grass.js`: proporção da placa (`√2`) e filtros da textura; `tests/tall-grass.test.mjs` cobre os dois |
 | Porta com faixa escura no meio | A arte tem que ser desenhada na folha inteira (32×64) e recortada nas metades: `tests/door-texture.test.mjs` reprova costura, painel torto e ferragem do lado errado |
 | Nenhuma ovelha aparece | É dia? (`worldSky.day` acima de 0,45). O chão em volta é grama? Já existem quatro vivas? Veja `tests/sheep.test.mjs` — ele cobre nascimento, cores, passeio e o corpo caixa por caixa |
+| Ovelha sem casco, sem brilho no olho ou com a lã lisa demais | O modelo é montado em `createModel` com `SHEEP_TUFTS`, casco e brilho: `tests/sheep.test.mjs` conta os tufos, os cascos, os brilhos e confere que o casco toca o chão |
 | Ovelha flutuando ou afundada | O modelo tem o pé em `y = 0` e o grupo é posto na altura do chão: `groundTypeAt`/`surfaceAt` em `world-creature-base.js` |
 | Ovelha atravessando água ou encosta | `stepToward` (na base) recusa o passo quando o chão à frente não serve; o teste "barrada por uma encosta" cobre |
 | T não abre o chat | O mouse está capturado? (T só vale com o jogo rodando). Alguma extensão do navegador com atalho em T? Veja `tests/chat.test.mjs` |

@@ -15,6 +15,7 @@ import {
     SHEEP_SPAWN_MAX_DISTANCE,
     SHEEP_SPAWN_MIN_DISTANCE,
     SHEEP_TURN_MAX,
+    SHEEP_TUFTS,
     SHEEP_TURN_MIN,
     SHEEP_WANDER_SPEED,
     coatFor,
@@ -358,7 +359,7 @@ test('parada, ela não mexe as patas; andando, mexe', () => {
 
 // ------------------------------------------------ o corpo
 
-test('o corpo é de caixas com cabeça, orelhas, quatro patas e rabo', () => {
+test('o corpo é de caixas: miolo de lã com tufos, cara, orelhas, quatro patas e rabo', () => {
     const clock = { t: 0 };
     const system = makeSystem(makeWorld(), clock);
     const sheep = spawnOne(system, clock, idlePlayer({ x: 0, z: 0 }));
@@ -367,24 +368,63 @@ test('o corpo é de caixas com cabeça, orelhas, quatro patas e rabo', () => {
     assert.equal(nomes.filter(nome => nome === 'leg').length, 4, 'quatro patas');
     assert.equal(nomes.filter(nome => nome === 'ear').length, 2, 'duas orelhas, uma de cada lado');
     assert.equal(nomes.filter(nome => nome === 'eye').length, 2, 'dois olhos');
-    for (const parte of ['body', 'head', 'muzzle', 'tail']) {
+    assert.equal(nomes.filter(nome => nome === 'glint').length, 2, 'um brilho em cada olho');
+    assert.equal(nomes.filter(nome => nome === 'tuft').length, SHEEP_TUFTS.length, 'a lã é feita de tufos');
+    assert.ok(SHEEP_TUFTS.length >= 6, 'a silhueta fofinha precisa de vários tufos, não de um');
+    for (const parte of ['body', 'head', 'topknot', 'muzzle', 'tail']) {
         assert.ok(nomes.includes(parte), `falta a peça ${parte}`);
+    }
+    // Cada pata leva a canela e o casco dentro (e é isso que gira no passo).
+    for (const leg of sheep.legs) {
+        const dentro = leg.children.map(child => child.name).sort();
+        assert.deepEqual(dentro, ['hoof', 'shin'], 'pata = canela + casco');
     }
 });
 
-test('a ovelha pisa no chão: o ponto mais baixo do corpo é o pé', () => {
+test('as orelhas são caídas, e os cascos são mais escuros que a lã', () => {
     const clock = { t: 0 };
     const system = makeSystem(makeWorld(), clock);
     const sheep = spawnOne(system, clock, idlePlayer({ x: 0, z: 0 }));
 
-    let maisBaixo = Infinity;
-    for (const child of sheep.group.children) {
-        // Cada peça é uma caixa 1×1×1 com escala: o fundo é y - altura/2.
-        const fundo = child.position.y - child.scale.y / 2;
-        maisBaixo = Math.min(maisBaixo, fundo);
-    }
+    for (const ear of sheep.ears) assert.ok(Math.abs(ear.rotation.z) > 0.2, 'orelha deitada, não em pé');
+
+    const hoof = sheep.legs[0].children.find(child => child.name === 'hoof');
+    const coat = SHEEP_COATS.find(item => item.key === sheep.coat).wool;
+    assert.notEqual(hoof.material.color.getHex(), coat, 'o casco não é da cor da lã');
+
+    // Os tufos são da mesma lã do corpo: a ovelha é uma peça só de cor.
+    const body = sheep.group.children.find(child => child.name === 'body');
+    for (const tuft of sheep.tufts) assert.equal(tuft.material.color.getHex(), body.material.color.getHex());
+});
+
+/**
+ * Fundo da caixa mais baixa do corpo, em coordenadas de dentro do grupo (o pé
+ * é 0). Atravessa os grupos das patas: a canela e o casco ficam pendurados no
+ * quadril, e é o casco que toca o chão.
+ */
+function lowestPoint(object, offsetY = 0) {
+    const y = offsetY + object.position.y;
+    let lowest = object.isMesh ? y - object.scale.y / 2 : Infinity;
+    for (const child of object.children) lowest = Math.min(lowest, lowestPoint(child, y));
+    return lowest;
+}
+
+test('a ovelha pisa no chão: o ponto mais baixo do corpo é o casco', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const sheep = spawnOne(system, clock, idlePlayer({ x: 0, z: 0 }));
+
+    const maisBaixo = lowestPoint(sheep.group, -sheep.group.position.y);
     assert.ok(Math.abs(maisBaixo) < 1e-9, `o ponto mais baixo está em ${maisBaixo}, e devia estar em 0`);
     assert.ok(sheep.group.position.y >= GROUND, 'o grupo está na altura do chão');
+    // O casco é quem encosta: se ele subisse junto com a lã, a ovelha flutuaria.
+    for (const leg of sheep.legs) {
+        const hoof = leg.children.find(child => child.name === 'hoof');
+        const fundo = leg.position.y + hoof.position.y - hoof.scale.y / 2;
+        assert.ok(Math.abs(fundo) < 1e-9, `casco a ${fundo} do chão`);
+    }
+    // Altura total de uma ovelha adulta de caixa: perto de um bloco.
+    assert.ok(sheep.head.position.y + 0.25 > 0.9, 'a cabeça fica quase na altura de um bloco');
 });
 
 test('cada cor pinta o corpo com o tom da sua lã', () => {
