@@ -46,6 +46,8 @@ import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld 
 import { canJumpFrom, createJumpState, updateJumpWindow } from './player-jump.js';
 import { createCreatureSystemClass, creatureInReach } from './world-creature.js';
 import { createSheepSystemClass } from './world-sheep.js';
+import { createChatState } from './world-chat.js';
+import { COMMAND_PREFIX, runChatCommand } from './world-chat-commands.js';
 import { dustScaleFor } from './world-creature-dust.js';
 import { configureWindSway, updateWindSway, windDirectionFor, windStep, windTargetFor } from './world-wind.js';
 import { advanceHandAnimation, countStrikes, createHandAnimation, handSwingAmount, startPunch } from './world-hand-animation.js';
@@ -2136,9 +2138,163 @@ let recipeBook = null;
 
 let pauseMenuShown = false;
 
+// =====================================================================
+// 4B. CHAT (tecla T)
+// =====================================================================
+// O estado (log, rascunho, histórico do ↑) vive em world-chat.js e os comandos
+// em world-chat-commands.js; aqui ficam o DOM, o teclado e o que cada comando
+// faz no jogo. Texto sem barra é fala; com barra, comando.
+const chat = createChatState();
+// Abrir o chat solta o mouse para digitar. Esse `unlock` não é pausa — mesma
+// ideia do `inventoryUnlockPending`, com o mesmo prazo de carência.
+let chatUnlockPending = false;
+let chatRenderSignature = '';
+
+function chatNow() {
+    return performance.now() * 0.001;
+}
+
+function chatInputElement() {
+    return document.getElementById('chat-input');
+}
+
+/**
+ * Abre o chat. `text` já vem preenchido com `/` quando o jogador aperta a barra
+ * — é o atalho do Minecraft para comando.
+ */
+function openChat(text = '') {
+    if (chat.open || inventoryOpen || dead || !playing()) return;
+    const draft = chat.openChat({ text });
+    const form = document.getElementById('chat-form');
+    const input = chatInputElement();
+    if (form) form.hidden = false;
+    if (input) {
+        input.value = draft;
+        // Foco é o que abre o teclado virtual do celular.
+        input.focus({ preventScroll: true });
+        try { input.setSelectionRange(draft.length, draft.length); } catch { /* input sem seleção */ }
+    }
+    if (!touchMode) {
+        chatUnlockPending = true;
+        controls.unlock();
+        setTimeout(() => { chatUnlockPending = false; }, 300);
+    }
+    resetInputFlags();
+    syncPauseMenu();
+    renderChat();
+}
+
+function closeChat({ relock = true } = {}) {
+    if (!chat.open) return;
+    chat.close();
+    const form = document.getElementById('chat-form');
+    const input = chatInputElement();
+    if (form) form.hidden = true;
+    if (input) {
+        input.value = '';
+        input.blur();
+    }
+    renderChat();
+    if (!touchMode && relock) {
+        startPlay({ preferMouse: lastPointerKind === 'mouse' });
+        return;
+    }
+    syncPauseMenu();
+}
+
+/**
+ * O que cada comando pode fazer no jogo. É a única ponte entre o módulo de
+ * comandos (puro) e o mundo de verdade.
+ */
+function chatCommandContext() {
+    return {
+        getPosition: () => ({ x: player.pos.x, y: player.pos.y, z: player.pos.z }),
+        teleport(x, y, z) {
+            if (![x, y, z].every(value => Number.isFinite(value))) return false;
+            if (y < 0 || y > WORLD_HEIGHT - 2) return false;
+            player.pos.set(x, y, z);
+            player.vel.set(0, 0, 0);
+            player.fallDistance = 0;
+            camera.position.set(x, y + player.eye, z);
+            return true;
+        },
+        setTime(fraction) {
+            worldClock.time = fraction;
+            updateSky();
+            return worldClock.time;
+        },
+        // "minutos" é do relógio do jogo: um dia inteiro são 1440 minutos.
+        addTime(minutes) {
+            worldClock.advance((minutes * DAY_LENGTH) / 1440);
+            updateSky();
+            return worldClock.time;
+        },
+        giveItem(id, count) {
+            const leftover = inventory.add(id, count, 0, inventory.slots.length);
+            updateHotbarUI();
+            return count - Math.max(0, leftover || 0);
+        },
+        clearInventory() {
+            let removed = 0;
+            for (let i = 0; i < inventory.slots.length; i++) {
+                if (!inventory.slots[i]) continue;
+                inventory.slots[i] = null;
+                removed++;
+            }
+            updateHotbarUI();
+            return removed;
+        },
+        killPlayer() {
+            invuln = 0;
+            takeDamage(999);
+        },
+        getSeed: () => world.seed,
+    };
+}
+
+/** Enter: manda a linha (fala ou comando) e fecha o chat. */
+function submitChat() {
+    const text = chat.send();
+    const input = chatInputElement();
+    if (input) input.value = '';
+    if (!text) { closeChat(); return; }
+    const at = chatNow();
+    if (text.startsWith(COMMAND_PREFIX)) {
+        // O comando digitado fica no log, como no Minecraft: sem isso o jogador
+        // não tem como reler o que pediu.
+        chat.add(text, { kind: 'input', at });
+        const result = runChatCommand(text, chatCommandContext(), { ITEMS, BLOCKS, ID });
+        for (const line of result.messages) chat.add(line, { kind: result.ok ? 'system' : 'error', at });
+    } else {
+        chat.add(`Jogador: ${text}`, { kind: 'say', at });
+    }
+    chatRenderSignature = '';
+    closeChat();
+}
+
+/**
+ * Desenha o log. Chamado todo quadro: mexer no DOM só quando o texto visível
+ * muda (ou quando a linha mais velha apaga) é o que mantém isso barato.
+ */
+function renderChat() {
+    const log = document.getElementById('chat-log');
+    if (!log) return;
+    const lines = chat.visible(chatNow());
+    const signature = `${chat.open ? '1' : '0'}|${lines.map(line => `${line.kind}#${line.text}`).join('\n')}`;
+    if (signature === chatRenderSignature) return;
+    chatRenderSignature = signature;
+    const items = lines.map(line => {
+        const item = document.createElement('li');
+        item.className = `chat-line ${line.kind}`;
+        item.textContent = line.text;
+        return item;
+    });
+    log.replaceChildren(...items);
+}
+
 function syncPauseMenu(overrides = {}) {
     syncTouchUi();
-    const state = { locked: playing(), inventoryOpen, dead, ...overrides };
+    const state = { locked: playing(), inventoryOpen, dead, chatOpen: chat.open, ...overrides };
     pauseMenuShown = shouldShowPauseMenu(state);
     document.getElementById('menu').style.display = pauseMenuDisplay(state);
     // Pausa de verdade (nem inventário, nem tela de morte): o mundo continua
@@ -3225,6 +3381,7 @@ function takeDamage(amount, source = 'generic') {
 
 function die(source = 'generic') {
     if (inventoryOpen) closeInventory(false);
+    if (chat.open) closeChat({ relock: false });
     dead = true;
     touchActive = false;
     resetInputFlags();
@@ -3958,9 +4115,40 @@ async function init() {
         }
         location.reload();
     });
+    // Chat: Enter envia, Esc fecha sem enviar, ↑/↓ voltam o que já foi enviado.
+    const chatForm = document.getElementById('chat-form');
+    const chatInput = document.getElementById('chat-input');
+    if (chatForm && chatInput) {
+        chatForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            submitChat();
+        });
+        chatInput.addEventListener('input', () => chat.setDraft(chatInput.value));
+        chatInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                closeChat();
+                return;
+            }
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                submitChat();
+                return;
+            }
+            if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+                event.preventDefault();
+                chatInput.value = chat.recall(event.key === 'ArrowUp' ? -1 : 1);
+                chat.setDraft(chatInput.value);
+                try { chatInput.setSelectionRange(chatInput.value.length, chatInput.value.length); } catch { /* sem seleção */ }
+            }
+        });
+    }
+
     controls.addEventListener('lock', () => syncPauseMenu({ locked: true }));
     renderer.domElement.addEventListener('click', () => {
-        if (!playing() && !inventoryOpen && !dead && menu.style.display === 'none') {
+        // Com o chat aberto, clicar na tela não pode recapturar o mouse no meio
+        // da digitação.
+        if (!playing() && !inventoryOpen && !dead && !chat.open && menu.style.display === 'none') {
             startPlay({ preferMouse: lastPointerKind === 'mouse' });
         }
     });
@@ -3977,6 +4165,8 @@ async function init() {
         resetInputFlags();
         saveGame(true);
         if (inventoryExit) return;
+        // Soltar o mouse para digitar no chat também não é pausa: o mundo segue.
+        if (chat.open || chatUnlockPending) return;
         btnPlay.disabled = true;
         const originalText = btnPlay.innerText;
         btnPlay.innerText = 'Aguarde...';
@@ -3991,6 +4181,8 @@ async function init() {
     });
 
     document.addEventListener('keydown', (event) => {
+        // Com o chat aberto, o teclado é dele (inclusive o T que abriu).
+        if (chat.open) return;
         if (inventoryOpen) { handleInventoryKey(event); return; }
         if (!controls.isLocked) return;
         switch (event.code) {
@@ -4001,6 +4193,9 @@ async function init() {
             case 'Space': jumpHeld = true; break;
             case 'KeyQ': dropSelectedItem(); break;
             case 'KeyE': if (!event.repeat) openInventory(null, { focusFirst: true }); break;
+            // T abre o chat vazio; a barra abre já com o `/`, para comando.
+            case 'KeyT': if (!event.repeat) { event.preventDefault(); openChat(); } break;
+            case 'Slash': if (!event.repeat) { event.preventDefault(); openChat(COMMAND_PREFIX); } break;
             case 'ShiftLeft': case 'ShiftRight': isSprinting = true; break;
             case 'KeyC': wantToCrouch = true; break;
             case 'F4': event.preventDefault(); cycleQuality(); break;
@@ -4280,6 +4475,7 @@ async function init() {
                     wantToCrouch = !wantToCrouch;
                     pressButton(id, wantToCrouch);
                 } else if (id === 'inventory') openInventory(null);
+                else if (id === 'chat') openChat();
                 else if (id === 'pause') pauseTouchPlay();
             });
             if (!hold) continue;
@@ -4371,7 +4567,11 @@ function animate() {
     const dt = Math.min(rawDt, 0.05);
     applyLook();
 
-    if (playing()) {
+    // Com o chat aberto o mundo continua rodando (como no Minecraft): o sol
+    // anda, a água corre, os bichos vivem. Só o jogador é que fica parado,
+    // porque o mouse está solto e as teclas vão para a linha de digitação.
+    const worldRunning = playing() || chat.open;
+    if (worldRunning) {
         updatePhysics(dt);
         // O Mofim é bicho de noite: o céu diz a hora (1 = noite fechada) e ele
         // aparece ao anoitecer / vai embora ao amanhecer.
@@ -4380,17 +4580,20 @@ function animate() {
         // A ovelha é o contrário: de dia ela está no pasto (`worldSky.day` perto
         // de 1). Mansa por enquanto — só vaga.
         sheepSystem.update(dt, { pos: player.pos }, true, { day: worldSky.day });
-        updateTarget();
-        if (!strikeCreature()) updateMining(dt);
-        updateEating(dt);
         updateSurvival(dt);
         updateItemEntities(dt);
         breakParticles.update(dt);
     }
+    // Mirar, cavar e comer são do mouse: com o chat aberto não há mouse no jogo.
+    if (playing()) {
+        updateTarget();
+        if (!strikeCreature()) updateMining(dt);
+        updateEating(dt);
+    }
     world.water.updateSubmersion(world, player);
     world.water.update(world, dt, now);
 
-    if (playing() || inventoryOpen) {
+    if (worldRunning || inventoryOpen) {
         updateWorldClock(dt);
         updateFurnaces(dt);
         world.furnaceSmoke.update(dt, furnaces, world, player.pos);
@@ -4410,8 +4613,11 @@ function animate() {
         scene.background.setHex(0x113366); 
     }
     
-    if (playing() || inventoryOpen) worldClouds.update(dt, camera);
+    if (worldRunning || inventoryOpen) worldClouds.update(dt, camera);
     else worldClouds.update(0, camera);
+    // O chat desenha todo quadro, mas só mexe no DOM quando o texto muda (o que
+    // inclui a linha que apaga sozinha).
+    renderChat();
     updateHand(dt);
     updateAmbient(dt);
     updateGrassWind(dt);

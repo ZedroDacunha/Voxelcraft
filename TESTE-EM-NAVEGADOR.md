@@ -480,6 +480,32 @@ vez de aparecer parada ao lado — então o teste é esperar e procurar.
 - [ ] Andar uns 44 blocos para longe faz as ovelhas mais distantes sumirem da
       cena, e voltar traz outras.
 
+## 24. Chat e comandos
+
+O chat é a única porta para comandos no jogo (não há console no navegador).
+
+- [ ] **T** abre a linha de digitação no canto de baixo, com o mundo rodando
+      atrás (o sol continua andando) e **sem** o menu de pausa aparecer.
+- [ ] **/** abre já com a barra escrita.
+- [ ] Digitar `ola` e apertar **Enter** mostra `Jogador: ola` no log, e a linha
+      **apaga sozinha em ~10 s**.
+- [ ] **Esc** fecha sem enviar; abrir de novo mostra a linha vazia.
+- [ ] **↑** traz o último comando enviado e **↓** volta ao que estava escrevendo.
+- [ ] `/help` lista os oito comandos; `/help give` mostra o uso do `/give`.
+- [ ] `/time set night` escurece na hora e responde a hora nova;
+      `/time add 120` adianta duas horas.
+- [ ] `/give terra 10` põe 10 blocos de terra na mochila;
+      `/give picareta de diamante` dá 1 (e não 64);
+      `/give chuveiro` responde em vermelho que não conhece o item.
+- [ ] `/tp 0 40 0` leva para o alto (o jogador cai);
+      `/tp ~ ~5 ~` sobe cinco blocos a partir de onde está.
+- [ ] `/clear` esvazia a mochila e diz quantos itens saíram; `/seed` mostra a
+      semente; `/kill` leva à tela de morte.
+- [ ] Depois de fechar o chat, **andar e olhar** voltam a funcionar (o mouse é
+      recapturado).
+- [ ] No celular, o botão de chat (topo, ao lado de Mochila) abre a linha e o
+      teclado virtual aparece.
+
 ## Se algo falhar
 
 | Sintoma | Onde olhar |
@@ -495,11 +521,16 @@ vez de aparecer parada ao lado — então o teste é esperar e procurar.
 | Nenhuma ovelha aparece | É dia? (`worldSky.day` acima de 0,45). O chão em volta é grama? Já existem quatro vivas? Veja `tests/sheep.test.mjs` — ele cobre nascimento, cores, passeio e o corpo caixa por caixa |
 | Ovelha flutuando ou afundada | O modelo tem o pé em `y = 0` e o grupo é posto na altura do chão: `groundTypeAt`/`surfaceAt` em `world-creature-base.js` |
 | Ovelha atravessando água ou encosta | `stepToward` (na base) recusa o passo quando o chão à frente não serve; o teste "barrada por uma encosta" cobre |
+| T não abre o chat | O mouse está capturado? (T só vale com o jogo rodando). Alguma extensão do navegador com atalho em T? Veja `tests/chat.test.mjs` |
+| Digitar no chat anda com o jogador | O teclado tem que estar todo no chat: `if (chat.open) return;` no `keydown` — teste "a tecla T e a barra abrem o chat" cobre |
+| Menu de pausa aparece ao abrir o chat | `chatOpen` em `game-pause-menu.js`; o `unlock` do chat é ignorado em `game.js` |
+| Comando não faz nada | Digite `/help`; item errado responde em vermelho. O `/give` aceita nome do código, nome do jogo e apelidos (`dirt`, `terra`) |
+| Hora do comando não bate com a HUD | O relógio começa às 06:00 com fração 0: `formatTimeOfDay` e `world-clock.js` têm a mesma conta (teste cobre) |
 | Offline abre o menu mas o mundo não carrega | Alguma coisa nova no jogo não está no `index.html` (importmap/`<link>`) — é de lá que o worker tira a lista |
 
 ## O que **não** precisa ser testado à mão
 
-Já coberto por `npm test` (807 testes):
+Já coberto por `npm test` (843 testes):
 
 - manifest e ícones — tamanho, opacidade, círculo seguro do maskable, favicon
   chapado (`tests/icons.test.mjs`);
