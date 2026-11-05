@@ -24,7 +24,7 @@
 // versões antigas do cache.
 
 const CACHE_PREFIX = 'voxel-sandbox';
-const CACHE_VERSION = 'v11';
+const CACHE_VERSION = 'v12';
 const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
 const OFFLINE_DOCUMENT = './index.html';
 

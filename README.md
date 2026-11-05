@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 688 testes de módulos puros (node --test)
+npm test           # 701 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -98,6 +98,11 @@ capturar o mouse, e sim um joystick e botões na própria tela.
   **Tamanho dos botões** (80%–140%, com o joystick e a hotbar acompanhando) e
   **Vibração** (Ligada/Desligada). Fica gravado em `localStorage` junto das
   outras preferências.
+- **Posição livre**: em **Editar posições** (na mesma sub-tela), o mundo pausa e
+  cada peça — joystick, Pular, Cavar, Usar, Agachar, Mochila, Pausar — pode ser
+  arrastada para onde o polegar alcançar. `Pronto` grava, `Restaurar` devolve
+  tudo ao lugar. As posições ficam em % da tela, então valem no celular e no
+  tablet e sobrevivem a girar o aparelho.
 - **Vibração** (onde o aparelho deixa — Android vibra, iPhone não): pulso curto
   ao quebrar, colocar, bater no Mofim, andar/correr e apertar botão; padrão mais
   forte ao levar dano. Cada acontecimento tem folga mínima, então não vira

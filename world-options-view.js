@@ -3,6 +3,7 @@ import {
     notifyGameSettingsChange, saveGameSettings, settingFraction, settingFromFraction,
     stepSetting,
 } from './world-game-settings.js';
+import { TOUCH_EDIT_EVENT, TOUCH_RESET_EVENT, resetTouchPositions } from './world-touch-positions.js';
 
 // Cada linha da tela de opções é uma barra clicável que mostra "Rótulo: valor".
 // O botão (`role="slider"`) recebe o clique/arraste e o `<span>` de saída mostra
@@ -63,6 +64,12 @@ export function createOptionsView(dialog = document.getElementById('options-dial
     const backButton = dialog.querySelector('#btn-options-back');
     const touchSummary = dialog.querySelector('#opt-touch-summary');
     const touchEntry = dialog.querySelector('#opt-touch-open');
+    const editButton = dialog.querySelector('#opt-touch-edit');
+
+    // "Editar posições" só existe dentro do mundo e no modo toque: é lá que os
+    // controles estão na tela para serem arrastados. `game.js` marca o body com
+    // `touch-mode` ao carregar; no menu do título a linha fica escondida.
+    const canEditPositions = () => document.body.classList.contains('touch-mode');
 
     function showTouchScreen(open) {
         if (!touchGrid || !mainGrid) return;
@@ -72,6 +79,7 @@ export function createOptionsView(dialog = document.getElementById('options-dial
         if (backButton) backButton.hidden = !open;
         if (title) title.textContent = open ? 'Opções de toque' : 'Opções';
         if (touchEntry) touchEntry.setAttribute('aria-expanded', String(open));
+        if (editButton) editButton.hidden = !canEditPositions();
         // Ao voltar, o foco vai para o botão que abriu a sub-tela. Ao fechar o
         // diálogo não: quem devolve o foco ao que estava atrás é o navegador, e
         // roubar o foco para um botão invisível deixaria o teclado perdido.
@@ -152,6 +160,13 @@ export function createOptionsView(dialog = document.getElementById('options-dial
     }
 
     touchEntry?.addEventListener('click', () => showTouchScreen(true));
+    // Fecha a janela e pede ao jogo o modo de edição (o jogo é quem desenha os
+    // controles; aqui só se avisa que o jogador quer arrastá-los).
+    editButton?.addEventListener('click', () => {
+        if (!canEditPositions()) return;
+        dialog.close();
+        document.dispatchEvent(new CustomEvent(TOUCH_EDIT_EVENT));
+    });
     backButton?.addEventListener('click', () => showTouchScreen(false));
     // Fechar e reabrir as opções sempre volta para a grade principal: quem
     // abriu no ESC para ver o volume não quer cair na tela de toque.
@@ -162,6 +177,10 @@ export function createOptionsView(dialog = document.getElementById('options-dial
         render(current);
         onChange?.(current);
         notifyGameSettingsChange(current);
+        // "Restaurar padrões" também devolve os controles ao lugar de fábrica; o
+        // aviso deixa o jogo reaplicar na hora (se estiver aberto).
+        resetTouchPositions();
+        document.dispatchEvent(new CustomEvent(TOUCH_RESET_EVENT));
     });
 
     return {

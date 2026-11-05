@@ -306,6 +306,8 @@
     }
     #touch-stick {
         position: absolute; left: 16px; bottom: 22px;
+        /* deslocamento da posição livre (zero para quem nunca arrastou) */
+        transform: translate(var(--touch-dx, 0px), var(--touch-dy, 0px));
         width: var(--touch-stick-size, 132px); height: var(--touch-stick-size, 132px);
         box-sizing: border-box;
         border: 2px solid #0009; border-radius: 50%; background: #20202040;
@@ -331,6 +333,12 @@
     .touch-btn { display: grid; place-items: center; min-height: 0; padding: 0;
         width: var(--touch-btn-size, 64px); height: var(--touch-btn-size, 64px);
         pointer-events: auto; touch-action: none; }
+    /* Deslocamento da posição livre. O seletor com #touch-ui ganha do
+       `.classic-btn:active:not(:disabled)` do menu, que tem `transform` próprio —
+       senão o botão arrastado voltaria para o lugar no instante do toque. */
+    #touch-ui .touch-btn { transform: translate(var(--touch-dx, 0px), var(--touch-dy, 0px)); }
+    #touch-ui .touch-btn.pressed, #touch-ui .touch-btn:active {
+        transform: translate(var(--touch-dx, 0px), var(--touch-dy, 0px)) translateY(1px); }
     .touch-icon { width: var(--touch-icon-size, 34px); height: var(--touch-icon-size, 34px);
         fill: currentColor; pointer-events: none; filter: drop-shadow(1px 2px 0 #292929); }
     #touch-top { position: absolute; right: 14px; top: 12px; display: flex; gap: 8px; }
@@ -343,6 +351,23 @@
         background: #1119; color: #fff; font: 12px/1.3 monospace; text-shadow: 1px 1px #000; border-radius: 3px;
         text-align: left; opacity: 1; transition: opacity .6s linear; pointer-events: none; }
     #touch-ui.hint-hidden #touch-hint { opacity: 0; }
+    /* --- modo de edição de posição --- */
+    /* o #menu (cartão de pausa) fica no meio do caminho: sem isto ele cobriria a
+       tela com o desfoque e engoliria o dedo que arrasta */
+    body.touch-editing #menu { pointer-events: none; background-color: transparent;
+        -webkit-backdrop-filter: none; backdrop-filter: none; }
+    body.touch-editing .pause-card { display: none; }
+    body.touch-editing #touch-ui { z-index: 11; background: rgba(0, 0, 0, .45); }
+    body.touch-editing #touch-hint { display: none; }
+    body.touch-editing #touch-stick,
+    body.touch-editing #touch-ui .touch-btn {
+        outline: 2px dashed rgba(255, 255, 255, .75); outline-offset: 3px; cursor: grab; }
+    body.touch-editing #touch-stick.dragging,
+    body.touch-editing #touch-ui .touch-btn.dragging { outline-style: solid; outline-color: #fff; }
+    #touch-edit-bar { position: absolute; left: 50%; top: 12px; transform: translateX(-50%);
+        display: flex; gap: 8px; pointer-events: none; }
+    #touch-edit-bar[hidden] { display: none; }
+    .touch-edit-btn { pointer-events: auto; min-height: 40px; padding: 6px 16px; font-size: 14px; }
     /* canhoto: joystick e botões trocam de lado, e a dica vai para o outro lado */
     body.touch-left #touch-stick { left: auto; right: 16px; }
     body.touch-left #touch-actions { right: auto; left: 14px; }
