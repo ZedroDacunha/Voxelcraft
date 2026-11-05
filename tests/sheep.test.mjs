@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import * as THREE from '../vendor/three/three.module.js';
 import { BLOCKS, ID } from '../world-catalog.js';
@@ -24,6 +25,13 @@ import {
     SHEEP_WOOL_MAX,
     SHEEP_WOOL_MIN,
     SHEEP_WOOL_REGROW_MIN,
+    SHEEP_BLEAT_COOLDOWN,
+    SHEEP_BLEAT_IDLE_MAX,
+    SHEEP_BLEAT_IDLE_MIN,
+    SHEEP_BLEAT_NEAR_COOLDOWN,
+    SHEEP_BLEAT_NEAR_RADIUS,
+    SHEEP_BLEAT_RANGE,
+    bleatFor,
     SHEEP_DAY_THRESHOLD,
     SHEEP_DESPAWN_DISTANCE,
     SHEEP_LEG_SWING,
@@ -904,4 +912,122 @@ test('a tosquia dá de um a três fardos, e as três quantias acontecem', () => 
         const count = woolCountFor(roll);
         assert.ok(count >= 1 && count <= 3, `${roll} deu ${count}`);
     }
+});
+
+// ------------------------------------------------ o balido
+
+test('sem ninguém por perto, o balido de passeio sai no relógio dela', () => {
+    assert.equal(bleatFor({ at: 0, distance: 18, nextIdleAt: 10 }), null, 'ainda cedo');
+    assert.equal(bleatFor({ at: 10, distance: 18, nextIdleAt: 10 }), 'call', 'chegou a hora');
+    // Longe demais, nem o chamado é ouvido.
+    assert.equal(bleatFor({ at: 10, distance: SHEEP_BLEAT_RANGE + 1, nextIdleAt: 0 }), null);
+    assert.ok(SHEEP_BLEAT_IDLE_MIN >= 10 && SHEEP_BLEAT_IDLE_MAX <= 60, 'o chamado é de vez em quando');
+});
+
+test('quando o jogador chega perto ela bale uma vez, não a cada quadro', () => {
+    const perto = 2;
+    assert.equal(bleatFor({ at: 100, distance: perto, near: true, wasNear: false }), 'near');
+    // Continuar perto não repete o balido.
+    assert.equal(bleatFor({ at: 105, distance: perto, near: true, wasNear: true, nextIdleAt: Infinity }), null,
+        'parado do lado dela, silêncio');
+    // Sair e voltar antes da espera também não.
+    assert.equal(bleatFor({
+        at: 100 + SHEEP_BLEAT_NEAR_COOLDOWN - 1,
+        distance: perto, near: true, wasNear: false, lastBleatAt: 100,
+    }), null, 'sair e voltar rápido não vira metralhadora');
+    // Depois da espera, sim.
+    assert.equal(bleatFor({
+        at: 100 + SHEEP_BLEAT_NEAR_COOLDOWN + 1,
+        distance: perto, near: true, wasNear: false, lastBleatAt: 100,
+    }), 'near');
+    assert.ok(SHEEP_BLEAT_NEAR_COOLDOWN > SHEEP_BLEAT_COOLDOWN, 'o "chegou perto" espera bem mais');
+});
+
+test('dois balidos da mesma ovelha nunca saem colados', () => {
+    // Um deles acabou de acontecer: nem o "chegou perto" nem o chamado passam.
+    assert.equal(bleatFor({
+        at: 50, distance: 1, near: true, wasNear: false, lastBleatAt: 49, nextIdleAt: 0,
+    }), null);
+    // O chamado de passeio também respeita a espera curta: dois "bé" seguidos
+    // não podem sair colados só porque o relógio sorteou cedo.
+    assert.equal(bleatFor({
+        at: 100, distance: 10, near: false, lastBleatAt: 98, nextIdleAt: 0,
+    }), null, 'o chamado espera a pausa mínima');
+    assert.equal(bleatFor({
+        at: 98 + SHEEP_BLEAT_COOLDOWN, distance: 10, near: false, lastBleatAt: 98, nextIdleAt: 0,
+    }), 'call', 'passada a pausa, ele sai');
+
+    // Passada a espera curta, o balido que estava engatilhado sai.
+    assert.equal(bleatFor({
+        at: 49 + SHEEP_BLEAT_COOLDOWN, distance: 1, near: true, wasNear: false,
+        lastBleatAt: 49, nextIdleAt: 0, nearCooldown: 0,
+    }), 'near');
+    // Um balido já pedido por outra regra tem prioridade.
+    assert.equal(bleatFor({
+        at: 0, distance: 1, near: false, pending: 'near', nextIdleAt: 0,
+    }), 'near');
+    assert.ok(SHEEP_BLEAT_NEAR_RADIUS > 0 && SHEEP_BLEAT_NEAR_RADIUS < SHEEP_BLEAT_RANGE,
+        'o raio do "chegou perto" é menor que o alcance do som');
+});
+
+// Sistema com um bisbilhoteiro no lugar do áudio.
+function makeBleatSystem(world, clock) {
+    const ouvidos = [];
+    const SheepSystem = createSheepSystemClass({
+        THREE, ID, BLOCKS, CHUNK_SIZE,
+        now: () => clock.t,
+        onBleat: evento => ouvidos.push(evento),
+    });
+    return { system: new SheepSystem(world), ouvidos };
+}
+
+test('a ovelha bale quando o jogador chega perto, e avisa a distância', () => {
+    const clock = { t: 0 };
+    const { system, ouvidos } = makeBleatSystem(makeWorld(), clock);
+    const longe = idlePlayer({ x: 0, z: 0 });
+    const sheep = spawnOne(system, clock, longe);
+    assert.equal(ouvidos.length, 0, 'nascendo longe, ela não bale');
+
+    // O jogador aparece do lado dela.
+    const perto = idlePlayer({ x: sheep.x, z: sheep.z });
+    clock.t += 0.05;
+    system.update(0.05, perto, true, { day: 1 });
+    assert.equal(ouvidos.length, 1, 'um balido');
+    assert.equal(ouvidos[0].reason, 'near');
+    assert.equal(ouvidos[0].entity, sheep);
+    assert.ok(ouvidos[0].distance < SHEEP_BLEAT_NEAR_RADIUS + 0.01);
+
+    // Ficando lá, ela não repete.
+    for (let i = 0; i < 10; i++) { clock.t += 0.05; system.update(0.05, perto, true, { day: 1 }); }
+    assert.equal(ouvidos.length, 1, 'e não vira zumbido');
+});
+
+test('de vez em quando ela bale sozinha, mesmo com o jogador longe', () => {
+    const clock = { t: 0 };
+    const { system, ouvidos } = makeBleatSystem(makeWorld(), clock);
+    const longe = idlePlayer({ x: 0, z: 0 });
+    const sheep = spawnOne(system, clock, longe);
+
+    // Longe, mas ainda dentro do alcance do som (10 blocos; o raio do "chegou
+    // perto" é 5): é a situação do chamado de passeio.
+    const aDezBlocos = idlePlayer({ x: sheep.x + 10, z: sheep.z });
+
+    // Adianta o relógio do chamado.
+    sheep.nextBleatAt = clock.t;
+    clock.t += 0.05;
+    system.update(0.05, aDezBlocos, true, { day: 1 });
+    assert.equal(ouvidos.length, 1);
+    assert.equal(ouvidos[0].reason, 'call');
+    assert.ok(ouvidos[0].distance > SHEEP_BLEAT_NEAR_RADIUS, 'é o chamado de longe');
+    // E o próximo fica para daqui a um tempo.
+    assert.ok(sheep.nextBleatAt > clock.t + SHEEP_BLEAT_IDLE_MIN - 1);
+});
+
+test('game.js toca os dois balidos com o volume caindo pela distância', () => {
+    const source = readFileSync(new URL('../game.js', import.meta.url), 'utf8');
+    assert.match(source, /onBleat: \(\{ reason, distance \}\) => \{/);
+    assert.match(source, /const falloff = clamp01\(1 - distance \/ SHEEP_BLEAT_RANGE\)/);
+    assert.match(source, /audio\.play\(near \? 'sheep-bleat-near' : 'sheep-bleat'/);
+    assert.match(source, /gainScale: falloff \*/, 'o volume cai com a distância');
+    assert.match(source, /import \{ SHEEP_BLEAT_RANGE/, 'o alcance vem do módulo da ovelha, não é número solto');
 });

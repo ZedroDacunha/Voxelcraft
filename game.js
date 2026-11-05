@@ -45,7 +45,7 @@ import { boxOverlapsXZ, woodDoorCollision, woodDoorPart, woodDoorShape, woodDoor
 import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld } from './player-physics.js';
 import { canJumpFrom, createJumpState, updateJumpWindow } from './player-jump.js';
 import { createCreatureSystemClass, creatureInReach } from './world-creature.js';
-import { SHEEP_WOOL_ITEMS, createSheepSystemClass } from './world-sheep.js';
+import { SHEEP_BLEAT_RANGE, SHEEP_WOOL_ITEMS, createSheepSystemClass } from './world-sheep.js';
 import { createChatState } from './world-chat.js';
 import { COMMAND_PREFIX, runChatCommand } from './world-chat-commands.js';
 import { createChatCompleter, visibleSuggestions } from './world-chat-completion.js';
@@ -1291,6 +1291,18 @@ const CreatureSystem = createCreatureSystemClass({
 // dá lã.
 const SheepSystem = createSheepSystemClass({
     THREE, ID, BLOCKS, CHUNK_SIZE, floorDiv, hash2,
+    // Balido: o chamado de passeio sai discreto; o "cheguei perto" sai mais
+    // agudo e mais alto. Nos dois casos o volume cai com a distância, e longe
+    // demais o som some — três ovelhas balindo juntas já é o bastante.
+    onBleat: ({ reason, distance }) => {
+        const falloff = clamp01(1 - distance / SHEEP_BLEAT_RANGE);
+        if (falloff < 0.08) return;
+        const near = reason === 'near';
+        audio.play(near ? 'sheep-bleat-near' : 'sheep-bleat', {
+            gainScale: falloff * (near ? 0.9 : 0.6),
+            rate: near ? 1.12 : 1,
+        });
+    },
 });
 
 // =====================================================================

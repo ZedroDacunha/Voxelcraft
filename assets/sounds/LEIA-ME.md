@@ -42,6 +42,8 @@ existir, usa a síntese.
 | `door-close.ogg` / `.wav` | porta de madeira fechando | rangido 0,14 s + baque no batente |
 | `place-*.ogg` / `.wav` | bloco colocado (um por material) | ruído 0,05–0,08 s + baque curto |
 | `mofim-chirp.ogg` / `.wav` | chilreio do Mofim (susto, fuga e chamado de passeio) | seno 1850→2450 Hz, dois trinados de 55 ms |
+| `sheep-bleat.ogg` / `.wav` | balido de passeio da ovelha (de vez em quando, andando ou pastando) | serra 320→248 Hz, três sílabas de 180 ms |
+| `sheep-bleat-near.ogg` / `.wav` | balido quando o jogador chega perto dela | serra 392→300 Hz, duas sílabas de 150 ms |
 
 A busca é feita uma vez por som e o resultado fica em cache: se você adicionar o
 arquivo depois de abrir a página, recarregue (Ctrl+F5) para ouvir.
@@ -50,7 +52,7 @@ arquivo depois de abrir a página, recarregue (Ctrl+F5) para ouvir.
 
 - Formato: **ogg (Vorbis)** ou **wav** PCM. MP3 não é lido por esta ponte.
 - Curtos: clique ≤ 150 ms, hover ≤ 60 ms, passo ≤ 150 ms, batida ≤ 70 ms,
-  quebrar ≤ 200 ms. Sons longos atrasam a sensação de resposta (a exceção é
+  quebrar ≤ 200 ms, balido ≤ 900 ms. Sons longos atrasam a sensação de resposta (a exceção é
   `death`, um evento final de até 800 ms).
 - Mono, 44,1 kHz. O volume final vem do controle **Volume** nas opções.
 - Minere o "clique" com um fade-out até o zero — um corte seco produz um estalo.

@@ -121,6 +121,23 @@ export const SHEEP_WOOL_REGROW_MIN = 300;
 export const SHEEP_WOOL_REGROW_MAX = 480;
 /** Cada pastagem enquanto tosquiada adianta o crescimento (segundos). */
 export const SHEEP_WOOL_GRAZE_BONUS = 90;
+// ---------------------------------------------------------------- o balido
+//
+// Duas situações, dois sons: o **chamado** de passeio (de vez em quando, andando
+// ou pastando) e o **"cheguei perto"** (quando o jogador entra no raio dela). O
+// silêncio é o padrão: bicho que bale sem parada vira zumbido.
+
+/** De quanto em quanto tempo ela bale sozinha (segundos). */
+export const SHEEP_BLEAT_IDLE_MIN = 14;
+export const SHEEP_BLEAT_IDLE_MAX = 34;
+/** Distância (blocos) em que o jogador "chega perto" e ela bale. */
+export const SHEEP_BLEAT_NEAR_RADIUS = 5;
+/** Espera entre dois balidos de "chegou perto", e entre dois balidos quaisquer. */
+export const SHEEP_BLEAT_NEAR_COOLDOWN = 22;
+export const SHEEP_BLEAT_COOLDOWN = 4;
+/** Além desta distância o balido não é ouvido — quem chama decide o volume. */
+export const SHEEP_BLEAT_RANGE = 20;
+
 /**
  * Cor da lã → nome do item no catálogo. Fica aqui, e não no jogo, para o teste
  * conferir que as três cores têm item; quem troca o nome pelo ID é o `game.js`,
@@ -292,6 +309,38 @@ export function headPoseFor(envelope) {
 }
 
 /**
+ * Vale um balido agora? Devolve o motivo — `'near'` (o jogador chegou perto) ou
+ * `'call'` (chamado de passeio) — ou `null` para ficar quieta.
+ *
+ * `'near'` só acontece na **transição** de longe para perto (`near && !wasNear`):
+ * ficar parado do lado dela não faz a ovelha balir a cada quadro. O chamado de
+ * passeio segue um relógio sorteado, e os dois respeitam uma espera comum para
+ * não saírem colados.
+ */
+export function bleatFor({
+    at,
+    distance,
+    near = false,
+    wasNear = false,
+    pending = null,
+    lastBleatAt = -Infinity,
+    nextIdleAt = Infinity,
+    cooldown = SHEEP_BLEAT_COOLDOWN,
+    range = SHEEP_BLEAT_RANGE,
+    nearCooldown = SHEEP_BLEAT_NEAR_COOLDOWN,
+} = {}) {
+    if (!(distance <= range)) return null;
+    if (at - lastBleatAt < cooldown) return null;
+    if (pending) return pending;
+    if (near && !wasNear) {
+        // O "chegou perto" tem espera própria e mais longa: sem ela, sair e
+        // voltar do raio dela viraria uma metralhadora de balidos.
+        return at - lastBleatAt < nearCooldown ? null : 'near';
+    }
+    return at >= nextIdleAt ? 'call' : null;
+}
+
+/**
  * Quantos fardos saem de uma tosquia, a partir de um sorteio de 0 a 1: um, dois
  * ou três, em partes iguais.
  */
@@ -317,6 +366,9 @@ export function createSheepSystemClass({
     floorDiv = defaultFloorDiv,
     hash2 = defaultHash2,
     now = () => performance.now() * 0.001,
+    // Avisa quem chamou que a ovelha baleu (e por quê). O módulo não conhece
+    // áudio: o `game.js` é quem toca, com o volume caindo pela distância.
+    onBleat = null,
 }) {
     const CreatureBase = createCreatureBaseClass({ THREE, BLOCKS, CHUNK_SIZE, floorDiv });
 
@@ -578,6 +630,12 @@ export function createSheepSystemClass({
                     // Pasto: a primeira vem cedo (para o jogador ver), depois de
                     // vez em quando. `grazeT` é o relógio da pastagem em curso
                     // (null quando não está pastando) e `bit`, se já mordeu.
+                    // Balido: o primeiro chamado vem depois de um tempo, e ela
+                    // começa "longe" (quem sabe se o jogador já está colado).
+                    nextBleatAt: at + SHEEP_BLEAT_IDLE_MIN
+                        + hash2(seed, attempt, 577) * (SHEEP_BLEAT_IDLE_MAX - SHEEP_BLEAT_IDLE_MIN),
+                    lastBleatAt: -Infinity,
+                    wasNear: false,
                     grazeAt: at + grazeDelayFor(hash2(seed, attempt, 401), true),
                     grazeT: null,
                     grazeFor: 0,
@@ -617,6 +675,25 @@ export function createSheepSystemClass({
                     this.removeEntity(e);
                     continue;
                 }
+
+                // Balido: chamado de vez em quando e um "cheguei perto" quando o
+                // jogador entra no raio dela.
+                const near = distanceToPlayer <= SHEEP_BLEAT_NEAR_RADIUS;
+                const motivo = bleatFor({
+                    at,
+                    distance: distanceToPlayer,
+                    near,
+                    wasNear: e.wasNear,
+                    lastBleatAt: e.lastBleatAt,
+                    nextIdleAt: e.nextBleatAt,
+                });
+                if (motivo) {
+                    e.lastBleatAt = at;
+                    e.nextBleatAt = at + SHEEP_BLEAT_IDLE_MIN
+                        + hash2(e.id, Math.round(at), 577) * (SHEEP_BLEAT_IDLE_MAX - SHEEP_BLEAT_IDLE_MIN);
+                    onBleat?.({ reason: motivo, distance: distanceToPlayer, entity: e });
+                }
+                e.wasNear = near;
 
                 // Lã de volta: a ovelha tosquiada cresce de novo quando o
                 // relógio (adiantado pelas pastagens) chega.

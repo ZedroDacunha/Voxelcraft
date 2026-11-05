@@ -603,3 +603,15 @@ Já coberto por `npm test` (862 testes):
       cima dele também é macio.
 - [ ] `/give la 4` dá lã branca e `/give tesoura` dá a tesoura (o `/help` lista os
       itens com o nome que aparece no jogo).
+
+## 27. Balido da ovelha
+
+- [ ] Perto de uma ovelha, dá para ouvir o **chamado de passeio** de vez em
+      quando (a cada 14–34 s), andando, parada ou pastando. É discreto.
+- [ ] Chegando a menos de **5 blocos** dela, sai um balido **diferente**: mais
+      agudo e mais curto.
+- [ ] **Ficar** do lado dela não repete o balido; sair do raio e voltar também
+      não repete na hora (espera de 22 s).
+- [ ] Andando para longe, o balido **enfraquece** e depois de ~20 blocos some.
+- [ ] Com `assets/sounds/sheep-bleat.ogg` na pasta (e Ctrl+F5), o som passa a ser
+      o do arquivo; sem o arquivo, continua a síntese.
