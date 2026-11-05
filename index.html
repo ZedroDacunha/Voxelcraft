@@ -21,7 +21,7 @@
     "three/addons/": "./vendor/three/addons/",
     "./game-pause-menu.js": "./game-pause-menu.js?v=b592dfec15",
     "./game-pointer-lock.js": "./game-pointer-lock.js?v=cf53899b88",
-    "./game.js": "./game.js?v=f0875feb01",
+    "./game.js": "./game.js?v=eb12801b49",
     "./inventory-a11y.js": "./inventory-a11y.js?v=25f3dab87d",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
     "./inventory-layout.js": "./inventory-layout.js?v=439823a409",
@@ -50,7 +50,7 @@
     "./world-furnace-effects.js": "./world-furnace-effects.js?v=b5fc477140",
     "./world-furnace-rules.js": "./world-furnace-rules.js?v=195bb6a8fc",
     "./world-furnace-sounds.js": "./world-furnace-sounds.js?v=a844b58f3c",
-    "./world-game-settings.js": "./world-game-settings.js?v=df442e3502",
+    "./world-game-settings.js": "./world-game-settings.js?v=51c16bd21d",
     "./world-graphics-quality.js": "./world-graphics-quality.js?v=1aafc939df",
     "./world-grid.js": "./world-grid.js?v=be11481d71",
     "./world-hand-animation.js": "./world-hand-animation.js?v=5db4d45ae7",
@@ -68,11 +68,12 @@
     "./world-mineral-blocks.js": "./world-mineral-blocks.js?v=4c39bc041e",
     "./world-mineral-textures.js": "./world-mineral-textures.js?v=ab422ad968",
     "./world-minerals.js": "./world-minerals.js?v=2f66ff7350",
-    "./world-options-view.js": "./world-options-view.js?v=0cbe28a90d",
+    "./world-options-view.js": "./world-options-view.js?v=aef01cc51e",
     "./world-ore-generation.js": "./world-ore-generation.js?v=7fe35588d3",
     "./world-point-lights.js": "./world-point-lights.js?v=495370ce08",
     "./world-pwa.js": "./world-pwa.js?v=634eb5dc1b",
     "./world-raycast.js": "./world-raycast.js?v=0f025b877c",
+    "./world-render-resolution.js": "./world-render-resolution.js?v=814445f627",
     "./world-save-codec.js": "./world-save-codec.js?v=71b8b469b6",
     "./world-save-indicator.js": "./world-save-indicator.js?v=464a1a9ddc",
     "./world-save-loader.js": "./world-save-loader.js?v=097322c79d",
@@ -180,6 +181,10 @@
         <div class="options-grid" id="options-graphics-grid" hidden>
             <button type="button" class="classic-btn option-btn" id="opt-graphics" aria-label="Gráficos">
                 <span class="option-text"><span class="option-name">Gráficos</span>: <span class="option-value" id="opt-graphics-value">Automática</span></span>
+            </button>
+            <button type="button" class="classic-btn option-btn option-slider" id="opt-resolution" aria-label="Resolução">
+                <span class="option-track" aria-hidden="true"><span class="option-knob"></span></span>
+                <span class="option-text"><span class="option-name">Resolução</span>: <span class="option-value" id="opt-resolution-value">Janela (nativa)</span></span>
             </button>
             <button type="button" class="classic-btn option-btn option-slider" id="opt-fov" aria-label="Campo de visão">
                 <span class="option-track" aria-hidden="true"><span class="option-knob"></span></span>

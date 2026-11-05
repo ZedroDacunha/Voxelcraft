@@ -162,7 +162,10 @@ test('o jogo aplica a escala pendente e mede FPS para adaptar', () => {
     const source = readFileSync(new URL('../game.js', import.meta.url), 'utf8');
     assert.match(source, /gfx\.consumePending\(\)/);
     assert.match(source, /gfx\.adapt\(perf\.fps, perf\.avg, document\.hidden\)/);
-    assert.match(source, /renderer\.setPixelRatio\(gfx\.scale\)/);
+    // a escala vai para o renderer em applyRenderResolution (renderTarget),
+    // e não muda o buffer quando há uma resolução fixa escolhida
+    assert.match(source, /renderer\.setPixelRatio\(target\.pixelRatio\)/);
+    assert.match(source, /if \(pendingScale !== null && !resolutionSize\(resolutionMode\)\) renderer\.setPixelRatio\(pendingScale\);/);
     assert.match(source, /const cycleQuality = \(\) => gfx\.cycle\(\)/);
 });
 

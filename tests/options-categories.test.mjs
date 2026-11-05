@@ -69,7 +69,7 @@ test('cada categoria tem a própria grade, escondida até ser aberta', () => {
 
 test('as linhas de valor ficam na categoria certa', () => {
     assert.deepEqual(AUDIO_OPTION_CONTROLS.map(row => row.key), ['volume']);
-    assert.deepEqual(GRAPHICS_OPTION_CONTROLS.map(row => row.key), ['graphics', 'fov', 'renderDistance']);
+    assert.deepEqual(GRAPHICS_OPTION_CONTROLS.map(row => row.key), ['graphics', 'resolution', 'fov', 'renderDistance']);
     assert.deepEqual(CONTROL_OPTION_CONTROLS.map(row => row.key), ['sensitivity']);
     assert.deepEqual(TOUCH_OPTION_CONTROLS.map(row => row.key),
         ['touchSensitivity', 'touchLayout', 'touchButtonSize', 'touchVibration']);
@@ -101,8 +101,10 @@ test('só as linhas de valor mostram valor; o resumo é do botão de toque', () 
         'um valor por linha de barra/lista');
     assert.equal((dialog.match(/class="option-summary"/g) ?? []).length, 1,
         'só o botão de toque resume');
+    // barra = campo de faixa ou lista com `slider` (a resolução é uma escada)
+    const isSlider = key => !GAME_SETTING_FIELDS[key].choices || GAME_SETTING_FIELDS[key].slider === true;
     assert.equal((dialog.match(/class="option-track"/g) ?? []).length,
-        OPTION_CONTROLS.filter(row => !GAME_SETTING_FIELDS[row.key].choices).length);
+        OPTION_CONTROLS.filter(row => isSlider(row.key)).length);
 });
 
 // --- a troca de telas ---------------------------------------------------

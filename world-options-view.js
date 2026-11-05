@@ -18,6 +18,7 @@ export const AUDIO_OPTION_CONTROLS = [
 
 export const GRAPHICS_OPTION_CONTROLS = [
     { key: 'graphics', button: 'opt-graphics', output: 'opt-graphics-value', label: 'Gráficos' },
+    { key: 'resolution', button: 'opt-resolution', output: 'opt-resolution-value', label: 'Resolução' },
     { key: 'fov', button: 'opt-fov', output: 'opt-fov-value', label: 'Campo de visão' },
     { key: 'renderDistance', button: 'opt-render-distance', output: 'opt-render-distance-value', label: 'Distância de render' },
 ];
@@ -71,13 +72,16 @@ export function createOptionsView(dialog = document.getElementById('options-dial
         const buttonEl = dialog.querySelector(`#${button}`);
         const field = GAME_SETTING_FIELDS[key];
         if (!buttonEl || !field) return null;
-        const slider = !field.choices;
+        // lista com `slider` (a resolução) é barra de degraus: o valor ARIA é a
+        // posição na lista, e o texto continua sendo a resolução escolhida
+        const listSlider = Boolean(field.choices) && field.slider === true;
+        const slider = !field.choices || listSlider;
         if (slider) {
             buttonEl.setAttribute('role', 'slider');
-            buttonEl.setAttribute('aria-valuemin', String(field.min));
-            buttonEl.setAttribute('aria-valuemax', String(field.max));
+            buttonEl.setAttribute('aria-valuemin', String(listSlider ? 0 : field.min));
+            buttonEl.setAttribute('aria-valuemax', String(listSlider ? field.choices.length - 1 : field.max));
         }
-        return { key, field, label, slider, buttonEl, outputEl: dialog.querySelector(`#${output}`) };
+        return { key, field, label, slider, listSlider, buttonEl, outputEl: dialog.querySelector(`#${output}`) };
     }).filter(Boolean);
 
     const rows = OPTION_SCREENS.flatMap(screen => buildRows(screen.controls));
@@ -146,7 +150,9 @@ export function createOptionsView(dialog = document.getElementById('options-dial
                 row.buttonEl.setAttribute('aria-label', `${row.label}: ${text}`);
                 continue;
             }
-            row.buttonEl.setAttribute('aria-valuenow', String(value));
+            // numa lista com barra, o valor ARIA é a posição na lista
+            const now = row.listSlider ? Math.max(0, row.field.choices.indexOf(value)) : value;
+            row.buttonEl.setAttribute('aria-valuenow', String(now));
             row.buttonEl.setAttribute('aria-valuetext', text);
             // posição na barra: é ela que o CSS usa para pôr o cursor da barra
             row.buttonEl.style.setProperty('--option-fill', `${(settingFraction(row.key, value) * 100).toFixed(1)}%`);

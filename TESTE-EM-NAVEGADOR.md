@@ -354,6 +354,33 @@ Menu → **Opções** (e também ESC → Opções, com o jogo rodando).
 - [ ] No celular a grade vira **uma coluna** e cada categoria abre normalmente,
       com o dedo arrastando as barras.
 
+## 19. Resolução do jogo
+
+Menu → **Opções** → **Gráficos** → **Resolução** (a segunda linha da categoria).
+No celular, dá para fazer o mesmo sem entrar num mundo.
+
+- [ ] A linha começa em **Janela (nativa)** e é uma barra (trilho e cursor).
+- [ ] Arrastar para a direita anda pelas resoluções: 640×360, 854×480, … até
+      **3840×2160**; o texto muda junto e o F3 (no jogo) mostra a mesma escolha.
+- [ ] Escolher **1280×720**: a imagem fica mais macia e o FPS sobe num aparelho
+      fraco — o jogo continua ocupando a **tela toda**, sem faixas pretas.
+- [ ] Escolher **1920×1080** num monitor 1080p: a imagem fica no ponto (sem
+      esticar) e o custo é o de sempre.
+- [ ] Ao escolher uma resolução fixa o navegador **pede tela cheia**; voltar para
+      **Janela (nativa)** sai dela.
+- [ ] Se você mesmo entrou em tela cheia (F11) e depois escolhe Janela, o jogo
+      **não** derruba a sua tela cheia.
+- [ ] Girar o celular ou redimensionar a janela: a imagem continua ocupando a
+      tela toda e a escolha não muda.
+- [ ] Teclado: setas andam **uma** resolução, `Home`/`End` vão às pontas e não dá
+      a volta.
+- [ ] Fechar o jogo e voltar: a resolução escolhida continua valendo.
+- [ ] **Restaurar padrões** volta para Janela (nativa).
+- [ ] No iPhone (Safari não tem tela cheia em página): a resolução muda a nitidez
+      e **nada quebra** — só não entra em tela cheia.
+- [ ] Com resolução fixa, apertar **F4** (qualidade) não muda a nitidez — a
+      escolha é sua; ao voltar para Janela, a qualidade volta a mandar.
+
 ## Se algo falhar
 
 | Sintoma | Onde olhar |
