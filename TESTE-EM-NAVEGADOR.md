@@ -255,6 +255,28 @@ tela abre pelo ESC durante o jogo).
 - [ ] No desktop com mouse nada muda: os controles de toque não aparecem, e a
       tela de Opções continua abrindo normalmente.
 
+## 15. Vibração no toque
+
+Menu → Opções → Configurações de toque → **Vibração: Ligada** (padrão). Use num
+**Android** (no iPhone o Safari não vibra — é limitação do navegador, não bug).
+
+- [ ] **Quebrar bloco**: um pulso curto no fim da quebra (e a grama alta também).
+- [ ] **Colocar bloco**: um tique bem leve, menor que o da quebra.
+- [ ] **Bater no Mofim** (segurando o dedo nele): pulso curto no golpe.
+- [ ] **Andar e correr**: cadência de vibração acompanhando os passos no chão —
+      parado, nadando ou pulando, nada vibra.
+- [ ] **Levar dano**: o padrão mais forte de todos (três pulsos, ~0,1 s).
+- [ ] **Botões**: um tique ao apertar `Pular`, `Cavar`, `Usar`, `Agachar`,
+      `Mochila` ou `Pausar` — inclusive quando o botão não faz nada no momento
+      (apertar `Usar` sem item escolhido vibra igual; é confirmação do toque).
+- [ ] **Vibração: Desligada** para tudo, na hora, sem recarregar o mundo.
+- [ ] **Pausar no meio de um dano** corta o padrão (não fica vibrando no bolso).
+- [ ] A vibração **não** atrapalha o áudio nem o desempenho: andando devagar,
+      olhando o F3, o FPS continua igual ao de antes.
+- [ ] No **desktop** (mouse) e no **iPhone** o jogo funciona exatamente como
+      antes: a opção existe, mas nada vibra.
+- [ ] Fechar e abrir o jogo mantém a escolha de vibração.
+
 ## Se algo falhar
 
 | Sintoma | Onde olhar |

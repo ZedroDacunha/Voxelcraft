@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 676 testes de módulos puros (node --test)
+npm test           # 688 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -94,9 +94,14 @@ capturar o mouse, e sim um joystick e botões na própria tela.
   `Mochila` e `Pausar` são de um toque. O nome de cada um fica no `aria-label`.
 - **Hotbar**: cada casa é um botão (não há roda do mouse).
 - **Opções → Configurações de toque** (sub-tela da mesma janela de Opções, no
-  menu e no ESC): **Mão** (Destro/Canhoto espelha joystick, botões e dica) e
-  **Tamanho dos botões** (80%–140%, com o joystick e a hotbar acompanhando).
-  Fica gravado em `localStorage` junto das outras preferências.
+  menu e no ESC): **Mão** (Destro/Canhoto espelha joystick, botões e dica),
+  **Tamanho dos botões** (80%–140%, com o joystick e a hotbar acompanhando) e
+  **Vibração** (Ligada/Desligada). Fica gravado em `localStorage` junto das
+  outras preferências.
+- **Vibração** (onde o aparelho deixa — Android vibra, iPhone não): pulso curto
+  ao quebrar, colocar, bater no Mofim, andar/correr e apertar botão; padrão mais
+  forte ao levar dano. Cada acontecimento tem folga mínima, então não vira
+  zumbido, e pausar/morrer cancela um pulso no meio.
 - **Híbrido**: notebook com tela de toque também joga com mouse — se o clique for
   do mouse, o jogo pede *pointer lock* como sempre; se for do dedo, vira toque.
 
