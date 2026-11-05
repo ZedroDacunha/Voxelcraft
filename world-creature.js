@@ -61,6 +61,27 @@ export const FLIGHT_DISTANCE = 2.6;
 /** Espera entre um voo de passeio e outro (segundos, sorteada na faixa). */
 export const FLIGHT_IDLE_MIN = 11;
 export const FLIGHT_IDLE_MAX = 22;
+/**
+ * Travessia: o voo maior, para cruzar o que não se anda.
+ *
+ * O voo curto resolve o degrau e a beirada; um lago largo, uma ravina ou um
+ * barranco no meio do caminho não. Aqui ele sai do chão, plana **baixo** por até
+ * nove blocos e pousa do outro lado — mais tempo no ar, mais longe, e ainda
+ * assim rente ao chão (rasante), porque não é bicho que sobe.
+ *
+ * O mínimo de 3,5 blocos existe para não virar atalho do voo curto: o que está
+ * perto se resolve com um pulo de asa, não com uma travessia.
+ */
+export const CROSS_DISTANCE = 9;
+export const CROSS_MIN_DISTANCE = 3.5;
+/** Altura do pico acima do ponto mais alto do trajeto (blocos). */
+export const CROSS_HEIGHT = 2.2;
+/** Fração do trajeto gasta subindo; o resto é planeio (0,32 → sobe rápido). */
+export const CROSS_RISE = 0.32;
+/** Velocidade no ar (blocos por segundo): a travessia longa dura mais. */
+export const CROSS_SPEED = 6.5;
+/** Depois de uma tentativa, quanto tempo ele espera antes de tentar de novo. */
+export const CROSS_COOLDOWN = 6;
 /** Vida do bicho: três golpes de mão (cada golpe ainda o assusta). */
 export const MOFIM_HEALTH = 3;
 /** Tempo que o corpo fica aceso depois de levar dano (segundos). */
@@ -238,6 +259,41 @@ export function flightHeightAt(from, to, progress, height = FLIGHT_HEIGHT) {
     return from + (to - from) * p + height * Math.sin(Math.PI * p);
 }
 
+/** Curva suave de 0 a 1 (acelera no meio, trava nas pontas). */
+function smoothstep(q) {
+    const t = Math.min(1, Math.max(0, q));
+    return t * t * (3 - 2 * t);
+}
+
+/**
+ * Altura do corpo durante a travessia (o voo maior).
+ *
+ * Diferente do voo curto, aqui o ponto alto não fica no meio: ele **sobe rápido**
+ * nos primeiros 32% do trajeto e passa o resto planando. A descida é uma curva em
+ * S — segura a altura no começo (é o que dá a cara de rasante) e alivia perto do
+ * chão, para o pouso não ser um tombo.
+ */
+export function crossHeightAt(from, to, progress, height = CROSS_HEIGHT, rise = CROSS_RISE) {
+    if (!(progress > 0)) return from;
+    if (progress >= 1) return to;
+    const p = Number(progress);
+    const peak = Math.max(from, to) + height;
+    if (p < rise) return from + (peak - from) * smoothstep(p / rise);
+    return peak + (to - peak) * smoothstep((p - rise) / (1 - rise));
+}
+
+/**
+ * Vale tentar a travessia agora? Só quando o chão barra o passo **e** já passou a
+ * espera da última tentativa — sem esse relógio ele tentaria de novo a cada
+ * quadro contra a mesma margem.
+ */
+export function crossFlightFor({ at, nextCrossAt = Infinity, blocked = false } = {}) {
+    if (!blocked) return false;
+    const now = Number(at);
+    if (!Number.isFinite(now)) return false;
+    return now >= Number(nextCrossAt);
+}
+
 /**
  * Vale sair voando agora? Devolve o motivo (`'escape'`, `'wander'`) ou `null`.
  *
@@ -374,6 +430,9 @@ export function createCreatureSystemClass({
                     flight: null,
                     nextFlightAt: at + FLIGHT_IDLE_MIN
                         + hash2(seed, attempt, 401) * (FLIGHT_IDLE_MAX - FLIGHT_IDLE_MIN),
+                    // A travessia não tem horário: ela só acontece quando o chão
+                    // fecha o caminho. Isto é a espera depois de uma tentativa.
+                    nextCrossAt: 0,
                     ...model,
                 });
                 return;
@@ -468,8 +527,8 @@ export function createCreatureSystemClass({
          * dois blocos no meio do caminho barra o voo, um degrau de um bloco não
          * — é o mesmo critério do passo, só que pelo ar.
          */
-        flightPathClear(e, toX, toZ, toY) {
-            const peak = Math.max(e.y, toY) + FLIGHT_HEIGHT;
+        flightPathClear(e, toX, toZ, toY, height = FLIGHT_HEIGHT) {
+            const peak = Math.max(e.y, toY) + height;
             const floorY = Math.floor(Number.isFinite(e.visualY) ? e.visualY : e.y) + 1;
             const steps = Math.max(1, Math.ceil(Math.hypot(toX - e.x, toZ - e.z) / 0.5));
             for (let i = 1; i <= steps; i++) {
@@ -512,12 +571,63 @@ export function createCreatureSystemClass({
             const target = this.flightTarget(e, dirX, dirZ);
             if (!target) return false;
             e.flight = {
+                kind: 'hop',
                 t: 0,
                 duration: FLIGHT_DURATION,
                 fromX: e.x, fromZ: e.z, fromY: e.visualY,
                 toX: target.x, toZ: target.z, toY: target.y,
             };
             // O arco do voo manda no corpo agora; nada de pulo/planeio pendente.
+            e.hopT = HOP_DURATION;
+            e.glideT = GLIDE_DURATION;
+            return true;
+        }
+
+        /**
+         * Onde a travessia pousa? Anda a direção pedida procurando chão firme do
+         * outro lado do vão — **do mais longe para o mais perto**, porque atravessar
+         * é justamente o ponto: parar no primeiro metro de grama depois do lago
+         * não cruza nada.
+         *
+         * O ar do caminho é checado até a altura do pico da travessia: um barranco
+         * de dois blocos reprova, um vão de água passa.
+         */
+        crossTarget(e, dirX, dirZ) {
+            const length = Math.hypot(dirX, dirZ);
+            if (!(length > 1e-6)) return null;
+            const ux = dirX / length, uz = dirZ / length;
+            const passos = Math.round((CROSS_DISTANCE - CROSS_MIN_DISTANCE) / 0.5);
+            for (let i = 0; i <= passos; i++) {
+                const distance = CROSS_DISTANCE - i * 0.5;
+                if (distance < CROSS_MIN_DISTANCE) break;
+                const x = e.x + ux * distance;
+                const z = e.z + uz * distance;
+                const y = this.surfaceAt(x, z);
+                if (y === null) continue;
+                if (!this.flightPathClear(e, x, z, y, CROSS_HEIGHT)) continue;
+                return { x, y, z, distance };
+            }
+            return null;
+        }
+
+        /**
+         * Levanta voo para atravessar o que o passo não vence. Devolve `false`
+         * quando não há pouso do outro lado — e aí ele volta a andar.
+         *
+         * O relógio anda mesmo quando a travessia é recusada: sem isso ele
+         * tentaria de novo a cada quadro contra a mesma margem.
+         */
+        startCrossFlight(e, dirX, dirZ, at) {
+            e.nextCrossAt = at + CROSS_COOLDOWN;
+            const target = this.crossTarget(e, dirX, dirZ);
+            if (!target) return false;
+            e.flight = {
+                kind: 'cross',
+                t: 0,
+                duration: Math.min(1.8, Math.max(0.5, target.distance / CROSS_SPEED)),
+                fromX: e.x, fromZ: e.z, fromY: e.visualY,
+                toX: target.x, toZ: target.z, toY: target.y,
+            };
             e.hopT = HOP_DURATION;
             e.glideT = GLIDE_DURATION;
             return true;
@@ -531,7 +641,9 @@ export function createCreatureSystemClass({
             const p = f.duration > 0 ? f.t / f.duration : 1;
             e.x = f.fromX + (f.toX - f.fromX) * p;
             e.z = f.fromZ + (f.toZ - f.fromZ) * p;
-            e.visualY = flightHeightAt(f.fromY, f.toY, p);
+            e.visualY = f.kind === 'cross'
+                ? crossHeightAt(f.fromY, f.toY, p)
+                : flightHeightAt(f.fromY, f.toY, p);
             e.heading = Math.atan2(f.toX - f.fromX, f.toZ - f.fromZ);
             if (p >= 1) {
                 e.x = f.toX; e.z = f.toZ;
@@ -641,9 +753,13 @@ export function createCreatureSystemClass({
                         // sair desviando pelo chão — e, se não houver onde
                         // pousar, desvia como sempre desviou.
                         if (!this.stepToward(e, dxp, dzp, FLEE_SPEED, dt)) {
-                            const voou = flightFor({ at, fleeing: true, blocked: true }) === 'escape'
+                            // A beirada se resolve com o voo curto; o lago largo,
+                            // só com a travessia. Sem pouso em nenhum dos dois, ele
+                            // desvia pelo chão como sempre desviou.
+                            const saltou = flightFor({ at, fleeing: true, blocked: true }) === 'escape'
                                 && this.startFlight(e, dxp, dzp, at);
-                            if (!voou) this.fleeStep(e, dxp, dzp, dt);
+                            const cruzou = !saltou && this.startCrossFlight(e, dxp, dzp, at);
+                            if (!saltou && !cruzou) this.fleeStep(e, dxp, dzp, dt);
                         }
                     } else {
                         // Passeio: de vez em quando um voo curto no rumo do alvo.
@@ -665,8 +781,13 @@ export function createCreatureSystemClass({
                             }
                             const dx = e.targetX - e.x, dz = e.targetZ - e.z;
                             const distance = Math.hypot(dx, dz);
-                            // Barrado passeando: sorteia outro alvo em vez de insistir.
-                            if (distance > 0.08 && !this.stepToward(e, dx, dz, WANDER_SPEED, dt)) e.turnAt = at;
+                            // Barrado passeando: se há chão firme do outro lado do
+                            // vão, ele atravessa; senão sorteia outro alvo em vez de
+                            // insistir contra a mesma margem.
+                            if (distance > 0.08 && !this.stepToward(e, dx, dz, WANDER_SPEED, dt)) {
+                                const tentar = crossFlightFor({ at, nextCrossAt: e.nextCrossAt, blocked: true });
+                                if (!tentar || !this.startCrossFlight(e, dx, dz, at)) e.turnAt = at;
+                            }
                         }
                     }
                 }
@@ -701,14 +822,23 @@ export function createCreatureSystemClass({
                 // abrem na horizontal — é o que faz a descida parecer planeio.
                 // Voando, ele sobe de peito erguido e desce de bico baixo.
                 const flightProgress = e.flight ? e.flight.t / e.flight.duration : 0;
+                // Na travessia ele sobe de peito erguido e passa o resto do
+                // trajeto de bico baixo, planando: asas abertas, batidas lentas.
+                const crossFlight = e.flight?.kind === 'cross';
                 const pitchTarget = airborne
-                    ? (flightProgress < 0.5 ? -0.2 : 0.2)
+                    ? (crossFlight
+                        ? (flightProgress < CROSS_RISE ? -0.24 : 0.14)
+                        : (flightProgress < 0.5 ? -0.2 : 0.2))
                     : (gliding ? 0.2 : 0);
                 e.glidePitch += (pitchTarget - e.glidePitch) * Math.min(1, 10 * dt);
                 e.group.rotation.x = e.glidePitch;
-                const wingBase = airborne ? 0.02 : (gliding ? 0.03 : 0.25);
-                const flapSpeed = airborne ? 26 : (gliding ? 5 : (fleeing ? 22 : 8));
-                const flapAmp = airborne ? 0.5 : (gliding ? 0.07 : (fleeing ? 0.36 : 0.18));
+                const wingBase = airborne ? (crossFlight ? 0 : 0.02) : (gliding ? 0.03 : 0.25);
+                const flapSpeed = airborne
+                    ? (crossFlight ? 13 : 26)
+                    : (gliding ? 5 : (fleeing ? 22 : 8));
+                const flapAmp = airborne
+                    ? (crossFlight ? 0.3 : 0.5)
+                    : (gliding ? 0.07 : (fleeing ? 0.36 : 0.18));
                 const flap = Math.sin(at * flapSpeed + e.phase) * flapAmp;
                 e.leftWing.rotation.z = -wingBase + flap;
                 e.rightWing.rotation.z = wingBase - flap;
