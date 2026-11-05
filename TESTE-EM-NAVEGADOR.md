@@ -228,17 +228,18 @@ olhar, toque para usar, segure para cavar.
 - [ ] No desktop com mouse nada mudou: clique esquerdo cava, direito usa, e o
       modo toque só liga se o jogador entrou por toque (ou com `?touch=1`).
 
-## 14. Configurações de toque (mão e tamanho)
+## 14. Controles de toque (mão e tamanho)
 
-Menu → **Opções** → último botão da grade, **Configurações de toque** (a mesma
+Menu → **Opções** → **Controles** → **Controles de toque** (a mesma
 tela abre pelo ESC durante o jogo).
 
 - [ ] O botão mostra um resumo (`Destro · 100%`) e **abre a sub-tela na mesma
       janela** — não aparece uma segunda janela por cima.
-- [ ] A sub-tela tem só duas linhas: **Mão** e **Tamanho dos botões**; o título
-      vira "Opções de toque".
-- [ ] **Voltar** devolve a grade principal e, ao fechar e reabrir as Opções,
-      volta sempre para a grade principal.
+- [ ] A sub-tela tem **Sensibilidade do olhar**, **Mão**, **Tamanho dos botões**,
+      **Vibração** (e **Editar posições**, dentro do mundo); o título vira
+      "Controles de toque".
+- [ ] **Voltar** devolve a categoria **Controles**, e de lá o `Voltar` devolve a
+      lista; ao fechar e reabrir as Opções, volta sempre para a lista.
 - [ ] **Mão: Canhoto** espelha na hora o joystick (vai para a direita), os
       botões (vão para a esquerda), `Mochila`/`Pausar` (canto superior esquerdo)
       e a dica do topo.
@@ -257,7 +258,7 @@ tela abre pelo ESC durante o jogo).
 
 ## 15. Vibração no toque
 
-Menu → Opções → Configurações de toque → **Vibração: Ligada** (padrão). Use num
+Menu → Opções → Controles → Controles de toque → **Vibração: Ligada** (padrão). Use num
 **Android** (no iPhone o Safari não vibra — é limitação do navegador, não bug).
 
 - [ ] **Quebrar bloco**: um pulso curto no fim da quebra (e a grama alta também).
@@ -279,7 +280,7 @@ Menu → Opções → Configurações de toque → **Vibração: Ligada** (padr�
 
 ## 16. Posição livre dos botões
 
-No meio do jogo (modo toque), ESC → Opções → Configurações de toque →
+No meio do jogo (modo toque), ESC → Opções → Controles → Controles de toque →
 **Editar posições**.
 
 - [ ] A janela de opções fecha, o cartão de pausa some e a tela escurece com os
@@ -307,7 +308,7 @@ No meio do jogo (modo toque), ESC → Opções → Configurações de toque →
 
 ## 17. Sensibilidade do olhar no toque
 
-No celular (modo toque), ESC → Opções → Configurações de toque →
+No celular (modo toque), ESC → Opções → Controles → Controles de toque →
 **Sensibilidade do olhar** (primeira linha da sub-tela).
 
 - [ ] A linha mostra **80%** de fábrica, com trilho e cursor de barra.
@@ -323,6 +324,35 @@ No celular (modo toque), ESC → Opções → Configurações de toque →
 - [ ] Fechar e abrir o jogo mantém o valor; **Restaurar padrões** volta para 80%.
 - [ ] A barra funciona também no teclado (setas de 5 em 5, `Home`/`End` nos
       extremos) e no menu do título, antes de entrar no mundo.
+
+## 18. Opções separadas por categorias
+
+Menu → **Opções** (e também ESC → Opções, com o jogo rodando).
+
+- [ ] A janela abre com **três botões**: `Áudio`, `Gráficos` e `Controles` — só
+      o nome, sem valor e sem trilho.
+- [ ] **Áudio** abre uma grade com uma linha só (**Volume**) e o título vira
+      "Áudio"; arrastar muda o volume na hora (o som de clicar nos botões já
+      acompanha).
+- [ ] **Gráficos** abre **Gráficos**, **Campo de visão** e **Distância de
+      render**, todos funcionando como antes (clique no primeiro, barra nos
+      outros dois).
+- [ ] **Controles** abre **Sensibilidade do mouse** e o botão **Controles de
+      toque** (com o resumo `Destro · 100%`); é também onde aparece a lista de
+      teclas recolhida (`Controles`).
+- [ ] Em **Controles**, o botão `Controles de toque` abre a sub-tela; **Voltar**
+      de lá cai em **Controles**, e o segundo **Voltar** cai na lista — nunca
+      aparece uma segunda janela por cima.
+- [ ] A cada troca de tela o título acompanha e o resto da janela (Concluído,
+      Restaurar padrões) fica no lugar.
+- [ ] **Restaurar padrões** funciona dentro de qualquer categoria.
+- [ ] Fechar com `ESC` e reabrir: a janela volta na **lista de categorias**, não
+      na última categoria aberta.
+- [ ] Teclado: `Tab` anda só entre os botões da tela visível (o que está
+      escondido não recebe foco); depois de abrir uma categoria o foco cai na
+      primeira linha dela, e depois de `Voltar` volta no botão que abriu.
+- [ ] No celular a grade vira **uma coluna** e cada categoria abre normalmente,
+      com o dedo arrastando as barras.
 
 ## Se algo falhar
 

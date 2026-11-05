@@ -8,7 +8,7 @@ import {
     formatSetting, loadGameSettings, notifyGameSettingsChange, onGameSettingsChange,
     sanitizeGameSettings, saveGameSettings, settingFraction, settingFromFraction, stepSetting,
 } from '../world-game-settings.js';
-import { OPTION_CONTROLS, TOUCH_OPTION_CONTROLS } from '../world-options-view.js';
+import { OPTION_CONTROLS, OPTION_SCREENS, TOUCH_OPTION_CONTROLS } from '../world-options-view.js';
 
 function fakeStorage(initial = {}) {
     const map = new Map(Object.entries(initial));
@@ -113,15 +113,17 @@ test('todo controle da tela de opções existe no index.html', () => {
     assert.ok(html.includes('id="btn-options-reset"'), 'botão de restaurar padrões ausente');
 });
 
-test('a tela de opções tem uma barra para cada campo', () => {
-    // a grade principal e a sub-tela de toque, juntas, cobrem todos os campos
-    assert.deepEqual(
-        [...OPTION_CONTROLS, ...TOUCH_OPTION_CONTROLS].map(row => row.key),
-        Object.keys(GAME_SETTING_FIELDS),
-    );
-    // e nenhum campo aparece nas duas telas
-    const keys = [...OPTION_CONTROLS, ...TOUCH_OPTION_CONTROLS].map(row => row.key);
-    assert.equal(new Set(keys).size, keys.length, 'campo repetido entre as telas');
+test('a tela de opções tem uma barra para cada campo, numa tela só', () => {
+    // as categorias (Áudio, Gráficos, Controles, Toque), juntas, cobrem todos
+    const keys = OPTION_CONTROLS.map(row => row.key);
+    assert.deepEqual([...keys].sort(), Object.keys(GAME_SETTING_FIELDS).sort());
+    // e nenhum campo aparece em duas categorias
+    assert.equal(new Set(keys).size, keys.length, 'campo repetido entre as categorias');
+    // cada categoria da lista tem a sua grade com as linhas dela
+    const screens = OPTION_SCREENS.filter(screen => screen.controls);
+    assert.deepEqual(screens.map(screen => screen.key), ['audio', 'graphics', 'controls', 'touch']);
+    assert.deepEqual(screens.flatMap(screen => screen.controls), OPTION_CONTROLS);
+    assert.equal(screens.find(screen => screen.key === 'touch').controls, TOUCH_OPTION_CONTROLS);
 });
 
 // ------------------------------------------------ qualidade gráfica (lista)

@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { pauseMenuDisplay, shouldShowPauseMenu } from '../game-pause-menu.js';
-import { OPTION_CONTROLS, TOUCH_OPTION_CONTROLS } from '../world-options-view.js';
+import { OPTION_CONTROLS } from '../world-options-view.js';
 
-// as duas telas do diálogo: a grade principal e a sub-tela de toque
-const ALL_CONTROLS = [...OPTION_CONTROLS, ...TOUCH_OPTION_CONTROLS];
+// todas as linhas de valor do diálogo (a lista de categorias só tem navegação)
+const ALL_CONTROLS = OPTION_CONTROLS;
 import { GAME_SETTING_FIELDS } from '../world-game-settings.js';
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');

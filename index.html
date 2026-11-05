@@ -68,7 +68,7 @@
     "./world-mineral-blocks.js": "./world-mineral-blocks.js?v=4c39bc041e",
     "./world-mineral-textures.js": "./world-mineral-textures.js?v=ab422ad968",
     "./world-minerals.js": "./world-minerals.js?v=2f66ff7350",
-    "./world-options-view.js": "./world-options-view.js?v=007667fa39",
+    "./world-options-view.js": "./world-options-view.js?v=0cbe28a90d",
     "./world-ore-generation.js": "./world-ore-generation.js?v=7fe35588d3",
     "./world-point-lights.js": "./world-point-lights.js?v=495370ce08",
     "./world-pwa.js": "./world-pwa.js?v=634eb5dc1b",
@@ -159,9 +159,27 @@
         <h2 id="options-title">Opções</h2>
 
         <div class="options-grid" id="options-main-grid">
-            <button type="button" class="classic-btn option-btn option-slider" id="opt-sensitivity" aria-label="Sensibilidade do mouse">
+            <button type="button" class="classic-btn option-btn" id="opt-open-audio" aria-label="Áudio" aria-expanded="false" aria-controls="options-audio-grid">
+                <span class="option-text"><span class="option-name">Áudio</span></span>
+            </button>
+            <button type="button" class="classic-btn option-btn" id="opt-open-graphics" aria-label="Gráficos" aria-expanded="false" aria-controls="options-graphics-grid">
+                <span class="option-text"><span class="option-name">Gráficos</span></span>
+            </button>
+            <button type="button" class="classic-btn option-btn" id="opt-open-controls" aria-label="Controles" aria-expanded="false" aria-controls="options-controls-grid">
+                <span class="option-text"><span class="option-name">Controles</span></span>
+            </button>
+        </div>
+
+        <div class="options-grid" id="options-audio-grid" hidden>
+            <button type="button" class="classic-btn option-btn option-slider" id="opt-volume" aria-label="Volume">
                 <span class="option-track" aria-hidden="true"><span class="option-knob"></span></span>
-                <span class="option-text"><span class="option-name">Sensibilidade do mouse</span>: <span class="option-value" id="opt-sensitivity-value">100%</span></span>
+                <span class="option-text"><span class="option-name">Volume</span>: <span class="option-value" id="opt-volume-value">70%</span></span>
+            </button>
+        </div>
+
+        <div class="options-grid" id="options-graphics-grid" hidden>
+            <button type="button" class="classic-btn option-btn" id="opt-graphics" aria-label="Gráficos">
+                <span class="option-text"><span class="option-name">Gráficos</span>: <span class="option-value" id="opt-graphics-value">Automática</span></span>
             </button>
             <button type="button" class="classic-btn option-btn option-slider" id="opt-fov" aria-label="Campo de visão">
                 <span class="option-track" aria-hidden="true"><span class="option-knob"></span></span>
@@ -171,15 +189,15 @@
                 <span class="option-track" aria-hidden="true"><span class="option-knob"></span></span>
                 <span class="option-text"><span class="option-name">Distância de render</span>: <span class="option-value" id="opt-render-distance-value">4 chunks</span></span>
             </button>
-            <button type="button" class="classic-btn option-btn option-slider" id="opt-volume" aria-label="Volume">
+        </div>
+
+        <div class="options-grid" id="options-controls-grid" hidden>
+            <button type="button" class="classic-btn option-btn option-slider" id="opt-sensitivity" aria-label="Sensibilidade do mouse">
                 <span class="option-track" aria-hidden="true"><span class="option-knob"></span></span>
-                <span class="option-text"><span class="option-name">Volume</span>: <span class="option-value" id="opt-volume-value">70%</span></span>
+                <span class="option-text"><span class="option-name">Sensibilidade do mouse</span>: <span class="option-value" id="opt-sensitivity-value">100%</span></span>
             </button>
-            <button type="button" class="classic-btn option-btn" id="opt-graphics" aria-label="Gráficos">
-                <span class="option-text"><span class="option-name">Gráficos</span>: <span class="option-value" id="opt-graphics-value">Automática</span></span>
-            </button>
-            <button type="button" class="classic-btn option-btn" id="opt-touch-open" aria-label="Configurações de toque" aria-expanded="false">
-                <span class="option-text"><span class="option-name">Configurações de toque</span>: <span class="option-summary" id="opt-touch-summary">Destro · 100%</span></span>
+            <button type="button" class="classic-btn option-btn" id="opt-touch-open" aria-label="Controles de toque" aria-expanded="false" aria-controls="options-touch-grid">
+                <span class="option-text"><span class="option-name">Controles de toque</span>: <span class="option-summary" id="opt-touch-summary">Destro · 100%</span></span>
             </button>
         </div>
 
