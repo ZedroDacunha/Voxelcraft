@@ -169,8 +169,10 @@ test('o jogo aplica a resolução no renderer, com o buffer do tamanho escolhido
 test('escolher uma resolução fixa pede tela cheia; voltar para Janela sai dela', () => {
     const body = sliceFn(game, 'requestResolutionFullscreen');
     assert.match(body, /const fixed = resolutionSize\(value\) !== null;/);
-    assert.match(body, /if \(fixed && !document\.fullscreenElement\)/);
-    assert.match(body, /document\.documentElement\.requestFullscreen\?\.\(\)\?\.catch/);
+    assert.match(body, /if \(fixed && !document\.fullscreenElement && !resolutionFullscreenPending\)/);
+    // um pedido em voo por vez: arrastar a barra dispara um por degrau
+    assert.match(body, /const request = document\.documentElement\.requestFullscreen\?\.\(\);/);
+    assert.match(body, /resolutionFullscreenPending = true;/);
     // só sai da tela cheia se foi a resolução que entrou nela
     assert.match(body, /else if \(!fixed && resolutionFullscreen && document\.fullscreenElement\)/);
     assert.match(body, /document\.exitFullscreen\?\.\(\)\?\.catch/);
@@ -188,7 +190,10 @@ test('a resolução vale na hora, com aviso, ao mudar nas opções', () => {
     assert.match(body, /applyRenderResolution\(\);/);
     assert.match(body, /if \(resolutionChanged\) \{/);
     assert.match(body, /requestResolutionFullscreen\(resolutionMode\);/);
-    assert.match(body, /showToast\(`Resolução: \$\{resolutionLabel\(resolutionMode\)\}`\);/);
+    // o aviso diz o tamanho aplicado de verdade (que pode ter sido clampado)
+    assert.match(body, /showToast\(resolutionMessage\(resolutionMode\), 3000\);/);
+    assert.match(game, /function resolutionMessage\(value\) \{/);
+    assert.match(sliceFn(game, 'resolutionMessage'), /return target\.clamped \?/);
     // muda depois da qualidade, para a escala já estar atualizada
     assert.ok(body.indexOf('gfx.setMode(mode, { quiet })') < body.indexOf('applyRenderResolution();'));
 });
@@ -197,7 +202,7 @@ test('o renderer nasce com a resolução salva e o resize não estraga a fixa', 
     assert.match(game, /\/\/ já nasce com a resolução escolhida nas opções[\s\S]{0,80}?applyRenderResolution\(\);/);
     assert.match(game, /let resolutionMode = GAME_SETTINGS\.resolution;/);
     // com resolução fixa, redimensionar a janela só reestica a imagem
-    assert.match(game, /if \(resolutionSize\(resolutionMode\)\) \{\n {12}applyRenderResolution\(\);\n {12}return;\n {8}\}/);
+    assert.match(game, /if \(resolutionSize\(resolutionMode\)\) \{\n {12}\/\/ o buffer continua do mesmo tamanho; só a imagem esticada muda\n {12}applyRenderResolution\(\{ buffer: false \}\);/);
     // a escala automática de qualidade fica guardada para quando voltar a Janela
     assert.match(game, /if \(pendingScale !== null && !resolutionSize\(resolutionMode\)\) renderer\.setPixelRatio\(pendingScale\);/);
     // o F3 diz em que resolução o jogo está desenhando

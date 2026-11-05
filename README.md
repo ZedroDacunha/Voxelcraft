@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 739 testes de módulos puros (node --test)
+npm test           # 750 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -218,7 +218,7 @@ seguinte, sem trilho nem cursor.
 | Sensibilidade do mouse | Controles | na hora |
 | Campo de visão | Gráficos | na hora |
 | Gráficos (automática/máxima/alta/média) | Gráficos | na hora — o mesmo caminho do `F4` |
-| Resolução (Janela/360p…4K) | Gráficos | na hora — e numa resolução fixa o jogo entra em tela cheia |
+| Resolução (Janela/360p…4K) | Gráficos | na hora — numa resolução fixa o jogo entra em tela cheia e pede confirmação (10 s, senão volta) |
 | Distância de render | Gráficos | no próximo mundo (recarregar chunks ao vivo é outro assunto) — um recado avisa quando você muda |
 
 A **Resolução** é a do jogo, não a da janela: o navegador não deixa a página
@@ -226,7 +226,9 @@ mudar a resolução do sistema, então o que se escolhe é **quantos pixels o ca
 desenha** (de 640×360 a 3840×2160, mais `Janela (nativa)`, que é o tamanho da
 tela com a escala automática). A imagem é esticada para ocupar a tela toda —
 sem faixas pretas — e escolher uma resolução fixa pede tela cheia, que é o único
-jeito de a janela acompanhar. Ver `world-render-resolution.js`.
+jeito de a janela acompanhar. Como a troca pode deixar um aparelho fraco em
+camera lenta, ela passa por uma **confirmação** (`Manter`/`Reverter`, 10 s): sem
+resposta, volta sozinha para a anterior. Ver `world-render-resolution.js`.
 
 Quem grava é `world-game-settings.js` (localStorage), que também **avisa** os
 assinantes — o jogo aplica o que dá na hora e o áudio da interface troca de

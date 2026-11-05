@@ -368,6 +368,19 @@ No celular, dá para fazer o mesmo sem entrar num mundo.
       esticar) e o custo é o de sempre.
 - [ ] Ao escolher uma resolução fixa o navegador **pede tela cheia**; voltar para
       **Janela (nativa)** sai dela.
+- [ ] Ao escolher uma resolução fixa aparece um **aviso** no padrão do jogo por
+      cima da janela de Opções (`Resolução: 1920×1080`) — antes ele ficava atrás
+      do diálogo.
+- [ ] Junto aparece a pergunta **`Manter 1920×1080? · 10`** com `Manter` e
+      `Reverter`. A contagem desce sozinha e, se ninguém mexer, **volta para a
+      resolução anterior** em 10 segundos.
+- [ ] A pergunta **não** aparece no meio do arrasto, só ao soltar a barra.
+- [ ] `Manter` fecha a pergunta e a resolução fica; `Reverter` volta na hora.
+- [ ] Fechar as Opções com a pergunta aberta **mantém** a escolha (não reverte).
+- [ ] Ir para outra categoria (Áudio, Controles…) tira a pergunta da frente e
+      mantém a resolução.
+- [ ] Em **Opções → Gráficos**, mudar a **Distância de render** mostra o aviso
+      dentro da janela (antes ele ficava escondido atrás dela).
 - [ ] Se você mesmo entrou em tela cheia (F11) e depois escolhe Janela, o jogo
       **não** derruba a sua tela cheia.
 - [ ] Girar o celular ou redimensionar a janela: a imagem continua ocupando a
@@ -380,6 +393,10 @@ No celular, dá para fazer o mesmo sem entrar num mundo.
       e **nada quebra** — só não entra em tela cheia.
 - [ ] Com resolução fixa, apertar **F4** (qualidade) não muda a nitidez — a
       escolha é sua; ao voltar para Janela, a qualidade volta a mandar.
+- [ ] Num aparelho que não aceita a resolução (GPU pequena), o jogo avisa
+      `Resolução: … (limite do aparelho)` e a imagem **não** fica achatada.
+- [ ] Redimensionar a janela (ou girar a tela) com resolução fixa: a imagem
+      continua ocupando tudo, sem engasgo a cada arrasto da borda.
 
 ## Se algo falhar
 

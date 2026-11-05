@@ -102,6 +102,51 @@ clique/arraste do jogador (o navegador exige gesto):
 - tudo dentro de `try` e com `?.`: o Safari do iPhone não tem
   `requestFullscreen`, e lá a resolução vale, a tela cheia não.
 
+## 5. Confirmação: aviso e pergunta
+
+Trocar a resolução muda o que o jogo desenha e, junto, pede tela cheia. Um engano
+— 4K num celular — deixaria o jogo em camera lenta sem o jogador saber como
+voltar. Então a escolha passa por **duas** mensagens, escolhidas pelo jogador:
+
+- **aviso** no padrão do jogo (`Resolução: 1920×1080`, 3 s), agora visível **por
+  cima** da janela de Opções (ver os problemas corrigidos abaixo);
+- **pergunta** dentro da janela, ao soltar a barra (não a cada degrau do
+  arrasto): `Manter 1920×1080? · 10` com `Manter` e `Reverter`. Sem resposta em
+  **10 s** (`RESOLUTION_CONFIRM_MS`), volta sozinha para a anterior — como em
+  jogo de PC. No teclado a pergunta vem depois de cada mudança, já que não existe
+  "soltar";
+- **fechar as Opções mantém** a escolha (quem saiu da tela já decidiu), e sair da
+  categoria Gráficos também tira a pergunta da frente sem reverter;
+- `Restaurar padrões` cancela a pergunta pendente;
+- a contagem é `aria-hidden`: quem usa leitor de tela ouve a pergunta uma vez, e
+  não um "9, 8, 7…".
+
+## 6. Problemas encontrados no caminho (e corrigidos)
+
+Ao revisar a primeira versão da opção, apareceram cinco coisas que valiam
+conserto — todas no mesmo PR, porque são do mesmo assunto:
+
+1. **o aviso ficava invisível.** `#toast` é `position: absolute; z-index: 6`, e um
+   `<dialog>` aberto com `showModal()` vive na *top layer*, na frente de tudo. Ou
+   seja: **todo** aviso disparado dentro da tela de opções (resolução, qualidade,
+   distância de render) nunca aparecia. Agora, com a janela aberta, o mesmo texto
+   cai numa linha `role="status"` dentro do diálogo (`.options-status`), que some
+   quando vazia e é limpa ao fechar;
+2. **pedidos de tela cheia empilhados.** Arrastar a barra dispara uma mudança por
+   degrau e o pedido é assíncrono; sem trava, cada passo abria outro pedido.
+   `resolutionFullscreenPending` garante um por vez;
+3. **resolução acima da GPU.** Pedir 4K num aparelho que não aceita o buffer não
+   melhora nada e o resultado fica indefinido. Agora o tamanho é limitado pelo
+   `maxTextureSize` do renderer — **mantendo a proporção** (3840×2160 com teto
+   2048 vira 2048×1152, não 2048×2048) — e o aviso conta o tamanho aplicado:
+   `Resolução: 2048×1152 (limite do aparelho)`;
+4. **redimensionar recriava o buffer.** Com resolução fixa, cada evento de
+   `resize` chamava `setSize` de novo (e `canvas.width` reallocava o buffer à
+   toa). O resize agora usa `applyRenderResolution({ buffer: false })`: só a
+   imagem esticada e a proporção mudam;
+5. **aviso de resolução não dizia o tamanho real.** Passou a usar o alvo de
+   verdade (`resolutionMessage`), que é também o que deixa o item 3 visível.
+
 ## Decisões de escopo
 
 - **esticar** em vez de faixas pretas (escolha do jogador);
@@ -111,7 +156,7 @@ clique/arraste do jogador (o navegador exige gesto):
   travada ao escolher, resolução diferente por mundo, nem limite de GPU — quem
   quiser 4K num celular descobre o custo no FPS.
 
-## O que ficou coberto por teste (`npm test`, 739)
+## O que ficou coberto por teste (`npm test`, 750)
 
 `tests/resolution.test.mjs` (14 testes):
 
@@ -138,6 +183,26 @@ Também conferi a barra num DOM de verdade (jsdom, fora do repo): arrastar para
 63% cai em 1920×1080, as pontas dão 360p e 4K, `Home` volta para Janela e as
 setas andam um degrau sem dar a volta.
 
+`tests/resolution-confirm.test.mjs` (11 testes) cobre o resto:
+
+- o aviso espelhado na janela (e limpo quando ela está fechada ou vazia), com a
+  linha `role="status"` e o CSS que a esconde vazia;
+- a pergunta: HTML no padrão do menu (`classic-btn`, sem trilho, contagem
+  `aria-hidden`), a constante de 10 s, a regra "só resolução fixa pergunta", o
+  revert salvando o valor anterior sem abrir pergunta nova, a pergunta só no
+  `pointerup`/`pointercancel` (nunca no `pointermove`) e no teclado, `Manter`
+  devolvendo o foco à barra, fechar mantendo a escolha e `Restaurar padrões`
+  cancelando;
+- timers: `clearTimeout`/`clearInterval` ao esconder e a contagem parando no zero;
+- limite da GPU com proporção preservada e o aviso do tamanho aplicado;
+- o resize sem recriar o buffer.
+
+Além da suíte, rodei a janela num DOM de verdade (jsdom, fora do repo) e
+percorri o fluxo: arrastar até 1920×1080 (a pergunta **não** aparece durante o
+arrasto), soltar (aparece "Manter 1920×1080?" com `10`), seta mudando para
+1920×1200, `Manter` fechando, nova escolha e `Reverter` voltando ao anterior,
+`Home` indo para Janela sem perguntar, e fechar a janela mantendo a escolha.
+
 O que só o aparelho mostra está no [roteiro](TESTE-EM-NAVEGADOR.md) §19 — em
 especial se a tela cheia pedida pela resolução aparece sem sustos no navegador
-que o jogador usa.
+que o jogador usa e se os 10 segundos são confortáveis.

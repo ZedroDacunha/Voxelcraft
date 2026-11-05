@@ -128,7 +128,7 @@ test('a tela de toque troca a grade no lugar e volta ao fechar', () => {
     assert.match(view, /opener\?\.addEventListener\('click', \(\) => showScreen\(key\)\);/);
     assert.match(view, /backButton\?\.addEventListener\('click', goBack\);/);
     // fechar e reabrir sempre cai na lista de categorias
-    assert.match(view, /dialog\.addEventListener\('close', \(\) => showScreen\('main', \{ focus: false \}\)\);/);
+    assert.match(view, /dialog\.addEventListener\('close', \(\) => \{[\s\S]{0,500}?showScreen\('main', \{ focus: false \}\);/);
     // e o resumo acompanha o que está salvo
     assert.match(view, /touchSummary\.textContent = `\$\{formatSetting\('touchLayout', settings\.touchLayout\)\} · \$\{formatSetting\('touchButtonSize', settings\.touchButtonSize\)\}`;/);
 });

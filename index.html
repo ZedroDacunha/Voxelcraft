@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="Voxel">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
-<link rel="stylesheet" href="styles.css?v=bdc8a6d7eb">
+<link rel="stylesheet" href="styles.css?v=d2d942a0c7">
 <link rel="stylesheet" href="inventory.css?v=3c73d92add">
 <!-- importmap:start (gerado por tools/stamp-importmap.mjs; não editar à mão) -->
 <script type="importmap">
@@ -21,7 +21,7 @@
     "three/addons/": "./vendor/three/addons/",
     "./game-pause-menu.js": "./game-pause-menu.js?v=b592dfec15",
     "./game-pointer-lock.js": "./game-pointer-lock.js?v=cf53899b88",
-    "./game.js": "./game.js?v=eb12801b49",
+    "./game.js": "./game.js?v=2be193397b",
     "./inventory-a11y.js": "./inventory-a11y.js?v=25f3dab87d",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
     "./inventory-layout.js": "./inventory-layout.js?v=439823a409",
@@ -68,12 +68,12 @@
     "./world-mineral-blocks.js": "./world-mineral-blocks.js?v=4c39bc041e",
     "./world-mineral-textures.js": "./world-mineral-textures.js?v=ab422ad968",
     "./world-minerals.js": "./world-minerals.js?v=2f66ff7350",
-    "./world-options-view.js": "./world-options-view.js?v=aef01cc51e",
+    "./world-options-view.js": "./world-options-view.js?v=a48ae4af26",
     "./world-ore-generation.js": "./world-ore-generation.js?v=7fe35588d3",
     "./world-point-lights.js": "./world-point-lights.js?v=495370ce08",
     "./world-pwa.js": "./world-pwa.js?v=634eb5dc1b",
     "./world-raycast.js": "./world-raycast.js?v=0f025b877c",
-    "./world-render-resolution.js": "./world-render-resolution.js?v=814445f627",
+    "./world-render-resolution.js": "./world-render-resolution.js?v=c966abb0c4",
     "./world-save-codec.js": "./world-save-codec.js?v=71b8b469b6",
     "./world-save-indicator.js": "./world-save-indicator.js?v=464a1a9ddc",
     "./world-save-loader.js": "./world-save-loader.js?v=097322c79d",
@@ -232,6 +232,19 @@
             <p><kbd>F3</kbd> depuração · <kbd>F4</kbd> alterna a qualidade gráfica durante o jogo</p>
             <p>Mouse: olhar ao redor · botão esquerdo: minerar · botão direito: usar ou colocar blocos.</p>
         </details>
+
+        <p id="options-status" class="options-status" role="status" aria-live="polite"></p>
+
+        <div class="options-confirm" id="options-confirm" role="group" aria-labelledby="options-confirm-text" hidden>
+            <p class="options-confirm-text">
+                <span id="options-confirm-text" role="status">Manter a resolução?</span>
+                <span class="options-confirm-count" id="options-confirm-count" aria-hidden="true">10</span>
+            </p>
+            <div class="options-confirm-actions">
+                <button class="classic-btn" type="button" id="btn-resolution-keep">Manter</button>
+                <button class="classic-btn" type="button" id="btn-resolution-revert">Reverter</button>
+            </div>
+        </div>
 
         <div class="world-dialog-actions">
             <button class="classic-btn" type="button" id="btn-options-reset">Restaurar padrões</button>

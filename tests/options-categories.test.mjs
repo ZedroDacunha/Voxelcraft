@@ -130,10 +130,10 @@ test('Voltar sobe um nível e devolve o foco ao botão que abriu', () => {
 });
 
 test('fechar e reabrir sempre volta para a lista de categorias', () => {
-    assert.match(view, /dialog\.addEventListener\('close', \(\) => showScreen\('main', \{ focus: false \}\)\);/);
-    assert.match(view, /refresh: \(\) => \{\n {12}current = loadGameSettings\(\);\n {12}render\(current\);\n {12}showScreen\('main', \{ focus: false \}\);/);
+    assert.match(view, /dialog\.addEventListener\('close', \(\) => \{[\s\S]{0,500}?hideResolutionConfirm\(\);[\s\S]{0,300}?showScreen\('main', \{ focus: false \}\);/);
+    assert.match(view, /refresh: \(\) => \{\n {12}hideResolutionConfirm\(\);\n {12}current = loadGameSettings\(\);\n {12}render\(current\);\n {12}showScreen\('main', \{ focus: false \}\);/);
     // sem roubar o foco de quem estava atrás do diálogo
-    assert.doesNotMatch(view, /close', \(\) => \{[^}]*focus/);
+    assert.doesNotMatch(view, /close', \(\) => \{[\s\S]{0,300}?\.focus\?\.\(\)/);
 });
 
 test('a lista de teclas é da categoria Controles', () => {

@@ -66,14 +66,32 @@ export function resolutionSize(id) {
  * qualidade (`pixelRatio`); numa resolução fixa, exatamente o tamanho escolhido
  * com `pixelRatio` 1 — senão a escala automática multiplicaria por cima e a
  * resolução escolhida deixaria de ser a escolhida.
+ *
+ * `limit` é o teto do aparelho (o maior buffer que a GPU aceita). Pedir mais que
+ * isso não deixa a imagem melhor: o navegador recusa o buffer e o jogo fica com
+ * o tamanho clampado sem o jogador saber por quê — melhor clampar aqui e dizer
+ * qual foi o tamanho aplicado.
  */
-export function renderTarget(resolution, { width, height, scale = 1 } = {}) {
+export function renderTarget(resolution, { width, height, scale = 1, limit } = {}) {
     const size = resolutionSize(resolution);
     const w = Number(width) > 0 ? Math.round(Number(width)) : 1;
     const h = Number(height) > 0 ? Math.round(Number(height)) : 1;
     const autoScale = Number(scale) > 0 ? Number(scale) : 1;
-    if (!size) return { auto: true, width: w, height: h, pixelRatio: autoScale };
-    return { auto: false, width: size.width, height: size.height, pixelRatio: 1 };
+    if (!size) return { auto: true, width: w, height: h, pixelRatio: autoScale, clamped: false };
+    const cap = Number(limit) > 0 ? Number(limit) : null;
+    // limitar as duas medidas pelo mesmo fator mantém a proporção: 3840×2160 com
+    // teto 2048 vira 2048×1152 (e não 2048×2048, que achataria o mundo)
+    const factor = cap ? Math.min(1, cap / size.width, cap / size.height) : 1;
+    const fitted = factor < 1
+        ? { width: Math.round(size.width * factor), height: Math.round(size.height * factor) }
+        : size;
+    return {
+        auto: false,
+        width: fitted.width,
+        height: fitted.height,
+        pixelRatio: 1,
+        clamped: fitted.width !== size.width || fitted.height !== size.height,
+    };
 }
 
 /**

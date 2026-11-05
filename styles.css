@@ -284,6 +284,22 @@
     .options-controls { margin-top: 1em; padding-top: .8em; border-top: 1px solid #33465a; color: #d0d0d0;
         font-size: .85em; text-align: left; }
     .options-controls summary { color: #d6d0a4; cursor: pointer; }
+    /* Aviso dentro da janela de Opções. O #toast vive atrás do <dialog> modal
+       (que fica na top layer), então com as opções abertas o mesmo texto vem
+       para cá — é onde o jogador está olhando quando muda uma opção. */
+    .options-dialog .options-status { margin: .6em 0 0; color: #fff; font: bold .85em monospace;
+        text-shadow: 1px 1px 0 #000; }
+    .options-status:empty { display: none; }
+    /* Confirmação da resolução: pergunta com contagem e dois botões, no cinza
+       do menu e sem raio — a mesma linguagem de todo o resto. */
+    .options-confirm { display: flex; align-items: center; justify-content: center; gap: .6em;
+        margin: .6em 0 0; padding: .45em .7em; border: 2px solid #171717; background: rgba(0, 0, 0, .55);
+        box-shadow: inset 2px 2px 0 #ffffff1f; }
+    .options-confirm[hidden] { display: none; }
+    .options-dialog .options-confirm-text { margin: 0; color: #fff; line-height: 1.2; }
+    .options-confirm-count { display: inline-block; margin-left: .45em; min-width: 1.3em; color: #ffd966; font-weight: 700; }
+    .options-confirm-actions { display: flex; gap: .4em; }
+    .options-confirm-actions .classic-btn { min-height: 2em; padding: .25em .8em; }
     .options-controls p { margin: 8px 0 0; color: #d0d0d0; line-height: 1.55; }
     /* --- toque: joystick à esquerda, ações à direita ---------------------- */
     /* O bloco inteiro ignora o mouse (pointer-events:none) e cada controle

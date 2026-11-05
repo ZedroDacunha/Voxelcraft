@@ -1314,12 +1314,25 @@ function damageTool(slotIndex, amount = 1) {
 }
 
 let toastTimer = 0;
-function showToast(text) {
+let optionsStatusTimer = 0;
+function showToast(text, ms = 2000) {
     const el = document.getElementById('toast');
     el.textContent = text;
     el.style.display = 'block';
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { el.style.display = 'none'; }, 2000);
+    toastTimer = setTimeout(() => { el.style.display = 'none'; }, ms);
+    // A janela de Opções é um <dialog> modal: fica na *top layer* e o #toast
+    // apareceria atrás dela — justamente quando o jogador muda uma opção. Com
+    // ela aberta, o mesmo aviso vai para a linha de status do diálogo.
+    const status = document.getElementById('options-status');
+    if (!status) return;
+    if (!document.getElementById('options-dialog')?.open) {
+        status.textContent = '';
+        return;
+    }
+    status.textContent = text;
+    clearTimeout(optionsStatusTimer);
+    optionsStatusTimer = setTimeout(() => { status.textContent = ''; }, Math.max(ms, 2600));
 }
 
 const setSaveIndicator = createWorldSaveIndicator(
@@ -2961,6 +2974,9 @@ let resolutionMode = GAME_SETTINGS.resolution;
 // Tela cheia pedida pela resolução (e não pelo jogador): só saímos dela quando
 // formos nós que entramos, para não derrubar um F11 escolhido à mão.
 let resolutionFullscreen = false;
+// O pedido de tela cheia é assíncrono; arrastar a barra dispara um por degrau,
+// e sem esta trava cada passo empilharia outro pedido.
+let resolutionFullscreenPending = false;
 
 // A tela de opções grava em world-game-settings e avisa; aqui só se aplica o
 // que dá para aplicar sem recarregar o mundo. A distância de render fica de
@@ -2971,21 +2987,29 @@ const QUALITY_FROM_SETTING = { auto: 'auto', max: 'max', 0.75: 0.75, 0.5: 0.5 };
 // (tamanho da tela × escala de qualidade); numa resolução fixa o buffer tem
 // exatamente aqueles pixels, `pixelRatio` 1, e o CSS estica para a tela toda —
 // o mesmo que trocar a resolução num jogo de PC, só que dentro do canvas.
-function applyRenderResolution() {
+// Maior buffer que a GPU do aparelho aceita. Pedir mais não deixa a imagem
+// melhor: o navegador recusa e o resultado fica indefinido.
+function deviceRenderLimit() {
+    const max = Number(renderer?.capabilities?.maxTextureSize);
+    return max > 0 ? max : undefined;
+}
+
+function applyRenderResolution({ buffer = true } = {}) {
     if (!renderer) return;
     const target = renderTarget(resolutionMode, {
         width: window.innerWidth,
         height: window.innerHeight,
         scale: gfx.scale,
+        limit: deviceRenderLimit(),
     });
     const canvasEl = renderer.domElement;
-    renderer.setPixelRatio(target.pixelRatio);
+    if (buffer) renderer.setPixelRatio(target.pixelRatio);
     if (target.auto) {
         canvasEl.style.removeProperty('display');
-        renderer.setSize(target.width, target.height);
+        if (buffer) renderer.setSize(target.width, target.height);
     } else {
         // `updateStyle = false`: o tamanho do buffer é nosso, o CSS também
-        renderer.setSize(target.width, target.height, false);
+        if (buffer) renderer.setSize(target.width, target.height, false);
         canvasEl.style.display = 'block';
         canvasEl.style.width = `${window.innerWidth}px`;
         canvasEl.style.height = `${window.innerHeight}px`;
@@ -3007,9 +3031,18 @@ function applyRenderResolution() {
 function requestResolutionFullscreen(value) {
     const fixed = resolutionSize(value) !== null;
     try {
-        if (fixed && !document.fullscreenElement) {
+        if (fixed && !document.fullscreenElement && !resolutionFullscreenPending) {
             resolutionFullscreen = true;
-            document.documentElement.requestFullscreen?.()?.catch?.(() => { resolutionFullscreen = false; });
+            resolutionFullscreenPending = true;
+            const request = document.documentElement.requestFullscreen?.();
+            if (request && typeof request.then === 'function') {
+                request.then(
+                    () => { resolutionFullscreenPending = false; },
+                    () => { resolutionFullscreenPending = false; resolutionFullscreen = false; },
+                );
+            } else {
+                resolutionFullscreenPending = false;
+            }
         } else if (!fixed && resolutionFullscreen && document.fullscreenElement) {
             resolutionFullscreen = false;
             document.exitFullscreen?.()?.catch?.(() => {});
@@ -3023,6 +3056,15 @@ function requestResolutionFullscreen(value) {
 document.addEventListener('fullscreenchange', () => {
     if (!document.fullscreenElement) resolutionFullscreen = false;
 });
+
+// O aviso diz o tamanho que foi aplicado de verdade: num aparelho que não
+// aceita 4K, o jogo desenha no teto da GPU e a mensagem conta isso.
+function resolutionMessage(value) {
+    if (resolutionSize(value) === null) return `Resolução: ${resolutionLabel(value)}`;
+    const target = renderTarget(value, { limit: deviceRenderLimit() });
+    const applied = `${target.width}×${target.height}`;
+    return target.clamped ? `Resolução: ${applied} (limite do aparelho)` : `Resolução: ${applied}`;
+}
 
 let appliedRenderDistance = GAME_SETTINGS.renderDistance;
 function applyGameSettings(settings, { quiet = false } = {}) {
@@ -3044,7 +3086,7 @@ function applyGameSettings(settings, { quiet = false } = {}) {
     applyRenderResolution();
     if (resolutionChanged) {
         requestResolutionFullscreen(resolutionMode);
-        if (!quiet) showToast(`Resolução: ${resolutionLabel(resolutionMode)}`);
+        if (!quiet) showToast(resolutionMessage(resolutionMode), 3000);
     }
     // A distância de render é a única que não muda com o mundo rodando. Em vez
     // de escrever isso na tela o tempo todo, avisa no momento em que muda.
@@ -3808,7 +3850,8 @@ async function init() {
         // Resolução fixa: o buffer continua do mesmo tamanho, só a imagem
         // esticada acompanha a janela (e a tela cheia entra/sai por aqui).
         if (resolutionSize(resolutionMode)) {
-            applyRenderResolution();
+            // o buffer continua do mesmo tamanho; só a imagem esticada muda
+            applyRenderResolution({ buffer: false });
             return;
         }
         camera.aspect = window.innerWidth / window.innerHeight;
