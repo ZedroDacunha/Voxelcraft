@@ -45,6 +45,7 @@ O `check` é o que o CI (`.github/workflows/ci.yml`) roda em todo PR para `main`
 | Entrada | `world-menu.js` (menu, seleção/criação de mundo), `world-options-view.js` (tela de opções em categorias, aberta no menu e no ESC do jogo), `game-pause-menu.js` (menu de pausa) |
 | Panorama do menu | `menu-background.js` (a câmera que gira e o céu) e `menu-panorama.js` (a ilha em malha única, com sombra de canto) |
 | Loop e estado do jogo | `game.js` (mundo, HUD, interação, save) |
+| Chat e comandos | `world-chat.js` (log, rascunho e histórico do ↑), `world-chat-commands.js` (tecla T, `/help`, `/give`, `/clear`, `/time`, `/tp`, `/kill`, `/seed` — a tabela que o Tab vai completar) |
 | Física e colisão do jogador | `player-physics.js` (AABB × voxels, passo subdividido, destravar, ocupação de célula, apoio no chão agachado), `player-jump.js` (janela do pulo tardio) |
 | Criaturas | `world-creature-base.js` (chão, passo, degrau e corpo de caixas que **todas** as criaturas usam), `world-creature.js` (Mofim: **orelhas, focinho, pés, cauda e olhos acesos à noite**, **asas de mariposa** em duas peças, **chegada andando no crepúsculo**, passeio, medo, chilreio, pulo de degrau, planeio na descida, **voo curto** para escapar ou passear, **travessia** para cruzar lago/ravina, brilho noturno e o pó luminoso que o corpo derrubado solta), `world-sheep.js` (**ovelha**: nasce de dia no capim a 16–30 blocos, mansa, vaga devagar com as patas em diagonal, em três lãs — branca, cinza e preta) |
 | Catálogo de blocos e receitas | `world-catalog.js`, `inventory-recipe-book.js` |

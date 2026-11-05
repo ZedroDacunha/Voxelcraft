@@ -171,9 +171,11 @@ test('toque e mouse compartilham a mesma ação de "usar"', () => {
 test('playing() substitui o pointer lock sem deixar buracos', () => {
     assert.match(game, /function playing\(\) \{\n    return Boolean\(controls\?\.isLocked\) \|\| touchActive;\n\}/);
 
-    // a física, o relógio do mundo e o salvamento seguem o mesmo critério
-    assert.match(game, /if \(playing\(\)\) \{\n        updatePhysics\(dt\);/);
-    assert.match(game, /if \(playing\(\) \|\| inventoryOpen\) \{\n        updateWorldClock\(dt\);/);
+    // a física, o relógio do mundo e o salvamento seguem o mesmo critério —
+    // com uma exceção deliberada: o chat aberto mantém o mundo rodando
+    assert.match(game, /const worldRunning = playing\(\) \|\| chat\.open;/);
+    assert.match(game, /if \(worldRunning\) \{\n        updatePhysics\(dt\);/);
+    assert.match(game, /if \(worldRunning \|\| inventoryOpen\) \{\n        updateWorldClock\(dt\);/);
     assert.match(game, /setInterval\(\(\) => \{ if \(playing\(\)\) saveGame\(true\); \}, 30000\);/);
     assert.match(game, /locked: playing\(\)/);
 

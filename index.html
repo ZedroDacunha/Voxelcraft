@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="Voxel">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
-<link rel="stylesheet" href="styles.css?v=640aa6f00e">
+<link rel="stylesheet" href="styles.css?v=b95ecf3c8c">
 <link rel="stylesheet" href="inventory.css?v=3c73d92add">
 <!-- importmap:start (gerado por tools/stamp-importmap.mjs; não editar à mão) -->
 <script type="importmap">
@@ -20,9 +20,9 @@
     "three": "./vendor/three/three.module.js?v=76dea8151b",
     "three/addons/": "./vendor/three/addons/",
     "./asset-versions.js": "./asset-versions.js?v=d42b8dc6ff",
-    "./game-pause-menu.js": "./game-pause-menu.js?v=b592dfec15",
+    "./game-pause-menu.js": "./game-pause-menu.js?v=f625baba0f",
     "./game-pointer-lock.js": "./game-pointer-lock.js?v=cf53899b88",
-    "./game.js": "./game.js?v=e862c948ea",
+    "./game.js": "./game.js?v=57d6bda3c9",
     "./inventory-a11y.js": "./inventory-a11y.js?v=25f3dab87d",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
     "./inventory-layout.js": "./inventory-layout.js?v=439823a409",
@@ -42,6 +42,8 @@
     "./world-block-orientation.js": "./world-block-orientation.js?v=f6af440217",
     "./world-break-particles.js": "./world-break-particles.js?v=9911bc613a",
     "./world-catalog.js": "./world-catalog.js?v=2f8a1f34b8",
+    "./world-chat-commands.js": "./world-chat-commands.js?v=c860a3ef9b",
+    "./world-chat.js": "./world-chat.js?v=dbb76832dc",
     "./world-clock.js": "./world-clock.js?v=77473e68d7",
     "./world-clouds.js": "./world-clouds.js?v=1e269cf3ec",
     "./world-creature-base.js": "./world-creature-base.js?v=860446fe33",
@@ -95,9 +97,9 @@
     "./world-terrain.js": "./world-terrain.js?v=5f100389a1",
     "./world-textures.js": "./world-textures.js?v=c05a68dc8e",
     "./world-tool-rules.js": "./world-tool-rules.js?v=85347f4434",
-    "./world-touch-controls.js": "./world-touch-controls.js?v=790519aae2",
+    "./world-touch-controls.js": "./world-touch-controls.js?v=4e9c677f5b",
     "./world-touch-layout.js": "./world-touch-layout.js?v=f8dda2fcd5",
-    "./world-touch-positions.js": "./world-touch-positions.js?v=3c17e2f5d1",
+    "./world-touch-positions.js": "./world-touch-positions.js?v=f720799f88",
     "./world-water-sounds.js": "./world-water-sounds.js?v=b620be020b",
     "./world-water.js": "./world-water.js?v=e16cf2152e",
     "./world-waterfall.js": "./world-waterfall.js?v=80c041820a",
@@ -333,6 +335,15 @@
     </svg>
     <span id="save-indicator-text" class="visually-hidden"></span>
 </div>
+<div id="chat">
+    <ul id="chat-log" role="log" aria-label="Mensagens do chat" aria-live="polite"></ul>
+    <form id="chat-form" hidden autocomplete="off">
+        <label class="visually-hidden" for="chat-input">Mensagem ou comando</label>
+        <input id="chat-input" type="text" maxlength="200" autocomplete="off" autocapitalize="off"
+               autocorrect="off" spellcheck="false" enterkeyhint="send"
+               placeholder="Mensagem ou /comando">
+    </form>
+</div>
 <div id="toast" role="status" aria-live="polite"></div>
 <div id="hurt"></div>
 <div id="death" role="alertdialog" aria-labelledby="death-cause" aria-describedby="death-info" tabindex="-1">
@@ -439,6 +450,7 @@
     </div>
     <div id="touch-top">
         <button class="classic-btn touch-btn" type="button" data-touch="inventory" aria-label="Mochila" title="Mochila"><svg class="touch-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M6.6 9.6h10.8A2.6 2.6 0 0 1 20 12.2v7.4a2.4 2.4 0 0 1-2.4 2.4H6.4A2.4 2.4 0 0 1 4 19.6v-7.4a2.6 2.6 0 0 1 2.6-2.6zM4 14.6h16v1.8H4zM10.2 16.8h3.6v2.6h-3.6z"/><path d="M9.2 9.6V7.4h5.6v2.2z"/></svg></button>
+        <button class="classic-btn touch-btn" type="button" data-touch="chat" aria-label="Chat" title="Chat"><svg class="touch-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M4 4.6h16a2 2 0 0 1 2 2v9.2a2 2 0 0 1-2 2h-7.1L7 21.6v-3.8H4a2 2 0 0 1-2-2V6.6a2 2 0 0 1 2-2zm2.6 4.2h10.8v1.8H6.6zm0 3.6h7.2v1.8H6.6z"/></svg></button>
         <button class="classic-btn touch-btn" type="button" data-touch="pause" aria-label="Pausar" title="Pausar"><svg class="touch-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><rect x="6.5" y="5" width="4" height="14"/><rect x="13.5" y="5" width="4" height="14"/></svg></button>
     </div>
     <p id="touch-hint">Arraste para olhar · toque no bloco para usar · segure para cavar</p>

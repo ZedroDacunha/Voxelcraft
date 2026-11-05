@@ -66,13 +66,21 @@ test('menu de pausa aparece quando nenhum estado exclusivo está ativo', () => {
     assert.equal(pauseMenuDisplay({}), 'grid');
 });
 
-test('menu de pausa fica oculto durante jogo, inventário ou morte', () => {
+test('menu de pausa fica oculto durante jogo, inventário, chat ou morte', () => {
     assert.equal(shouldShowPauseMenu({ locked: true }), false);
     assert.equal(shouldShowPauseMenu({ inventoryOpen: true }), false);
     assert.equal(shouldShowPauseMenu({ dead: true }), false);
+    // Chat: o mouse está solto para digitar, mas o jogo não pausou.
+    assert.equal(shouldShowPauseMenu({ chatOpen: true }), false);
     assert.equal(pauseMenuDisplay({ locked: true }), 'none');
     assert.equal(pauseMenuDisplay({ inventoryOpen: true }), 'none');
     assert.equal(pauseMenuDisplay({ dead: true }), 'none');
+    assert.equal(pauseMenuDisplay({ chatOpen: true }), 'none');
+});
+
+test('só o chat aberto não é motivo para esconder o menu quando o jogo pausou de verdade', () => {
+    // Fechar o chat devolve o controle: aí o menu volta a aparecer.
+    assert.equal(shouldShowPauseMenu({ chatOpen: false }), true);
 });
 
 test('pointer lock bem-sucedido resolve true e limpa listeners/timer', async () => {

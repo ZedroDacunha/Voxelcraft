@@ -182,6 +182,29 @@
     #death p { margin: 0 0 20px; max-width: 460px; font: 14px/1.5 monospace; }
     #hurt { position: absolute; inset: 0; pointer-events: none; z-index: 4; opacity: 0; background: radial-gradient(ellipse at center, rgba(200,0,0,0) 45%, rgba(200,0,0,0.65) 100%); }
 
+    /* --- chat ---------------------------------------------------------------
+       No canto de baixo, em cima da hotbar, como no Minecraft: o log fica
+       sempre ali (as linhas apagam sozinhas) e a linha de digitação só aparece
+       com o chat aberto. A caixa é escura e translúcida para o mundo continuar
+       legível atrás; o texto tem sombra de 1px porque o fundo é o jogo. */
+    #chat { position: absolute; left: 10px; bottom: 118px; z-index: 6; width: min(52ch, 62vw);
+        pointer-events: none; font: 13px/1.35 monospace; color: #fff; }
+    #chat-log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column;
+        gap: 1px; max-height: calc(10 * 1.35em + 8px); overflow: hidden; }
+    .chat-line { background: rgba(0, 0, 0, .55); padding: 1px 6px; border-radius: 2px;
+        text-shadow: 1px 1px 0 #000; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .chat-line.input { color: #d8d8d8; }
+    .chat-line.say { color: #ffffff; }
+    .chat-line.error { color: #ff9a9a; }
+    #chat-form { margin: 4px 0 0; pointer-events: auto; }
+    #chat-form[hidden] { display: none; }
+    #chat-input { box-sizing: border-box; width: 100%; margin: 0; padding: 3px 6px;
+        background: rgba(0, 0, 0, .72); color: #fff; border: 2px solid #555; border-radius: 2px;
+        font: 13px/1.35 monospace; outline: none; }
+    #chat-input::placeholder { color: #9a9a9a; }
+    #chat-input:focus { border-color: #d0d0d0; }
+    /* Pausa e edição dos botões: o chat sai da frente como o resto do HUD. */
+    body.is-paused #chat, body.touch-editing #chat { opacity: 0; pointer-events: none; }
     #toast { position: absolute; bottom: 125px; left: 50%; transform: translateX(-50%); z-index: 6; pointer-events: none;
         color: #fff; font: bold 14px monospace; text-shadow: 1px 1px 0 #000; background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 4px; display: none; }
 
@@ -364,7 +387,7 @@
     .touch-btn.pressed { background: linear-gradient(#626262, #777); box-shadow: inset 2px 2px 2px #0008; transform: translateY(1px); }
     /* a dica ocupa a faixa livre do topo: do outro lado ficam Mochila e Pausar */
     #touch-hint { position: absolute; left: 14px; top: 10px;
-        right: calc(24px + 2 * var(--touch-top-size, 46px) + 8px); margin: 0; padding: 4px 10px;
+        right: calc(24px + 3 * var(--touch-top-size, 46px) + 16px); margin: 0; padding: 4px 10px;
         background: #1119; color: #fff; font: 12px/1.3 monospace; text-shadow: 1px 1px #000; border-radius: 3px;
         text-align: left; opacity: 1; transition: opacity .6s linear; pointer-events: none; }
     #touch-ui.hint-hidden #touch-hint { opacity: 0; }
@@ -395,6 +418,9 @@
     body.touch-left #touch-hint { left: calc(24px + 2 * var(--touch-top-size, 46px) + 8px); right: 14px; text-align: right; }
     /* no toque o joystick e os botões ocupam a faixa de baixo: a hotbar sobe */
     body.touch-mode #hud-bottom { bottom: calc(14px + 2 * var(--touch-btn-size, 64px) + var(--touch-gap-size, 10px)); }
+    /* o chat sobe junto com a hotbar: no toque a faixa de baixo é dos botões */
+    body.touch-mode #chat { bottom: calc(14px + 2 * var(--touch-btn-size, 64px) + var(--touch-gap-size, 10px)
+        + var(--hud-slot-size, 46px) + 26px); width: min(52ch, 74vw); }
     /* no toque cada casa da hotbar recebe o dedo; o resto da faixa deixa o toque
        passar para a tela, senão metade do mundo ficaria sem "usar/cavar" */
     body.touch-mode #hud-bottom { pointer-events: none; }
