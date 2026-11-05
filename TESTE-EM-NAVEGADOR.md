@@ -443,6 +443,25 @@ antiga em cache, tufo esticado e folhas sumindo à distância.
       cada PNG do capim (não várias versões empilhadas).
 - [ ] Com rede desligada depois de jogar uma vez, o capim continua aparecendo.
 
+## 22. Porta de carvalho
+
+A porta é a única textura do jogo desenhada em duas metades que precisam
+combinar. Antes cada metade pintava a própria borda e a porta ficava com uma
+faixa escura no meio.
+
+- [ ] A porta fechada parece **uma peça**: nenhuma faixa escura no meio, entre o
+      bloco de baixo e o de cima.
+- [ ] Dá para ver o **batente** (moldura) em volta e **dois painéis rebaixados**,
+      um em cada metade, alinhados.
+- [ ] As **dobradiças de ferro** aparecem do lado da charneira, uma em cada
+      metade, e a **maçaneta dourada** do lado oposto, na altura do meio.
+- [ ] De longe (uns 20 blocos) a porta ainda se lê como porta, não como um
+      retângulo de madeira.
+- [ ] Ao abrir a porta, o painel girado mostra a metade de baixo do desenho (é a
+      mesma arte, sem versão própria para a porta aberta).
+- [ ] O ícone da porta no inventário mostra a metade de baixo com batente e
+      painel.
+
 ## Se algo falhar
 
 | Sintoma | Onde olhar |
@@ -454,11 +473,12 @@ antiga em cache, tufo esticado e folhas sumindo à distância.
 | Offline mostra erro 504 ou tela de branco | *Cache Storage*: o arquivo está lá? A instalação falhou (veja *Network* com o filtro "service worker")? |
 | Parece a versão antiga | `?sw=0` para confirmar que é cache; depois confira se `npm run stamp` foi rodado (hash novo = URL nova). Imagem de `assets/` também tem hash: se o `?v=` da textura não mudou, o carimbo não foi rodado |
 | Capim largo/achatado ou cintilando | `world-tall-grass.js`: proporção da placa (`√2`) e filtros da textura; `tests/tall-grass.test.mjs` cobre os dois |
+| Porta com faixa escura no meio | A arte tem que ser desenhada na folha inteira (32×64) e recortada nas metades: `tests/door-texture.test.mjs` reprova costura, painel torto e ferragem do lado errado |
 | Offline abre o menu mas o mundo não carrega | Alguma coisa nova no jogo não está no `index.html` (importmap/`<link>`) — é de lá que o worker tira a lista |
 
 ## O que **não** precisa ser testado à mão
 
-Já coberto por `npm test` (774 testes):
+Já coberto por `npm test` (781 testes):
 
 - manifest e ícones — tamanho, opacidade, círculo seguro do maskable, favicon
   chapado (`tests/icons.test.mjs`);

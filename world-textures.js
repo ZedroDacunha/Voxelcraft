@@ -647,25 +647,62 @@ export function createTextureTools(THREE) {
                 }
                 case TILE.WOOD_DOOR_UPPER:
                 case TILE.WOOD_DOOR_LOWER: {
-                    // As duas metades da porta usavam o fallback magenta do
-                    // atlas (não havia arte para 32/33).
-                    const upper = sourceTile === TILE.WOOD_DOOR_UPPER;
-                    if (x < 2 || x > 29 || y < 2 || y > 29) return [96 + j(4), 62 + j(3), 36 + j(3)];
-                    const grain = hash2(Math.floor(x / 3), Math.floor(y / 5), 6151 + alt * 37);
-                    const plank = grain > 0.8 ? [186 + j(6), 138 + j(5), 84 + j(5)]
-                        : grain < 0.18 ? [128 + j(5), 88 + j(4), 50 + j(4)]
-                        : [158 + j(8), 112 + j(7), 66 + j(6)];
-                    if (x === 10 || x === 21) return plank.map(channel => channel - 26);
-                    const panelTop = upper ? 6 : 20;
-                    const panelBottom = upper ? 15 : 27;
-                    if (x >= 5 && x <= 26 && y >= panelTop && y <= panelBottom) {
-                        const frame = x === 5 || x === 26 || y === panelTop || y === panelBottom;
-                        if (frame) return [92 + j(3), 60 + j(3), 34 + j(2)];
-                        return upper ? [180 + j(6), 138 + j(6), 92 + j(5)] : [128 + j(5), 88 + j(4), 52 + j(4)];
+                    // A porta é UMA peça de dois blocos: a arte é desenhada na
+                    // folha inteira (32×64) e só então recortada nas metades.
+                    // Desenhar cada metade por si deixava uma faixa escura de
+                    // 4 px no meio — a porta lia como dois blocos empilhados.
+                    const upperFace = sourceTile === TILE.WOOD_DOOR_UPPER;
+                    const gx = x;
+                    const gy = upperFace ? y : y + TILE_PX;
+
+                    // Madeira clara (carvalho), com veio curto e pouco ruído:
+                    // mancha grande vira sujeira quando o bloco é pequeno na tela.
+                    const tone = hash2(Math.floor(gx / 2), Math.floor(gy / 6), 8123 + alt * 41);
+                    const shift = tone > 0.84 ? 8 : tone < 0.16 ? -8 : 0;
+                    const light = 176 + shift + j(2);
+                    const base = [light, light * 0.71, light * 0.43];
+                    const shade = amount => base.map(channel => channel + amount);
+
+                    // Batente: borda de fora escurecida, vinco claro por dentro.
+                    // O contraste do batente é de propósito maior que o do veio:
+                    // com pouco degrau o vinco some no ruído da madeira e a porta
+                    // perde a moldura.
+                    if (gx < 1 || gx > 30 || gy < 1 || gy > 62) return shade(-46);
+                    if (gx < 2 || gx > 29 || gy < 2 || gy > 61) {
+                        return gx === 2 || gy === 2 ? shade(22) : shade(-24);
                     }
-                    // maçaneta, na metade de baixo e do lado oposto às dobradiças
-                    if (!upper && y >= 17 && y <= 19 && x >= 24 && x <= 26) return [232, 194, 96];
-                    return plank;
+
+                    // Dobradiças de ferro coladas na borda esquerda, uma por
+                    // metade — é o que faz o bloco se ler como porta de longe.
+                    const hingeTop = gy >= 10 && gy <= 12 ? 10 : gy >= 50 && gy <= 52 ? 50 : null;
+                    if (hingeTop !== null && gx >= 1 && gx <= 7) {
+                        if (gy === hingeTop || gy === hingeTop + 2) return [58, 62, 66];
+                        if (gx === 2) return [158, 162, 166];
+                        if (gx === 3 || gx === 6) return [58, 62, 66];
+                        return [108, 112, 116];
+                    }
+
+                    // Maçaneta na altura da mão, com luz em cima à esquerda e
+                    // sombra embaixo à direita (o dourado chapado sumia no fundo).
+                    if (gx >= 23 && gx <= 25 && gy >= 29 && gy <= 31) {
+                        if (gx === 23 && gy === 29) return [255, 240, 178];
+                        if (gx === 25 || gy === 31) return [164, 122, 42];
+                        return [234, 198, 98];
+                    }
+
+                    // Dois painéis rebaixados, um em cada metade: borda escura,
+                    // sombra por dentro em cima/à esquerda, luz embaixo/à direita.
+                    for (const [panelTop, panelBottom] of [[5, 21], [42, 58]]) {
+                        if (gx < 7 || gx > 24 || gy < panelTop || gy > panelBottom) continue;
+                        if (gx === 7 || gx === 24 || gy === panelTop || gy === panelBottom) return shade(-20);
+                        if (gy === panelTop + 1 || gx === 8) return shade(-34);
+                        if (gy === panelBottom - 1 || gx === 23) return shade(20);
+                        return shade(-10);
+                    }
+
+                    // Veio curto entre os painéis: sem ele a madeira fica chapada.
+                    if (gy > 23 && gy < 40 && (gx === 16 || gx === 17)) return shade(-10);
+                    return base;
                 }
                 case TILE.MOFIM_LANTERN: {
                     // Moldura na cor do bicho (verde-musgo) com o pó aceso no
