@@ -25,55 +25,56 @@ test('o título do menu é um SVG inline, sem imagem ou arquivo externo', () => 
 
 test('o nome continua acessível pelo container e rotula a tela inicial', () => {
     assert.match(html, /<main id="title-screen" aria-labelledby="title-screen-logo">/);
-    assert.match(logo, /^<div class="title-screen-logo" id="title-screen-logo" role="img" aria-label="Voxel Sandbox">/);
+    assert.match(logo, /^<div class="title-screen-logo" id="title-screen-logo" role="img" aria-label="Voxelcraft">/);
+    assert.doesNotMatch(html, /Voxel Sandbox<\/div>/, 'o nome desenhado é VOXELCRAFT, sem o SANDBOX');
 });
 
-test('as duas palavras são lajes de pedra: face, contorno, massa e fundo claro', () => {
-    // As duas palavras existem como <path> e são reusadas por <use> em cada camada.
-    assert.match(logo, /<path id="title-word-0"/);
-    assert.match(logo, /<path id="title-word-1"/);
-    assert.equal(uses(/href="#title-word-0"/).length, uses(/href="#title-word-1"/).length,
-        'as duas palavras têm o mesmo número de camadas');
-
-    // Face de pedra + véu de sombra em cada palavra.
-    assert.equal(uses(/fill="url\(#title-stone\)"/).length, 2, 'duas faces texturizadas');
-    assert.equal(uses(/fill="url\(#title-shade\)"/).length, 2, 'dois véus de sombra');
-
-    // Contorno da face (fino) e contorno da laje inteira (grosso, no fundo).
-    assert.equal(uses(/stroke="#141310"/).length, 2, 'dois contornos de face');
-    assert.equal(uses(/stroke="#12110f"/).length, 2, 'dois contornos de laje');
-
-    // Fundo claro da laje, o degrau iluminado que aparece embaixo das letras.
-    assert.equal(uses(/fill="#aeaca1"/).length, 2, 'dois fundos claros');
+test('a palavra é uma só, como no logo clássico', () => {
+    assert.equal((logo.match(/<path id="title-word"/g) ?? []).length, 1, 'um único contorno de palavra');
+    assert.doesNotMatch(logo, /title-word-\d/, 'não há segunda palavra (SANDBOX saiu)');
 });
 
-test('a profundidade é uma laje maciça, não uma sombra chapada', () => {
-    const massa = uses(/fill="url\(#title-slab\)"/);
-    assert.ok(massa.length >= 12, `a massa escura é empilhada em vários passos (achei ${massa.length})`);
+test('a palavra é uma laje: contorno, fundo claro, massa escura e face', () => {
+    // Contorno grosso da laje inteira e contorno fino da face.
+    assert.equal(uses(/stroke="#151413"/).length, 2, 'dois contornos');
+    // Faixa clara da face inferior da laje.
+    assert.equal(uses(/fill="#bcbab4"/).length, 1, 'um fundo claro');
+    // Massa escura empilhada até virar sólida.
+    const massa = uses(/fill="#333230"/);
+    assert.ok(massa.length >= 8, `a massa escura é empilhada em vários passos (achei ${massa.length})`);
     for (const tag of massa) {
         assert.match(tag, /transform="translate\([\d.]+ [\d.]+\)"/, 'cada passo anda na diagonal');
     }
-    // Todas as camadas de uma palavra compartilham o mesmo path: é ele que garante a laje sólida.
-    assert.match(logo, /<use href="#title-word-0" fill="url\(#title-slab\)" transform="translate\(12\.6 30\)"\/>/);
+    // Face em três tons de pedra, mais o véu de luz/sombra por cima.
+    assert.equal(uses(/href="#title-word-t1"/).length, 1);
+    assert.equal(uses(/href="#title-word-t2"/).length, 1);
+    assert.equal(uses(/href="#title-word-t3"/).length, 1);
+    assert.equal(uses(/fill="url\(#title-shade\)"/).length, 1);
 });
 
-test('a pedra é textura de padrão, com manchas e uma trinca', () => {
-    assert.match(logo, /<pattern id="title-stone" width="[\d.]+" height="[\d.]+" patternUnits="userSpaceOnUse">/);
-    const pattern = logo.slice(logo.indexOf('<pattern id="title-stone"'), logo.indexOf('</pattern>'));
-    assert.ok((pattern.match(/<rect\b/g) ?? []).length >= 10, 'manchas suficientes para não virar cor chapada');
-    assert.match(pattern, /fill="#dbd8ce"/, 'base clara da pedra');
+test('a pedra é um mosaico de blocos, não uma cor chapada', () => {
+    for (const [id, cor] of [['t1', '#dcdad5'], ['t2', '#cbc9c4'], ['t3', '#a3a19c']]) {
+        const m = logo.match(new RegExp(`<path id="title-word-${id}"[^>]*>`));
+        assert.ok(m, `a camada ${id} existe`);
+        assert.match(m[0], new RegExp(`fill="${cor}"`), `a camada ${id} tem o tom ${cor}`);
+        // Cada tom é feito de muitos retângulos de 7 unidades (o tamanho da célula),
+        // fundidos na vertical — daí a altura variável.
+        const blocos = (m[0].match(/h7v\d+h-7z/g) ?? []).length;
+        assert.ok(blocos > 20, `a camada ${id} tem blocos suficientes (achei ${blocos})`);
+    }
 });
 
 test('a sombra da face escurece de cima para baixo', () => {
     const grad = logo.slice(logo.indexOf('<linearGradient id="title-shade"'), logo.indexOf('</linearGradient>'));
     assert.match(grad, /x2="0" y2="1"/, 'gradiente vertical');
-    assert.match(grad, /stop-opacity="\.38"/, 'topo iluminado');
-    assert.match(grad, /stop-opacity="\.3"/, 'base na sombra');
+    assert.match(grad, /stop-opacity="\.30"/, 'topo iluminado');
+    assert.match(grad, /stop-opacity="\.26"/, 'base na sombra');
 });
 
 test('o splash e o texto em fonte do sistema saíram do título', () => {
     assert.doesNotMatch(html, /title-logo-splash/);
     assert.doesNotMatch(html, /um mundo de blocos!/);
+    assert.doesNotMatch(html, /SANDBOX/);
     assert.doesNotMatch(styles, /\.title-logo-(main|sub|splash)\b/);
 });
 
@@ -81,11 +82,11 @@ test('o splash e o texto em fonte do sistema saíram do título', () => {
 
 test('o título escala de 360 px a 4K sem encostar nos botões', () => {
     const regra = styles.match(/\.title-screen-logo \{[^}]*\}/)?.[0] ?? '';
-    assert.match(regra, /width:\s*min\(86vw,\s*620px,\s*calc\(46vh \* 2\.4505\)\)/,
+    assert.match(regra, /width:\s*min\(90vw,\s*860px,\s*calc\(46vh \* 5\.3658\)\)/,
         'largura presa à viewport, a um teto e à altura disponível');
     assert.match(styles, /\.title-logo-art \{[^}]*width:\s*100%[^}]*height:\s*auto/,
         'o SVG acompanha o container sem distorcer');
     const baixa = styles.match(/@media \(max-height: 540px\) \{[\s\S]*?\n    \}/)?.[0] ?? '';
-    assert.match(baixa, /\.title-screen-logo \{[^}]*calc\(33vh \* 2\.4505\)/,
+    assert.match(baixa, /\.title-screen-logo \{[^}]*calc\(28vh \* 5\.3658\)/,
         'em tela baixa o título encolhe junto com a altura');
 });
