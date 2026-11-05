@@ -101,6 +101,11 @@ aparelho do jogador.
       do mesmo lado, um alguns segundos atrás do outro; param a uns 12 blocos e
       passam a passear. Nenhum aparece já parado ao lado do jogador.
 - [ ] Eles andam, pulam degraus e chiam.
+- [ ] De perto, o bicho tem **orelhas, focinho, pés no chão e cauda**, e a luzinha
+      fica na ponta de uma antena (não boiando acima da cabeça).
+- [ ] À noite os **olhos acendem** (duas luzinhas âmbar) e ele **pisca** de vez em
+      quando; de dia os olhos são só dois pontos escuros.
+- [ ] Os três da noite não têm exatamente a mesma cor.
 - [ ] De vez em quando ele faz um **voo curto**: sai do chão, sobe ~1,5 bloco e
       pousa adiante (não é o tempo todo — é a cada 11–22 s por bicho).
 - [ ] Encurralado na beira de um lago, ele **voa** para a margem em vez de ficar
