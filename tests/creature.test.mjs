@@ -25,6 +25,12 @@ import {
     FLIGHT_DISTANCE,
     FLIGHT_DURATION,
     FLIGHT_HEIGHT,
+    CROSS_COOLDOWN,
+    CROSS_DISTANCE,
+    CROSS_HEIGHT,
+    CROSS_RISE,
+    crossFlightFor,
+    crossHeightAt,
     flightFor,
     flightHeightAt,
     SCARE_SPEED,
@@ -873,4 +879,130 @@ test('parede de dois blocos barra o voo: ele não atravessa a encosta', () => {
         assert.ok(creature.x < 2, `parou antes da parede (x = ${creature.x.toFixed(2)})`);
     }
     assert.equal(creature.y, GROUND + 1, 'nunca subiu a parede');
+});
+
+// ------------------------------------------------ travessia (voo maior)
+
+test('o arco da travessia sobe rápido, plana baixo e pousa no destino', () => {
+    const from = 11, to = 11;
+    assert.equal(crossHeightAt(from, to, 0), from);
+    assert.equal(crossHeightAt(from, to, 1), to);
+    // O pico não fica no meio: ele já está no alto a 32% do trajeto...
+    assert.ok(Math.abs(crossHeightAt(from, to, CROSS_RISE) - (from + CROSS_HEIGHT)) < 1e-9,
+        'sobe rápido: o alto do voo chega cedo');
+    // ...e no começo do planeio o corpo continua lá em cima (é a rasante).
+    const meioDoPlaneio = CROSS_RISE + (1 - CROSS_RISE) * 0.2;
+    assert.ok(crossHeightAt(from, to, meioDoPlaneio) > from + CROSS_HEIGHT * 0.8,
+        'plana baixo, sem cair de uma vez');
+    // Nunca desce abaixo dos dois pontos e pousa macio (perto do fim, pouco acima do chão).
+    for (let p = 0; p <= 1; p += 0.02) {
+        const y = crossHeightAt(from, to, p);
+        assert.ok(y >= Math.min(from, to) - 1e-9, `não passa do chão (p = ${p.toFixed(2)})`);
+    }
+    assert.ok(crossHeightAt(from, to, 0.97) < to + 0.15, 'o pouso é macio, não um tombo');
+    // Começando mais alto do que pousa, o pico ainda respeita o ponto mais alto.
+    assert.ok(crossHeightAt(14, 10, CROSS_RISE) >= 14 + CROSS_HEIGHT - 1e-9);
+    assert.equal(crossHeightAt(14, 10, 1), 10);
+});
+
+test('a travessia só acontece com o chão barrado e depois da espera', () => {
+    assert.equal(crossFlightFor({ at: 10, nextCrossAt: 0, blocked: true }), true);
+    assert.equal(crossFlightFor({ at: 3, nextCrossAt: 8, blocked: true }), false,
+        'ainda de castigo da última tentativa');
+    assert.equal(crossFlightFor({ at: 100, nextCrossAt: 0 }), false,
+        'com o caminho livre não há o que atravessar');
+    assert.equal(CROSS_DISTANCE > FLIGHT_DISTANCE && CROSS_HEIGHT > FLIGHT_HEIGHT, true,
+        'a travessia é o voo maior: mais longe e mais alto que o pulo de asa');
+});
+
+test('lago largo no passeio: ele atravessa em vez de contornar a água', () => {
+    const clock = { t: 0 };
+    const seco = makeWorld();
+    // Água de x = 2 até x = 7: seis blocos que o passo não vence.
+    const secoOuAgua = x => (x <= 1 || x >= 8);
+    const lago = makeWorld({ above: (x) => (secoOuAgua(x) ? 0 : ID.WATER) });
+
+    const player = idlePlayer({ x: 0.5, y: GROUND + 1, z: 20 });
+    const system = makeSystem(seco, clock);
+    const creature = spawnOne(system, seco, clock, player);
+    system.world = lago;
+
+    creature.x = 0.5; creature.z = 0.5; creature.y = GROUND + 1; creature.visualY = GROUND + 1;
+    creature.targetX = 40; creature.targetZ = 0.5;
+    creature.turnAt = clock.t + 100;
+
+    let voo = null;
+    for (let i = 0; i < 200 && !voo; i++) {
+        clock.t += 0.05;
+        creature.targetX = 40; creature.turnAt = clock.t + 100; // não deixa sortear outro alvo
+        system.update(0.05, player, true);
+        if (creature.flight) voo = creature.flight;
+    }
+    assert.ok(voo, 'chegou na beirada e levantou voo');
+    assert.equal(voo.kind, 'cross', 'foi travessia, não pulo de asa');
+    const alcance = Math.hypot(voo.toX - voo.fromX, voo.toZ - voo.fromZ);
+    assert.ok(alcance > FLIGHT_DISTANCE, `cruzou mais longe que o voo curto (${alcance.toFixed(2)} blocos)`);
+    assert.ok(alcance >= 8, `foi o mais longe que deu: a margem oposta (${alcance.toFixed(2)})`);
+    assert.ok(voo.duration > FLIGHT_DURATION, 'e ficou mais tempo no ar');
+
+    for (let i = 0; i < 60 && creature.flight; i++) {
+        clock.t += 0.05;
+        system.update(0.05, player, true);
+    }
+    assert.equal(creature.flight, null, 'pousou');
+    assert.ok(creature.x >= 8, `do outro lado do lago (x = ${creature.x.toFixed(2)})`);
+    assert.equal(creature.y, GROUND + 1, 'em cima da grama da margem');
+});
+
+test('encurralado num lago largo, a fuga é a travessia (o voo curto não alcança)', () => {
+    const clock = { t: 0 };
+    const seco = makeWorld();
+    const secoOuAgua = x => (x <= 1 || x >= 8);
+    const lago = makeWorld({ above: (x) => (secoOuAgua(x) ? 0 : ID.WATER) });
+
+    const perseguidor = walkerPlayer({ x: -1.5, y: GROUND + 1, z: 0.5 });
+    const system = makeSystem(seco, clock);
+    const creature = spawnOne(system, seco, clock, perseguidor);
+    system.world = lago;
+
+    creature.x = 0.5; creature.z = 0.5; creature.y = GROUND + 1; creature.visualY = GROUND + 1;
+    creature.targetX = 0.5; creature.targetZ = 0.5;
+
+    let voo = null;
+    for (let i = 0; i < 60 && !voo; i++) {
+        clock.t += 0.05;
+        system.update(0.05, perseguidor, true);
+        if (creature.flight) voo = creature.flight;
+    }
+    assert.ok(voo, 'sem chão para correr e com a margem longe, ele levantou voo');
+    assert.equal(voo.kind, 'cross', 'a margem está a mais de um pulo de asa: foi travessia');
+
+    for (let i = 0; i < 60 && creature.flight; i++) {
+        clock.t += 0.05;
+        system.update(0.05, perseguidor, true);
+    }
+    assert.equal(creature.flight, null, 'pousou');
+    assert.ok(creature.x >= 8, `pousou na margem oposta (x = ${creature.x.toFixed(2)})`);
+});
+
+test('a travessia não atravessa barranco: parede de dois blocos continua barrando', () => {
+    const clock = { t: 0 };
+    const world = makeWorld({ heightAt: x => (x >= 2 ? GROUND + 2 : GROUND) });
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 20 });
+    const creature = spawnOne(system, world, clock, player);
+
+    creature.x = 0.5; creature.z = 0.5; creature.y = GROUND + 1; creature.visualY = GROUND + 1;
+    creature.nextCrossAt = 0;
+
+    for (let i = 0; i < 80; i++) {
+        clock.t += 0.05;
+        creature.targetX = 40; creature.targetZ = 0.5; creature.turnAt = clock.t + 100;
+        system.update(0.05, player, true);
+        assert.ok(creature.x < 2, `parou antes do barranco (x = ${creature.x.toFixed(2)})`);
+        assert.ok(!creature.flight || creature.flight.toX < 2, 'nenhum voo do outro lado');
+    }
+    assert.equal(creature.y, GROUND + 1, 'nunca subiu o barranco');
+    assert.ok(creature.nextCrossAt > clock.t - CROSS_COOLDOWN - 1,
+        'e o relógio da travessia anda mesmo quando ela é recusada');
 });

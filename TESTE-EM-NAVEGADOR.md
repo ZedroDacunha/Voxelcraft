@@ -102,6 +102,9 @@ aparelho do jogador.
       pousa adiante (não é o tempo todo — é a cada 11–22 s por bicho).
 - [ ] Encurralado na beira de um lago, ele **voa** para a margem em vez de ficar
       tremendo contra a água.
+- [ ] Num lago **largo** (ou numa ravina), ele faz a **travessia**: sai do chão,
+      plana baixo por vários blocos e pousa do outro lado. Num barranco alto, não
+      atravessa — dá a volta.
 - [ ] Correndo perto ele se assusta; **agachado** não; um golpe assusta e
       empurra. Ao amanhecer ele sobe e some, sem deixar pó.
 
