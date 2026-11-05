@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 564 testes de módulos puros (node --test)
+npm test           # 566 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -168,9 +168,13 @@ menu, e as teclas ficam num `Controles` recolhido. No toque, o botão `Pausar`
 abre o mesmo cartão.
 
 A tela de opções é a **mesma** do menu inicial, agora também com o jogo rodando
-atrás: cada opção é uma barra estilo Minecraft (`Sensibilidade: 100%`,
-`Campo de visão: 75°`…) — clique ou arraste na barra para mudar, setas e
-`Home`/`End` pelo teclado, e `role="slider"` para o leitor de tela.
+atrás, no formato do Minecraft: o nome e o valor ficam **centrados** no botão
+(`Campo de visão: 75°`) e, nas opções de faixa, um trilho escuro com o **cursor**
+mostra onde o valor está. Clique e arraste na barra mudam pela posição (é o gesto
+que serve no dedo também), setas andam um passo e `Home`/`End` vão aos extremos;
+o leitor de tela recebe `role="slider"` com `aria-value*`. Já as opções de
+**lista** — hoje só `Gráficos` — são botão: cada clique passa para o modo
+seguinte, sem trilho nem cursor.
 
 | Opção | Vale quando |
 | --- | --- |

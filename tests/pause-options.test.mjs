@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 import { pauseMenuDisplay, shouldShowPauseMenu } from '../game-pause-menu.js';
 import { OPTION_CONTROLS } from '../world-options-view.js';
+import { GAME_SETTING_FIELDS } from '../world-game-settings.js';
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const styles = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
@@ -68,20 +69,55 @@ test('as opções do jogo são as mesmas do menu (uma tela só)', () => {
     }
 });
 
-test('cada opção é uma barra arrastável com nome e valor', () => {
+test('opções de faixa são barras: trilho, cursor e valor no meio', () => {
     const dialog = html.slice(html.indexOf('<dialog id="options-dialog"'), html.indexOf('id="world-dialog"'));
-    assert.equal((dialog.match(/class="classic-btn option-btn"/g) ?? []).length, OPTION_CONTROLS.length);
-    assert.equal((dialog.match(/class="option-value"/g) ?? []).length, OPTION_CONTROLS.length);
+    const sliders = OPTION_CONTROLS.filter(row => !GAME_SETTING_FIELDS[row.key].choices);
+
+    assert.equal((dialog.match(/class="classic-btn option-btn option-slider"/g) ?? []).length, sliders.length);
+    assert.equal((dialog.match(/class="option-track"/g) ?? []).length, sliders.length, 'um trilho por barra');
+    assert.equal((dialog.match(/class="option-knob"/g) ?? []).length, sliders.length, 'um cursor por barra');
+    assert.equal((dialog.match(/class="option-value"/g) ?? []).length, OPTION_CONTROLS.length, 'toda opção mostra o valor');
+
+    // o trilho é desenho, não conteúdo: fica fora do leitor de tela
+    for (const track of dialog.match(/<span class="option-track"[^>]*>/g) ?? []) {
+        assert.match(track, /aria-hidden="true"/);
+    }
     assert.match(viewSource, /setAttribute\('role', 'slider'\)/);
     assert.match(viewSource, /aria-valuetext/);
     assert.match(viewSource, /--option-fill/);
 });
 
-test('a tela diz o que vale na hora e o que espera o próximo mundo', () => {
+test('gráficos é botão de clique, sem trilho nem cursor', () => {
+    const dialog = html.slice(html.indexOf('<dialog id="options-dialog"'), html.indexOf('id="world-dialog"'));
+    const graphicsStart = dialog.lastIndexOf('<button', dialog.indexOf('id="opt-graphics"'));
+    const graphics = dialog.slice(graphicsStart, dialog.indexOf('</button>', graphicsStart));
+    assert.match(graphics, /class="classic-btn option-btn"/, 'sem a classe de barra');
+    assert.doesNotMatch(graphics, /option-track|option-knob/);
+
+    // o clique anda um modo; o role de slider é só para os campos de faixa
+    assert.match(viewSource, /const slider = !field\.choices/);
+    assert.match(viewSource, /if \(slider\) \{[\s\S]*setAttribute\('role', 'slider'\)/);
+    assert.match(viewSource, /buttonEl\.addEventListener\('click', \(\) => \{\s*apply\(key, stepSetting\(key, current\[key\], 1\)\)/);
+});
+
+test('o rótulo de cada controle bate com o texto da tela', () => {
+    const dialog = html.slice(html.indexOf('<dialog id="options-dialog"'), html.indexOf('id="world-dialog"'));
+    for (const { button, label } of OPTION_CONTROLS) {
+        const start = dialog.indexOf(`id="${button}"`);
+        assert.ok(start > 0, `#${button} ausente`);
+        const block = dialog.slice(start, dialog.indexOf('</button>', start));
+        assert.match(block, new RegExp(`aria-label="${label}"`), `#${button}: aria-label deveria ser "${label}"`);
+        assert.ok(block.includes(`<span class="option-name">${label}</span>`), `#${button}: nome na tela difere de "${label}"`);
+    }
+});
+
+test('a tela diz o que vale na hora, o que espera o próximo mundo e como usar', () => {
     const hint = html.match(/<p class="options-hint">([\s\S]*?)<\/p>/);
     assert.ok(hint, 'a tela de opções precisa explicar o que muda quando');
     assert.match(hint[1], /na hora/);
     assert.match(hint[1], /próximo mundo/);
+    assert.match(hint[1], /[Aa]rraste/, 'explica o gesto da barra');
+    assert.match(hint[1], /clique/i, 'e o do botão');
 });
 
 test('o jogo aplica as opções ao vivo, menos a distância de render', () => {
@@ -110,6 +146,7 @@ test('a qualidade gráfica da tela de opções é a mesma do F4', () => {
 test('a grade de opções vira uma coluna no celular', () => {
     assert.match(styles, /\.options-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2/);
     assert.match(styles, /@media \(max-width: 560px\)\s*\{\s*\.options-grid\s*\{[^}]*grid-template-columns:\s*1fr/);
-    assert.match(styles, /\.option-btn\s*\{[^}]*position: relative|\.option-btn\s*\{[^}]*display: flex/);
-    assert.match(styles, /\.option-btn::before\s*\{[^}]*width:\s*var\(--option-fill/);
+    assert.match(styles, /\.option-btn\s*\{[^}]*display: flex/);
+    assert.match(styles, /\.option-track\s*\{[^}]*position: absolute/);
+    assert.match(styles, /\.option-knob\s*\{[^}]*left:\s*var\(--option-fill/, 'o cursor segue o valor');
 });

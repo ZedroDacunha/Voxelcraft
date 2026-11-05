@@ -228,16 +228,24 @@
     .options-dialog kbd { padding: 2px 5px; border: 1px solid #747474; background: #343434; color: #fff; font: 12px monospace; }
     .options-dialog .world-dialog-actions { justify-content: space-between; }
     .options-hint { margin: 0; color: #b9c3cc; font-size: 12px; }
-    /* Grade de opções estilo Minecraft: cada opção é uma barra com o nome à
-       esquerda e o valor à direita. O preenchimento (`--option-fill`) é escrito
-       pelo world-options-view.js conforme o valor. */
+    /* Grade de opções no padrão do Minecraft: o texto fica centrado dentro do
+       botão e, nas opções de faixa, um trilho escuro com o cursor em cima. A
+       posição do cursor vem de --option-fill, escrita pelo world-options-view.js. */
     .options-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 14px 0; }
-    .option-btn { display: flex; align-items: center; justify-content: space-between; gap: 10px;
-        min-height: 36px; padding: 7px 10px; text-align: left; touch-action: none; }
-    .option-btn::before { content: ''; position: absolute; inset: 0 auto 0 0; width: var(--option-fill, 0%);
-        background: #ffffff26; pointer-events: none; }
-    .option-name, .option-value { position: relative; z-index: 1; }
-    .option-value { color: #fff; font: 700 13px/1 monospace; text-shadow: 1px 1px 0 #0008; }
+    .option-btn { display: flex; align-items: center; justify-content: center; min-height: 36px;
+        padding: 7px 12px; text-align: center; touch-action: none; }
+    .option-text { position: relative; z-index: 2; }
+    .option-name { color: #f2f2f2; }
+    .option-value { color: #fff; font-weight: 700; }
+    /* Trilho: fica atrás do texto, escuro e fundo, para o valor branco continuar
+       legível em qualquer posição do cursor. */
+    .option-track { position: absolute; inset: 6px 8px; z-index: 1; border: 1px solid #101010;
+        background: #202020; box-shadow: inset 1px 1px 3px #000a; pointer-events: none; }
+    /* Cursor: a alça clara do Minecraft, um pouco mais alta que o trilho. */
+    .option-knob { position: absolute; top: -2px; bottom: -2px; left: var(--option-fill, 0%);
+        width: 9px; transform: translateX(-50%); border: 1px solid #171717;
+        background: linear-gradient(#f2f2f2 0%, #cfcfcf 48%, #a9a9a9 100%);
+        box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #0006; }
     .options-controls { margin-top: 16px; padding-top: 12px; border-top: 1px solid #33465a; color: #d0d0d0; font-size: 13px; }
     .options-controls summary { color: #d6d0a4; cursor: pointer; }
     .options-controls p { margin: 8px 0 0; color: #d0d0d0; line-height: 1.55; }
