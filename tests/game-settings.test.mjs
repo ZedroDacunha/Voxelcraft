@@ -8,7 +8,7 @@ import {
     formatSetting, loadGameSettings, notifyGameSettingsChange, onGameSettingsChange,
     sanitizeGameSettings, saveGameSettings, settingFraction, settingFromFraction, stepSetting,
 } from '../world-game-settings.js';
-import { OPTION_CONTROLS } from '../world-options-view.js';
+import { OPTION_CONTROLS, TOUCH_OPTION_CONTROLS } from '../world-options-view.js';
 
 function fakeStorage(initial = {}) {
     const map = new Map(Object.entries(initial));
@@ -75,7 +75,10 @@ test('chaves desconhecidas não vazam para as preferências', () => {
 
 test('save grava na chave certa e load devolve o mesmo', () => {
     const storage = fakeStorage();
-    const settings = { sensitivity: 1.5, fov: 90, renderDistance: 2, volume: 0.35, graphics: '0.5' };
+    const settings = {
+        sensitivity: 1.5, fov: 90, renderDistance: 2, volume: 0.35, graphics: '0.5',
+        touchLayout: 'left', touchButtonSize: 1.2,
+    };
     saveGameSettings(settings, storage);
     const [[key, value]] = storage.entries();
     assert.equal(key, GAME_SETTINGS_KEY);
@@ -101,7 +104,7 @@ test('save com storage bloqueado não lança', () => {
 
 test('todo controle da tela de opções existe no index.html', () => {
     const html = readFileSync(path.join(import.meta.dirname, '..', 'index.html'), 'utf8');
-    for (const { key, button, output } of OPTION_CONTROLS) {
+    for (const { key, button, output } of [...OPTION_CONTROLS, ...TOUCH_OPTION_CONTROLS]) {
         assert.ok(GAME_SETTING_FIELDS[key], `campo desconhecido: ${key}`);
         assert.ok(html.includes(`id="${button}"`), `botão #${button} ausente no index.html`);
         assert.ok(html.includes(`id="${output}"`), `saída #${output} ausente no index.html`);
@@ -110,7 +113,14 @@ test('todo controle da tela de opções existe no index.html', () => {
 });
 
 test('a tela de opções tem uma barra para cada campo', () => {
-    assert.deepEqual(OPTION_CONTROLS.map(row => row.key), Object.keys(GAME_SETTING_FIELDS));
+    // a grade principal e a sub-tela de toque, juntas, cobrem todos os campos
+    assert.deepEqual(
+        [...OPTION_CONTROLS, ...TOUCH_OPTION_CONTROLS].map(row => row.key),
+        Object.keys(GAME_SETTING_FIELDS),
+    );
+    // e nenhum campo aparece nas duas telas
+    const keys = [...OPTION_CONTROLS, ...TOUCH_OPTION_CONTROLS].map(row => row.key);
+    assert.equal(new Set(keys).size, keys.length, 'campo repetido entre as telas');
 });
 
 // ------------------------------------------------ qualidade gráfica (lista)

@@ -228,6 +228,33 @@ olhar, toque para usar, segure para cavar.
 - [ ] No desktop com mouse nada mudou: clique esquerdo cava, direito usa, e o
       modo toque só liga se o jogador entrou por toque (ou com `?touch=1`).
 
+## 14. Configurações de toque (mão e tamanho)
+
+Menu → **Opções** → último botão da grade, **Configurações de toque** (a mesma
+tela abre pelo ESC durante o jogo).
+
+- [ ] O botão mostra um resumo (`Destro · 100%`) e **abre a sub-tela na mesma
+      janela** — não aparece uma segunda janela por cima.
+- [ ] A sub-tela tem só duas linhas: **Mão** e **Tamanho dos botões**; o título
+      vira "Opções de toque".
+- [ ] **Voltar** devolve a grade principal e, ao fechar e reabrir as Opções,
+      volta sempre para a grade principal.
+- [ ] **Mão: Canhoto** espelha na hora o joystick (vai para a direita), os
+      botões (vão para a esquerda), `Mochila`/`Pausar` (canto superior esquerdo)
+      e a dica do topo.
+- [ ] No canhoto, `Pular` e `Cavar` ficam do lado do polegar (a coluna perto da
+      mão), não `Agachar`/`Usar`.
+- [ ] **Tamanho dos botões**: arrastar a barra muda os botões **e o joystick**
+      na hora; a hotbar continua acima dos botões em 80% e em 140%.
+- [ ] Em 140% num celular estreito os controles **não se encostam** (a trava de
+      largura entra em ação) e nenhum botão sai da tela.
+- [ ] Girar o celular (paisagem baixa, altura ≤ 460 px) mantém a proporção.
+- [ ] Fechar o jogo e abrir de novo mantém mão e tamanho escolhidos.
+- [ ] **Restaurar padrões** volta para `Destro · 100%` e devolve os controles ao
+      canto de sempre.
+- [ ] No desktop com mouse nada muda: os controles de toque não aparecem, e a
+      tela de Opções continua abrindo normalmente.
+
 ## Se algo falhar
 
 | Sintoma | Onde olhar |

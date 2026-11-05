@@ -279,8 +279,11 @@ test('os controles são só ícones, mas continuam dizendo o que fazem', () => {
             `${id}: aria-label com o nome do módulo`);
         assert.ok(!/touch-btn[^>]*>[^<]*[A-Za-zÀ-ú]/.test(html), `${id}: nada de rótulo escrito`);
     }
-    // ícone desenhado no CSS, sem imagem externa para baixar/offline
-    assert.match(css, /\.touch-icon \{ width: 34px; height: 34px; fill: currentColor;/);
-    assert.match(css, /\.touch-btn \{ display: grid; place-items: center; width: 64px; height: 64px;/);
+    // ícone desenhado no CSS, sem imagem externa para baixar/offline; o tamanho
+    // sai de --touch-scale (a opção "Tamanho dos botões")
+    assert.match(css, /\.touch-icon \{ width: var\(--touch-icon-size, 34px\); height: var\(--touch-icon-size, 34px\);/);
+    assert.match(css, /\.touch-icon \{[^}]*fill: currentColor;/);
+    assert.match(css, /--touch-icon-size: min\(calc\(34px \* var\(--touch-scale, 1\)\), 9vw\);/);
+    assert.match(css, /\.touch-btn \{ display: grid; place-items: center; min-height: 0; padding: 0;/);
     assert.ok(!/data-touch="[^"]+"[^>]*><img/.test(html), 'sem <img> nos botões');
 });
