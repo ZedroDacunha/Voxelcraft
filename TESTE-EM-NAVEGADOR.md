@@ -86,6 +86,8 @@ aparelho do jogador.
       igual ao `F4`.
 - [ ] `Distância de render` mostra o valor novo, mas só muda o mundo no próximo
       que você entrar (o próprio painel avisa).
+- [ ] Ao pausar, o **mundo de onde você parou** aparece borrado atrás do cartão,
+      sem HUD e sem a mão; numa tela grande (≥ 1600×900) o menu vem maior.
 - [ ] `Tab` percorre as opções e as setas mudam o valor; `ESC` fecha a tela e
       volta para o menu de pausa.
 - [ ] No celular, o botão **Pausar** abre o mesmo cartão e dá para arrastar as

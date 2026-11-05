@@ -99,7 +99,30 @@ A distância de render fica de fora de propósito: mudar chunks com o mundo
 rodando é outro assunto (recarregar região, reconstruir malha, mexer no que já
 foi gerado). Prometer ao vivo e não cumprir seria pior do que dizer quando vale.
 
-## 4. Testes (24 novos, 566 no total)
+## 4. Fundo do mundo borrado e escala de GUI
+
+Até aqui o menu de pausa escurecia a tela com uma película chapada. No Minecraft
+o mundo continua ali atrás, borrado — e é isso que dá a sensação de "pausei
+daqui".
+
+- **Borrão do que está embaixo, não de uma foto**: `#menu` usa
+  `backdrop-filter: blur(7px) saturate(.92)` (com o prefixo `-webkit-` para o
+  Safari). Como o laço do jogo continua pintando o canvas congelado, o borrão é
+  do mundo **de onde parou**. Os diálogos (`Opções…`, criar mundo) borram o que
+  está atrás pelo `::backdrop`.
+- **HUD e mão saem de cena**: `syncPauseMenu` liga `body.is-paused`, o CSS
+  esconde `#hud-bottom`/`#crosshair` e o laço deixa de desenhar o `handScene`
+  enquanto `pauseMenuShown` — sem um braço atravessado no borrão.
+- **Escala de GUI**: `--ui-scale` vale 1, 1,3, 1,6 ou 2 conforme a resolução
+  (media queries de largura **e** altura). `#menu` e `.options-dialog` passam a
+  ter `font-size: calc(15px * var(--ui-scale))` e todas as medidas deles são em
+  `em` (largura do cartão, altura dos botões, trilho e alça da barra). Em tela
+  grande o menu cresce de verdade; o HUD do jogo não muda.
+- **Tela de opções mais fiel**: larga (44em), translúcida em cima do mundo
+  borrado, título centrado sem o "CONFIGURAÇÃO" em cima, e o `Concluído` no meio
+  embaixo, como no original.
+
+## 5. Testes (28 novos, 570 no total)
 
 - `tests/pause-options.test.mjs` (13): o menu de pausa tem os três botões no
   `.classic-btn`, o texto velho saiu, o cartão segue o padrão (borda 2px), o
@@ -117,9 +140,13 @@ foi gerado). Prometer ao vivo e não cumprir seria pior do que dizer quando vale
 - `tests/graphics-quality.test.mjs` (+4): `setMode` faz o mesmo que o `F4`,
   modo desconhecido é ignorado sem aviso, `quiet` cala o aviso do boot, e o
   `cycle` continua a lista de onde a escolha direta parou;
-- `tests/game-menu-state.test.mjs`: `pauseMenuDisplay()` agora é `grid`.
+- `tests/game-menu-state.test.mjs`: `pauseMenuDisplay()` agora é `grid`;
+- quatro do fundo/escala: `backdrop-filter` no `#menu` e no `::backdrop` (com
+  prefixo), `body.is-paused` escondendo HUD e alça de mira, a mão fora do quadro
+  (`if (!pauseMenuShown) renderer.render(handScene…)`), os degraus de
+  `--ui-scale` e as medidas em `em` dos dois painéis.
 
-## 5. O que sobra (de propósito)
+## 6. O que sobra (de propósito)
 
 - **`ESC` de novo não volta ao jogo**: quem volta é o botão. O navegador segura
   o *pointer lock* por ~1 s depois do ESC, e um atalho que falha às vezes é pior
