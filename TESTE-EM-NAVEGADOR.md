@@ -119,6 +119,23 @@ aparelho do jogador.
 - [ ] Correndo perto ele se assusta; **agachado** não; um golpe assusta e
       empurra. Ao amanhecer ele sobe e some, sem deixar pó.
 
+## 8. A luz do Mofim
+
+- [ ] De noite, o chão em volta dele **clareia de verdade** (não é só o pontinho
+      brilhante da antena): dá para ver o tom de grama, terra ou pedra.
+- [ ] Quando ele **chia**, a luz dá um **pulso** curto (meio segundo) e volta —
+      o som e o clarão acontecem juntos.
+- [ ] O pulso **não pisca aos saltos**: sobe e desce suave, mesmo com o bicho
+      andando.
+- [ ] A luz do Mofim **não briga** com a tocha: com duas fontes por perto, as
+      duas vagas se revezam para as mais próximas (chegar perto da tocha não
+      apaga o bicho de vez, e vice-versa).
+- [ ] Quando ele vai embora ao amanhecer, a luz **apaga com ele** (não fica uma
+      poça acesa no ar).
+- [ ] Em **Gráficos → Baixa**, o bicho **não** pega vaga do pool: continuam só
+      tochas e fornalhas, e ele fica apenas com o brilho próprio.
+- [ ] Fora do alcance (~13 blocos) a luz dele cai a zero, como a das tochas.
+
 ## Se algo falhar
 
 | Sintoma | Onde olhar |

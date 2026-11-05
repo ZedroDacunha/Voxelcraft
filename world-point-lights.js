@@ -35,6 +35,70 @@ export function emitterColor(blockType) {
     return EMITTER_COLORS.get(blockType) ?? 0xffc07a;
 }
 
+// A luzinha do Mofim também disputa o pool. O nível é o de uma tocha fraca: ele
+// não é lampião, é bicho — a poça de luz tem de ser um convite, não um poste.
+export const MOFIM_LIGHT_LEVEL = 10;
+export const MOFIM_LIGHT_COLOR = 0xffdc9a;
+/** Quanto a luz incha no chilreio (fração do nível, 0,8 = +80% no pico). */
+export const MOFIM_PULSE_GAIN = 0.8;
+
+/**
+ * A criatura pode entrar na disputa por uma PointLight?
+ *
+ * No modo gráfico mais baixo (escala 0,5) não: a máquina já está no limite e as
+ * duas vagas ficam com as tochas. É o único custo que existe aqui — nenhuma luz
+ * nova é criada, o pool é o mesmo.
+ */
+export function creatureLightsAllowed(mode) {
+    return mode !== 0.5;
+}
+
+/**
+ * Candidatos a PointLight vindos das criaturas.
+ *
+ * A posição é **exata** (a luz fica na ponta da antena, onde o bicho está) e não
+ * o centro de um bloco. O pulso do chilreio não entra no nível daqui: ele é
+ * aplicado no quadro, em `updateEmitterLights`, senão a luz só piscaria a cada
+ * 250 ms da varredura.
+ */
+/** A luz nasce acima do corpo, na ponta da antena. */
+export const MOFIM_LIGHT_OFFSET = 0.66;
+
+/**
+ * Onde fica a luz de uma criatura, agora.
+ *
+ * `visualY` é a altura **desenhada** (pulo, voo, planeio); `y` é a do chão. A luz
+ * tem de seguir a primeira — no voo curto o bicho sobe 1,5 bloco e a luz fica
+ * boiando no chão se usar `y`.
+ */
+export function creatureLightPoint(entity) {
+    if (!entity) return null;
+    const y = Number.isFinite(entity.visualY) ? entity.visualY : entity.y;
+    if (!Number.isFinite(entity.x) || !Number.isFinite(entity.z) || !Number.isFinite(y)) return null;
+    return { x: entity.x, y: y + MOFIM_LIGHT_OFFSET, z: entity.z };
+}
+
+export function creatureEmitterCandidates(entities = [], { allowed = true } = {}) {
+    if (!allowed || !Array.isArray(entities)) return [];
+    const out = [];
+    for (const e of entities) {
+        if (!e || e.leaving) continue;
+        const p = creatureLightPoint(e);
+        if (!p) continue;
+        out.push({
+            x: p.x,
+            y: p.y,
+            z: p.z,
+            level: MOFIM_LIGHT_LEVEL,
+            color: MOFIM_LIGHT_COLOR,
+            exact: true,
+            creature: true,
+            entity: e,
+        });
+    }
+    return out;
+}
+
 // Luz do item na mão. A tocha tremula (fogo), a lanterna é firme e alcança mais;
 // `offset` é onde a luz fica no espaço da câmera (na ponta do que se segura).
 export const HELD_LIGHTS = new Map([
@@ -82,13 +146,22 @@ export function pickEmitters(candidates, { origin, max = LIGHT_POOL_SIZE, range 
         if (!(level > 0)) continue;
         const x = Number(candidate.x), y = Number(candidate.y), z = Number(candidate.z);
         if (![x, y, z].every(Number.isFinite)) continue;
-        const cx = x + 0.5, cy = y + 0.6, cz = z + 0.5;
-        const distance = Math.hypot(cx - origin.x, y + 0.5 - origin.y, cz - origin.z);
+        // Bloco ilumina do centro (um pouco acima do meio, onde a chama fica);
+        // criatura ilumina de onde ela está, sem arredondar para o bloco.
+        const exato = candidate.exact === true;
+        const cx = exato ? x : x + 0.5;
+        const cy = exato ? y : y + 0.6;
+        const cz = exato ? z : z + 0.5;
+        const distance = Math.hypot(cx - origin.x, (exato ? cy : y + 0.5) - origin.y, cz - origin.z);
         const intensity = emitterIntensity(level, distance, range);
         if (intensity <= 0) continue;
         // Aceita a cor pronta (fornalha acesa muda de cor) ou deduz do tipo.
         const color = Number.isFinite(candidate.color) ? candidate.color : emitterColor(candidate.type);
-        picked.push({ x: cx, y: cy, z: cz, level, color, distance, intensity });
+        picked.push({
+            x: cx, y: cy, z: cz, level, color, distance, intensity,
+            creature: candidate.creature === true,
+            entity: candidate.entity,
+        });
     }
     // `sort` é estável, então empate fica na ordem em que a busca encontrou.
     picked.sort((a, b) => a.distance - b.distance);

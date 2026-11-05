@@ -49,7 +49,11 @@ import { advanceHandAnimation, countStrikes, createHandAnimation, handSwingAmoun
 import { advanceStepTracker, createStepTracker, stepDistanceThisFrame, stepPitch, stepSoundFor } from './world-step-sounds.js';
 import { materialSoundName } from './world-block-materials.js';
 import { createWaterAudioState, waterSoundFor } from './world-water-sounds.js';
-import { LIGHT_POOL_RANGE, LIGHT_POOL_SIZE, heldLightFor, heldLightIntensity, pickEmitters } from './world-point-lights.js';
+import {
+    LIGHT_POOL_RANGE, LIGHT_POOL_SIZE, MOFIM_PULSE_GAIN, creatureEmitterCandidates,
+    creatureLightPoint, creatureLightsAllowed, emitterIntensity, heldLightFor, heldLightIntensity,
+    pickEmitters,
+} from './world-point-lights.js';
 import { damageSoundFor } from './world-damage-sounds.js';
 import { ambientAvailability, createAmbientState, stepAmbient } from './world-ambient-sounds.js';
 import { createWaterfallSoundState, scanWaterfall, updateWaterfallSound, waterfallGain } from './world-waterfall.js';
@@ -1991,7 +1995,15 @@ function updateEmitterLights(now) {
     // é imperceptível na luz e cabe folgado no quadro.
     if (now >= emitterScanAt) {
         emitterScanAt = now + 0.25;
-        activeEmitters = pickEmitters(scanNearbyEmitters(camera.position), { origin: camera.position });
+        activeEmitters = pickEmitters([
+            ...scanNearbyEmitters(camera.position),
+            // O Mofim também é fonte de verdade: a luzinha da antena disputa as
+            // mesmas duas vagas que tochas e fornalhas (nenhuma luz nova na cena).
+            ...creatureEmitterCandidates(
+                creatureSystem?.entities ?? [],
+                { allowed: creatureLightsAllowed(gfx.mode) },
+            ),
+        ], { origin: camera.position });
     }
     for (let i = 0; i < emitterLights.length; i++) {
         const light = emitterLights[i];
@@ -2001,10 +2013,24 @@ function updateEmitterLights(now) {
             continue;
         }
         light.color.setHex(emitter.color);
-        light.position.set(emitter.x, emitter.y, emitter.z);
+        // A criatura anda entre varreduras: seguir a posição dela a cada quadro
+        // evita a luz arrastando 250 ms atrás (1,6 bloco no voo de travessia).
+        const ponto = emitter.creature ? creatureLightPoint(emitter.entity) : null;
+        const px = ponto ? ponto.x : emitter.x;
+        const py = ponto ? ponto.y : emitter.y;
+        const pz = ponto ? ponto.z : emitter.z;
+        light.position.set(px, py, pz);
         // Tremor leve e fora de fase entre as fontes: duas tochas iguais piscando
         // no mesmo ritmo parecem um só fogo.
-        light.intensity = emitter.intensity * (0.93 + 0.07 * Math.sin(now * 6.7 + i * 2.3));
+        const tremor = 0.93 + 0.07 * Math.sin(now * 6.7 + i * 2.3);
+        // Criatura: o chilreio incha a luz, e isso tem de aparecer no quadro — a
+        // varredura roda a 4 Hz, então o pulso é recalculado aqui.
+        light.intensity = emitter.creature
+            ? emitterIntensity(
+                emitter.level * (1 + MOFIM_PULSE_GAIN * (emitter.entity?.lightPulse ?? 0)),
+                Math.hypot(px - camera.position.x, py - camera.position.y, pz - camera.position.z),
+            ) * tremor
+            : emitter.intensity * tremor;
     }
 }
 

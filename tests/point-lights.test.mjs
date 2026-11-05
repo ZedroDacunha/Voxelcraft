@@ -6,6 +6,11 @@ import {
     LIGHT_POOL_RANGE,
     LIGHT_POOL_SIZE,
     HELD_LIGHTS,
+    MOFIM_LIGHT_COLOR,
+    MOFIM_LIGHT_LEVEL,
+    creatureEmitterCandidates,
+    creatureLightPoint,
+    creatureLightsAllowed,
     emitterColor,
     emitterIntensity,
     heldLightFor,
@@ -139,4 +144,69 @@ test('empate de distância mantém a ordem em que a busca achou', () => {
     const picked = pickEmitters(candidates, { origin, max: 1 });
     assert.equal(picked.length, 1);
     assert.equal(picked[0].x, 7.5, 'o primeiro encontrado ganha o empate');
+});
+
+// ---------------------------------------------- luz do Mofim no pool
+
+const mofim = (extra = {}) => ({ x: 3.25, y: 11, z: -2.5, visualY: 11.4, lightPulse: 0, ...extra });
+
+test('a criatura vira candidata a luz na posição em que ela está', () => {
+    const [candidato] = creatureEmitterCandidates([mofim()], {});
+    assert.ok(candidato, 'entrou na lista');
+    assert.equal(candidato.exact, true, 'posição exata, não centro de bloco');
+    assert.equal(candidato.creature, true);
+    assert.equal(candidato.x, 3.25, 'sem arredondar');
+    assert.equal(candidato.z, -2.5);
+    assert.equal(candidato.y, 11.4 + 0.66, 'a luz fica no alto da antena, acima do corpo');
+    assert.equal(candidato.level, MOFIM_LIGHT_LEVEL);
+    assert.equal(candidato.color, MOFIM_LIGHT_COLOR);
+});
+
+test('criatura indo embora, sem dados ou com a luz desligada não vira fonte', () => {
+    assert.equal(creatureEmitterCandidates([mofim({ leaving: true })]).length, 0, 'quem está indo embora apaga');
+    assert.equal(creatureEmitterCandidates([mofim({ x: NaN })]).length, 0, 'posição inválida fica de fora');
+    assert.equal(creatureEmitterCandidates([null, undefined, {}]).length, 0);
+    assert.equal(creatureEmitterCandidates([mofim()], { allowed: false }).length, 0,
+        'no modo gráfico mais baixo a vaga fica com as tochas');
+    assert.equal(creatureLightsAllowed(0.5), false, 'escala 0,5 = sem luz de bicho');
+    for (const modo of ['auto', 'max', 1, 0.75]) {
+        assert.equal(creatureLightsAllowed(modo), true, `modo ${modo} permite`);
+    }
+});
+
+test('o pulso do chilreio não entra no nível: quem aplica é o quadro', () => {
+    const calmo = creatureEmitterCandidates([mofim({ lightPulse: 0 })])[0];
+    const aceso = creatureEmitterCandidates([mofim({ lightPulse: 1 })])[0];
+    assert.equal(aceso.level, calmo.level,
+        'a varredura roda a 4 Hz; se o pulso entrasse aqui, a luz piscaria aos saltos');
+});
+
+test('a luz da criatura fica onde ela está, não no centro do bloco', () => {
+    const [escolhido] = pickEmitters(creatureEmitterCandidates([mofim()]), {
+        origin: { x: 0, y: 11, z: 0 },
+    });
+    assert.ok(escolhido, 'a criatura ganhou uma vaga');
+    assert.equal(escolhido.creature, true, 'e o jogo sabe que é criatura');
+    assert.equal(escolhido.x, 3.25, 'a PointLight vai para a posição real');
+    assert.ok(escolhido.entity, 'o candidato carrega o bicho (para ler o pulso no quadro)');
+});
+
+test('o bicho perto ganha a vaga de uma tocha longe', () => {
+    const tocha = { x: 10, y: 11, z: 0, level: 14, type: ID.TORCH };
+    const escolhido = pickEmitters(
+        [tocha, ...creatureEmitterCandidates([mofim({ x: 2, y: 11, z: 0, visualY: 11 }), ])],
+        { origin: { x: 0, y: 12, z: 0 }, max: 1 },
+    );
+    assert.equal(escolhido.length, 1);
+    assert.equal(escolhido[0].creature, true, 'o mais próximo ganha, seja bicho ou tocha');
+});
+
+test('a luz da criatura segue a altura desenhada, não a do chão', () => {
+    // No voo curto ele sobe 1,5 bloco: a luz sobe junto.
+    assert.deepEqual(creatureLightPoint({ x: 1.5, y: 10, z: -0.25, visualY: 11.5 }),
+        { x: 1.5, y: 11.5 + 0.66, z: -0.25 });
+    // Sem visualY (parado no chão), usa a altura do corpo.
+    assert.deepEqual(creatureLightPoint({ x: 0, y: 10, z: 0 }), { x: 0, y: 10.66, z: 0 });
+    assert.equal(creatureLightPoint(null), null);
+    assert.equal(creatureLightPoint({ x: 0, y: NaN, z: 0 }), null, 'altura inválida não vira luz');
 });
