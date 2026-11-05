@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { pauseMenuDisplay, shouldShowPauseMenu } from '../game-pause-menu.js';
-import { OPTION_CONTROLS } from '../world-options-view.js';
+import { OPTION_CONTROLS, TOUCH_OPTION_CONTROLS } from '../world-options-view.js';
+
+// as duas telas do diálogo: a grade principal e a sub-tela de toque
+const ALL_CONTROLS = [...OPTION_CONTROLS, ...TOUCH_OPTION_CONTROLS];
 import { GAME_SETTING_FIELDS } from '../world-game-settings.js';
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -57,13 +60,13 @@ test('a tela de opções abre do menu de pausa', () => {
 
 test('as opções do jogo são as mesmas do menu (uma tela só)', () => {
     const dialog = html.slice(html.indexOf('<dialog id="options-dialog"'), html.indexOf('id="world-dialog"'));
-    for (const { button, output } of OPTION_CONTROLS) {
+    for (const { button, output } of ALL_CONTROLS) {
         assert.ok(dialog.includes(`id="${button}"`), `#${button} fora do diálogo de opções`);
         assert.ok(dialog.includes(`id="${output}"`), `#${output} fora do diálogo de opções`);
     }
     // Um botão sem type dentro do form method="dialog" fecharia a tela ao clicar.
     const buttons = dialog.match(/<button[^>]*>/g) ?? [];
-    assert.ok(buttons.length >= OPTION_CONTROLS.length + 2, 'faltam botões no diálogo');
+    assert.ok(buttons.length >= ALL_CONTROLS.length + 2, 'faltam botões no diálogo');
     for (const button of buttons) {
         assert.match(button, /type="(button|submit)"/, `botão sem type: ${button}`);
     }
@@ -71,12 +74,12 @@ test('as opções do jogo são as mesmas do menu (uma tela só)', () => {
 
 test('opções de faixa são barras: trilho, cursor e valor no meio', () => {
     const dialog = html.slice(html.indexOf('<dialog id="options-dialog"'), html.indexOf('id="world-dialog"'));
-    const sliders = OPTION_CONTROLS.filter(row => !GAME_SETTING_FIELDS[row.key].choices);
+    const sliders = ALL_CONTROLS.filter(row => !GAME_SETTING_FIELDS[row.key].choices);
 
     assert.equal((dialog.match(/class="classic-btn option-btn option-slider"/g) ?? []).length, sliders.length);
     assert.equal((dialog.match(/class="option-track"/g) ?? []).length, sliders.length, 'um trilho por barra');
     assert.equal((dialog.match(/class="option-knob"/g) ?? []).length, sliders.length, 'um cursor por barra');
-    assert.equal((dialog.match(/class="option-value"/g) ?? []).length, OPTION_CONTROLS.length, 'toda opção mostra o valor');
+    assert.equal((dialog.match(/class="option-value"/g) ?? []).length, ALL_CONTROLS.length, 'toda opção mostra o valor');
 
     // o trilho é desenho, não conteúdo: fica fora do leitor de tela
     for (const track of dialog.match(/<span class="option-track"[^>]*>/g) ?? []) {
@@ -102,7 +105,7 @@ test('gráficos é botão de clique, sem trilho nem cursor', () => {
 
 test('o rótulo de cada controle bate com o texto da tela', () => {
     const dialog = html.slice(html.indexOf('<dialog id="options-dialog"'), html.indexOf('id="world-dialog"'));
-    for (const { button, label } of OPTION_CONTROLS) {
+    for (const { button, label } of ALL_CONTROLS) {
         const start = dialog.indexOf(`id="${button}"`);
         assert.ok(start > 0, `#${button} ausente`);
         const block = dialog.slice(start, dialog.indexOf('</button>', start));

@@ -62,7 +62,6 @@ import { createWaterfallSoundState, scanWaterfall, updateWaterfallSound, waterfa
 import {
     TOUCH_HOLD_MS,
     TOUCH_LOOK_SENSITIVITY,
-    TOUCH_STICK_RADIUS,
     isTouchDevice,
     lookAfterDrag,
     movementFromStick,
@@ -71,6 +70,7 @@ import {
     touchGesture,
 } from './world-touch-controls.js';
 import { getSharedAudio } from './world-audio.js';
+import { touchLayoutState, touchStickRadius } from './world-touch-layout.js';
 import { rightClickIntent } from './world-interaction-rules.js';
 import { loadGameSettings, onGameSettingsChange } from './world-game-settings.js';
 import { advanceStarvation, deathTitle, HUNGER_WARNINGS, hungerStage } from './world-survival-rules.js';
@@ -2694,6 +2694,19 @@ const touchLook = {
 // ligado, `updateTarget()` mira pela direção do dedo; soltar devolve a mira
 // para a câmera.
 const touchAim = { on: false, hit: null, dir: new THREE.Vector3() };
+// Layout de toque vindo das opções: multiplicador de tamanho (CSS
+// `--touch-scale`, que o joystick, os botões e a hotbar leem) e o lado em que
+// ficam os controles. É aplicado em `applyGameSettings`, que roda no começo e a
+// cada mudança — mexer no ESC muda na hora.
+let touchScale = 1;
+
+function applyTouchLayout(settings = GAME_SETTINGS) {
+    const state = touchLayoutState(settings);
+    touchScale = state.size;
+    document.body.classList.toggle('touch-left', state.lefty);
+    document.body.classList.toggle('touch-right', !state.lefty);
+    document.body.style.setProperty('--touch-scale', String(state.size));
+}
 
 function playing() {
     return Boolean(controls?.isLocked) || touchActive;
@@ -2811,6 +2824,9 @@ function applyGameSettings(settings, { quiet = false } = {}) {
     GAME_SETTINGS.sensitivity = settings.sensitivity;
     GAME_SETTINGS.fov = settings.fov;
     GAME_SETTINGS.volume = settings.volume;
+    // Toque: lado e tamanho dos controles valem na hora, inclusive com o dedo
+    // já no joystick (o raio é lido a cada movimento).
+    applyTouchLayout(settings);
     LOOK_SENSITIVITY = settings.sensitivity;
     audio.setVolume?.(settings.volume);
     const mode = QUALITY_FROM_SETTING[settings.graphics];
@@ -3845,7 +3861,11 @@ async function init() {
         if (!ui || !stick || !knob) return;
 
         function applyStick(dx, dy) {
-            const vector = stickVector(dx, dy, TOUCH_STICK_RADIUS);
+            // O raio cresce com o tamanho escolhido nas opções: empurrar "até o
+            // fim" tem de ser o mesmo gesto proporcional no joystick pequeno e
+            // no grande.
+            const radius = touchStickRadius(touchScale);
+            const vector = stickVector(dx, dy, radius);
             touchStick.x = vector.x;
             touchStick.y = vector.y;
             const move = movementFromStick(vector);
@@ -3855,7 +3875,7 @@ async function init() {
             moveRight = move.right;
             isSprinting = move.sprint;
             knob.style.transform =
-                `translate(${(vector.x * TOUCH_STICK_RADIUS).toFixed(1)}px, ${(vector.y * TOUCH_STICK_RADIUS).toFixed(1)}px)`;
+                `translate(${(vector.x * radius).toFixed(1)}px, ${(vector.y * radius).toFixed(1)}px)`;
         }
 
         function releaseStick() {

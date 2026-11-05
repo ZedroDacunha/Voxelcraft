@@ -30,6 +30,19 @@ export const GAME_SETTING_FIELDS = Object.freeze({
         default: 'auto',
         format: value => GAME_SETTING_FIELDS.graphics.labels[value] ?? 'Automática',
     }),
+    // Toque: de que lado ficam joystick e botões (canhoto troca tudo de lado) e
+    // o tamanho dos controles. Valem só no modo toque; no desktop não há o que
+    // mudar, mas a preferência fica guardada para o celular.
+    touchLayout: Object.freeze({
+        choices: Object.freeze(['right', 'left']),
+        labels: Object.freeze({ right: 'Destro', left: 'Canhoto' }),
+        default: 'right',
+        format: value => GAME_SETTING_FIELDS.touchLayout.labels[value] ?? 'Destro',
+    }),
+    touchButtonSize: Object.freeze({
+        min: 0.8, max: 1.4, step: 0.1, default: 1,
+        format: value => `${Math.round(value * 100)}%`,
+    }),
 });
 
 export const DEFAULT_GAME_SETTINGS = Object.freeze(Object.fromEntries(

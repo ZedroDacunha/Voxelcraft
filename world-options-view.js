@@ -15,6 +15,13 @@ export const OPTION_CONTROLS = [
     { key: 'graphics', button: 'opt-graphics', output: 'opt-graphics-value', label: 'Gráficos' },
 ];
 
+// Os controles de toque moram numa sub-tela do mesmo diálogo (o botão "Toque"
+// troca a grade no lugar). Duas janelas empilhadas nunca: é a regra do menu.
+export const TOUCH_OPTION_CONTROLS = [
+    { key: 'touchLayout', button: 'opt-touch-layout', output: 'opt-touch-layout-value', label: 'Mão' },
+    { key: 'touchButtonSize', button: 'opt-touch-size', output: 'opt-touch-size-value', label: 'Tamanho dos botões' },
+];
+
 // Onde o ponteiro caiu na barra, de 0 (esquerda) a 1 (direita). Barra sem
 // largura (tela escondida) não muda nada: devolve null.
 function fractionFromPointer(event, element) {
@@ -27,9 +34,10 @@ export function createOptionsView(dialog = document.getElementById('options-dial
     if (!dialog) return null;
 
     // Campo com faixa numérica é barra arrastável (role="slider"); campo de
-    // lista (gráficos) é botão: cada clique passa para o modo seguinte, como no
-    // Minecraft — arrastar numa lista de quatro modos só daria saltos.
-    const rows = OPTION_CONTROLS.map(({ key, button, output, label }) => {
+    // lista (gráficos, mão) é botão: cada clique passa para o modo seguinte,
+    // como no Minecraft — arrastar numa lista de dois ou quatro modos só daria
+    // saltos.
+    const buildRows = (list) => list.map(({ key, button, output, label }) => {
         const buttonEl = dialog.querySelector(`#${button}`);
         const field = GAME_SETTING_FIELDS[key];
         if (!buttonEl || !field) return null;
@@ -42,7 +50,38 @@ export function createOptionsView(dialog = document.getElementById('options-dial
         return { key, field, label, slider, buttonEl, outputEl: dialog.querySelector(`#${output}`) };
     }).filter(Boolean);
 
+    const rows = [...buildRows(OPTION_CONTROLS), ...buildRows(TOUCH_OPTION_CONTROLS)];
+
+    // A sub-tela de toque troca a grade e o título no mesmo diálogo; "Voltar"
+    // devolve a grade principal. O resumo no botão evita ter de abrir a tela
+    // para saber como os controles estão.
+    const mainGrid = dialog.querySelector('#options-main-grid');
+    const touchGrid = dialog.querySelector('#options-touch-grid');
+    const controlsDetails = dialog.querySelector('.options-controls');
+    const title = dialog.querySelector('#options-title');
+    const backButton = dialog.querySelector('#btn-options-back');
+    const touchSummary = dialog.querySelector('#opt-touch-summary');
+    const touchEntry = dialog.querySelector('#opt-touch-open');
+
+    function showTouchScreen(open) {
+        if (!touchGrid || !mainGrid) return;
+        mainGrid.hidden = open;
+        touchGrid.hidden = !open;
+        if (controlsDetails) controlsDetails.hidden = open;
+        if (backButton) backButton.hidden = !open;
+        if (title) title.textContent = open ? 'Opções de toque' : 'Opções';
+        if (touchEntry) touchEntry.setAttribute('aria-expanded', String(open));
+        // Ao voltar, o foco vai para o botão que abriu a sub-tela. Ao fechar o
+        // diálogo não: quem devolve o foco ao que estava atrás é o navegador, e
+        // roubar o foco para um botão invisível deixaria o teclado perdido.
+        if (open) dialog.querySelector('#opt-touch-layout')?.focus?.();
+        else if (dialog.open) touchEntry?.focus?.();
+    }
+
     const render = (settings) => {
+        if (touchSummary) {
+            touchSummary.textContent = `${formatSetting('touchLayout', settings.touchLayout)} · ${formatSetting('touchButtonSize', settings.touchButtonSize)}`;
+        }
         for (const row of rows) {
             const value = settings[row.key];
             const text = formatSetting(row.key, value);
@@ -110,6 +149,12 @@ export function createOptionsView(dialog = document.getElementById('options-dial
             }
         });
     }
+
+    touchEntry?.addEventListener('click', () => showTouchScreen(true));
+    backButton?.addEventListener('click', () => showTouchScreen(false));
+    // Fechar e reabrir as opções sempre volta para a grade principal: quem
+    // abriu no ESC para ver o volume não quer cair na tela de toque.
+    dialog.addEventListener('close', () => showTouchScreen(false));
 
     dialog.querySelector('#btn-options-reset')?.addEventListener('click', () => {
         current = saveGameSettings(DEFAULT_GAME_SETTINGS);
