@@ -1285,3 +1285,78 @@ test('os três da noite não são clones: cada um tem seu tom', () => {
     const cores = system.entities.map(e => e.bodyMaterial.color.getHexString());
     assert.equal(new Set(cores).size, CREATURE_LIMIT, `tons diferentes (${cores.join(', ')})`);
 });
+
+// ------------------------------------------------ asas de mariposa
+
+const dentroDaAsa = (wing, nome) => wing.children.filter(c => c.name === nome);
+
+test('as asas de mariposa têm duas peças, borda escura e mancha em cada lado', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 14 });
+    const creature = spawnOne(system, world, clock, player);
+
+    for (const asa of [creature.leftWing, creature.rightWing]) {
+        assert.equal(dentroDaAsa(asa, 'forewing').length, 1, 'asa dianteira');
+        assert.equal(dentroDaAsa(asa, 'hindwing').length, 1, 'asa traseira');
+        assert.equal(dentroDaAsa(asa, 'wing-edge').length, 1, 'borda escura');
+        assert.equal(dentroDaAsa(asa, 'wing-spot').length, 1, 'mancha clara');
+    }
+
+    // A borda é escura de verdade e a mancha é clara: é o contraste que desenha a asa.
+    const soma = cor => cor.r + cor.g + cor.b;
+    const borda = dentroDaAsa(creature.leftWing, 'wing-edge')[0].material;
+    const mancha = dentroDaAsa(creature.leftWing, 'wing-spot')[0].material;
+    assert.ok(soma(borda.color) < soma(mancha.color), 'borda escura contra mancha clara');
+    assert.equal(borda.transparent, false, 'a borda é opaca');
+});
+
+test('a asa gira no ombro: a ponta percorre o arco inteiro', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 14 });
+    const creature = spawnOne(system, world, clock, player);
+
+    // O pivô fica no ombro, junto do corpo — não no meio da asa.
+    assert.ok(Math.abs(creature.leftWing.position.x) < 0.25, 'pivô no ombro');
+    assert.ok(Math.abs(creature.rightWing.position.x) < 0.25, 'pivô no ombro');
+
+    // Envergadura de mariposa: ponta a ponta passa de 0,9 (era 0,82 na placa antiga).
+    const caixa = new THREE.Box3().setFromObject(creature.group);
+    assert.ok(caixa.max.x - caixa.min.x > 0.9,
+        `asas abertas (envergadura ${(caixa.max.x - caixa.min.x).toFixed(2)})`);
+
+    // Girar o ombro mexe a ponta: a asa sobe e desce de verdade.
+    const ponta = dentroDaAsa(creature.leftWing, 'forewing')[0];
+    const alturaDaPonta = () => {
+        creature.group.updateMatrixWorld(true);
+        return ponta.localToWorld(new THREE.Vector3(0, 0, 0)).y;
+    };
+    const antes = alturaDaPonta();
+    creature.leftWing.rotation.z = 0.5;
+    const depois = alturaDaPonta();
+    assert.ok(Math.abs(depois - antes) > 0.05, 'a ponta se move ao girar o ombro');
+});
+
+test('a asa de trás acompanha o bater com atraso', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock);
+    const player = walkerPlayer({ x: 0, y: GROUND + 1, z: 0 });
+    const creature = spawnOne(system, world, clock, player);
+
+    let articulou = false;
+    for (let i = 0; i < 30 && !articulou; i++) {
+        clock.t += 0.05;
+        system.update(0.05, player, true);
+        if (Math.abs(creature.leftHind.rotation.z) > 0.01) articulou = true;
+    }
+    assert.ok(articulou, 'a traseira tem rotação própria (articulação)');
+    // E o sinal é oposto ao do pivô: ela "atrasa" o bater da dianteira.
+    const pivo = creature.leftWing.rotation.z;
+    const traseira = creature.leftHind.rotation.z;
+    assert.ok(Math.sign(pivo) !== Math.sign(traseira) || Math.abs(traseira) < 0.02,
+        'a traseira vai para o lado oposto ao da dianteira');
+});

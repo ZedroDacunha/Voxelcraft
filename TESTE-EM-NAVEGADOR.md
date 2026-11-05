@@ -103,6 +103,9 @@ aparelho do jogador.
 - [ ] Eles andam, pulam degraus e chiam.
 - [ ] De perto, o bicho tem **orelhas, focinho, pés no chão e cauda**, e a luzinha
       fica na ponta de uma antena (não boiando acima da cabeça).
+- [ ] As asas são de mariposa: **duas peças** por lado (dianteira maior com mancha
+      clara, traseira menor atrás), borda escura na ponta, e elas **articulam no
+      ombro** — a de trás acompanha o bater com atraso.
 - [ ] À noite os **olhos acendem** (duas luzinhas âmbar) e ele **pisca** de vez em
       quando; de dia os olhos são só dois pontos escuros.
 - [ ] Os três da noite não têm exatamente a mesma cor.

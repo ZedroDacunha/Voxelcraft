@@ -494,12 +494,29 @@ export function createCreatureSystemClass({
             const rightEye = this.addPart(group, eye, 0.078, 0.47, 0.252, 0.055, 0.075, 0.03);
             leftEye.name = 'eye';
             rightEye.name = 'eye';
-            const leftWing = this.addPart(group, this.materials.wing, -0.29, 0.32, -0.015, 0.24, 0.12, 0.035);
-            const rightWing = this.addPart(group, this.materials.wing, 0.29, 0.32, -0.015, 0.24, 0.12, 0.035);
+            // Asas de mariposa. Cada lado é um conjunto preso no **ombro** (antes
+            // era uma placa girando em torno do próprio meio, e a ponta mal se mexia):
+            // asa dianteira maior, traseira menor e articulada, borda escura e a
+            // mancha clara — é o que dá recorte de asa contra o céu da noite.
+            const leftWing = new THREE.Group();
+            leftWing.position.set(-0.23, 0.34, -0.01);
             leftWing.rotation.z = -0.25;
-            rightWing.rotation.z = 0.25;
             leftWing.name = 'wing';
+            const rightWing = new THREE.Group();
+            rightWing.position.set(0.23, 0.34, -0.01);
+            rightWing.rotation.z = 0.25;
             rightWing.name = 'wing';
+            group.add(leftWing, rightWing);
+            const montarAsa = (pivot, lado) => {
+                this.addPart(pivot, this.materials.wing, lado * 0.12, 0, 0, 0.26, 0.13, 0.035).name = 'forewing';
+                const traseira = this.addPart(pivot, this.materials.wing, lado * 0.09, -0.09, -0.035, 0.20, 0.10, 0.03);
+                traseira.name = 'hindwing';
+                this.addPart(pivot, this.materials.eye, lado * 0.245, 0, 0, 0.03, 0.13, 0.038).name = 'wing-edge';
+                this.addPart(pivot, this.materials.belly, lado * 0.13, 0.01, 0.019, 0.07, 0.07, 0.006).name = 'wing-spot';
+                return traseira;
+            };
+            const leftHind = montarAsa(leftWing, -1);
+            const rightHind = montarAsa(rightWing, 1);
             // Pés: encostam no chão, então ele pisa em vez de flutuar.
             this.addPart(group, body, -0.13, 0.06, 0.07, 0.09, 0.09, 0.15).name = 'foot';
             this.addPart(group, body, 0.13, 0.06, 0.07, 0.09, 0.09, 0.15).name = 'foot';
@@ -511,7 +528,7 @@ export function createCreatureSystemClass({
             const glowMesh = this.addPart(group, this.materials.glow, 0, 0.665, 0.06, 0.055, 0.055, 0.055);
             glowMesh.name = 'lantern';
             return {
-                group, leftWing, rightWing, torso,
+                group, leftWing, rightWing, leftHind, rightHind, torso,
                 bodyMaterial: body, eyeMaterial: eye,
                 eyeMeshes: [leftEye, rightEye], glowMesh,
             };
@@ -858,9 +875,11 @@ export function createCreatureSystemClass({
                     e.group.position.set(e.x, e.leaveFromY + LEAVE_RISE * gone, e.z);
                     e.group.scale.setScalar(Math.max(0.02, 1 - gone));
                     e.group.rotation.x = -0.4 * gone;
-                    const flap = Math.sin(at * 30 + e.phase) * 0.55;
+                    const flap = Math.sin(at * 30 + e.phase) * 0.35;
                     e.leftWing.rotation.z = -0.1 + flap;
                     e.rightWing.rotation.z = 0.1 - flap;
+                    e.leftHind.rotation.z = flap * 0.3;
+                    e.rightHind.rotation.z = -flap * 0.3;
                     // O dia chegou: a luzinha apaga junto com ele (antes ela
                     // ficava acesa até o bicho sumir).
                     const flashSaindo = Math.max(0, (e.hurtUntil - at) / HURT_FLASH);
@@ -1017,12 +1036,18 @@ export function createCreatureSystemClass({
                 const flapSpeed = airborne
                     ? (crossFlight ? 13 : 26)
                     : (gliding ? 5 : (fleeing ? 22 : 8));
+                // Amplitudes menores que as de antes: com o pivô no ombro a ponta
+                // da asa percorre o dobro, e o bater exagerado virava borboleta.
                 const flapAmp = airborne
-                    ? (crossFlight ? 0.3 : 0.5)
-                    : (gliding ? 0.07 : (fleeing ? 0.36 : 0.18));
+                    ? (crossFlight ? 0.2 : 0.32)
+                    : (gliding ? 0.05 : (fleeing ? 0.24 : 0.12));
                 const flap = Math.sin(at * flapSpeed + e.phase) * flapAmp;
                 e.leftWing.rotation.z = -wingBase + flap;
                 e.rightWing.rotation.z = wingBase - flap;
+                // A asa de trás acompanha o bater com atraso (articulação): sem
+                // isso as duas peças giram juntas e o conjunto vira um remo.
+                e.leftHind.rotation.z = flap * 0.3;
+                e.rightHind.rotation.z = -flap * 0.3;
             }
         }
     }
