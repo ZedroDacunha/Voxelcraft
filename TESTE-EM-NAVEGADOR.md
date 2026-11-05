@@ -479,6 +479,15 @@ vez de aparecer parada ao lado — então o teste é esperar e procurar.
 - [ ] As quatro patas têm **casco escuro** na ponta, e o casco anda junto com a
       pata no passo (não fica plantado no chão).
 - [ ] De perto a ovelha tem uns 1,05 bloco de altura: dá para ver por cima dela.
+- [ ] De vez em quando ela **para de andar**, abaixa a cabeça até encostar no
+      chão, mastiga e fica 4–6 s assim (a primeira vez vem logo depois de nascer;
+      depois, a cada 30–60 s). Pastando, ela não anda nem desliza.
+- [ ] Quando a cabeça chega no chão, a grama **à frente do focinho** vira
+      **terra**, e a touceira de grama alta que estava nela desaparece.
+- [ ] Em cima de areia, pedra ou terra batida ela abaixa a cabeça e **nada
+      muda** — ovelha come grama, não praia.
+- [ ] A terra comida **volta a ser grama em 5 a 10 minutos** (deixe a tela
+      aberta e volte). Se você puser outro bloco no lugar, o seu bloco fica.
 - [ ] Chegar correndo, de perto, agachado ou não, **não espanta** a ovelha: é
       mansa (o susto só entra na parte 6).
 - [ ] Subir um degrau de **um** bloco ela sobe; um barranco de dois ela contorna.
@@ -546,6 +555,7 @@ O chat é a única porta para comandos no jogo (não há console no navegador).
 | Porta com faixa escura no meio | A arte tem que ser desenhada na folha inteira (32×64) e recortada nas metades: `tests/door-texture.test.mjs` reprova costura, painel torto e ferragem do lado errado |
 | Nenhuma ovelha aparece | É dia? (`worldSky.day` acima de 0,45). O chão em volta é grama? Já existem quatro vivas? Veja `tests/sheep.test.mjs` — ele cobre nascimento, cores, passeio e o corpo caixa por caixa |
 | Ovelha sem casco, sem brilho no olho ou com a lã lisa demais | O modelo é montado em `createModel` com `SHEEP_TUFTS`, casco e brilho: `tests/sheep.test.mjs` conta os tufos, os cascos, os brilhos e confere que o casco toca o chão |
+| Ovelha mexendo a cabeça sem parar, ou abaixando sem comer nada | Só pasta de vez em quando e só come grama: `tests/sheep.test.mjs` confere o pasto (para, baixa, come a célula da frente) e o crescimento em 5–10 min |
 | Ovelha flutuando ou afundada | O modelo tem o pé em `y = 0` e o grupo é posto na altura do chão: `groundTypeAt`/`surfaceAt` em `world-creature-base.js` |
 | Ovelha atravessando água ou encosta | `stepToward` (na base) recusa o passo quando o chão à frente não serve; o teste "barrada por uma encosta" cobre |
 | T não abre o chat | O mouse está capturado? (T só vale com o jogo rodando). Alguma extensão do navegador com atalho em T? Veja `tests/chat.test.mjs` |

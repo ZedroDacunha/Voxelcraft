@@ -5,6 +5,19 @@ import * as THREE from '../vendor/three/three.module.js';
 import { BLOCKS, ID } from '../world-catalog.js';
 import {
     SHEEP_COATS,
+    SHEEP_GRAZE_BITE,
+    SHEEP_GRAZE_FIRST_MAX,
+    SHEEP_GRAZE_FIRST_MIN,
+    SHEEP_GRAZE_REST_MAX,
+    SHEEP_GRAZE_REST_MIN,
+    SHEEP_GRAZE_REACH,
+    SHEEP_GRAZE_TIME_MAX,
+    SHEEP_GRAZE_TIME_MIN,
+    SHEEP_HEAD_REST,
+    headPoseFor,
+    SHEEP_NECK_Y,
+    SHEEP_REGROW_LIMIT,
+    SHEEP_REGROW_MIN,
     SHEEP_DAY_THRESHOLD,
     SHEEP_DESPAWN_DISTANCE,
     SHEEP_LEG_SWING,
@@ -20,6 +33,9 @@ import {
     SHEEP_WANDER_SPEED,
     coatFor,
     createSheepSystemClass,
+    grazeCellFor,
+    grazeDelayFor,
+    grazeEnvelope,
     isPastureTime,
     legPose,
     spawnPointFor,
@@ -33,18 +49,28 @@ const GROUND = 10; // `heightAt` devolve o bloco do topo; a ovelha anda em GROUN
 // teste do Mofim. `heightAt` e `groundType` podem ser trocados para montar
 // encostas, areia e água.
 function makeWorld({ heightAt = () => GROUND, groundType = () => ID.GRASS } = {}) {
-    return {
+    // `overrides` guarda o que o jogo mudou (grama comida, planta removida,
+    // terra que voltou a ser grama): o mundo começa plano e vai sendo editado.
+    const overrides = new Map();
+    const chave = (x, y, z) => `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+    const world = {
         seed: 4242,
         scene: new THREE.Scene(),
+        overrides,
         getChunk: () => ({}),
         generator: { heightAt: (x, z) => heightAt(x, z) },
         getBlock: (x, y, z) => {
             const gx = Math.floor(x), gz = Math.floor(z);
-            const ground = heightAt(gx, gz);
-            if (y === ground) return groundType(gx, gz);
-            return 0;
+            const mudado = overrides.get(chave(gx, y, gz));
+            if (mudado !== undefined) return mudado;
+            return y === heightAt(gx, gz) ? groundType(gx, gz) : 0;
+        },
+        setBlock: (x, y, z, type) => {
+            overrides.set(chave(x, y, z), type);
+            return true;
         },
     };
+    return world;
 }
 
 function makeSystem(world, clock) {
@@ -366,14 +392,18 @@ test('o corpo é de caixas: miolo de lã com tufos, cara, orelhas, quatro patas 
 
     const nomes = sheep.group.children.map(child => child.name);
     assert.equal(nomes.filter(nome => nome === 'leg').length, 4, 'quatro patas');
-    assert.equal(nomes.filter(nome => nome === 'ear').length, 2, 'duas orelhas, uma de cada lado');
-    assert.equal(nomes.filter(nome => nome === 'eye').length, 2, 'dois olhos');
-    assert.equal(nomes.filter(nome => nome === 'glint').length, 2, 'um brilho em cada olho');
     assert.equal(nomes.filter(nome => nome === 'tuft').length, SHEEP_TUFTS.length, 'a lã é feita de tufos');
     assert.ok(SHEEP_TUFTS.length >= 6, 'a silhueta fofinha precisa de vários tufos, não de um');
-    for (const parte of ['body', 'head', 'topknot', 'muzzle', 'tail']) {
+    for (const parte of ['body', 'head', 'tail']) {
         assert.ok(nomes.includes(parte), `falta a peça ${parte}`);
     }
+    // A cabeça é um grupo com o pivô no pescoço: é o que deixa o focinho descer
+    // para pastar sem a cara se desmontar.
+    const cara = sheep.head.children.map(child => child.name);
+    for (const parte of ['skull', 'topknot', 'muzzle']) assert.ok(cara.includes(parte), `falta a peça ${parte}`);
+    assert.equal(cara.filter(nome => nome === 'ear').length, 2, 'duas orelhas, uma de cada lado');
+    assert.equal(cara.filter(nome => nome === 'eye').length, 2, 'dois olhos');
+    assert.equal(cara.filter(nome => nome === 'glint').length, 2, 'um brilho em cada olho');
     // Cada pata leva a canela e o casco dentro (e é isso que gira no passo).
     for (const leg of sheep.legs) {
         const dentro = leg.children.map(child => child.name).sort();
@@ -423,8 +453,11 @@ test('a ovelha pisa no chão: o ponto mais baixo do corpo é o casco', () => {
         const fundo = leg.position.y + hoof.position.y - hoof.scale.y / 2;
         assert.ok(Math.abs(fundo) < 1e-9, `casco a ${fundo} do chão`);
     }
-    // Altura total de uma ovelha adulta de caixa: perto de um bloco.
-    assert.ok(sheep.head.position.y + 0.25 > 0.9, 'a cabeça fica quase na altura de um bloco');
+    // Altura total de uma ovelha adulta de caixa: perto de um bloco (o topo do
+    // topete fica em 1,05 — o jogador tem 1,8 e vê por cima dela).
+    const topete = sheep.head.children.find(child => child.name === 'topknot');
+    const topo = sheep.head.position.y + topete.position.y + topete.scale.y / 2;
+    assert.ok(Math.abs(topo - 1.05) < 0.02, `o topo da ovelha está em ${topo}, e devia ser ~1,05`);
 });
 
 test('cada cor pinta o corpo com o tom da sua lã', () => {
@@ -482,4 +515,244 @@ test('a ovelha não herda o susto do Mofim', () => {
     assert.equal(sheep.scaredUntil, undefined);
     for (let i = 0; i < 20; i++) { clock.t += 0.05; system.update(0.05, idlePlayer({ x: sheep.x, z: sheep.z }), true, { day: 1 }); }
     assert.equal(sheep.scaredUntil, undefined, 'nada de pânico: ela é mansa');
+});
+
+// ------------------------------------------------ pastar (puro)
+
+test('o focinho alcança a célula da frente, conforme o rumo dela', () => {
+    // O modelo olha para +z, e o rumo é o mesmo do `rotation.y`.
+    assert.deepEqual(grazeCellFor({ x: 0.5, z: 0.5, heading: 0 }), { x: 0, z: 1 }, 'rumo +z, come a célula de z+1');
+    const leste = grazeCellFor({ x: 0.5, z: 0.5, heading: Math.PI / 2 });
+    assert.deepEqual(leste, { x: 1, z: 0 }, 'rumo +x, come a célula de x+1');
+
+    // A célula é a do chão, não a do corpo: o alcance é menor que um bloco.
+    assert.ok(SHEEP_GRAZE_REACH > 0.5 && SHEEP_GRAZE_REACH < 1.2);
+    assert.deepEqual(
+        grazeCellFor({ x: 0.5, z: 0.5, heading: Math.PI }),
+        { x: 0, z: 0 - 1 },
+        'de costas, come a célula de trás (o focinho está virado para lá)',
+    );
+});
+
+test('a cabeça desce, fica embaixo e sobe: o envelope da pastagem', () => {
+    assert.equal(grazeEnvelope(0), 0, 'começa em pé');
+    assert.equal(grazeEnvelope(1), 0, 'termina em pé');
+    assert.equal(grazeEnvelope(0.5), 1, 'no meio do pasto, a cabeça está no chão');
+    assert.ok(grazeEnvelope(0.1) > 0 && grazeEnvelope(0.1) < 1, 'desce aos poucos, não de estalo');
+    assert.ok(grazeEnvelope(0.9) > 0 && grazeEnvelope(0.9) < 1, 'sobe aos poucos');
+    // Desce até o meio e sobe depois: o fundo é plano (é onde ela mastiga).
+    for (let p = 0.2; p <= 0.8; p += 0.1) assert.equal(grazeEnvelope(p), 1, `plano em ${p}`);
+});
+
+test('a primeira pastagem vem cedo; as outras, de vez em quando', () => {
+    assert.equal(grazeDelayFor(0, true), SHEEP_GRAZE_FIRST_MIN);
+    assert.equal(grazeDelayFor(1, true), SHEEP_GRAZE_FIRST_MAX);
+    assert.equal(grazeDelayFor(0, false), SHEEP_GRAZE_REST_MIN);
+    assert.equal(grazeDelayFor(1, false), SHEEP_GRAZE_REST_MAX);
+    assert.ok(SHEEP_GRAZE_FIRST_MIN < SHEEP_GRAZE_REST_MIN, 'a primeira é mais cedo que as seguintes');
+    assert.ok(SHEEP_GRAZE_REST_MIN >= 30, 'pastar é raro: pelo menos meio minuto entre uma vez e outra');
+    assert.ok(SHEEP_GRAZE_TIME_MIN >= 4 && SHEEP_GRAZE_TIME_MAX <= 6, 'cada pastagem dura 4–6 s');
+    assert.ok(SHEEP_GRAZE_BITE > 0 && SHEEP_GRAZE_BITE < 1, 'a mordida acontece dentro da pastagem');
+});
+
+// ------------------------------------------------ pastar (no mundo)
+
+// Põe a pastagem para começar neste instante e confirma que começou.
+function grazeNow(system, clock, player, sheep) {
+    sheep.grazeAt = clock.t;
+    system.update(0.016, player, true, { day: 1 });
+    assert.notEqual(sheep.grazeT, null, 'a ovelha deveria ter começado a pastar');
+    return grazeCellFor({ x: sheep.x, z: sheep.z, heading: sheep.heading });
+}
+
+// Roda até a mordida (ou desiste), devolvendo o tempo que passou.
+function grazeUntilBite(system, clock, player, sheep) {
+    for (let i = 0; i < 400 && !sheep.bit; i++) {
+        clock.t += 0.05;
+        system.update(0.05, player, true, { day: 1 });
+    }
+    assert.equal(sheep.bit, true, 'a mordida deveria ter acontecido');
+}
+
+test('pastando, ela para, baixa a cabeça e come a grama da frente', () => {
+    const world = makeWorld();
+    const clock = { t: 0 };
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, z: 0 });
+    const sheep = spawnOne(system, clock, player);
+
+    const cell = grazeNow(system, clock, player, sheep);
+    assert.equal(world.getBlock(cell.x, GROUND, cell.z), ID.GRASS, 'antes, é grama');
+
+    const ondeEstava = { x: sheep.x, z: sheep.z };
+    grazeUntilBite(system, clock, player, sheep);
+
+    assert.equal(world.getBlock(cell.x, GROUND, cell.z), ID.DIRT, 'a grama da frente virou terra');
+    assert.equal(world.getBlock(cell.x, GROUND + 1, cell.z), 0, 'e a célula de cima continua vazia');
+    assert.equal(sheep.x, ondeEstava.x, 'pastando, ela não anda');
+    assert.equal(sheep.z, ondeEstava.z, 'pastando, ela não anda');
+    // Cabeça baixa de verdade: o grupo do pescoço desceu e inclinou.
+    assert.ok(sheep.head.position.y < SHEEP_NECK_Y - 0.3, 'a cabeça desce quase meio bloco');
+    assert.ok(sheep.head.rotation.x > SHEEP_HEAD_REST + 0.8, 'o focinho inclina para o chão');
+});
+
+test('terminada a pastagem, a cabeça volta a subir e ela volta a andar', () => {
+    const world = makeWorld();
+    const clock = { t: 0 };
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, z: 0 });
+    const sheep = spawnOne(system, clock, player);
+
+    grazeNow(system, clock, player, sheep);
+    for (let i = 0; i < 400 && sheep.grazeT !== null; i++) {
+        clock.t += 0.05;
+        system.update(0.05, player, true, { day: 1 });
+    }
+    assert.equal(sheep.grazeT, null, 'a pastagem termina');
+    assert.equal(sheep.head.position.y, SHEEP_NECK_Y, 'a cabeça volta ao lugar');
+    assert.ok(Math.abs(sheep.head.rotation.x - SHEEP_HEAD_REST) < 0.1, 'e volta a inclinação de repouso');
+    assert.ok(sheep.grazeAt > clock.t, 'e fica um tempo sem pastar de novo');
+});
+
+test('ela morde uma vez por pastagem, não a cada quadro', () => {
+    const world = makeWorld();
+    const clock = { t: 0 };
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, z: 0 });
+    const sheep = spawnOne(system, clock, player);
+
+    grazeNow(system, clock, player, sheep);
+    grazeUntilBite(system, clock, player, sheep);
+    const primeira = system.regrow.length;
+    for (let i = 0; i < 40; i++) {
+        clock.t += 0.05;
+        system.update(0.05, player, true, { day: 1 });
+    }
+    assert.equal(system.regrow.length, primeira, 'a mesma pastagem não come duas células');
+    assert.ok(primeira <= 1, 'no máximo uma célula por mordida');
+});
+
+test('só come grama: areia e pedra ficam onde estão', () => {
+    const world = makeWorld();
+    const clock = { t: 0 };
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, z: 0 });
+    const sheep = spawnOne(system, clock, player);
+
+    const cell = grazeCellFor({ x: sheep.x, z: sheep.z, heading: sheep.heading });
+    world.setBlock(cell.x, GROUND, cell.z, ID.SAND);
+    assert.equal(world.getBlock(cell.x, GROUND, cell.z), ID.SAND);
+
+    grazeNow(system, clock, player, sheep);
+    grazeUntilBite(system, clock, player, sheep);
+    assert.equal(world.getBlock(cell.x, GROUND, cell.z), ID.SAND, 'areia não se come');
+    assert.equal(system.regrow.length, 0, 'e nada entra na fila de crescimento');
+});
+
+test('a touceira de grama alta em cima da grama comida sai junto', () => {
+    const world = makeWorld();
+    const clock = { t: 0 };
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, z: 0 });
+    const sheep = spawnOne(system, clock, player);
+
+    const cell = grazeCellFor({ x: sheep.x, z: sheep.z, heading: sheep.heading });
+    world.setBlock(cell.x, GROUND + 1, cell.z, ID.TALL_GRASS);
+
+    grazeNow(system, clock, player, sheep);
+    grazeUntilBite(system, clock, player, sheep);
+    assert.equal(world.getBlock(cell.x, GROUND, cell.z), ID.DIRT, 'a grama virou terra');
+    assert.equal(world.getBlock(cell.x, GROUND + 1, cell.z), 0, 'e a touceira foi comida');
+});
+
+test('a terra comida volta a ser grama entre cinco e dez minutos, e não antes', () => {
+    const world = makeWorld();
+    const clock = { t: 0 };
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, z: 0 });
+    const sheep = spawnOne(system, clock, player);
+
+    const cell = grazeNow(system, clock, player, sheep);
+    grazeUntilBite(system, clock, player, sheep);
+    assert.equal(system.regrow.length, 1, 'a célula comida entrou na fila');
+
+    // O prazo é sorteado entre cinco e dez minutos (valores escritos à mão de
+    // propósito: repetir a constante aqui não provaria nada).
+    const espera = system.regrow[0].at - clock.t;
+    assert.ok(espera > 298 && espera <= 601, `o crescimento demora ${espera.toFixed(1)} s, e devia ser 300–600`);
+    assert.ok(SHEEP_REGROW_MIN >= 300, 'cinco minutos é o mínimo');
+
+    // Um segundo antes do prazo, continua terra.
+    clock.t = system.regrow[0].at - 1;
+    system.update(0.016, player, true, { day: 1 });
+    assert.equal(world.getBlock(cell.x, GROUND, cell.z), ID.DIRT, 'antes do prazo, ainda é terra');
+
+    // No prazo, volta a ser grama e a célula sai da fila.
+    clock.t = system.regrow[0].at + 0.01;
+    system.update(0.016, player, true, { day: 1 });
+    assert.equal(world.getBlock(cell.x, GROUND, cell.z), ID.GRASS, 'no prazo, volta a ser grama');
+    assert.equal(system.regrow.length, 0, 'e a fila fica vazia');
+});
+
+test('onde o jogador construiu, a grama não volta', () => {
+    const world = makeWorld();
+    const clock = { t: 0 };
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, z: 0 });
+    const sheep = spawnOne(system, clock, player);
+
+    const cell = grazeNow(system, clock, player, sheep);
+    grazeUntilBite(system, clock, player, sheep);
+
+    // O jogador põe pedra no lugar da terra comida.
+    world.setBlock(cell.x, GROUND, cell.z, ID.STONE);
+    clock.t = system.regrow[0].at + 1;
+    system.update(0.016, player, true, { day: 1 });
+    assert.equal(world.getBlock(cell.x, GROUND, cell.z), ID.STONE, 'o bloco do jogador manda');
+    assert.equal(system.regrow.length, 0, 'e a célula sai da fila (não fica tentando para sempre)');
+});
+
+test('a fila de crescimento tem teto: pasto infinito não vira memória infinita', () => {
+    const world = makeWorld();
+    const clock = { t: 0 };
+    const system = makeSystem(world, clock);
+
+    for (let i = 0; i < SHEEP_REGROW_LIMIT + 40; i++) system.queueRegrow(i, GROUND, 0, clock.t);
+    assert.equal(system.regrow.length, SHEEP_REGROW_LIMIT, 'a fila para no teto');
+    assert.equal(system.regrow[system.regrow.length - 1].x, SHEEP_REGROW_LIMIT + 39, 'e as mais novas ficam');
+});
+
+test('com a cabeça no chão, o focinho encosta na grama da frente (sem entrar no bloco)', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const sheep = spawnOne(system, clock, idlePlayer({ x: 0, z: 0 })); // ovelha virada para +z do modelo
+
+    // Põe a cabeça na pose de pastagem completa, pela mesma função que o jogo usa.
+    const pose = headPoseFor(1);
+    sheep.head.rotation.x = pose.rotationX;
+    sheep.head.position.y = pose.y;
+    sheep.head.position.z = pose.z;
+    // Referência limpa: a ovelha na origem e virada para +z (sem o rumo do passeio).
+    sheep.group.position.set(0, 0, 0);
+    sheep.group.rotation.y = 0;
+    sheep.group.updateMatrixWorld(true);
+
+    const focinho = sheep.head.children.find(child => child.name === 'muzzle');
+    const onde = new THREE.Vector3();
+    focinho.getWorldPosition(onde);
+
+    // Encostado, não enterrado: o centro do focinho fica a meia altura dele.
+    assert.ok(onde.y > -0.02 && onde.y < 0.12, `o focinho está em y = ${onde.y.toFixed(3)}`);
+    // E à frente, sobre a célula que ela come (0,8 bloco à frente do centro).
+    assert.ok(onde.z > 0.45 && onde.z < 0.85, `o focinho está em z = ${onde.z.toFixed(3)}`);
+
+    // Em pé, o focinho está bem acima disso (é a diferença que se vê pastar).
+    const emPe = headPoseFor(0);
+    sheep.head.rotation.x = emPe.rotationX;
+    sheep.head.position.y = emPe.y;
+    sheep.head.position.z = emPe.z;
+    sheep.group.updateMatrixWorld(true);
+    const ondeEmPe = new THREE.Vector3();
+    focinho.getWorldPosition(ondeEmPe);
+    assert.ok(ondeEmPe.y - onde.y > 0.5, 'pastando, o focinho desce mais de meio bloco');
 });

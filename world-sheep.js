@@ -72,6 +72,44 @@ export const SHEEP_LEG_SWING = 0.5;
 export const SHEEP_HOP_TIME = 0.24;
 export const SHEEP_GLIDE_TIME = 0.3;
 
+// ---------------------------------------------------------------- pastar
+//
+// Ela come a grama **à frente do focinho**: para, abaixa a cabeça, morde o bloco
+// do chão logo adiante e ele vira terra. A terra volta a ser grama sozinha, entre
+// cinco e dez minutos — devagar o bastante para a marca do pasto durar, e sem
+// deixar o campo esburacado para sempre.
+
+/** A primeira pastagem chega antes: o jogador precisa ver acontecer. */
+export const SHEEP_GRAZE_FIRST_MIN = 8;
+export const SHEEP_GRAZE_FIRST_MAX = 20;
+/** Depois disso, ela pasta de vez em quando (segundos entre uma e outra). */
+export const SHEEP_GRAZE_REST_MIN = 30;
+export const SHEEP_GRAZE_REST_MAX = 60;
+/** Quanto tempo fica com a cabeça baixa em cada pastagem (segundos). */
+export const SHEEP_GRAZE_TIME_MIN = 4;
+export const SHEEP_GRAZE_TIME_MAX = 6;
+/** Onde, dentro da pastagem, a mordida acontece (fração do tempo). */
+export const SHEEP_GRAZE_BITE = 0.45;
+/** Que fração do começo e do fim ela leva para descer e subir a cabeça. */
+export const SHEEP_GRAZE_DIP = 0.2;
+/** Até onde o focinho alcança, à frente do centro dela (blocos). */
+export const SHEEP_GRAZE_REACH = 0.8;
+
+/** Pivô do pescoço: a cabeça gira e desce em volta daqui. */
+export const SHEEP_NECK_Y = 0.68;
+export const SHEEP_NECK_Z = 0.4;
+/** Inclinação da cabeça em repouso (radianos) — a mesma de antes do pasto. */
+export const SHEEP_HEAD_REST = 0.1;
+/** Quanto a cabeça desce e quanto o focinho inclina na pastagem completa. */
+export const SHEEP_HEAD_DROP = 0.36;
+export const SHEEP_HEAD_TILT = 1.0;
+
+/** A grama comida volta a crescer entre cinco e dez minutos (segundos). */
+export const SHEEP_REGROW_MIN = 300;
+export const SHEEP_REGROW_MAX = 600;
+/** Quantas células ficam na fila de crescimento; as mais antigas saem. */
+export const SHEEP_REGROW_LIMIT = 128;
+
 // ---------------------------------------------------------------- a arte da ovelha
 //
 // Medidas em blocos, com o **pé no y = 0** (o grupo é posto na altura do chão).
@@ -191,6 +229,57 @@ export function legPose(stride) {
     return [swing, -swing, -swing, swing];
 }
 
+/**
+ * A célula de chão que o focinho alcança, dado o rumo dela.
+ *
+ * `heading` é o mesmo ângulo do `group.rotation.y`: o modelo olha para +z, então
+ * à frente é `(sin, cos)`. Função pura de propósito — o teste confere a conta sem
+ * precisar de mundo nem de THREE.
+ */
+export function grazeCellFor({ x, z, heading, reach = SHEEP_GRAZE_REACH }) {
+    return {
+        x: Math.floor(x + Math.sin(heading) * reach),
+        z: Math.floor(z + Math.cos(heading) * reach),
+    };
+}
+
+/**
+ * O quanto a cabeça está abaixada dentro da pastagem: 0 no começo, 1 no meio,
+ * 0 no fim. Ela desce nos primeiros 20% do tempo, fica embaixo e sobe nos
+ * últimos 20% — o miolo parado é onde acontece a mordida.
+ */
+export function grazeEnvelope(progress) {
+    const p = Math.min(1, Math.max(0, Number(progress) || 0));
+    if (p <= 0 || p >= 1) return 0;
+    if (p < SHEEP_GRAZE_DIP) return p / SHEEP_GRAZE_DIP;
+    if (p > 1 - SHEEP_GRAZE_DIP) return (1 - p) / SHEEP_GRAZE_DIP;
+    return 1;
+}
+
+/**
+ * A pose da cabeça para um envelope de pastagem (0 em pé, 1 com o focinho no
+ * chão). Fica numa função só porque o teste e a animação precisam da mesma
+ * conta: com o pescoço em `SHEEP_NECK_Y`, descer `SHEEP_HEAD_DROP` e inclinar
+ * `SHEEP_HEAD_TILT` deixa o focinho encostado na grama da frente.
+ */
+export function headPoseFor(envelope) {
+    const e = Math.min(1, Math.max(0, Number(envelope) || 0));
+    return {
+        rotationX: SHEEP_HEAD_REST + SHEEP_HEAD_TILT * e,
+        y: SHEEP_NECK_Y - SHEEP_HEAD_DROP * e,
+        z: SHEEP_NECK_Z + 0.04 * e,
+    };
+}
+
+/** Quanto tempo até a próxima pastagem, a partir de um sorteio de 0 a 1. */
+export function grazeDelayFor(roll, first = false) {
+    const r = Math.min(1, Math.max(0, Number(roll) || 0));
+    const [min, max] = first
+        ? [SHEEP_GRAZE_FIRST_MIN, SHEEP_GRAZE_FIRST_MAX]
+        : [SHEEP_GRAZE_REST_MIN, SHEEP_GRAZE_REST_MAX];
+    return min + r * (max - min);
+}
+
 export function createSheepSystemClass({
     THREE,
     ID,
@@ -207,6 +296,8 @@ export function createSheepSystemClass({
             super(world);
             this.nextSpawnAt = 0;
             this.spawnAttempt = 0;
+            // Células de grama comida esperando crescer de volta (5–10 min).
+            this.regrow = [];
             // Pele do focinho, olho e casco: iguais em todas, então são
             // compartilhados. A lã é uma por cor e também é compartilhada (a
             // ovelha não pisca nem leva golpe neste recorte: nada pinta o corpo
@@ -233,8 +324,9 @@ export function createSheepSystemClass({
          * ovelha a vinte blocos de distância.
          *
          * Cada peça tem um trabalho e um nome, porque o teste e a animação
-         * dependem deles: `body` (miolo), `tuft`, `head`, `topknot`, `muzzle`,
-         * `eye`, `glint`, `ear`, `leg` (com `shin` e `hoof` dentro), `tail`.
+         * dependem deles: `body` (miolo), `tuft`, `head` (o grupo do pescoço, com
+         * `skull`, `topknot`, `muzzle`, `eye`, `glint` e `ear` dentro),
+         * `leg` (com `shin` e `hoof` dentro) e `tail`.
          *
          * As patas são **grupos** com o pivô no quadril: ao girar, a pata e o
          * casco andam juntos, como perna de verdade — antes a caixa girava no
@@ -254,24 +346,36 @@ export function createSheepSystemClass({
                 tuft.x, tuft.y, tuft.z, tuft.sx, tuft.sy, tuft.sz, wool, 'tuft',
             ));
 
-            // Cabeça, topete e cara.
-            const head = part(0, 0.8, 0.52, 0.36, 0.32, 0.32, wool, 'head');
-            head.rotation.x = 0.1;
-            part(0, 0.99, 0.48, 0.2, 0.12, 0.18, wool, 'topknot');
-            part(0, 0.73, 0.7, 0.24, 0.16, 0.06, this.materials.skin, 'muzzle');
+            // A cabeça é um **grupo** com o pivô no pescoço, e não peças soltas:
+            // é o que permite baixar o focinho até o chão para pastar sem a cara
+            // se desmontar. As posições aqui dentro são relativas ao pescoço.
+            const head = new THREE.Group();
+            head.name = 'head';
+            head.position.set(0, SHEEP_NECK_Y, SHEEP_NECK_Z);
+            head.rotation.x = SHEEP_HEAD_REST;
+            group.add(head);
+            const naCabeca = (x, y, z, sx, sy, sz, material, name) => {
+                const mesh = this.addPart(head, material, x, y - SHEEP_NECK_Y, z - SHEEP_NECK_Z, sx, sy, sz);
+                mesh.name = name;
+                return mesh;
+            };
+
+            naCabeca(0, 0.8, 0.52, 0.36, 0.32, 0.32, wool, 'skull');
+            naCabeca(0, 0.99, 0.48, 0.2, 0.12, 0.18, wool, 'topknot');
+            naCabeca(0, 0.73, 0.7, 0.24, 0.16, 0.06, this.materials.skin, 'muzzle');
 
             const eyes = [];
             const glints = [];
             for (const side of [1, -1]) {
-                eyes.push(part(side * 0.11, 0.85, 0.69, 0.06, 0.06, 0.03, this.materials.eye, 'eye'));
+                eyes.push(naCabeca(side * 0.11, 0.85, 0.69, 0.06, 0.06, 0.03, this.materials.eye, 'eye'));
                 // O brilho fica no canto de cima do olho, do mesmo lado.
-                glints.push(part(side * 0.095, 0.87, 0.705, 0.02, 0.02, 0.02, this.materials.glint, 'glint'));
+                glints.push(naCabeca(side * 0.095, 0.87, 0.705, 0.02, 0.02, 0.02, this.materials.glint, 'glint'));
             }
 
             // Orelhas: deitadas para os lados e caídas. É a diferença de leitura
             // mais barata entre a ovelha e qualquer outro bicho de caixa.
             const ears = [1, -1].map(side => {
-                const ear = part(side * 0.26, 0.8, 0.48, 0.28, 0.07, 0.12, wool, 'ear');
+                const ear = naCabeca(side * 0.26, 0.8, 0.48, 0.28, 0.07, 0.12, wool, 'ear');
                 ear.rotation.z = -side * 0.34;
                 return ear;
             });
@@ -294,6 +398,61 @@ export function createSheepSystemClass({
             const tail = part(0, 0.78, -0.5, 0.14, 0.16, 0.12, wool, 'tail');
 
             return { group, head, tufts, eyes, glints, ears, legs, tail, coat: coatKey };
+        }
+
+        // ------------------------------------------------------------ pastar
+
+        /**
+         * Come a grama à frente do focinho: o bloco do chão vira terra e a grama
+         * alta que estiver nele sai. Devolve `true` se comeu.
+         *
+         * Nunca come no escuro: só grama. Areia, pedra e terra viram um "não" —
+         * é o que impede a ovelha de "comer" a praia.
+         */
+        eatAhead(entity, at) {
+            const cell = grazeCellFor({ x: entity.x, z: entity.z, heading: entity.heading });
+            const front = this.surfaceAt(cell.x, cell.z);
+            if (front === null) return false;
+            const gy = front - 1;
+            if (this.world.getBlock(cell.x, gy, cell.z) !== ID.GRASS) return false;
+            if (!this.world.setBlock?.(cell.x, gy, cell.z, ID.DIRT)) return false;
+            // Touceira em cima da grama: come a planta junto.
+            if (this.world.getBlock(cell.x, gy + 1, cell.z) === ID.TALL_GRASS) {
+                this.world.setBlock(cell.x, gy + 1, cell.z, 0);
+            }
+            this.queueRegrow(cell.x, gy, cell.z, at);
+            return true;
+        }
+
+        /** Põe a célula comida na fila de crescimento (5–10 min, sorteado). */
+        queueRegrow(x, y, z, at) {
+            const roll = hash2(x, z, (this.world.seed ?? 0) + 613);
+            const delay = SHEEP_REGROW_MIN + roll * (SHEEP_REGROW_MAX - SHEEP_REGROW_MIN);
+            this.regrow.push({ x, y, z, at: at + delay });
+            if (this.regrow.length > SHEEP_REGROW_LIMIT) {
+                this.regrow.splice(0, this.regrow.length - SHEEP_REGROW_LIMIT);
+            }
+        }
+
+        /**
+         * Faz a grama voltar. Só devolve terra → grama: se o jogador construiu em
+         * cima (ou pôs outro bloco ali), o bloco dele manda e a célula sai da fila.
+         * Célula em chunk que não está na memória fica para a próxima.
+         */
+        growBack(at) {
+            for (let i = this.regrow.length - 1; i >= 0; i--) {
+                const cell = this.regrow[i];
+                if (at < cell.at) continue;
+                const loaded = this.world.getChunk?.(
+                    floorDiv(cell.x, CHUNK_SIZE), floorDiv(cell.z, CHUNK_SIZE),
+                );
+                if (!loaded) continue;
+                if (this.world.getBlock(cell.x, cell.y, cell.z) !== ID.DIRT) {
+                    this.regrow.splice(i, 1);
+                    continue;
+                }
+                if (this.world.setBlock?.(cell.x, cell.y, cell.z, ID.GRASS)) this.regrow.splice(i, 1);
+            }
         }
 
         trySpawn(playerPos, at, day = 1) {
@@ -325,6 +484,13 @@ export function createSheepSystemClass({
                     // para as pernas voltarem devagar ao repouso quando ela para.
                     stride: hash2(seed, attempt, 307) * Math.PI * 2,
                     walking: 0,
+                    // Pasto: a primeira vem cedo (para o jogador ver), depois de
+                    // vez em quando. `grazeT` é o relógio da pastagem em curso
+                    // (null quando não está pastando) e `bit`, se já mordeu.
+                    grazeAt: at + grazeDelayFor(hash2(seed, attempt, 401), true),
+                    grazeT: null,
+                    grazeFor: 0,
+                    bit: false,
                     hopFrom: y, hopT: SHEEP_HOP_TIME,
                     glideFrom: y, glideT: SHEEP_GLIDE_TIME,
                     coat: coat.key,
@@ -351,6 +517,7 @@ export function createSheepSystemClass({
             const dayNow = Number.isFinite(Number(day)) ? Number(day) : 1;
 
             this.trySpawn(playerPos, at, dayNow);
+            this.growBack(at);
 
             for (let i = this.entities.length - 1; i >= 0; i--) {
                 const e = this.entities[i];
@@ -360,16 +527,38 @@ export function createSheepSystemClass({
                     continue;
                 }
 
-                if (at >= e.turnAt) this.pickTarget(e, at);
+                // Pasto: para, abaixa a cabeça, morde (no meio do tempo) e sobe.
+                if (e.grazeT !== null) {
+                    e.grazeT += dt;
+                    const progress = e.grazeT / e.grazeFor;
+                    if (!e.bit && progress >= SHEEP_GRAZE_BITE) {
+                        e.bit = true;
+                        this.eatAhead(e, at);
+                    }
+                    if (e.grazeT >= e.grazeFor) {
+                        e.grazeT = null;
+                        e.grazeAt = at + grazeDelayFor(hash2(e.id, Math.round(at), 733), false);
+                    }
+                } else if (at >= e.grazeAt) {
+                    e.grazeT = 0;
+                    e.grazeFor = SHEEP_GRAZE_TIME_MIN
+                        + hash2(e.id, Math.round(at), 811) * (SHEEP_GRAZE_TIME_MAX - SHEEP_GRAZE_TIME_MIN);
+                    e.bit = false;
+                }
+                const pastando = e.grazeT !== null;
 
-                const dx = e.targetX - e.x, dz = e.targetZ - e.z;
-                const distanceToTarget = Math.hypot(dx, dz);
                 let andou = false;
-                if (distanceToTarget > SHEEP_ARRIVE) {
-                    andou = this.stepToward(e, dx, dz, SHEEP_WANDER_SPEED, dt);
-                    // Barrada (água, encosta, buraco): sorteia outro alvo em vez
-                    // de empurrar a mesma parede até o tempo acabar.
-                    if (!andou) e.turnAt = at;
+                if (!pastando) {
+                    if (at >= e.turnAt) this.pickTarget(e, at);
+
+                    const dx = e.targetX - e.x, dz = e.targetZ - e.z;
+                    const distanceToTarget = Math.hypot(dx, dz);
+                    if (distanceToTarget > SHEEP_ARRIVE) {
+                        andou = this.stepToward(e, dx, dz, SHEEP_WANDER_SPEED, dt);
+                        // Barrada (água, encosta, buraco): sorteia outro alvo em
+                        // vez de empurrar a mesma parede até o tempo acabar.
+                        if (!andou) e.turnAt = at;
+                    }
                 }
 
                 // O chão manda na altura: subir degrau é um arco, descer é um
@@ -389,8 +578,18 @@ export function createSheepSystemClass({
                 for (let leg = 0; leg < e.legs.length; leg++) {
                     e.legs[leg].rotation.x = pose[leg] * e.walking;
                 }
-                // Cabeça: um balanço curto junto com a passada.
-                if (e.head) e.head.rotation.x = 0.1 + Math.sin(e.stride * 2) * 0.06 * e.walking;
+                // Cabeça: balanço curto junto com a passada e, no pasto, o
+                // focinho descendo até o chão com uma mastigadinha no meio.
+                if (e.head) {
+                    const envelope = pastando ? grazeEnvelope(e.grazeT / e.grazeFor) : 0;
+                    const pose = headPoseFor(envelope);
+                    const mascando = Math.sin((pastando ? e.grazeT / e.grazeFor : 0) * Math.PI * 6) * 0.05;
+                    e.head.rotation.x = pose.rotationX
+                        + Math.sin(e.stride * 2) * 0.06 * e.walking
+                        + mascando * envelope;
+                    e.head.position.y = pose.y;
+                    e.head.position.z = pose.z;
+                }
 
                 e.group.position.set(e.x, e.visualY, e.z);
                 e.group.rotation.y = e.heading;
