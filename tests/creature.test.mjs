@@ -25,6 +25,12 @@ import {
     FLIGHT_DISTANCE,
     FLIGHT_DURATION,
     FLIGHT_HEIGHT,
+    ARRIVE_MIN_GAP,
+    ARRIVE_SPEED,
+    ARRIVE_SPREAD,
+    ARRIVE_STOP_DISTANCE,
+    ARRIVE_TIMEOUT,
+    arrivalDone,
     CROSS_COOLDOWN,
     CROSS_DISTANCE,
     CROSS_HEIGHT,
@@ -84,6 +90,9 @@ function spawnOne(system, world, clock, player) {
         system.update(0.016, player, true);
     }
     assert.equal(system.entities.length, 1, 'o Mofim deveria ter nascido');
+    // Daqui para baixo quem manda é o teste: ele posiciona o bicho e escolhe os
+    // alvos, então a chegada (que caminha na direção do jogador) sai de cena.
+    system.entities[0].arriving = false;
     return system.entities[0];
 }
 
@@ -1005,4 +1014,148 @@ test('a travessia não atravessa barranco: parede de dois blocos continua barran
     assert.equal(creature.y, GROUND + 1, 'nunca subiu o barranco');
     assert.ok(creature.nextCrossAt > clock.t - CROSS_COOLDOWN - 1,
         'e o relógio da travessia anda mesmo quando ela é recusada');
+});
+
+// ------------------------------------------------ chegada ao anoitecer
+
+test('a chegada termina ao chegar perto, e não antes', () => {
+    assert.equal(arrivalDone({ distance: ARRIVE_STOP_DISTANCE, startedAt: 0, at: 1 }), true,
+        'já está perto o bastante');
+    assert.equal(arrivalDone({ distance: 25, startedAt: 0, at: 10 }), false,
+        'ainda vem vindo, no tempo');
+    assert.equal(arrivalDone({ distance: 25, startedAt: 0, at: ARRIVE_TIMEOUT }), true,
+        'demorou demais: desiste de vir');
+    // O passo da chegada é de passeio: mais rápido que vagar, longe de ser fuga.
+    assert.ok(ARRIVE_SPEED > WANDER_SPEED && ARRIVE_SPEED < FLEE_SPEED,
+        'passo de passeio, não de corrida');
+});
+
+test('o Mofim aparece no crepúsculo, antes da noite fechada', () => {
+    assert.ok(NIGHT_SPAWN_THRESHOLD < 0.5, 'entra em cena com o sol ainda no horizonte');
+    assert.equal(isMofimTime(NIGHT_SPAWN_THRESHOLD), true, 'no limiar já é hora dele');
+    assert.equal(isMofimTime(NIGHT_SPAWN_THRESHOLD - 0.01), false, 'um pouco antes, ainda não');
+    assert.equal(isMofimTime(1), true, 'de noite, sim');
+});
+
+test('ao anoitecer ele nasce longe e vem andando até perto do jogador', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+
+    // Nasce no primeiro instante em que é hora dele.
+    for (let i = 0; i < 20 && system.entities.length === 0; i++) {
+        clock.t += 0.1;
+        system.update(0.1, player, true);
+    }
+    const creature = system.entities[0];
+    assert.ok(creature, 'nasceu');
+    assert.equal(creature.arriving, true, 'e veio em passeio de chegada');
+
+    const nascimento = Math.hypot(creature.x, creature.z);
+    assert.ok(nascimento >= SPAWN_MIN_DISTANCE - 0.5 && nascimento <= SPAWN_MAX_DISTANCE,
+        `nasceu longe (${nascimento.toFixed(1)} blocos)`);
+
+    let distancia = nascimento;
+    for (let i = 0; i < 400 && creature.arriving; i++) {
+        clock.t += 0.1;
+        system.update(0.1, player, true);
+        const agora = Math.hypot(creature.x, creature.z);
+        assert.ok(agora <= distancia + 1e-6, 'vem na direção do jogador, sem dar voltas');
+        distancia = agora;
+    }
+
+    assert.equal(creature.arriving, false, 'a chegada acabou');
+    assert.ok(distancia <= ARRIVE_STOP_DISTANCE + 0.2,
+        `parou perto (${distancia.toFixed(2)} blocos) em vez de encostar no jogador`);
+    assert.equal(creature.y, GROUND + 1, 'chegou andando, no chão');
+});
+
+test('os da mesma noite chegam pelo mesmo lado', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+
+    const lados = [];
+    let vistos = 0;
+    for (let i = 0; i < 300 && lados.length < 2; i++) {
+        clock.t += 0.1;
+        system.update(0.1, player, true);
+        for (const e of system.entities.slice(vistos)) {
+            lados.push(Math.atan2(e.z, e.x));
+        }
+        vistos = system.entities.length;
+    }
+
+    assert.equal(lados.length, 2, 'chegaram dois');
+    let diferenca = Math.abs(lados[0] - lados[1]);
+    if (diferenca > Math.PI) diferenca = Math.PI * 2 - diferenca;
+    assert.ok(diferenca <= ARRIVE_SPREAD,
+        `vieram pelo mesmo lado (${diferenca.toFixed(3)} rad de diferença)`);
+});
+
+test('chegada sem caminho: ele desiste de vir e não fica preso', () => {
+    const clock = { t: 0 };
+    const seco = makeWorld();
+    const system = makeSystem(seco, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    while (system.entities.length === 0) {
+        clock.t += 0.1;
+        system.update(0.1, player, true);
+    }
+    const creature = system.entities[0];
+
+    // Ilhota de uma célula em volta dele: todo passo da chegada cai na água.
+    const cx = Math.floor(creature.x), cz = Math.floor(creature.z);
+    const ilha = makeWorld({ above: (x, z) => (x === cx && z === cz ? 0 : ID.WATER) });
+    system.world = ilha;
+
+    for (let i = 0; i < 20 && creature.arriving; i++) {
+        clock.t += 0.1;
+        system.update(0.1, player, true);
+    }
+    assert.equal(creature.arriving, false, 'sem caminho, a chegada acaba em vez de travar');
+});
+
+test('assustado, o passeio de chegada acaba: ele foge em vez de vir', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    while (system.entities.length === 0) {
+        clock.t += 0.1;
+        system.update(0.1, player, true);
+    }
+    const creature = system.entities[0];
+    assert.equal(creature.arriving, true, 'vinha em passeio de chegada');
+
+    // O jogador corre até perto dele.
+    const perto = walkerPlayer({ x: creature.x + 2, y: GROUND + 1, z: creature.z });
+    clock.t += 0.1;
+    system.update(0.1, perto, true);
+
+    assert.equal(creature.arriving, false, 'o susto corta a chegada');
+    assert.ok(clock.t < creature.scaredUntil, 'e ele está fugindo');
+});
+
+test('a fila de chegada cabe no limite: três por noite, um atrás do outro', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    for (let i = 0; i < 300; i++) {
+        clock.t += 0.1;
+        system.update(0.1, player, true);
+    }
+    assert.equal(system.entities.length, CREATURE_LIMIT, 'a noite inteira chega');
+    // Em fila: dois quaisquer nunca nascem um em cima do outro.
+    for (const a of system.entities) {
+        for (const b of system.entities) {
+            if (a === b) continue;
+            assert.ok(Math.hypot(a.x - b.x, a.z - b.z) >= 1,
+                'ninguém apareceu dentro do outro');
+        }
+    }
+    assert.ok(ARRIVE_MIN_GAP < SPAWN_MIN_DISTANCE, 'o espaço entre eles é o da fila, não o do susto');
 });

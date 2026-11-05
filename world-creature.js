@@ -19,10 +19,38 @@ import { hash2 as defaultHash2 } from './world-math.js';
 
 /** Linhas de spawn por vez (o resto do mundo continua vazio: é bicho, não enxame). */
 export const CREATURE_LIMIT = 3;
-/** Distância em que ele nasce e em que desaparece. */
-export const SPAWN_MIN_DISTANCE = 9;
-export const SPAWN_MAX_DISTANCE = 24;
+/**
+ * Distância em que ele nasce e em que desaparece.
+ *
+ * Nasce **longe** de propósito: ao anoitecer os Mofins vêm andando de longe até
+ * o jogador (a chegada), em vez de aparecerem já parados ao lado dele.
+ */
+export const SPAWN_MIN_DISTANCE = 20;
+export const SPAWN_MAX_DISTANCE = 30;
 export const DESPAWN_DISTANCE = 38;
+/**
+ * Chegada: o passeio de vinda ao anoitecer.
+ *
+ * Os da mesma noite entram pelo mesmo lado (`ARRIVE_SPREAD` de abertura, para não
+ * virarem uma fila perfeita) e vêm em passo de passeio — mais rápido que o vagar,
+ * bem mais lento que a fuga. Param quando já estão perto e voltam ao passeio de
+ * sempre; se o caminho fecha ou demora demais, desistem em vez de insistir.
+ */
+export const ARRIVE_SPEED = 1.15;
+export const ARRIVE_STOP_DISTANCE = 12;
+export const ARRIVE_TIMEOUT = 30;
+export const ARRIVE_SPREAD = 0.22;
+/** Leque de desvios quando o caminho reto da chegada está barrado. */
+export const ARRIVE_FAN = [0, 0.6, -0.6, 1.1, -1.1];
+/**
+ * Espaço mínimo entre um recém-chegado e os outros (blocos).
+ *
+ * É pequeno porque a chegada é uma fila: um vem alguns blocos atrás do outro, de
+ * propósito. Antes o mínimo era de 8 blocos (o que fazia sentido com bichos
+ * surgindo parados em pontos sorteados) e a fila era recusada — a noite ficava
+ * com dois em vez de três.
+ */
+export const ARRIVE_MIN_GAP = 4;
 /** Velocidade vagando e fugindo (blocos por segundo). */
 export const WANDER_SPEED = 0.72;
 export const FLEE_SPEED = 3.1;
@@ -88,8 +116,14 @@ export const MOFIM_HEALTH = 3;
 export const HURT_FLASH = 0.22;
 /** Empurrão do golpe, em blocos (para o bicho "sentir" o impacto). */
 export const KNOCKBACK_DISTANCE = 0.35;
-/** Noite a partir da qual o Mofim aparece (`night` = 1 - dia do céu). */
-export const NIGHT_SPAWN_THRESHOLD = 0.5;
+/**
+ * Noite a partir da qual o Mofim aparece (`night` = 1 - dia do céu).
+ *
+ * Fica abaixo de 0,5 de propósito: eles entram em cena no **crepúsculo**, com o
+ * sol ainda no horizonte, e só então vêm andando. Esperar a noite fechada fazia
+ * o bicho aparecer já no escuro, do nada.
+ */
+export const NIGHT_SPAWN_THRESHOLD = 0.38;
 /** Tempo que ele leva para sumir quando o dia amanhece (segundos). */
 export const LEAVE_DURATION = 0.9;
 /** Quanto ele sobe enquanto desaparece (blocos). */
@@ -311,6 +345,27 @@ export function flightFor({ at, nextFlightAt = Infinity, fleeing = false, blocke
     return now >= Number(nextFlightAt) ? 'wander' : null;
 }
 
+/**
+ * A chegada acabou? `true` = pode voltar a passear por ali.
+ *
+ * Três motivos para terminar, todos na mesma função pura: já chegou perto o
+ * bastante, passou do tempo (o jogador foi embora, o caminho enroscou) ou o
+ * jogador veio até ele.
+ */
+export function arrivalDone({
+    distance,
+    startedAt = 0,
+    at = 0,
+    stopDistance = ARRIVE_STOP_DISTANCE,
+    timeout = ARRIVE_TIMEOUT,
+} = {}) {
+    const d = Number(distance);
+    if (Number.isFinite(d) && d <= stopDistance) return true;
+    const elapsed = Number(at) - Number(startedAt);
+    if (!Number.isFinite(elapsed)) return true;
+    return elapsed >= timeout;
+}
+
 /** Gira um vetor 2D: usado para desviar de encostas enquanto foge. */
 function rotate2(x, z, angle) {
     const c = Math.cos(angle), s = Math.sin(angle);
@@ -335,6 +390,8 @@ export function createCreatureSystemClass({
             this.nextSpawnAt = 0;
             this.spawnAttempt = 0;
             this.nextId = 1;
+            // Lado de onde a noite inteira chega; zera quando o dia volta.
+            this.arrivalBearing = null;
             this.cube = new THREE.BoxGeometry(1, 1, 1);
             this.materials = {
                 body: new THREE.MeshLambertMaterial({ color: 0x438f78 }),
@@ -402,18 +459,29 @@ export function createCreatureSystemClass({
         }
 
         trySpawn(playerPos, at, night = 1) {
-            if (!isMofimTime(night)) return;
+            if (!isMofimTime(night)) {
+                // De dia não há chegada: a próxima noite escolhe outro lado.
+                this.arrivalBearing = null;
+                return;
+            }
             if (at < this.nextSpawnAt || this.entities.length >= CREATURE_LIMIT) return;
             this.nextSpawnAt = at + 4.5;
             const seed = this.world.seed + this.spawnAttempt++ * 7919;
+            // Os da mesma noite entram pelo mesmo lado: é o que faz a chegada
+            // parecer um grupo vindo de longe, e não três bichos surgindo em
+            // pontos aleatórios do horizonte.
+            if (this.arrivalBearing === null) {
+                this.arrivalBearing = hash2(seed, 0, 977) * Math.PI * 2;
+            }
             for (let attempt = 0; attempt < 10; attempt++) {
-                const angle = hash2(seed, attempt, 41) * Math.PI * 2;
+                const angle = this.arrivalBearing
+                    + (hash2(seed, attempt, 41) - 0.5) * ARRIVE_SPREAD;
                 const distance = SPAWN_MIN_DISTANCE + hash2(seed, attempt, 89) * (SPAWN_MAX_DISTANCE - SPAWN_MIN_DISTANCE);
                 const x = playerPos.x + Math.cos(angle) * distance;
                 const z = playerPos.z + Math.sin(angle) * distance;
                 const y = this.surfaceAt(x, z);
                 if (y === null) continue;
-                if (this.entities.some(e => (e.x - x) ** 2 + (e.z - z) ** 2 < 64)) continue;
+                if (this.entities.some(e => (e.x - x) ** 2 + (e.z - z) ** 2 < ARRIVE_MIN_GAP ** 2)) continue;
                 const model = this.createModel();
                 model.group.position.set(x, y, z);
                 this.world.scene.add(model.group);
@@ -424,6 +492,8 @@ export function createCreatureSystemClass({
                     lastChirpAt: -Infinity, chirpPending: null,
                     nextIdleAt: at + CHIRP_IDLE_MIN + hash2(seed, attempt, 211) * (CHIRP_IDLE_MAX - CHIRP_IDLE_MIN),
                     health: MOFIM_HEALTH, hurtUntil: 0,
+                    // Chegada ao anoitecer: nasce longe e vem andando até perto.
+                    arriving: true, arriveAt: at,
                     leaving: false, leaveT: 0, leaveFromY: y,
                     hopFrom: 0, hopTo: 0, hopT: HOP_DURATION,
                     glideFrom: y, glideT: GLIDE_DURATION, visualY: y, glidePitch: 0,
@@ -443,6 +513,8 @@ export function createCreatureSystemClass({
         scare(entity, at, from) {
             entity.scaredUntil = at + SCARE_DURATION;
             entity.lastHitAt = at;
+            // Quem se assusta corre: a chegada tranquila acabou.
+            entity.arriving = false;
             // O primeiro chilreio do susto é diferente do resto: é o grito, não o
             // chiado de quem está correndo.
             entity.chirpPending = 'startle';
@@ -654,6 +726,23 @@ export function createCreatureSystemClass({
         }
 
         /**
+         * Um passo da chegada: vem na direção do jogador em passo de passeio e,
+         * se o caminho reto está barrado, abre em leque (cada bicho para o seu
+         * lado). Devolve `false` quando não há por onde vir — aí ele desiste de
+         * vir e passeia por onde está.
+         */
+        arrivalStep(e, dirX, dirZ, dt) {
+            const length = Math.hypot(dirX, dirZ);
+            if (!(length > 1e-6)) return false;
+            const side = e.id % 2 ? 1 : -1;
+            for (const angle of ARRIVE_FAN) {
+                const dir = rotate2(dirX, dirZ, angle * side);
+                if (this.stepToward(e, dir.x, dir.z, ARRIVE_SPEED, dt)) return true;
+            }
+            return false;
+        }
+
+        /**
          * Fuga: reto para longe e, se o chão barra, diagonais cada vez mais
          * abertas. Antes o alvo de fuga era recalculado a cada quadro e o desvio
          * se perdia — ele ficava parado, tremendo contra a grama alta.
@@ -760,6 +849,15 @@ export function createCreatureSystemClass({
                                 && this.startFlight(e, dxp, dzp, at);
                             const cruzou = !saltou && this.startCrossFlight(e, dxp, dzp, at);
                             if (!saltou && !cruzou) this.fleeStep(e, dxp, dzp, dt);
+                        }
+                    } else if (e.arriving) {
+                        // Chegada ao anoitecer: vem andando de longe até perto do
+                        // jogador. Enquanto isso não passeia nem sorteia alvo — o
+                        // caminho dele é o jogador. Termina ao chegar, ao demorar
+                        // demais ou quando não há por onde vir.
+                        if (arrivalDone({ distance: distanceToPlayer, startedAt: e.arriveAt, at })
+                            || !this.arrivalStep(e, -dxp, -dzp, dt)) {
+                            e.arriving = false;
                         }
                     } else {
                         // Passeio: de vez em quando um voo curto no rumo do alvo.
