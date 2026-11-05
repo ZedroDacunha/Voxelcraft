@@ -1,4 +1,4 @@
-# SiteCraft
+# Voxelcraft
 
 Sandbox voxel no navegador, no estilo Minecraft, escrito em JavaScript puro —
 **sem etapa de build, sem bundler e sem dependências de runtime**. A cópia do

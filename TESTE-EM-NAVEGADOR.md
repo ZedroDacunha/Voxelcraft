@@ -418,7 +418,7 @@ Abra o jogo e pare na tela inicial (só olhar, não precisa entrar em mundo).
 - [ ] Deitar o celular (tela baixa): o título encolhe junto e os botões
       continuam visíveis e clicáveis.
 - [ ] Teclado: `Tab` continua indo do título para os botões, e o leitor de tela
-      anuncia a tela como **Voxel Sandbox**.
+      anuncia a tela como **Voxelcraft**.
 - [ ] Zoom do navegador em 200 %: o título continua legível e dentro da tela.
 - [ ] Trocar de mundo e voltar ao menu: o título aparece igual, sem piscar.
 
