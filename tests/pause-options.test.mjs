@@ -51,7 +51,7 @@ test('o menu de pausa centraliza o cartão e não perde o aviso de toque', () =>
 
 test('a tela de opções abre do menu de pausa', () => {
     assert.match(gameSource, /getElementById\('btn-menu-options'\)\?\.addEventListener\('click'/);
-    assert.match(gameSource, /optionsDialog\?\.showModal\(\)/);
+    assert.match(gameSource, /optionsDialog\.showModal\(\)/);
     assert.match(html, /<dialog id="options-dialog"/);
 });
 
@@ -111,13 +111,29 @@ test('o rótulo de cada controle bate com o texto da tela', () => {
     }
 });
 
-test('a tela diz o que vale na hora, o que espera o próximo mundo e como usar', () => {
-    const hint = html.match(/<p class="options-hint">([\s\S]*?)<\/p>/);
-    assert.ok(hint, 'a tela de opções precisa explicar o que muda quando');
-    assert.match(hint[1], /na hora/);
-    assert.match(hint[1], /próximo mundo/);
-    assert.match(hint[1], /[Aa]rraste/, 'explica o gesto da barra');
-    assert.match(hint[1], /clique/i, 'e o do botão');
+test('a tela de opções tem só o título, sem texto de explicação', () => {
+    const dialog = html.slice(html.indexOf('<dialog id="options-dialog"'), html.indexOf('id="world-dialog"'));
+    assert.match(dialog, /<h2 id="options-title">Opções<\/h2>/);
+    assert.doesNotMatch(dialog, /options-hint/, 'sem parágrafo de instruções embaixo do título');
+    // entre o topo do painel e a grade não há nada além do título
+    const beforeGrid = dialog.slice(0, dialog.indexOf('class="options-grid"'));
+    assert.equal((beforeGrid.match(/<p[\s>]/g) ?? []).length, 0, 'nada de texto solto embaixo do título');
+});
+
+test('abrir as opções esconde o cartão de pausa', () => {
+    // Antes as duas janelas ficavam uma em cima da outra (o cartão aparecendo
+    // através do painel translúcido).
+    assert.match(gameSource, /document\.body\.classList\.add\('options-open'\)/);
+    assert.match(gameSource, /optionsDialog\?\.addEventListener\('close', \(\) => \{\s*document\.body\.classList\.remove\('options-open'\)/);
+    assert.match(styles, /body\.options-open \.pause-card \{\s*display:\s*none/);
+});
+
+test('mudar a distância de render avisa na hora, em vez de explicar sempre', () => {
+    const start = gameSource.indexOf('function applyGameSettings');
+    const body = gameSource.slice(start, gameSource.indexOf('onGameSettingsChange(settings =>', start));
+    assert.match(body, /settings\.renderDistance !== appliedRenderDistance/);
+    assert.match(body, /showToast\('Distância de render vale ao entrar no próximo mundo'\)/);
+    assert.match(body, /if \(!quiet\)/, 'o aviso do boot não aparece');
 });
 
 test('o jogo aplica as opções ao vivo, menos a distância de render', () => {

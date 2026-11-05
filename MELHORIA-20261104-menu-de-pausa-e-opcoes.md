@@ -87,7 +87,7 @@ aplica o que dá sem recarregar o mundo:
 | Campo de visão | na hora (o alvo do FOV já era lido por quadro) |
 | Volume | na hora (`audio.setVolume`) |
 | Gráficos | na hora, pelo **mesmo caminho do F4** (`gfx.setMode`) |
-| Distância de render | só no próximo mundo — e o painel diz isso |
+| Distância de render | só no próximo mundo — e um recado rápido avisa na hora em que você muda |
 
 A qualidade gráfica ganhou `setMode(modo)` em `world-graphics-quality.js`, que
 divide o `applyMode()` com o `cycle()` do `F4`: as duas formas de trocar
@@ -122,7 +122,22 @@ daqui".
   borrado, título centrado sem o "CONFIGURAÇÃO" em cima, e o `Concluído` no meio
   embaixo, como no original.
 
-## 5. Testes (28 novos, 570 no total)
+## 5. Menos texto, sem janela atrás
+
+Dois ajustes que só apareceram com a tela no ar:
+
+- **o título ficou sozinho.** O parágrafo de instruções ("Arraste a barra… vale
+  na hora…") saiu: no original a tela de opções tem só o nome dela em cima. A
+  informação que importava — a distância de render valer no próximo mundo —
+  virou um **recado rápido** (`showToast`) no momento em que você mexe nela, em
+  vez de texto permanente que ninguém lê duas vezes;
+- **a tela anterior sai de cena.** Antes, com as opções abertas, o cartão de
+  pausa continuava atrás do painel translúcido e parecia uma janela atravessando
+  a outra. Agora `body.options-open` esconde o `.pause-card` enquanto o diálogo
+  está aberto (o `#menu` fica: a película escura e o borrão do mundo continuam
+  sendo o fundo), e o `close` do diálogo devolve o cartão.
+
+## 6. Testes (30 novos, 572 no total)
 
 - `tests/pause-options.test.mjs` (13): o menu de pausa tem os três botões no
   `.classic-btn`, o texto velho saiu, o cartão segue o padrão (borda 2px), o
@@ -146,7 +161,7 @@ daqui".
   (`if (!pauseMenuShown) renderer.render(handScene…)`), os degraus de
   `--ui-scale` e as medidas em `em` dos dois painéis.
 
-## 6. O que sobra (de propósito)
+## 7. O que sobra (de propósito)
 
 - **`ESC` de novo não volta ao jogo**: quem volta é o botão. O navegador segura
   o *pointer lock* por ~1 s depois do ESC, e um atalho que falha às vezes é pior

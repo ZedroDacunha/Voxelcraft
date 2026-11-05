@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 570 testes de módulos puros (node --test)
+npm test           # 572 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -189,7 +189,7 @@ seguinte, sem trilho nem cursor.
 | Campo de visão | na hora |
 | Volume | na hora |
 | Gráficos (automática/máxima/alta/média) | na hora — o mesmo caminho do `F4` |
-| Distância de render | no próximo mundo (recarregar chunks ao vivo é outro assunto) |
+| Distância de render | no próximo mundo (recarregar chunks ao vivo é outro assunto) — um recado avisa quando você muda |
 
 Quem grava é `world-game-settings.js` (localStorage), que também **avisa** os
 assinantes — o jogo aplica o que dá na hora e o áudio da interface troca de

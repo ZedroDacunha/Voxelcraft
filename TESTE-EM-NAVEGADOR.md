@@ -84,8 +84,10 @@ aparelho do jogador.
       câmera na hora, sem fechar a tela.
 - [ ] Sensibilidade e volume também valem na hora; **Gráficos** muda a resolução
       igual ao `F4`.
-- [ ] `Distância de render` mostra o valor novo, mas só muda o mundo no próximo
-      que você entrar (o próprio painel avisa).
+- [ ] `Distância de render` mostra o valor novo e, ao mudar, avisa num recado
+      rápido que vale **no próximo mundo** que você entrar.
+- [ ] Com as opções abertas, o cartão de pausa **não** aparece mais atrás; ao
+      fechar (`Concluído` ou `ESC`), ele volta.
 - [ ] Ao pausar, o **mundo de onde você parou** aparece borrado atrás do cartão,
       sem HUD e sem a mão; numa tela grande (≥ 1600×900) o menu vem maior.
 - [ ] `Tab` percorre as opções e as setas mudam o valor; `ESC` fecha a tela e

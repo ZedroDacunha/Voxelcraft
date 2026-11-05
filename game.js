@@ -2710,6 +2710,7 @@ const cycleQuality = () => gfx.cycle();
 // que dá para aplicar sem recarregar o mundo. A distância de render fica de
 // fora de propósito: mudar chunks ao vivo é outro assunto (vale no próximo).
 const QUALITY_FROM_SETTING = { auto: 'auto', max: 'max', 0.75: 0.75, 0.5: 0.5 };
+let appliedRenderDistance = GAME_SETTINGS.renderDistance;
 function applyGameSettings(settings, { quiet = false } = {}) {
     GAME_SETTINGS.sensitivity = settings.sensitivity;
     GAME_SETTINGS.fov = settings.fov;
@@ -2718,6 +2719,12 @@ function applyGameSettings(settings, { quiet = false } = {}) {
     audio.setVolume?.(settings.volume);
     const mode = QUALITY_FROM_SETTING[settings.graphics];
     if (mode !== undefined && gfx.mode !== mode) gfx.setMode(mode, { quiet });
+    // A distância de render é a única que não muda com o mundo rodando. Em vez
+    // de escrever isso na tela o tempo todo, avisa no momento em que muda.
+    if (settings.renderDistance !== appliedRenderDistance) {
+        appliedRenderDistance = settings.renderDistance;
+        if (!quiet) showToast('Distância de render vale ao entrar no próximo mundo');
+    }
 }
 applyGameSettings(GAME_SETTINGS, { quiet: true });
 onGameSettingsChange(settings => applyGameSettings(settings));
@@ -3521,7 +3528,14 @@ async function init() {
     // gráficos) muda na hora; a distância de render vale no próximo mundo.
     const optionsDialog = document.getElementById('options-dialog');
     document.getElementById('btn-menu-options')?.addEventListener('click', () => {
-        optionsDialog?.showModal();
+        if (!optionsDialog) return;
+        // o cartão de pausa sai de cena enquanto as opções estão abertas: duas
+        // janelas empilhadas pareciam uma atravessando a outra
+        document.body.classList.add('options-open');
+        optionsDialog.showModal();
+    });
+    optionsDialog?.addEventListener('close', () => {
+        document.body.classList.remove('options-open');
     });
     const btnWorlds = document.getElementById('btn-worlds');
     btnWorlds.addEventListener('click', async () => {
