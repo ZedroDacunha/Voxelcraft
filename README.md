@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 655 testes de módulos puros (node --test)
+npm test           # 661 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -82,10 +82,16 @@ capturar o mouse, e sim um joystick e botões na própria tela.
 
 - **Joystick** (canto inferior esquerdo): arraste a partir de onde o dedo encostou.
   A zona morta é por eixo (tremor de dedo não anda) e empurrar até o fim **corre**.
-- **Olhar**: arraste em qualquer ponto livre da tela; a sensibilidade das opções
-  vale igual ao mouse.
-- **Botões**: `Cavar` e `Pular` seguram enquanto o dedo estiver neles; `Usar`,
-  `Agachar` (alterna), `Mochila` e `Pausar` são de um toque.
+- **Dedo na tela é a mira** (como no Minecraft de celular): o bloco escolhido é o
+  que está embaixo do dedo, não o da cruz do centro. Três gestos, um dedo só:
+  - **arrastar** → olha em volta (a sensibilidade das opções vale igual ao mouse);
+  - **toque curto parado** → usa/coloca naquele bloco (o mesmo "usar" do botão
+    direito do mouse);
+  - **segurar parado** (~0,25 s) → cava aquele bloco, e deslizar o dedo cava a
+    fileira por onde ele passa.
+- **Botões**: só ícones, grandes — `Pular` (seta ↑) e `Cavar` (picareta) seguram
+  enquanto o dedo estiver neles; `Usar` (mão), `Agachar` (seta ↓, alterna),
+  `Mochila` e `Pausar` são de um toque. O nome de cada um fica no `aria-label`.
 - **Hotbar**: cada casa é um botão (não há roda do mouse).
 - **Híbrido**: notebook com tela de toque também joga com mouse — se o clique for
   do mouse, o jogo pede *pointer lock* como sempre; se for do dedo, vira toque.

@@ -60,12 +60,15 @@ import { damageSoundFor } from './world-damage-sounds.js';
 import { ambientAvailability, createAmbientState, stepAmbient } from './world-ambient-sounds.js';
 import { createWaterfallSoundState, scanWaterfall, updateWaterfallSound, waterfallGain } from './world-waterfall.js';
 import {
+    TOUCH_HOLD_MS,
     TOUCH_LOOK_SENSITIVITY,
     TOUCH_STICK_RADIUS,
     isTouchDevice,
     lookAfterDrag,
     movementFromStick,
+    ndcFromPoint,
     stickVector,
+    touchGesture,
 } from './world-touch-controls.js';
 import { getSharedAudio } from './world-audio.js';
 import { rightClickIntent } from './world-interaction-rules.js';
@@ -1755,7 +1758,10 @@ function breakBlock(x, y, z) {
 // o golpe viraria uma mineração silenciosa do cenário).
 function strikeCreature() {
     if (!leftHeld) return false;
-    camera.getWorldDirection(creatureAim);
+    // Com o dedo na tela a mira é o dedo, não a cruz: o golpe segue a mesma
+    // linha que escolheu o bloco.
+    if (touchAim.on) creatureAim.copy(touchAim.dir);
+    else camera.getWorldDirection(creatureAim);
     // O bloco na mira limita o alcance do golpe: se ele está mais perto, o Mofim
     // está atrás dele. Sem isso, qualquer bicho no raio de 3,5 blocos travava a
     // mineração e não dava para quebrar nada em volta.
@@ -2670,8 +2676,24 @@ if (touchMode) {
 }
 // Estado do joystick: onde o dedo começou e onde está agora.
 const touchStick = { pointerId: null, centerX: 0, centerY: 0, x: 0, y: 0 };
-// Arrasto de olhar: um dedo na tela (fora dos controles) gira a câmera.
-const touchLook = { pointerId: null, lastX: 0, lastY: 0 };
+// Arrasto de olhar: um dedo na tela (fora dos controles) gira a câmera. O mesmo
+// dedo, se ficar parado, vira toque curto (usar) ou segurar (cavar) — ver
+// `touchGesture()` em world-touch-controls.js.
+const touchLook = {
+    pointerId: null,
+    lastX: 0,
+    lastY: 0,
+    startX: 0,
+    startY: 0,
+    startedAt: 0,
+    mode: 'wait',
+    holdTimer: 0,
+};
+// Mira do dedo: quando o jogador toca na tela, o bloco escolhido é o que está
+// embaixo do dedo, não o da cruz do centro. Enquanto `touchAim.on` estiver
+// ligado, `updateTarget()` mira pela direção do dedo; soltar devolve a mira
+// para a câmera.
+const touchAim = { on: false, hit: null, dir: new THREE.Vector3() };
 
 function playing() {
     return Boolean(controls?.isLocked) || touchActive;
@@ -2686,10 +2708,29 @@ function resetInputFlags() {
     leftHeld = false;
     touchStick.pointerId = null;
     touchStick.x = touchStick.y = 0;
-    touchLook.pointerId = null;
+    stopTouchGesture();
     resetMining();
     cancelEating();
     resetTouchStickVisual();
+    // Nenhum botão de toque pode ficar desenhado como apertado depois que o
+    // dedo saiu, mesmo que a saída tenha vindo de pausa, morte ou inventário.
+    for (const button of document.querySelectorAll('.touch-btn.pressed')) {
+        button.classList.remove('pressed');
+        button.setAttribute('aria-pressed', 'false');
+    }
+}
+
+function clearTouchAim() {
+    touchAim.on = false;
+    touchAim.hit = null;
+    touchAim.dir.set(0, 0, 0);
+}
+
+function stopTouchGesture() {
+    if (touchLook.holdTimer) { clearTimeout(touchLook.holdTimer); touchLook.holdTimer = 0; }
+    touchLook.pointerId = null;
+    touchLook.mode = 'wait';
+    clearTouchAim();
 }
 
 function resetTouchStickVisual() {
@@ -3087,9 +3128,34 @@ function intersectsPlayer(bx, by, bz) {
 // =====================================================================
 // 9. RAYCAST POR VOXELS (DDA)
 // =====================================================================
+const touchRaycaster = new THREE.Raycaster();
+const touchNdc = new THREE.Vector2();
+
+// Mira do dedo: o bloco escolhido é o que está embaixo do toque, e não o da
+// cruz do centro. Guarda também a direção para o golpe no Mofim usar a mesma
+// linha — senão o bicho apanharia sem estar na frente do dedo.
+function aimAtScreen(clientX, clientY) {
+    const canvas = renderer.domElement;
+    const width = canvas.clientWidth || window.innerWidth;
+    const height = canvas.clientHeight || window.innerHeight;
+    const ndc = ndcFromPoint(clientX, clientY, width, height);
+    touchNdc.set(ndc.x, ndc.y);
+    touchRaycaster.setFromCamera(touchNdc, camera);
+    touchAim.on = true;
+    touchAim.dir.copy(touchRaycaster.ray.direction);
+    updateTarget();
+}
+
 function updateTarget() {
-    camera.getWorldDirection(tmpDir);
-    currentHit = raycastVoxels(camera.position, tmpDir, REACH, WORLD_RAYCAST_ACCESS);
+    if (touchAim.on) {
+        // A mira do dedo é uma direção, não um bloco congelado: quebrar um bloco
+        // não pode deixar o alvo apontando para o buraco que ficou no lugar.
+        currentHit = raycastVoxels(camera.position, touchAim.dir, REACH, WORLD_RAYCAST_ACCESS);
+        touchAim.hit = currentHit;
+    } else {
+        camera.getWorldDirection(tmpDir);
+        currentHit = raycastVoxels(camera.position, tmpDir, REACH, WORLD_RAYCAST_ACCESS);
+    }
     if (currentHit) {
         targetMesh.position.set(currentHit.x + 0.5, currentHit.y + 0.5, currentHit.z + 0.5);
         targetMesh.visible = true;
@@ -3821,19 +3887,68 @@ async function init() {
             });
         }
 
-        // Olhar: arrastar em qualquer ponto livre da tela (os controles têm
-        // `pointer-events: auto` e consomem o próprio dedo).
+        // Dedo na tela, em qualquer ponto livre (os controles têm
+        // `pointer-events: auto` e consomem o próprio dedo). Três gestos saem do
+        // mesmo dedo, como no Minecraft de celular:
+        //   - arrastar  → olhar em volta (o mesmo `look` do mouse);
+        //   - toque curto parado → usar/colocar no bloco sob o dedo;
+        //   - segurar parado → cavar o bloco sob o dedo.
+        // A mira é o ponto tocado, não a cruz do centro: o dedo é a mira.
+        function gestureAt(event, released = false) {
+            return touchGesture({
+                dx: event.clientX - touchLook.startX,
+                dy: event.clientY - touchLook.startY,
+                elapsed: performance.now() - touchLook.startedAt,
+                released,
+            });
+        }
+
+        function startBreaking() {
+            touchLook.mode = 'hold';
+            aimAtScreen(touchLook.startX, touchLook.startY);
+            leftHeld = true;
+            pressButton('break', true);
+        }
+
+        function endGesture() {
+            if (touchLook.holdTimer) { clearTimeout(touchLook.holdTimer); touchLook.holdTimer = 0; }
+            if (touchLook.mode === 'hold') {
+                leftHeld = false;
+                pressButton('break', false);
+            }
+            touchLook.pointerId = null;
+            touchLook.mode = 'wait';
+            clearTouchAim();
+            updateTarget();
+        }
+
         canvas.addEventListener('pointerdown', (event) => {
             if (!playing() || event.pointerType === 'mouse' || touchLook.pointerId !== null) return;
             event.preventDefault();
             touchLook.pointerId = event.pointerId;
-            touchLook.lastX = event.clientX;
-            touchLook.lastY = event.clientY;
+            touchLook.lastX = touchLook.startX = event.clientX;
+            touchLook.lastY = touchLook.startY = event.clientY;
+            touchLook.startedAt = performance.now();
+            touchLook.mode = 'wait';
             canvas.setPointerCapture?.(event.pointerId);
+            // O relógio não pode depender de `pointermove`: um dedo parado não
+            // gera evento nenhum, e sem este timer segurar nunca viraria cavar.
+            touchLook.holdTimer = setTimeout(() => {
+                if (playing() && touchLook.pointerId === event.pointerId && touchLook.mode === 'wait') startBreaking();
+            }, TOUCH_HOLD_MS);
         });
         canvas.addEventListener('pointermove', (event) => {
             if (event.pointerId !== touchLook.pointerId) return;
             event.preventDefault();
+            if (touchLook.mode === 'hold') {
+                // Segurando, o dedo anda e a mira acompanha: cavar uma fileira.
+                aimAtScreen(event.clientX, event.clientY);
+                touchLook.lastX = event.clientX;
+                touchLook.lastY = event.clientY;
+                return;
+            }
+            if (gestureAt(event) === 'look') touchLook.mode = 'look';
+            if (touchLook.mode !== 'look') return;
             const next = lookAfterDrag(look, event.clientX - touchLook.lastX, event.clientY - touchLook.lastY, {
                 sensitivity: TOUCH_LOOK_SENSITIVITY * LOOK_SENSITIVITY,
                 maxPitch: MAX_PITCH,
@@ -3844,11 +3959,20 @@ async function init() {
             look.pitch = next.pitch;
             applyLook();
         });
-        for (const type of ['pointerup', 'pointercancel']) {
-            canvas.addEventListener(type, (event) => {
-                if (event.pointerId === touchLook.pointerId) touchLook.pointerId = null;
-            });
-        }
+        canvas.addEventListener('pointerup', (event) => {
+            if (event.pointerId !== touchLook.pointerId) return;
+            const gesture = gestureAt(event, true);
+            if (gesture === 'tap') {
+                // Toque curto: o mesmo "usar" do botão direito do mouse, só que
+                // no bloco que o dedo escolheu.
+                aimAtScreen(event.clientX, event.clientY);
+                useHeldItem({ sneaking: wantToCrouch });
+            }
+            endGesture();
+        });
+        canvas.addEventListener('pointercancel', (event) => {
+            if (event.pointerId === touchLook.pointerId) endGesture();
+        });
 
         // Botões de ação.
         function pressButton(id, pressed) {

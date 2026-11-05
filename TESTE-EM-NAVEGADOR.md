@@ -197,6 +197,37 @@ aparelho do jogador.
       sol, lua e estrelas se movendo).
 - [ ] Nada do menu (título, botões) ficou ilegível com o céu laranja.
 
+## 13. Toque no mundo (celular e tablet)
+
+Abra com `?touch=1` num aparelho de dedo (ou no Chrome com "modo dispositivo"
+ligado). No menu, o aviso de toque já explica: joystick à esquerda, arraste para
+olhar, toque para usar, segure para cavar.
+
+- [ ] Os botões da direita são **só ícones** (seta ↑ Pular, picareta Cavar, mão
+      Usar, seta ↓ Agachar, mochila Mochila, duas barras Pausar), no mesmo cinza
+      de borda preta do menu, sem texto escrito.
+- [ ] Ler em voz alta (leitor de tela) diz "Pular", "Cavar", "Usar"… e não lê o
+      desenho do ícone.
+- [ ] **Toque curto** num bloco com o dedo parado: o bloco sob o dedo ganha o
+      contorno de mira e o item da mão é usado ali (colocar bloco, abrir forno,
+      porta, comer). Não precisa acertar a cruz do centro.
+- [ ] **Segurar** o dedo parado no mesmo lugar: depois de ~0,25 s o bloco
+      começa a quebrar, o botão Cavar acende e o braço bate. Soltar para.
+- [ ] **Arrastar** o dedo: a câmera gira e **nada** é usado nem quebrado.
+- [ ] Segurar e **deslizar** o dedo cava a fileira de blocos por onde ele passa,
+      e a mira acompanha o dedo.
+- [ ] Tocar na **água/sem bloco** com comida na mão come; com bloco na mão nada
+      acontece (não dá para colocar no ar).
+- [ ] Tocar em cima do **Mofim** com o dedo (segurando) dá o golpe nele, e o
+      bloco atrás dele não é minerado.
+- [ ] Tocar na **hotbar** troca a casa; tocar **entre** as casas da hotbar agora
+      vale como toque no mundo (a faixa do HUD não engole mais o dedo).
+- [ ] A dica do topo some sozinha depois de alguns segundos.
+- [ ] Em **paisagem baixa** (altura ≤ 460 px) os botões ficam menores e não
+      cobrem a hotbar.
+- [ ] No desktop com mouse nada mudou: clique esquerdo cava, direito usa, e o
+      modo toque só liga se o jogador entrou por toque (ou com `?touch=1`).
+
 ## Se algo falhar
 
 | Sintoma | Onde olhar |
