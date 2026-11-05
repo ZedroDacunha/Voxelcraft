@@ -53,6 +53,7 @@ import {
     nightGlow,
     shouldFlee,
 } from '../world-creature.js';
+import { DUST_LANDING_PUFF, DUST_LIFETIME } from '../world-creature-dust.js';
 
 const CHUNK_SIZE = 16;
 const GROUND = 10; // `heightAt` devolve o bloco do topo; o Mofim anda em GROUND + 1
@@ -76,9 +77,10 @@ function makeWorld({ heightAt = () => GROUND, groundType = () => ID.GRASS, above
     };
 }
 
-function makeSystem(world, clock, { onChirp = () => {}, onDeath = () => {} } = {}) {
+function makeSystem(world, clock, { onChirp = () => {}, onDeath = () => {}, dustQuality } = {}) {
     const CreatureSystem = createCreatureSystemClass({
         THREE, ID, BLOCKS, CHUNK_SIZE, now: () => clock.t, onChirp, onDeath,
+        ...(dustQuality ? { dustQuality } : {}),
     });
     return new CreatureSystem(world);
 }
@@ -1413,4 +1415,125 @@ test('quando ele chia, a luzinha incha e depois apaga', () => {
     assert.equal(creature.lightPulse, 0, 'e apagou sozinho');
     // O tamanho calmo respira com a noite; o que importa é ter voltado a encolher.
     assert.ok(creature.glowMesh.scale.x < tamanhoAceso, 'e a luzinha voltou a encolher');
+});
+
+// ------------------------------------------------ rastro de pó luminoso
+
+// Deixa o bicho parado de verdade: sem alvo de passeio e sem voo sorteado.
+function freeze(creature, clock) {
+    creature.arriving = false;
+    creature.targetX = creature.x;
+    creature.targetZ = creature.z;
+    creature.turnAt = clock.t + 1000;
+    creature.nextFlightAt = Infinity;
+}
+
+test('parado não solta pó; andando deixa rastro', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    const creature = spawnOne(system, world, clock, player);
+    freeze(creature, clock);
+    system.dust.clear();
+
+    clock.t += 0.016;
+    system.update(0.016, player, true);
+    assert.equal(system.dust.count, 0, 'parado no capim, nada de pó');
+
+    // 0,2 bloco por quadro, dez quadros: dois blocos andados.
+    for (let i = 0; i < 10; i++) {
+        creature.x += 0.2;
+        clock.t += 0.016;
+        system.update(0.016, player, true);
+    }
+    assert.ok(system.dust.count > 0, `andando ele levanta pó (${system.dust.count})`);
+});
+
+test('o pó do rastro apaga sozinho', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    const creature = spawnOne(system, world, clock, player);
+    freeze(creature, clock);
+    system.dust.clear();
+
+    for (let i = 0; i < 6; i++) {
+        creature.x += 0.3;
+        clock.t += 0.016;
+        system.update(0.016, player, true);
+    }
+    assert.ok(system.dust.count > 0, 'tem pó no ar');
+    // Um quadro longo, maior que a vida do pó: tudo apaga.
+    clock.t += DUST_LIFETIME + 0.1;
+    system.update(DUST_LIFETIME + 0.1, player, true);
+    assert.equal(system.dust.count, 0, 'e depois some sozinho');
+});
+
+test('em Gráficos Baixa ele não levanta pó nenhum', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock, { dustQuality: () => 0 });
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    const creature = spawnOne(system, world, clock, player);
+    freeze(creature, clock);
+
+    for (let i = 0; i < 10; i++) {
+        creature.x += 0.3;
+        clock.t += 0.016;
+        system.update(0.016, player, true);
+    }
+    assert.equal(system.dust.count, 0, 'no modo baixo o rastro fica desligado');
+});
+
+test('ao amanhecer ele sobe sem deixar pó', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    const creature = spawnOne(system, world, clock, player);
+    freeze(creature, clock);
+    system.dust.clear();
+
+    creature.x += 0.5;
+    clock.t += 0.016;
+    // `night = 0` é o dia: ele entra no ramo da partida, que não solta pó.
+    system.update(0.016, player, true, { night: 0 });
+    assert.equal(creature.leaving, true, 'ele está indo embora');
+    assert.equal(system.dust.count, 0, 'e a saída não deixa rastro');
+});
+
+test('pousar depois de voar levanta uma nuvem no chão', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    const creature = spawnOne(system, world, clock, player);
+    freeze(creature, clock);
+    system.dust.clear();
+
+    // No quadro anterior ele estava voando; agora está no chão, sem andar.
+    creature.wasAirborne = true;
+    clock.t += 0.016;
+    system.update(0.016, player, true);
+    assert.ok(system.dust.count >= DUST_LANDING_PUFF,
+        `a nuvem do pouso subiu (${system.dust.count})`);
+});
+
+test('descer um degrau (planeio curto) não levanta nuvem de pouso', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    const creature = spawnOne(system, world, clock, player);
+    freeze(creature, clock);
+    system.dust.clear();
+
+    // Planeio de descida: ele está no ar *planeando*, não voando.
+    creature.glideT = 0;
+    creature.glideFrom = creature.y + 1;
+    clock.t += 0.016;
+    system.update(0.016, player, true);
+    assert.equal(system.dust.count, 0, 'degrau não é pouso: nada de nuvem');
 });

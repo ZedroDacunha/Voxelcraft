@@ -45,6 +45,7 @@ import { boxOverlapsXZ, woodDoorCollision, woodDoorPart, woodDoorShape, woodDoor
 import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld } from './player-physics.js';
 import { canJumpFrom, createJumpState, updateJumpWindow } from './player-jump.js';
 import { createCreatureSystemClass, creatureInReach } from './world-creature.js';
+import { dustScaleFor } from './world-creature-dust.js';
 import { advanceHandAnimation, countStrikes, createHandAnimation, handSwingAmount, startPunch } from './world-hand-animation.js';
 import { advanceStepTracker, createStepTracker, stepDistanceThisFrame, stepPitch, stepSoundFor } from './world-step-sounds.js';
 import { materialSoundName } from './world-block-materials.js';
@@ -1267,6 +1268,9 @@ const CreatureSystem = createCreatureSystemClass({
             rate: reason === 'startle' ? 1.22 : (reason === 'panic' ? 1.1 : 1),
         });
     },
+    // Pó do rastro: sai de graça na qualidade alta, pela metade em 0,75 e não
+    // sai em Baixa (escala 0,5) — partícula é a primeira coisa que se corta.
+    dustQuality: () => dustScaleFor(gfx.mode),
     // Mofim derrubado: o corpo some e deixa pó luminoso no lugar. Um punhado
     // (ou dois, conforme o bicho) — três pós + uma tábua viram uma lanterna.
     onDeath: entity => {

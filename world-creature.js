@@ -16,6 +16,7 @@
 
 import { floorDiv as defaultFloorDiv } from './world-grid.js';
 import { hash2 as defaultHash2 } from './world-math.js';
+import { DUST_LANDING_PUFF, createCreatureDust, dustStep } from './world-creature-dust.js';
 
 /** Linhas de spawn por vez (o resto do mundo continua vazio: é bicho, não enxame). */
 export const CREATURE_LIMIT = 3;
@@ -412,6 +413,9 @@ export function createCreatureSystemClass({
     now = () => performance.now() * 0.001,
     onChirp = () => {},
     onDeath = () => {},
+    // Quanto de rastro de pó o modo gráfico comporta (0 = nenhum). O jogo passa
+    // uma função para poder mudar em Gráficos sem recriar o bicho.
+    dustQuality = () => 1,
 }) {
     class CreatureSystem {
         constructor(world) {
@@ -423,6 +427,11 @@ export function createCreatureSystemClass({
             // Lado de onde a noite inteira chega; zera quando o dia volta.
             this.arrivalBearing = null;
             this.cube = new THREE.BoxGeometry(1, 1, 1);
+            // Rastro de pó: pool fixo de cubinhos, criado no primeiro pó e nunca
+            // descartado. Ele vive no sistema (não no bicho): um pool só serve
+            // os três da noite.
+            this.dust = createCreatureDust({ THREE, getScene: () => this.world.scene });
+            this.dustQuality = typeof dustQuality === 'function' ? dustQuality : () => 1;
             this.materials = {
                 body: new THREE.MeshLambertMaterial({ color: 0x438f78 }),
                 belly: new THREE.MeshLambertMaterial({ color: 0xb7d8a1 }),
@@ -592,6 +601,9 @@ export function createCreatureSystemClass({
                     leaving: false, leaveT: 0, leaveFromY: y,
                     hopFrom: 0, hopTo: 0, hopT: HOP_DURATION,
                     glideFrom: y, glideT: GLIDE_DURATION, visualY: y, glidePitch: 0,
+                    // Rastro de pó: de onde ele saiu no quadro anterior e a sobra
+                    // de partículas que ainda não nasceram.
+                    dustX: x, dustZ: z, dustBudget: 0, wasAirborne: false,
                     flight: null,
                     nextFlightAt: at + FLIGHT_IDLE_MIN
                         + hash2(seed, attempt, 401) * (FLIGHT_IDLE_MAX - FLIGHT_IDLE_MIN),
@@ -1046,6 +1058,33 @@ export function createCreatureSystemClass({
                 // A luzinha da antena cresce no escuro.
                 e.glowMesh.scale.setScalar(GLOW_SIZE * (1 + 1.4 * luz + 1.1 * pulso));
                 e.group.position.set(e.x, e.visualY + Math.sin(at * 3 + e.phase) * bob, e.z);
+                // --- rastro de pó luminoso ---------------------------------
+                // A quantidade segue a distância andada neste quadro: parado não
+                // levanta nada, e o ritmo não depende da taxa de quadros.
+                const noAr = Boolean(airborne || gliding);
+                const escala = Math.max(0, Number(this.dustQuality()) || 0);
+                const andou = Math.hypot(e.x - e.dustX, e.z - e.dustZ);
+                e.dustX = e.x;
+                e.dustZ = e.z;
+                if (escala > 0) {
+                    const passo = dustStep({ budget: e.dustBudget, distance: andou, scale: escala });
+                    e.dustBudget = passo.budget;
+                    if (passo.count > 0) {
+                        this.dust.emit(e.x, e.visualY + 0.05, e.z, passo.count, { air: noAr });
+                    }
+                } else {
+                    // Modo gráfico sem pó: zera a sobra para ele não "soltar" um
+                    // punhado atrasado ao voltar para a qualidade alta.
+                    e.dustBudget = 0;
+                }
+                // Pouso: a nuvem que sobe quando ele toca o chão depois de **voar**
+                // (voo curto ou travessia). Descer um degrau também é planeio, e
+                // dele não sai nuvem — seria uma a cada degrau de escada.
+                const noArDeVerdade = Boolean(airborne);
+                if (e.wasAirborne && !noArDeVerdade && escala > 0) {
+                    this.dust.emit(e.x, e.visualY + 0.03, e.z, DUST_LANDING_PUFF, { air: true, burst: true });
+                }
+                e.wasAirborne = noArDeVerdade;
                 e.group.rotation.y = e.heading;
                 // Planando, o corpo inclina um pouco para a frente e as asas
                 // abrem na horizontal — é o que faz a descida parecer planeio.
@@ -1078,6 +1117,8 @@ export function createCreatureSystemClass({
                 e.leftHind.rotation.z = flap * 0.3;
                 e.rightHind.rotation.z = -flap * 0.3;
             }
+            // O pó envelhece uma vez por quadro, não uma vez por bicho.
+            this.dust.update(dt);
         }
     }
     return CreatureSystem;
