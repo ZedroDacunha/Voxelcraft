@@ -150,6 +150,22 @@ aparelho do jogador.
       Voltando de Baixa para Alta, **não** aparece um punhado de pó atrasado.
 - [ ] O jogo não engasga com três Mofins juntos (o pool é fixo: 40 partículas).
 
+## 10. O vento no capim
+
+- [ ] O capim **balança devagar**, vergando sempre para o mesmo lado (não é
+      zumbido de um lado para o outro).
+- [ ] Na **maior parte do tempo** ele está quase parado: o balanço forte só
+      acontece quando o **som de vento** está tocando. Ouça e olhe junto — os
+      dois têm de começar e terminar praticamente na mesma hora.
+- [ ] A troca **não dá salto**: quando a fase de vento acaba, o capim vai
+      assentando por alguns segundos em vez de parar de repente.
+- [ ] Tufos vizinhos **não balançam em sincronia** (cada um tem seu tempo).
+- [ ] No alto de um morro balança mais do que no vale.
+- [ ] Pausando o jogo (ESC), o fundo desfocado **não** continua balançando; ao
+      voltar, ele retoma de onde estava.
+- [ ] O tufo de capim **na mão** do jogador continua parado.
+- [ ] Nenhum outro bloco (grama baixa, folhas, flores) passou a se mexer.
+
 ## Se algo falhar
 
 | Sintoma | Onde olhar |
