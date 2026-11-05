@@ -138,6 +138,17 @@ export const SOUND_RECIPES = Object.freeze({
         kind: 'noise', cut: 700, cutTo: 420, q: 0.5, attack: 0.004, duration: 0.08, gain: 0.09,
         thump: Object.freeze({ from: 120, to: 80, duration: 0.05, gain: 0.05 }),
     }),
+    // Balido: três sílabas curtas descendo ("bé-é-é"). É o chamado de passeio,
+    // discreto, e o de "chegou perto", mais agudo e curto — dois sons diferentes
+    // para as duas situações.
+    'sheep-bleat': Object.freeze({
+        wave: 'sawtooth', from: 320, to: 248, attack: 0.02, duration: 0.18, gain: 0.13,
+        repeat: 3, gap: 0.05,
+    }),
+    'sheep-bleat-near': Object.freeze({
+        wave: 'sawtooth', from: 392, to: 300, attack: 0.012, duration: 0.15, gain: 0.16,
+        repeat: 2, gap: 0.04,
+    }),
     // Tosquia: a tesoura cortando lã. Ruído curto e fino, sem baque — o baque
     // é do golpe, e tosquiar não é golpe.
     'shear': Object.freeze({
