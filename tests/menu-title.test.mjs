@@ -90,3 +90,12 @@ test('o título escala de 360 px a 4K sem encostar nos botões', () => {
     assert.match(baixa, /\.title-screen-logo \{[^}]*calc\(28vh \* 5\.3658\)/,
         'em tela baixa o título encolhe junto com a altura');
 });
+
+test('o nome do jogo é o mesmo no rodapé, no README e no título desenhado', () => {
+    const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+    assert.match(readme, /^# Voxelcraft$/m, 'o README abre com o nome novo');
+    assert.match(html, /<footer class="title-screen-footer">\s*<span>Voxelcraft · Edição de sobrevivência<\/span>/,
+        'o rodapé do menu usa o nome novo');
+    assert.match(logo, /aria-label="Voxelcraft"/, 'e o título desenhado também');
+    assert.doesNotMatch(readme, /^# SiteCraft$/m, 'o nome antigo não ficou no topo do README');
+});

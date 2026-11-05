@@ -1,4 +1,4 @@
-# SiteCraft
+# Voxelcraft
 
 Sandbox voxel no navegador, no estilo Minecraft, escrito em JavaScript puro —
 **sem etapa de build, sem bundler e sem dependências de runtime**. A cópia do
@@ -253,7 +253,7 @@ cinza do menu) que aparece quando há como instalar:
 | Service worker | `service-worker.js` | guarda **o jogo inteiro** na instalação (a lista sai do `index.html`) |
 | Registro | `world-pwa.js` | registra só em `http(s)`; `?sw=0` desliga |
 | Botão de instalar | `world-install-prompt.js` | decide quando mostrar e chama o convite do navegador (testado sem DOM) |
-| Ícones | `icons/` | gerados por `tools/make-icons.mjs` (PNG escrito na mão, sem dependência): bloco transparente para desktop, maskable com fundo para o Android e um opaco de 180 para o iOS |
+| Ícones | `icons/`, `tools/grass-block.png` | `tools/make-icons.mjs` reamostra a arte do bloco (`tools/grass-block.png`) e escreve os PNGs sem dependência: bloco transparente para desktop, maskable com fundo para o Android e um opaco de 180 para o iOS |
 
 **O que guardar vem do próprio `index.html`.** Na instalação o worker busca a
 página e lê duas coisas: o importmap (que já lista **todos** os módulos com o
