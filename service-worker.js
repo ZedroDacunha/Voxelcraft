@@ -16,15 +16,16 @@
 //   segurança;
 // - arquivos → cache primeiro, com atualização em segundo plano. Os módulos têm
 //   `?v=<hash>` no importmap, então cache nunca entrega código velho;
-// - imagens (`assets/`) → mesma regra, mas a chave do cache ignora o `?v=`: elas
-//   não são código, e o jogo as pede com uma versão escrita à mão;
+// - imagens (`assets/`) → mesma regra, com a versão na chave. O `?v=` delas é o
+//   hash do próprio arquivo (`asset-versions.js`), então trocar a arte muda a
+//   URL e a imagem nova chega na hora;
 // - só origem própria: CDN de terceiros não entra no cache do jogo.
 //
 // Ao mudar a casca ou a estratégia, suba CACHE_VERSION: a ativação apaga as
 // versões antigas do cache.
 
 const CACHE_PREFIX = 'voxel-sandbox';
-const CACHE_VERSION = 'v21';
+const CACHE_VERSION = 'v22';
 const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
 const OFFLINE_DOCUMENT = './index.html';
 
@@ -47,8 +48,9 @@ const MINIMUM_SHELL = [
 ];
 
 // Imagens que o jogo carrega já dentro do mundo (não aparecem no index.html).
-// A chave do cache ignora o `?v=`, então a lista vale para qualquer versão —
-// e um teste confere que ela bate com os `./assets/*.png` do game.js.
+// Ficam guardadas na URL sem versão, como rede de segurança: se a versão do
+// arquivo mudar e o jogador estiver sem rede, ainda desenha o capim de ontem.
+// Um teste confere que a lista bate com os PNGs de `world-tall-grass.js`.
 const IMAGES = [
     './assets/tall-grass-short-v2.png',
     './assets/tall-grass-medium-v2.png',
@@ -71,7 +73,7 @@ self.addEventListener('install', (event) => {
         }
         // Um arquivo novo que ainda não existe não pode travar a instalação
         // inteira: guarda o que der e segue.
-        await Promise.all([...files].map((url) => cache.add(url).catch(() => {})));
+        await Promise.all([...files].map((url) => cacheFresh(cache, url)));
         await self.skipWaiting();
     })());
 });
@@ -141,19 +143,6 @@ function pageFilesFromHtml(html) {
     return [...files];
 }
 
-/**
- * Chave do cache. Módulo e CSS guardam a URL inteira (com o `?v=`), porque é o
- * hash que garante "nunca servir código de outra versão". Imagem não é código:
- * o jogo pede `assets/...png?v=<versão escrita à mão>` e a chave descarta essa
- * versão, então o que está guardado serve para qualquer uma.
- */
-function cacheKey(request) {
-    const url = new URL(request.url);
-    if (!url.pathname.includes('/assets/') || !url.search) return request;
-    url.searchParams.delete('v');
-    return url.href;
-}
-
 /** Limpa as versões antigas dos módulos (URL com `?v=` que não é a de hoje). */
 async function dropStaleModules() {
     const cache = await caches.open(CACHE_NAME);
@@ -200,14 +189,32 @@ async function handleDocument(request) {
     }
 }
 
+/**
+ * Guarda um arquivo **do servidor**, não do cache HTTP.
+ *
+ * `cache.add` aproveitaria a cópia que o navegador já tem — e é justamente ela
+ * que fica velha quando alguém troca um PNG mantendo o caminho. `reload` força
+ * a resposta real do servidor na hora da instalação.
+ */
+async function cacheFresh(cache, url) {
+    try {
+        const response = await fetch(url, { cache: 'reload' });
+        if (response && response.ok) await cache.put(url, response);
+    } catch (error) {
+        // arquivo que não existe (ou rede caindo) não pode derrubar a instalação
+    }
+}
+
 async function handleAsset(event, request) {
     const cache = await caches.open(CACHE_NAME);
-    const key = cacheKey(request);
+    // A chave é a URL inteira, com o `?v=`: versão nova do arquivo = chave
+    // nova = resposta do servidor, nunca a cópia velha.
+    const key = request;
     const cached = await cache.match(key);
 
     const network = fetch(request)
         .then((response) => {
-            if (response && response.ok) cache.put(key, response.clone());
+            if (response && response.ok) return storeAsset(cache, key, response);
             return response;
         })
         .catch(() => null);
@@ -220,5 +227,39 @@ async function handleAsset(event, request) {
 
     const response = await network;
     if (response) return response;
+    // Sem rede: uma imagem de outra versão ainda é melhor que chão vazio. Só
+    // vale para `assets/` — código velho nunca é servido por engano.
+    const previous = await cachedOtherVersion(cache, key);
+    if (previous) return previous;
     return new Response('', { status: 504, statusText: 'Sem rede e sem cache' });
+}
+
+/** Guarda a resposta e apaga as versões anteriores do mesmo arquivo. */
+async function storeAsset(cache, key, response) {
+    await cache.put(key, response.clone());
+    await forgetOtherVersions(cache, key);
+    return response;
+}
+
+async function forgetOtherVersions(cache, key) {
+    const url = new URL(key.url);
+    if (!url.pathname.includes('/assets/')) return;
+    for (const old of await cache.keys()) {
+        const oldUrl = new URL(old.url);
+        if (oldUrl.pathname !== url.pathname || oldUrl.search === url.search) continue;
+        await cache.delete(old);
+    }
+}
+
+/** Cópia guardada do mesmo arquivo em outra versão (rede de segurança). */
+async function cachedOtherVersion(cache, key) {
+    const url = new URL(key.url);
+    if (!url.pathname.includes('/assets/')) return null;
+    for (const old of await cache.keys()) {
+        const oldUrl = new URL(old.url);
+        if (oldUrl.pathname !== url.pathname) continue;
+        const hit = await cache.match(old);
+        if (hit) return hit;
+    }
+    return null;
 }

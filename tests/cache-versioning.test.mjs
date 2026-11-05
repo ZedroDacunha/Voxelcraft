@@ -1,13 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 
 import {
-    ROOT, contentHash, localModules, renderIndex, versionedUrl,
+    ROOT, assetFiles, assetVersion, assetVersions, contentHash, localModules,
+    renderAssetVersions, renderIndex, versionedUrl,
 } from '../tools/stamp-importmap.mjs';
 
-const indexHtml = () => readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+const read = (file) => readFileSync(path.join(ROOT, file), 'utf8');
+const indexHtml = () => read('index.html');
 const importMap = () => JSON.parse(/<script type="importmap">([\s\S]*?)<\/script>/.exec(indexHtml())[1]);
 
 test('index.html está carimbado (rode node tools/stamp-importmap.mjs)', () => {
@@ -72,4 +75,46 @@ test('script de entrada e CSS usam o hash do próprio conteúdo', () => {
             `${css} sem hash (ou com hash antigo)`,
         );
     }
+});
+
+// --- imagens de assets/ --------------------------------------------------
+//
+// Módulo tem importmap; imagem não tem. A versão da imagem era escrita à mão
+// no game.js e não subia junto com o PNG: o arquivo novo continuava sendo
+// pedido na URL do velho e o cache devolvia a arte antiga. Agora ela também é
+// hash de conteúdo, carimbado em `asset-versions.js`.
+
+test('asset-versions.js está carimbado (rode node tools/stamp-importmap.mjs)', () => {
+    assert.equal(
+        read('asset-versions.js'), renderAssetVersions(),
+        'asset-versions.js desatualizado — rode `npm run stamp` e commite o resultado',
+    );
+});
+
+test('toda imagem de assets/ tem versão, e é o hash do próprio arquivo', () => {
+    const versions = assetVersions();
+    const files = assetFiles();
+    assert.ok(files.length >= 3, 'o capim tem três PNGs');
+    assert.deepEqual(Object.keys(versions).sort(), files.sort());
+    for (const file of files) {
+        assert.equal(versions[file], contentHash(ROOT, file), `${file}: versão é o hash do conteúdo`);
+    }
+});
+
+test('trocar um byte do PNG muda a URL pedida (o bug do capim não volta)', () => {
+    const file = 'assets/tall-grass-medium-v2.png';
+    const original = readFileSync(path.join(ROOT, file));
+    const trocado = Buffer.from(original);
+    trocado[trocado.length - 1] ^= 0xff; // um byte diferente = outro arquivo
+
+    const hashOf = (buffer) => createHash('sha256').update(buffer).digest('hex').slice(0, 10);
+    assert.notEqual(hashOf(trocado), hashOf(original), 'hash de conteúdo, não versão escrita à mão');
+    assert.equal(assetVersion(ROOT, file), hashOf(original), 'e o carimbo usa exatamente esse hash');
+});
+
+test('o jogo não guarda mais versão de imagem escrita à mão', () => {
+    const game = read('game.js');
+    assert.ok(!/grassTextureVersion/.test(game), 'a versão saiu do game.js');
+    assert.ok(!/20261029-5/.test(game), 'e a constante antiga também');
+    assert.match(game, /tallGrassTextureUrl\(/, 'a URL da textura vem do módulo do capim');
 });

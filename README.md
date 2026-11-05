@@ -272,9 +272,13 @@ Três estratégias, porque os tipos de requisição têm problemas opostos:
   vêm com `?v=<hash>` no importmap, servir do cache nunca entrega código velho:
   hash diferente é URL diferente. Na ativação, as versões antigas de módulo saem
   do cache (a URL de hoje é conhecida, então dá para limpar o resto).
-- **imagens** (`assets/`): iguais às anteriores, mas a chave do cache ignora o
-  `?v=` — o jogo pede as texturas com uma versão escrita à mão, e imagem não é
-  código: o que está guardado serve para qualquer versão.
+- **imagens** (`assets/`): iguais às anteriores, com o `?v=` na chave. A versão
+  de cada PNG é o **hash do próprio arquivo** (carimbado em `asset-versions.js`),
+  então trocar a arte muda a URL e a imagem nova chega na hora. Guardar sem a
+  versão foi o bug do capim: o arquivo trocado continuava sendo pedido na URL do
+  velho e o cache devolvia a arte antiga para sempre. Sem rede, uma versão
+  anterior da mesma imagem ainda serve de rede de segurança (só imagem — código
+  velho nunca é servido).
 
 Só a própria origem é cacheada — CDN de terceiros fica de fora. O `three.js` já
 está em `vendor/`, então o jogo não depende de CDN para abrir.
@@ -291,7 +295,12 @@ O `index.html` aponta cada módulo com um sufixo `?v=<sha256>`, gerado por
 `tools/stamp-importmap.mjs` a partir do conteúdo do arquivo. Isso evita a
 mistura clássica de módulo novo com módulo velho em cache depois de um deploy.
 
-**Ao editar qualquer `.js` ou `.css` referenciado pelo `index.html`, rode:**
+O mesmo carimbo gera `asset-versions.js`, com o hash de cada imagem de
+`assets/`: é de lá que sai o `?v=` das texturas do capim (imagem não passa pelo
+importmap). Nenhuma versão de asset é escrita à mão.
+
+**Ao editar qualquer `.js`/`.css` referenciado pelo `index.html` — ou trocar um
+PNG de `assets/` — rode:**
 
 ```bash
 npm run stamp

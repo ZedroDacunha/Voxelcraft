@@ -40,12 +40,18 @@ casca mínima escrita no worker e o resto se completa no primeiro uso online.
 
 ## As outras duas mudanças
 
-**1. Imagem não é código.** O jogo pede as texturas de capim com uma versão
-escrita à mão (`?v=20261029-5`, em `game.js`), que o worker não tem como
-adivinhar. A chave do cache para `assets/` ignora o `?v=`: o que está guardado
-serve para qualquer versão, e a atualização em segundo plano troca o arquivo se
-ele mudar. Módulo e CSS continuam com a URL inteira na chave — neles o hash é
-justamente o que impede servir código de outra versão.
+**1. Imagem não é código.** O jogo pedia as texturas de capim com uma versão
+escrita à mão (`?v=20261029-5`, em `game.js`), que o worker não tinha como
+adivinhar; a chave do cache para `assets/` ignorava o `?v=` e a atualização em
+segundo plano trocava o arquivo se ele mudasse. Módulo e CSS sempre ficaram com
+a URL inteira na chave — neles o hash é justamente o que impede servir código de
+outra versão.
+
+> ⚠️ **Isto mudou em 05/11.** Ignorar o `?v=` na chave da imagem foi o que
+> deixou o capim com a arte antiga: a versão à mão não subia junto com o PNG e a
+> cópia velha era servida para sempre. Hoje a versão da imagem é o hash do
+> próprio arquivo (carimbado em `asset-versions.js`) e ela **entra** na chave.
+> Ver `BUG-20261105-textura-da-grama.md`.
 
 **2. Faxina na ativação.** Antes, ao sair uma versão, as entradas velhas de
 módulo ficavam no cache para sempre. Agora a ativação compara o cache com a

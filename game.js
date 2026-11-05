@@ -85,6 +85,9 @@ import {
     BlockFacingStore, DEFAULT_BLOCK_FACING, facingTowardPlayer, isFrontFace, isHorizontalFacing,
     tileForBlockFace,
 } from './world-block-orientation.js';
+import {
+    TALL_GRASS_VARIANTS, createTallGrassGeometry, createTallGrassMaterial, tallGrassTextureUrl,
+} from './world-tall-grass.js';
 
 async function loadThreeModules() {
     // A cópia em vendor/ evita depender de CDN (funciona offline e garante a
@@ -239,31 +242,6 @@ function createTorchFlameTexture() {
     if ('colorSpace' in texture && THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
     texture.needsUpdate = true;
     return texture;
-}
-
-function createTallGrassGeometry(variant = 1) {
-    // As imagens são arquivos separados e já estão cortadas até o contorno do tufo.
-    const variants = [
-        { height: 0.28, aspect: 299 / 198 },
-        { height: 0.52, aspect: 386 / 368 },
-        { height: 0.78, aspect: 315 / 454 },
-    ];
-    const selected = variants[variant] ?? variants[1];
-    const halfWidth = selected.height * selected.aspect / 2, height = selected.height;
-    const rootOffset = -0.025;
-    const positions = [
-        -halfWidth, rootOffset, -halfWidth, halfWidth, rootOffset, halfWidth,
-        halfWidth, height + rootOffset, halfWidth, -halfWidth, height + rootOffset, -halfWidth,
-        halfWidth, rootOffset, -halfWidth, -halfWidth, rootOffset, halfWidth,
-        -halfWidth, height + rootOffset, halfWidth, halfWidth, height + rootOffset, -halfWidth,
-    ];
-    const uvs = [0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1];
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-    geometry.setIndex([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7]);
-    geometry.computeVertexNormals();
-    return geometry;
 }
 
 function buildTorchFlameGeometry(centers) {
@@ -1559,7 +1537,7 @@ function getItemGeometry(itemId) {
     const geo = item.sprite
         ? buildSpriteGeo(spritePixels(item.sprite.kind, item.sprite.mat), ITEM_SIZE * 1.6 / 16, ITEM_SIZE * 0.25)
         : block?.render === 'instanced'
-            ? createTallGrassGeometry().scale(0.4, 0.4, 0.4)
+            ? createTallGrassGeometry({ THREE }).scale(0.4, 0.4, 0.4)
             : buildCubeGeo(block.tiles, ITEM_SIZE);
     itemGeometryCache[itemId] = geo;
     return geo;
@@ -1944,7 +1922,7 @@ function refreshHeldItem() {
         const block = BLOCKS[item.block];
         if (!heldGeoCache[key]) {
             heldGeoCache[key] = block?.render === 'instanced'
-                ? createTallGrassGeometry().scale(0.4, 0.4, 0.4)
+                ? createTallGrassGeometry({ THREE }).scale(0.4, 0.4, 0.4)
                 : buildCubeGeo(block.tiles, 0.3);
         }
         const mat = block?.render === 'instanced' ? tallGrassMaterial :
@@ -3862,32 +3840,23 @@ async function init() {
     });
 
     const decorations = new InstancedBlockManager(THREE, scene, { maxCapacity: 2000 });
-    const grassTextureFiles = [
-        './assets/tall-grass-short-v2.png',
-        './assets/tall-grass-medium-v2.png',
-        './assets/tall-grass-tall-v2.png',
-    ];
-    const grassTextureVersion = '20261029-5';
-    const grassTextures = await Promise.all(grassTextureFiles.map(file =>
-        new THREE.TextureLoader().loadAsync(new URL(`${file}?v=${grassTextureVersion}`, import.meta.url).href),
+    // O capim usa PNGs de verdade (não o atlas). A versão na URL é o hash do
+    // próprio arquivo, carimbado por `npm run stamp` — trocar a arte muda a URL
+    // e nenhum cache consegue devolver o desenho antigo.
+    const grassTextureOptions = {
+        maxAnisotropy: renderer.capabilities.getMaxAnisotropy(),
+        mipmaps: renderer.capabilities.isWebGL2,
+    };
+    const grassTextures = await Promise.all(TALL_GRASS_VARIANTS.map(variant =>
+        new THREE.TextureLoader().loadAsync(tallGrassTextureUrl(variant.file)),
     ));
-    tallGrassMaterials = grassTextures.map(texture => {
-        texture.magFilter = THREE.NearestFilter;
-        texture.minFilter = THREE.NearestFilter;
-        texture.generateMipmaps = false;
-        texture.needsUpdate = true;
-        if ('colorSpace' in texture && THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
-        return new THREE.MeshLambertMaterial({
-            map: texture, alphaTest: 0.35, transparent: false,
-            depthWrite: true, side: THREE.DoubleSide,
-        });
-    });
+    tallGrassMaterials = grassTextures.map(texture => createTallGrassMaterial(THREE, texture, grassTextureOptions));
     // Vento: uma direção por mundo, sortida da semente. O capim balança com o
     // que se ouve — a intensidade é atualizada todo quadro em updateGrassWind.
     windDirection = windDirectionFor(SEED);
     for (const material of tallGrassMaterials) configureWindSway(material, { direction: windDirection });
     tallGrassMaterial = tallGrassMaterials[1];
-    const grassGeometries = Array.from({ length: 3 }, (_, variant) => createTallGrassGeometry(variant));
+    const grassGeometries = TALL_GRASS_VARIANTS.map((_, variant) => createTallGrassGeometry({ THREE, variant }));
     window.testInstancedMesh = () => testInstancedMesh(THREE, renderer);
 
     world = new World(scene, SEED, decorations, grassGeometries, tallGrassMaterials);

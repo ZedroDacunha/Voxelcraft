@@ -250,15 +250,44 @@ test('arquivo sem cache e sem rede: 504 explícito', async () => {
     assert.equal(result.responded.body, '');
 });
 
-test('imagem é servida do cache mesmo com outra versão escrita na URL', async () => {
+test('imagem trocada chega na hora: versão diferente na URL não reusa o cache', async () => {
+    const worker = loadWorker();
+    await (await worker.fire('install')).waited;
+
+    // Ontem o jogo pedia a arte com esta versão...
+    const antiga = get('./assets/tall-grass-tall-v2.png?v=hash-antigo');
+    await (await worker.fire('fetch', { request: antiga })).waited;
+
+    // ...o PNG foi trocado e o `?v=` passou a ser o hash do arquivo novo.
+    const nova = get('./assets/tall-grass-tall-v2.png?v=hash-novo');
+    const result = await worker.fire('fetch', { request: nova });
+    assert.match(await result.responded.text(), /hash-novo/, 'desenhou a arte que o servidor tem agora');
+    const cache = await worker.cache();
+    assert.ok(cache.entries.has(nova.url), 'a versão nova entrou no cache');
+    assert.ok(!cache.entries.has(antiga.url), 'e a velha saiu (uma cópia por imagem)');
+});
+
+test('sem rede, a imagem de outra versão ainda serve de rede de segurança', async () => {
     const worker = loadWorker();
     await (await worker.fire('install')).waited;
     worker.setOffline(true);
 
-    // O jogo pede a imagem com `?v=`, mas ela foi guardada sem versão.
-    const result = await worker.fire('fetch', { request: get('./assets/tall-grass-tall-v2.png?v=20261029-5') });
+    // A instalação guarda a imagem sem versão; o jogo pede com o hash do arquivo.
+    const result = await worker.fire('fetch', { request: get('./assets/tall-grass-tall-v2.png?v=hash-de-hoje') });
     assert.equal(result.responded.status, 200, 'sem rede e ainda assim desenha o capim');
     assert.match(await result.responded.text(), /tall-grass-tall/);
+});
+
+test('código de outra versão nunca é servido (só imagem aceita fallback)', async () => {
+    const worker = loadWorker();
+    await (await worker.fire('install')).waited;
+    await (await worker.cache()).put(
+        new URL('./world-audio.js?v=antigo', BASE).href, new FakeResponse('código velho'),
+    );
+    worker.setOffline(true);
+
+    const result = await worker.fire('fetch', { request: get('./world-audio.js?v=novo') });
+    assert.equal(result.responded.status, 504, 'melhor sem som do que com o código de outra versão');
 });
 
 test('versão antiga de módulo sai do cache na ativação (imagem fica)', async () => {

@@ -422,6 +422,27 @@ Abra o jogo e pare na tela inicial (só olhar, não precisa entrar em mundo).
 - [ ] Zoom do navegador em 200 %: o título continua legível e dentro da tela.
 - [ ] Trocar de mundo e voltar ao menu: o título aparece igual, sem piscar.
 
+## 21. Capim: a arte certa, sem cintilar
+
+O capim usa PNGs próprios em `assets/`, e o que já deu errado ali foi: arte
+antiga em cache, tufo esticado e folhas sumindo à distância.
+
+- [ ] O tufo no chão parece o desenho de `assets/tall-grass-*-v2.png`: mesma
+      proporção (não é um capim largo e baixo, "amassado").
+- [ ] Existem **três alturas** de tufo (rasteiro, médio, alto) e elas se
+      misturam pelo mundo.
+- [ ] Andando para frente e para trás, o capim do fundo **não cintila** nem
+      rasga; só balança com o vento.
+- [ ] O tufo **na mão** (item da barra) é o mesmo desenho e fica parado.
+- [ ] Depois de trocar um PNG de `assets/` (e rodar `npm run stamp`), a arte
+      nova aparece **no primeiro recarregamento**, sem precisar limpar cache.
+- [ ] No DevTools → *Network*, a URL da textura termina em
+      `tall-grass-*.png?v=<10 caracteres>` — e esse `v` é diferente do de antes
+      da troca do arquivo.
+- [ ] No DevTools → *Application* → *Cache Storage*, existe **uma** cópia de
+      cada PNG do capim (não várias versões empilhadas).
+- [ ] Com rede desligada depois de jogar uma vez, o capim continua aparecendo.
+
 ## Se algo falhar
 
 | Sintoma | Onde olhar |
@@ -431,12 +452,13 @@ Abra o jogo e pare na tela inicial (só olhar, não precisa entrar em mundo).
 | Instalou, mas o ícone está cortado | Recorte do launcher maior que o esperado: baixe o `blockRatio` em `tools/make-icons.mjs`, rode `node tools/make-icons.mjs` e olhe o círculo seguro em `tests/icons.test.mjs` |
 | Ícone com fundo preto no iPhone | O `apple-touch-icon` está transparente: ele precisa ser opaco (teste cobre) |
 | Offline mostra erro 504 ou tela de branco | *Cache Storage*: o arquivo está lá? A instalação falhou (veja *Network* com o filtro "service worker")? |
-| Parece a versão antiga | `?sw=0` para confirmar que é cache; depois confira se `npm run stamp` foi rodado (hash novo = URL nova) |
+| Parece a versão antiga | `?sw=0` para confirmar que é cache; depois confira se `npm run stamp` foi rodado (hash novo = URL nova). Imagem de `assets/` também tem hash: se o `?v=` da textura não mudou, o carimbo não foi rodado |
+| Capim largo/achatado ou cintilando | `world-tall-grass.js`: proporção da placa (`√2`) e filtros da textura; `tests/tall-grass.test.mjs` cobre os dois |
 | Offline abre o menu mas o mundo não carrega | Alguma coisa nova no jogo não está no `index.html` (importmap/`<link>`) — é de lá que o worker tira a lista |
 
 ## O que **não** precisa ser testado à mão
 
-Já coberto por `npm test` (541 testes):
+Já coberto por `npm test` (774 testes):
 
 - manifest e ícones — tamanho, opacidade, círculo seguro do maskable, favicon
   chapado (`tests/icons.test.mjs`);
