@@ -117,6 +117,17 @@ export const HURT_FLASH = 0.22;
 /** Empurrão do golpe, em blocos (para o bicho "sentir" o impacto). */
 export const KNOCKBACK_DISTANCE = 0.35;
 /**
+ * Piscada: os olhos fecham por um instante de vez em quando.
+ *
+ * É animação barata, mas é o que separa "escultura" de "bicho": com os olhos
+ * parados ele parece um enfeite que anda.
+ */
+export const BLINK_DURATION = 0.12;
+export const BLINK_MIN = 3.2;
+export const BLINK_MAX = 7.5;
+/** Quanto os olhos fecham na piscada (fração da altura). */
+export const BLINK_SHUT = 0.15;
+/**
  * Noite a partir da qual o Mofim aparece (`night` = 1 - dia do céu).
  *
  * Fica abaixo de 0,5 de propósito: eles entram em cena no **crepúsculo**, com o
@@ -372,6 +383,11 @@ function rotate2(x, z, angle) {
     return { x: x * c - z * s, z: x * s + z * c };
 }
 
+/** Tamanhos do corpo que a animação mexe (o desenho e a animação têm de bater). */
+const EYE_HEIGHT = 0.075;
+const TORSO_HEIGHT = 0.34;
+const GLOW_SIZE = 0.055;
+
 export function createCreatureSystemClass({
     THREE,
     ID,
@@ -440,22 +456,65 @@ export function createCreatureSystemClass({
             return mesh;
         }
 
-        createModel() {
+        /**
+         * O corpo do Mofim.
+         *
+         * Tudo é caixa — é o estilo do jogo —, mas as caixas fazem um trabalho:
+         * orelhas e cauda quebram a silhueta de bloco, o focinho separa a cara do
+         * resto, os pés tiram o corpo do ar (antes ele flutuava 0,07 do chão) e a
+         * luzinha virou a ponta de uma antena, em vez de uma caixinha solta acima
+         * da cabeça.
+         *
+         * `tone` (0..1) desloca um pouco o matiz: os três da noite não são clones.
+         */
+        createModel(tone = 0.5) {
             const group = new THREE.Group();
             // Cópia do material por criatura: o clarão do dano não pode pintar as
             // outras (os materiais são compartilhados pelo sistema).
-            const body = this.materials.body.clone();
-            this.addPart(group, body, 0, 0.24, 0, 0.46, 0.34, 0.42);
-            this.addPart(group, this.materials.belly, 0, 0.18, 0.215, 0.28, 0.18, 0.025);
-            this.addPart(group, body, 0, 0.43, 0.105, 0.30, 0.28, 0.28);
-            this.addPart(group, this.materials.eye, -0.075, 0.46, 0.248, 0.045, 0.06, 0.025);
-            this.addPart(group, this.materials.eye, 0.075, 0.46, 0.248, 0.045, 0.06, 0.025);
+            const base = this.materials.body.color.clone()
+                .offsetHSL((tone - 0.5) * 0.07, (tone - 0.5) * 0.05, (tone - 0.5) * 0.07);
+            const body = new THREE.MeshLambertMaterial({ color: base });
+            // Olhos com material próprio: acendem à noite e piscam.
+            const eye = new THREE.MeshLambertMaterial({ color: 0x173b42 });
+            const torso = this.addPart(group, body, 0, 0.24, 0, 0.46, 0.34, 0.42);
+            torso.name = 'torso';
+            this.addPart(group, this.materials.belly, 0, 0.18, 0.215, 0.28, 0.18, 0.025).name = 'belly';
+            this.addPart(group, body, 0, 0.43, 0.105, 0.30, 0.28, 0.28).name = 'head';
+            // Focinho claro + nariz: a cara deixa de ser a parede do corpo.
+            this.addPart(group, this.materials.belly, 0, 0.395, 0.245, 0.15, 0.10, 0.05).name = 'muzzle';
+            this.addPart(group, this.materials.eye, 0, 0.405, 0.275, 0.05, 0.035, 0.02).name = 'nose';
+            // Orelhas: o que faz a silhueta ler como bicho de longe.
+            const leftEar = this.addPart(group, body, -0.10, 0.58, 0.09, 0.075, 0.13, 0.05);
+            const rightEar = this.addPart(group, body, 0.10, 0.58, 0.09, 0.075, 0.13, 0.05);
+            leftEar.rotation.z = -0.22;
+            rightEar.rotation.z = 0.22;
+            leftEar.name = 'ear';
+            rightEar.name = 'ear';
+            const leftEye = this.addPart(group, eye, -0.078, 0.47, 0.252, 0.055, 0.075, 0.03);
+            const rightEye = this.addPart(group, eye, 0.078, 0.47, 0.252, 0.055, 0.075, 0.03);
+            leftEye.name = 'eye';
+            rightEye.name = 'eye';
             const leftWing = this.addPart(group, this.materials.wing, -0.29, 0.32, -0.015, 0.24, 0.12, 0.035);
             const rightWing = this.addPart(group, this.materials.wing, 0.29, 0.32, -0.015, 0.24, 0.12, 0.035);
             leftWing.rotation.z = -0.25;
             rightWing.rotation.z = 0.25;
-            const glowMesh = this.addPart(group, this.materials.glow, 0, 0.62, 0.08, 0.07, 0.07, 0.07);
-            return { group, leftWing, rightWing, bodyMaterial: body, glowMesh };
+            leftWing.name = 'wing';
+            rightWing.name = 'wing';
+            // Pés: encostam no chão, então ele pisa em vez de flutuar.
+            this.addPart(group, body, -0.13, 0.06, 0.07, 0.09, 0.09, 0.15).name = 'foot';
+            this.addPart(group, body, 0.13, 0.06, 0.07, 0.09, 0.09, 0.15).name = 'foot';
+            const tail = this.addPart(group, body, 0, 0.30, -0.31, 0.08, 0.20, 0.08);
+            tail.rotation.x = -0.3;
+            tail.name = 'tail';
+            // Luzinha na ponta da antena (antes ela boiava acima da cabeça).
+            this.addPart(group, this.materials.eye, 0, 0.60, 0.06, 0.02, 0.10, 0.02).name = 'antenna';
+            const glowMesh = this.addPart(group, this.materials.glow, 0, 0.665, 0.06, 0.055, 0.055, 0.055);
+            glowMesh.name = 'lantern';
+            return {
+                group, leftWing, rightWing, torso,
+                bodyMaterial: body, eyeMaterial: eye,
+                eyeMeshes: [leftEye, rightEye], glowMesh,
+            };
         }
 
         trySpawn(playerPos, at, night = 1) {
@@ -482,7 +541,7 @@ export function createCreatureSystemClass({
                 const y = this.surfaceAt(x, z);
                 if (y === null) continue;
                 if (this.entities.some(e => (e.x - x) ** 2 + (e.z - z) ** 2 < ARRIVE_MIN_GAP ** 2)) continue;
-                const model = this.createModel();
+                const model = this.createModel(hash2(seed, attempt, 173));
                 model.group.position.set(x, y, z);
                 this.world.scene.add(model.group);
                 this.entities.push({
@@ -492,6 +551,8 @@ export function createCreatureSystemClass({
                     lastChirpAt: -Infinity, chirpPending: null,
                     nextIdleAt: at + CHIRP_IDLE_MIN + hash2(seed, attempt, 211) * (CHIRP_IDLE_MAX - CHIRP_IDLE_MIN),
                     health: MOFIM_HEALTH, hurtUntil: 0,
+                    blinkAt: at + BLINK_MIN + hash2(seed, attempt, 617) * (BLINK_MAX - BLINK_MIN),
+                    blinkT: 0,
                     // Chegada ao anoitecer: nasce longe e vem andando até perto.
                     arriving: true, arriveAt: at,
                     leaving: false, leaveT: 0, leaveFromY: y,
@@ -800,6 +861,12 @@ export function createCreatureSystemClass({
                     const flap = Math.sin(at * 30 + e.phase) * 0.55;
                     e.leftWing.rotation.z = -0.1 + flap;
                     e.rightWing.rotation.z = 0.1 - flap;
+                    // O dia chegou: a luzinha apaga junto com ele (antes ela
+                    // ficava acesa até o bicho sumir).
+                    const flashSaindo = Math.max(0, (e.hurtUntil - at) / HURT_FLASH);
+                    e.bodyMaterial.emissive.setRGB(flashSaindo * 0.85, flashSaindo * 0.45, flashSaindo * 0.12);
+                    e.eyeMaterial.emissive.setRGB(0, 0, 0);
+                    e.glowMesh.scale.setScalar(GLOW_SIZE * (1 - gone));
                     if (gone >= 1) this.removeEntity(e);
                     continue;
                 }
@@ -912,8 +979,24 @@ export function createCreatureSystemClass({
                     flash * 0.45 + glow * 0.75,
                     flash * 0.12 + glow * 0.45,
                 );
-                // A luzinha das costas cresce no escuro: de dia ele é silhueta.
-                e.glowMesh.scale.setScalar(0.07 * (1 + 1.3 * glow / 0.16));
+                // Olhos: de dia são dois pontos escuros; à noite, duas luzinhas.
+                // É o que faz o bicho ser visto no escuro — o corpo, à noite, é
+                // quase silhueta.
+                const luz = Math.min(1, glow / 0.16);
+                e.eyeMaterial.emissive.setRGB(0.95 * luz, 0.68 * luz, 0.26 * luz);
+                // Piscada: os dois fecham juntos por um instante, de vez em quando.
+                e.blinkT = Math.max(0, e.blinkT - dt);
+                if (at >= e.blinkAt) {
+                    e.blinkT = BLINK_DURATION;
+                    const seed = this.world.seed + e.id * 7919 + Math.floor(at);
+                    e.blinkAt = at + BLINK_MIN + hash2(seed, e.id, 617) * (BLINK_MAX - BLINK_MIN);
+                }
+                const olho = e.blinkT > 0 ? BLINK_SHUT : 1;
+                for (const eyeMesh of e.eyeMeshes) eyeMesh.scale.y = EYE_HEIGHT * olho;
+                // Respiração: o corpo sobe e desce um fio, devagar, sem parar.
+                e.torso.scale.y = TORSO_HEIGHT * (1 + 0.03 * Math.sin(at * 2.1 + e.phase));
+                // A luzinha da antena cresce no escuro.
+                e.glowMesh.scale.setScalar(GLOW_SIZE * (1 + 1.4 * luz));
                 e.group.position.set(e.x, e.visualY + Math.sin(at * 3 + e.phase) * bob, e.z);
                 e.group.rotation.y = e.heading;
                 // Planando, o corpo inclina um pouco para a frente e as asas

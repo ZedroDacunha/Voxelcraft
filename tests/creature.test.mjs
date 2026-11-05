@@ -26,6 +26,8 @@ import {
     FLIGHT_DURATION,
     FLIGHT_HEIGHT,
     ARRIVE_MIN_GAP,
+    BLINK_DURATION,
+    BLINK_SHUT,
     ARRIVE_SPEED,
     ARRIVE_SPREAD,
     ARRIVE_STOP_DISTANCE,
@@ -1158,4 +1160,128 @@ test('a fila de chegada cabe no limite: três por noite, um atrás do outro', ()
         }
     }
     assert.ok(ARRIVE_MIN_GAP < SPAWN_MIN_DISTANCE, 'o espaço entre eles é o da fila, não o do susto');
+});
+
+// ------------------------------------------------ aparência (anatomia + olhos)
+
+const partes = (creature, nome) => creature.group.children.filter(c => c.name === nome);
+
+test('o bicho tem anatomia: orelhas, focinho, pés, cauda e a luzinha na antena', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 14 });
+    const creature = spawnOne(system, world, clock, player);
+
+    assert.equal(partes(creature, 'ear').length, 2, 'duas orelhas');
+    assert.equal(partes(creature, 'foot').length, 2, 'dois pés');
+    assert.equal(partes(creature, 'muzzle').length, 1, 'focinho');
+    assert.equal(partes(creature, 'tail').length, 1, 'cauda');
+    assert.equal(partes(creature, 'antenna').length, 1, 'antena');
+    assert.equal(partes(creature, 'eye').length, 2, 'dois olhos');
+
+    // Os pés tiram o corpo do ar: o ponto mais baixo do desenho é o chão.
+    const caixa = new THREE.Box3().setFromObject(creature.group);
+    const chao = creature.group.position.y;
+    assert.ok(caixa.min.y - chao < 0.05,
+        `o corpo encosta no chão (${(caixa.min.y - chao).toFixed(3)} acima)`);
+    // E as orelhas sobem acima do topo do corpo antigo (o pescoço era vazio).
+    const orelha = partes(creature, 'ear')[0];
+    assert.ok(orelha.position.y > 0.5, 'as orelhas ficam acima do corpo');
+
+    // A luzinha está presa: a antena termina onde ela começa.
+    const antena = partes(creature, 'antenna')[0];
+    const luzinha = partes(creature, 'lantern')[0];
+    const topoAntena = antena.position.y + 0.05;
+    assert.ok(Math.abs(topoAntena - luzinha.position.y) < 0.06,
+        'a luz fica na ponta da antena, não boiando acima da cabeça');
+});
+
+test('os olhos acendem à noite e apagam de dia', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 14 });
+    const creature = spawnOne(system, world, clock, player);
+
+    clock.t += 0.1;
+    system.update(0.1, player, true, { night: 1 });
+    const noite = creature.eyeMaterial.emissive.r;
+    assert.ok(noite > 0.5, `à noite os olhos acendem (${noite.toFixed(2)})`);
+
+    // No crepúsculo (ainda é hora dele) os olhos já estão bem mais fracos.
+    clock.t += 0.1;
+    system.update(0.1, player, true, { night: NIGHT_SPAWN_THRESHOLD });
+    const crepusculo = creature.eyeMaterial.emissive.r;
+    assert.ok(crepusculo < noite * 0.6,
+        `no crepúsculo já enfraqueceram (${crepusculo.toFixed(2)})`);
+
+    // Ao amanhecer ele vai embora — e a luzinha apaga junto com ele.
+    clock.t += 0.1;
+    system.update(0.1, player, true, { night: 0 });
+    for (let i = 0; i < 30 && creature.eyeMaterial; i++) {
+        clock.t += 0.05;
+        system.update(0.05, player, true, { night: 0 });
+    }
+    assert.ok(creature.eyeMaterial.emissive.r < 0.05, 'de dia ficam escuros');
+    // O material é do bicho, não compartilhado: um olho aceso não acende os outros.
+    assert.notEqual(creature.eyeMaterial, system.materials.eye);
+});
+
+test('ele pisca: os olhos fecham por um instante e voltam', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 14 });
+    const creature = spawnOne(system, world, clock, player);
+
+    const aberto = creature.eyeMeshes[0].scale.y;
+    assert.ok(aberto > 0.05, 'os olhos começam abertos');
+
+    creature.blinkAt = clock.t;
+    clock.t += 0.016;
+    system.update(0.016, player, true);
+    const fechado = creature.eyeMeshes[0].scale.y;
+    assert.ok(fechado < aberto * (BLINK_SHUT + 0.02),
+        `fechou na piscada (${fechado.toFixed(3)} contra ${aberto.toFixed(3)})`);
+
+    // Passado o tempo da piscada, os olhos voltam a abrir.
+    for (let i = 0; i <= Math.ceil(BLINK_DURATION / 0.05); i++) {
+        clock.t += 0.05;
+        system.update(0.05, player, true);
+    }
+    assert.ok(Math.abs(creature.eyeMeshes[0].scale.y - aberto) < 1e-6, 'e abriu de novo');
+    assert.ok(creature.blinkAt > clock.t, 'a próxima piscada foi marcada');
+});
+
+test('ele respira: o corpo sobe e desce devagar, sem sair do lugar', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 14 });
+    const creature = spawnOne(system, world, clock, player);
+
+    const alturas = [];
+    for (let i = 0; i < 60; i++) {
+        clock.t += 0.1;
+        system.update(0.1, player, true);
+        alturas.push(creature.torso.scale.y);
+    }
+    const maior = Math.max(...alturas), menor = Math.min(...alturas);
+    assert.ok(maior - menor > 0.01, `o corpo respira (${menor.toFixed(3)} → ${maior.toFixed(3)})`);
+    assert.ok(maior < 0.36 && menor > 0.32, 'e não infla como balão');
+});
+
+test('os três da noite não são clones: cada um tem seu tom', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    for (let i = 0; i < 300 && system.entities.length < CREATURE_LIMIT; i++) {
+        clock.t += 0.1;
+        system.update(0.1, player, true);
+    }
+    assert.equal(system.entities.length, CREATURE_LIMIT, 'chegaram os três');
+    const cores = system.entities.map(e => e.bodyMaterial.color.getHexString());
+    assert.equal(new Set(cores).size, CREATURE_LIMIT, `tons diferentes (${cores.join(', ')})`);
 });
