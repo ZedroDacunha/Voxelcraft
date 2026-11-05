@@ -398,6 +398,25 @@ No celular, dá para fazer o mesmo sem entrar num mundo.
 - [ ] Redimensionar a janela (ou girar a tela) com resolução fixa: a imagem
       continua ocupando tudo, sem engasgo a cada arrasto da borda.
 
+## 20. Título do menu
+
+Abra o jogo e pare na tela inicial (só olhar, não precisa entrar em mundo).
+
+- [ ] O título é **VOXEL** grande em cima e **SANDBOX** menor embaixo, letras de
+      pedra com profundidade na diagonal e inclinação leve.
+- [ ] O granulado da pedra aparece nas letras (não é cor chapada).
+- [ ] A frase `um mundo de blocos!` **não** aparece mais.
+- [ ] A borda das letras fica nítida em qualquer tamanho de janela — sem
+      serrilhado, mesmo em tela grande.
+- [ ] Redimensionar a janela: o título acompanha a largura e **nunca** empurra os
+      botões (`Um jogador`, `Opções...`, `Sair do jogo`) para fora da tela.
+- [ ] Deitar o celular (tela baixa): o título encolhe junto e os botões
+      continuam visíveis e clicáveis.
+- [ ] Teclado: `Tab` continua indo do título para os botões, e o leitor de tela
+      anuncia a tela como **Voxel Sandbox**.
+- [ ] Zoom do navegador em 200 %: o título continua legível e dentro da tela.
+- [ ] Trocar de mundo e voltar ao menu: o título aparece igual, sem piscar.
+
 ## Se algo falhar
 
 | Sintoma | Onde olhar |

@@ -205,13 +205,14 @@
     .menu-mark { display: grid; place-items: center; width: 22px; height: 22px; border: 2px solid #fff; background: #54723e;
         box-shadow: 2px 2px 0 #26351f; font: 900 14px/1 monospace; }
     .title-screen-center { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 14px 0 24px; }
-    .title-screen-logo { position: relative; display: flex; flex-direction: column; align-items: center; margin: 0 0 clamp(28px, 5vh, 48px);
-        transform: rotate(-2deg); filter: drop-shadow(3px 5px 0 rgba(0,0,0,.75)); }
-    .title-logo-main { color: #f1eee1; font: 1000 clamp(54px, 10vw, 112px)/.82 Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
-        letter-spacing: -.045em; -webkit-text-stroke: 2px #24221d; text-shadow: 3px 3px 0 #898577, 6px 6px 0 #292823; }
-    .title-logo-sub { margin-top: 8px; color: #d7d2bf; font: 900 clamp(14px, 2.3vw, 23px)/1 monospace; letter-spacing: .42em; text-shadow: 2px 2px 0 #292823; }
-    .title-logo-splash { position: absolute; right: clamp(-90px, -11vw, -48px); bottom: 10%; color: #fff34c; font: 900 clamp(12px, 1.8vw, 20px)/1 cursive;
-        white-space: nowrap; text-shadow: 2px 2px 0 #4d4819; transform: rotate(-13deg); }
+    /* O título: letras de pedra montadas em blocos, extrudadas na diagonal e
+       inclinadas, no espírito dos menus clássicos de jogos voxel. O desenho é um
+       SVG inline (sem recurso externo), então a borda fica nítida de 360 px a 4K
+       e a altura fica limitada para os botões nunca saírem da tela. */
+    .title-screen-logo { position: relative; display: flex; justify-content: center;
+        width: min(86vw, 620px, calc(46vh * 1.909)); margin: 0 0 clamp(28px, 5vh, 48px);
+        filter: drop-shadow(5px 7px 0 rgba(0, 0, 0, .45)); }
+    .title-logo-art { display: block; width: 100%; height: auto; overflow: visible; }
     .title-screen-actions { display: grid; gap: 8px; width: min(360px, calc(100vw - 40px)); }
     .classic-btn { position: relative; min-height: 34px; box-sizing: border-box; padding: 6px 16px; border: 2px solid #171717; border-radius: 0;
         color: #fff; background: linear-gradient(#858585 0%, #777 47%, #696969 50%, #777 100%);
@@ -417,13 +418,11 @@
     @media (max-width: 520px) {
         .title-screen-footer span:last-child { display: none; }
         .title-screen-logo { margin-bottom: 34px; }
-        .title-logo-main { -webkit-text-stroke-width: 1px; }
         .world-menu-card { padding: 22px 16px; }
     }
     @media (max-height: 540px) {
         #title-screen { padding-block: 10px; }
-        .title-screen-logo { margin-bottom: 18px; }
-        .title-logo-main { font-size: clamp(42px, 12vh, 72px); }
+        .title-screen-logo { margin-bottom: 18px; width: min(70vw, 420px, calc(33vh * 1.909)); }
         .title-screen-actions { gap: 5px; width: min(320px, calc(100vw - 40px)); }
         .classic-btn-wide { min-height: 32px; }
     }
