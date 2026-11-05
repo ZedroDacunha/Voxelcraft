@@ -180,6 +180,23 @@ aparelho do jogador.
 - [ ] Pausando (ESC), o pó **congela** no ar; ao voltar, retoma de onde estava.
 - [ ] O pó atravessa parede (é fumaça), mas desbota em 1,5 s sem deixar sujeira.
 
+## 12. O sol no menu
+
+- [ ] Ao abrir o jogo, o **sol aparece** no céu do menu, logo acima da linha das
+      árvores — um quadrado amarelo, do mesmo jeito que no jogo.
+- [ ] O céu está **laranja de fim de tarde** e a luz na ilha é dourada (não é mais
+      meio-dia branco).
+- [ ] A ilha fica um pouco **menor** que antes e há céu de verdade em cima dela
+      (antes eram só uns 5% de céu no topo).
+- [ ] A câmera gira devagar e, depois de alguns minutos, o sol **sai de quadro**
+      — e isso é esperado (não é bug).
+- [ ] Com "reduzir movimento" ligado no sistema, a câmera **não gira** e o sol
+      fica parado em cena.
+- [ ] Em celular (retrato e paisagem) e em tela larga o sol continua visível.
+- [ ] Ao entrar no mundo, o céu do **jogo** está normal (o mesmo de antes, com
+      sol, lua e estrelas se movendo).
+- [ ] Nada do menu (título, botões) ficou ilegível com o céu laranja.
+
 ## Se algo falhar
 
 | Sintoma | Onde olhar |

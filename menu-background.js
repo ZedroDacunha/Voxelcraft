@@ -5,8 +5,10 @@
 // - a malha vem de `menu-panorama.js`, com as faces escondidas fora e a sombra
 //   de canto escrita em cor de vértice — o mesmo relevo dos blocos do jogo;
 // - o céu é o `world-sky.js`, que é quem decide cor do fundo, nevoeiro, força e
-//   cor do sol (e desenha sol, lua e estrelas). O relógio aqui é parado numa
-//   tarde de sol: um menu que escurece sozinho deixaria o título ilegível.
+//   cor do sol (e desenha sol, lua e estrelas). O relógio aqui é parado **no fim
+//   da tarde**: o sol fica logo acima da linha das árvores, aparece no quadro e
+//   pinta o céu de laranja. Um menu que escurece sozinho deixaria o título
+//   ilegível — por isso a hora não anda, só a câmera.
 // - as luzes (hemisférica + direcional) nascem com os valores do jogo e são
 //   reescritas pelo céu a cada quadro, como no mundo.
 
@@ -15,6 +17,7 @@ import { TILE, TILE_PX, atlasTileRect } from './world-catalog.js';
 import { clamp01, mulberry32, smoothstep } from './world-math.js';
 import { createTextureTools } from './world-textures.js';
 import { createWorldSkySystem } from './world-sky.js';
+import { MENU_CAMERA, MENU_SUN_TIME, menuCameraPosition } from './menu-framing.js';
 import { MENU_LAKE, buildMenuPanorama, panoramaGeometry } from './menu-panorama.js';
 
 const canvas = document.getElementById('menu-world');
@@ -22,11 +25,8 @@ const titleScreen = document.getElementById('title-screen');
 if (!canvas || !titleScreen) throw new Error('A tela inicial não está pronta para mostrar o panorama.');
 
 const SKY_COLOR = 0x9bcce7;
-// Onde o sol está no céu do menu, em fração do dia (0 = nascer, 0.25 = meio-dia).
-// 0.06 é manhã de céu limpo: dia cheio, luz branca e sombra no ponto mais claro
-// do jogo. Baixar para perto de 0.02 dá fim de tarde laranja; subir passa do
-// meio-dia. É o único número a mexer para trocar a hora do menu.
-const MENU_SUN_TIME = 0.06;
+// A hora do menu e o enquadramento da ilha moram em `menu-framing.js`: é lá que a
+// conta do sol em quadro fica testável (aqui há DOM, e teste não entra).
 const FOG_NEAR = 42;
 const FOG_FAR = 105;
 
@@ -36,7 +36,7 @@ scene.fog = new THREE.Fog(SKY_COLOR, FOG_NEAR, FOG_FAR);
 
 // `far` generoso: o sol, a lua e as estrelas ficam a 250 unidades da câmera.
 const camera = new THREE.PerspectiveCamera(43, 1, 0.1, 400);
-const target = new THREE.Vector3(0, 5, 0);
+const target = new THREE.Vector3(0, MENU_CAMERA.targetY, 0);
 
 const renderer = new THREE.WebGLRenderer({
     canvas,
@@ -153,13 +153,12 @@ window.addEventListener('resize', resize, { passive: true });
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 let frameId = 0;
 let previousFrame = 0;
-let angle = -0.1;
 function render(now = 0) {
     frameId = 0;
     clouds.position.x = reduceMotion.matches ? 0 : Math.sin(now * 0.000035) * 2.1;
-    angle = reduceMotion.matches ? -0.1 : -0.1 + now * 0.000014;
-    const radius = 39;
-    camera.position.set(Math.sin(angle) * radius, 18.5 + Math.sin(angle * 1.7) * 0.7, Math.cos(angle) * radius);
+    // O giro e o ponto de partida (virado para o sol) vêm de `menu-framing.js`.
+    const pose = menuCameraPosition(now, { reduced: reduceMotion.matches });
+    camera.position.set(pose.x, pose.y, pose.z);
     camera.lookAt(target);
     worldSky.update({
         scene,
