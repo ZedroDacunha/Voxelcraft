@@ -46,6 +46,7 @@ import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld 
 import { canJumpFrom, createJumpState, updateJumpWindow } from './player-jump.js';
 import { createCreatureSystemClass, creatureInReach } from './world-creature.js';
 import { dustScaleFor } from './world-creature-dust.js';
+import { configureWindSway, updateWindSway, windDirectionFor, windStep, windTargetFor } from './world-wind.js';
 import { advanceHandAnimation, countStrikes, createHandAnimation, handSwingAmount, startPunch } from './world-hand-animation.js';
 import { advanceStepTracker, createStepTracker, stepDistanceThisFrame, stepPitch, stepSoundFor } from './world-step-sounds.js';
 import { materialSoundName } from './world-block-materials.js';
@@ -2565,6 +2566,20 @@ function updateAmbient(dt) {
     applyAmbientLevels(stepAmbient(ambientState, dt, { availability }));
 }
 
+// ---------------------------------------------------------------------
+// Vento visível: o capim balança com o mesmo vento que se ouve.
+// A intensidade vem da fase do ambiente (já multiplicada pela altitude), com
+// rampa — sem isso o capim pararia de um quadro para o outro no fim da fase.
+// Pausa, menu e aba escondida congelam o vento em vez de zerá-lo.
+const windState = { time: 0, level: 0 };
+
+function updateGrassWind(dt) {
+    if (!playing() || dead || document.hidden) return;
+    windState.time += dt;
+    windState.level = windStep(windState.level, windTargetFor(ambientApplied), dt);
+    updateWindSway(tallGrassMaterials, windState.time, windState.level);
+}
+
 // =====================================================================
 // 5E3. CACHOEIRA (O ÚNICO LAÇO QUE DEPENDE DO LUGAR)
 // =====================================================================
@@ -3497,6 +3512,10 @@ async function init() {
             depthWrite: true, side: THREE.DoubleSide,
         });
     });
+    // Vento: uma direção por mundo, sortida da semente. O capim balança com o
+    // que se ouve — a intensidade é atualizada todo quadro em updateGrassWind.
+    const windDirection = windDirectionFor(SEED);
+    for (const material of tallGrassMaterials) configureWindSway(material, { direction: windDirection });
     tallGrassMaterial = tallGrassMaterials[1];
     const grassGeometries = Array.from({ length: 3 }, (_, variant) => createTallGrassGeometry(variant));
     window.testInstancedMesh = () => testInstancedMesh(THREE, renderer);
@@ -3954,6 +3973,7 @@ function animate() {
     else worldClouds.update(0, camera);
     updateHand(dt);
     updateAmbient(dt);
+    updateGrassWind(dt);
     updateWaterfall(dt);
     if (hurtFlash > 0) { hurtFlash = Math.max(0, hurtFlash - dt * 2); hurtEl.style.opacity = hurtFlash; }
     world.update(player.pos.x, player.pos.z);

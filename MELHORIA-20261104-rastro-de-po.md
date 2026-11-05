@@ -113,7 +113,9 @@ Suíte: **605 → 623 testes**.
 
 - **rajada de pó no chilreio**: o pulso de luz já marca o som; mais partícula
   aqui viraria fogos de artifício;
-- **pó reagindo ao vento** (a mesma direção do capim): outro sistema, outro PR.
+- **pó reagindo ao vento**: outro sistema, outro PR. O vento já existia só no
+  áudio; ele virou visual primeiro ([vento no capim](MELHORIA-20261105-vento-no-capim.md))
+  e o pó bebe dele no PR seguinte.
 
 ## Como conferir no jogo
 
