@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 712 testes de módulos puros (node --test)
+npm test           # 725 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -42,7 +42,7 @@ O `check` é o que o CI (`.github/workflows/ci.yml`) roda em todo PR para `main`
 
 | Área | Arquivos |
 | --- | --- |
-| Entrada | `world-menu.js` (menu, seleção/criação de mundo), `world-options-view.js` (tela de opções em grade, aberta no menu e no ESC do jogo), `game-pause-menu.js` (menu de pausa) |
+| Entrada | `world-menu.js` (menu, seleção/criação de mundo), `world-options-view.js` (tela de opções em categorias, aberta no menu e no ESC do jogo), `game-pause-menu.js` (menu de pausa) |
 | Panorama do menu | `menu-background.js` (a câmera que gira e o céu) e `menu-panorama.js` (a ilha em malha única, com sombra de canto) |
 | Loop e estado do jogo | `game.js` (mundo, HUD, interação, save) |
 | Física e colisão do jogador | `player-physics.js` (AABB × voxels, passo subdividido, destravar, ocupação de célula, apoio no chão agachado), `player-jump.js` (janela do pulo tardio) |
@@ -85,7 +85,7 @@ capturar o mouse, e sim um joystick e botões na própria tela.
 - **Dedo na tela é a mira** (como no Minecraft de celular): o bloco escolhido é o
   que está embaixo do dedo, não o da cruz do centro. Três gestos, um dedo só:
   - **arrastar** → olha em volta (a sensibilidade do dedo é uma barra própria,
-    em Configurações de toque);
+    em Controles → Controles de toque);
   - **toque curto parado** → usa/coloca naquele bloco (o mesmo "usar" do botão
     direito do mouse);
   - **segurar parado** (~0,25 s) → cava aquele bloco, e deslizar o dedo cava a
@@ -94,7 +94,7 @@ capturar o mouse, e sim um joystick e botões na própria tela.
   enquanto o dedo estiver neles; `Usar` (mão), `Agachar` (seta ↓, alterna),
   `Mochila` e `Pausar` são de um toque. O nome de cada um fica no `aria-label`.
 - **Hotbar**: cada casa é um botão (não há roda do mouse).
-- **Opções → Configurações de toque** (sub-tela da mesma janela de Opções, no
+- **Opções → Controles → Controles de toque** (um nível dentro da mesma janela, no
   menu e no ESC): **Mão** (Destro/Canhoto espelha joystick, botões e dica),
   **Sensibilidade do olhar** (50%–200%, 80% de fábrica, separada da do mouse),
   **Tamanho dos botões** (80%–140%, com o joystick e a hotbar acompanhando) e
@@ -197,7 +197,14 @@ pessoa saem da frente. Os menus crescem junto com a tela (`--ui-scale`: 1×, 1,3
 acompanha, enquanto o HUD do jogo fica no tamanho de sempre.
 
 A tela de opções é a **mesma** do menu inicial, agora também com o jogo rodando
-atrás, no formato do Minecraft: o nome e o valor ficam **centrados** no botão
+atrás, no formato do Minecraft — e **separada por categorias**: a janela abre
+com três botões (`Áudio`, `Gráficos`, `Controles`) e cada um troca a grade no
+lugar, com o título acompanhando e `Voltar` para a lista. O toque mora dentro de
+`Controles` (`Controles de toque`), porque é onde o jogador procura o mouse e o
+dedo juntos; a lista de teclas recolhida também é de lá. Uma janela só, nunca
+duas empilhadas.
+
+Dentro de uma categoria, o nome e o valor ficam **centrados** no botão
 (`Campo de visão: 75°`) e, nas opções de faixa, um trilho escuro com o **cursor**
 mostra onde o valor está. Clique e arraste na barra mudam pela posição (é o gesto
 que serve no dedo também), setas andam um passo e `Home`/`End` vão aos extremos;
@@ -205,13 +212,13 @@ o leitor de tela recebe `role="slider"` com `aria-value*`. Já as opções de
 **lista** — hoje só `Gráficos` — são botão: cada clique passa para o modo
 seguinte, sem trilho nem cursor.
 
-| Opção | Vale quando |
-| --- | --- |
-| Sensibilidade do mouse | na hora |
-| Campo de visão | na hora |
-| Volume | na hora |
-| Gráficos (automática/máxima/alta/média) | na hora — o mesmo caminho do `F4` |
-| Distância de render | no próximo mundo (recarregar chunks ao vivo é outro assunto) — um recado avisa quando você muda |
+| Opção | Categoria | Vale quando |
+| --- | --- | --- |
+| Volume | Áudio | na hora |
+| Sensibilidade do mouse | Controles | na hora |
+| Campo de visão | Gráficos | na hora |
+| Gráficos (automática/máxima/alta/média) | Gráficos | na hora — o mesmo caminho do `F4` |
+| Distância de render | Gráficos | no próximo mundo (recarregar chunks ao vivo é outro assunto) — um recado avisa quando você muda |
 
 Quem grava é `world-game-settings.js` (localStorage), que também **avisa** os
 assinantes — o jogo aplica o que dá na hora e o áudio da interface troca de

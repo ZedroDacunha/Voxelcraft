@@ -89,7 +89,8 @@ test('a tela de toque é a mesma janela, com Voltar — nunca duas janelas', () 
 test('o botão de entrada mostra como estão os controles', () => {
     const entry = dialog.slice(dialog.indexOf('id="opt-touch-open"'), dialog.indexOf('</button>', dialog.indexOf('id="opt-touch-open"')));
     assert.match(entry, /aria-expanded="false"/);
-    assert.match(entry, /<span class="option-name">Configurações de toque<\/span>/);
+    assert.match(entry, /aria-controls="options-touch-grid"/);
+    assert.match(entry, /<span class="option-name">Controles de toque<\/span>/);
     assert.match(entry, /<span class="option-summary" id="opt-touch-summary">Destro · 100%<\/span>/);
     // é navegação, não barra: sem trilho nem cursor
     assert.doesNotMatch(entry, /option-track|option-knob/);
@@ -115,20 +116,19 @@ test('as duas linhas de toque existem com nome e valor na tela', () => {
 });
 
 test('a tela de toque troca a grade no lugar e volta ao fechar', () => {
-    assert.match(view, /const rows = \[\.\.\.buildRows\(OPTION_CONTROLS\), \.\.\.buildRows\(TOUCH_OPTION_CONTROLS\)\];/);
-    assert.match(view, /function showTouchScreen\(open\) \{/);
-    assert.match(view, /mainGrid\.hidden = open;/);
-    assert.match(view, /touchGrid\.hidden = !open;/);
-    assert.match(view, /controlsDetails\.hidden = open;/, 'a lista de teclas sai da frente');
-    assert.match(view, /title\.textContent = open \? 'Opções de toque' : 'Opções';/);
-    assert.match(view, /backButton\.hidden = !open;/);
-    // fechar não rouba o foco de quem abriu as opções
-    assert.match(view, /else if \(dialog\.open\) touchEntry\?\.focus\?\.\(\);/);
-    assert.match(view, /touchEntry\.setAttribute\('aria-expanded', String\(open\)\);/);
-    assert.match(view, /touchEntry\?\.addEventListener\('click', \(\) => showTouchScreen\(true\)\);/);
-    assert.match(view, /backButton\?\.addEventListener\('click', \(\) => showTouchScreen\(false\)\);/);
-    // fechar e reabrir sempre cai na grade principal
-    assert.match(view, /dialog\.addEventListener\('close', \(\) => showTouchScreen\(false\)\);/);
+    assert.match(view, /const rows = OPTION_SCREENS\.flatMap\(screen => buildRows\(screen\.controls\)\);/);
+    assert.match(view, /function showScreen\(next = 'main', \{ focus = true \} = \{\}\) \{/);
+    assert.match(view, /if \(grid\) grid\.hidden = key !== target;/, 'uma grade por vez');
+    assert.match(view, /if \(controlsDetails\) controlsDetails\.hidden = target !== keysScreen;/, 'a lista de teclas é da categoria Controles');
+    assert.match(view, /if \(title\) title\.textContent = titles\.get\(target\) \?\? 'Opções';/);
+    assert.match(view, /if \(backButton\) backButton\.hidden = target === 'main';/);
+    // fechar não rouba o foco de quem abriu as opções; voltar devolve ao botão que abriu
+    assert.match(view, /openers\.get\(left\)\?\.focus\?\.\(\);/);
+    assert.match(view, /opener\?\.setAttribute\('aria-expanded', String\(target === key\)\);/);
+    assert.match(view, /opener\?\.addEventListener\('click', \(\) => showScreen\(key\)\);/);
+    assert.match(view, /backButton\?\.addEventListener\('click', goBack\);/);
+    // fechar e reabrir sempre cai na lista de categorias
+    assert.match(view, /dialog\.addEventListener\('close', \(\) => showScreen\('main', \{ focus: false \}\)\);/);
     // e o resumo acompanha o que está salvo
     assert.match(view, /touchSummary\.textContent = `\$\{formatSetting\('touchLayout', settings\.touchLayout\)\} · \$\{formatSetting\('touchButtonSize', settings\.touchButtonSize\)\}`;/);
 });
@@ -142,7 +142,7 @@ test('a sub-tela escondida não aparece por cima da grade', () => {
 test('o resumo do botão não é confundido com o valor de uma barra', () => {
     // "um .option-value por linha" é o que o teste do menu de pausa confere
     const values = (dialog.match(/class="option-value"/g) ?? []).length;
-    const rows = OPTION_CONTROLS.length + TOUCH_OPTION_CONTROLS.length;
+    const rows = OPTION_CONTROLS.length;
     assert.equal(values, rows, 'o resumo usa .option-summary, não .option-value');
 });
 

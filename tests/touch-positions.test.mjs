@@ -160,7 +160,7 @@ test('a tela de opções tem a linha Editar posições, só dentro do mundo', ()
     // o jogo marca o body no modo toque; a linha só aparece lá
     assert.match(view, /import \{ TOUCH_EDIT_EVENT, TOUCH_RESET_EVENT, resetTouchPositions \} from '\.\/world-touch-positions\.js';/);
     assert.match(view, /const canEditPositions = \(\) => document\.body\.classList\.contains\('touch-mode'\);/);
-    assert.match(view, /if \(editButton\) editButton\.hidden = !canEditPositions\(\);/);
+    assert.match(view, /if \(editButton\) editButton\.hidden = target !== 'touch' \|\| !canEditPositions\(\);/);
     assert.match(view, /document\.dispatchEvent\(new CustomEvent\(TOUCH_EDIT_EVENT\)\);/);
 });
 

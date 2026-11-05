@@ -5,24 +5,51 @@ import {
 } from './world-game-settings.js';
 import { TOUCH_EDIT_EVENT, TOUCH_RESET_EVENT, resetTouchPositions } from './world-touch-positions.js';
 
-// Cada linha da tela de opções é uma barra clicável que mostra "Rótulo: valor".
-// O botão (`role="slider"`) recebe o clique/arraste e o `<span>` de saída mostra
-// o valor formatado — os dois vivem no index.html e são achados por id.
-export const OPTION_CONTROLS = [
-    { key: 'sensitivity', button: 'opt-sensitivity', output: 'opt-sensitivity-value', label: 'Sensibilidade do mouse' },
-    { key: 'fov', button: 'opt-fov', output: 'opt-fov-value', label: 'Campo de visão' },
-    { key: 'renderDistance', button: 'opt-render-distance', output: 'opt-render-distance-value', label: 'Distância de render' },
+// Cada linha de opção é uma barra clicável que mostra "Rótulo: valor". O botão
+// (`role="slider"`) recebe o clique/arraste e o `<span>` de saída mostra o valor
+// formatado — os dois vivem no index.html e são achados por id.
+//
+// As linhas estão separadas por categoria porque a tela de opções deixou de ser
+// uma parede de barras: a janela abre com as categorias e cada uma abre a
+// própria grade no lugar (nunca duas janelas empilhadas — regra do menu).
+export const AUDIO_OPTION_CONTROLS = [
     { key: 'volume', button: 'opt-volume', output: 'opt-volume-value', label: 'Volume' },
-    { key: 'graphics', button: 'opt-graphics', output: 'opt-graphics-value', label: 'Gráficos' },
 ];
 
-// Os controles de toque moram numa sub-tela do mesmo diálogo (o botão "Toque"
-// troca a grade no lugar). Duas janelas empilhadas nunca: é a regra do menu.
+export const GRAPHICS_OPTION_CONTROLS = [
+    { key: 'graphics', button: 'opt-graphics', output: 'opt-graphics-value', label: 'Gráficos' },
+    { key: 'fov', button: 'opt-fov', output: 'opt-fov-value', label: 'Campo de visão' },
+    { key: 'renderDistance', button: 'opt-render-distance', output: 'opt-render-distance-value', label: 'Distância de render' },
+];
+
+export const CONTROL_OPTION_CONTROLS = [
+    { key: 'sensitivity', button: 'opt-sensitivity', output: 'opt-sensitivity-value', label: 'Sensibilidade do mouse' },
+];
+
 export const TOUCH_OPTION_CONTROLS = [
+    { key: 'touchSensitivity', button: 'opt-touch-sensitivity', output: 'opt-touch-sensitivity-value', label: 'Sensibilidade do olhar' },
     { key: 'touchLayout', button: 'opt-touch-layout', output: 'opt-touch-layout-value', label: 'Mão' },
     { key: 'touchButtonSize', button: 'opt-touch-size', output: 'opt-touch-size-value', label: 'Tamanho dos botões' },
     { key: 'touchVibration', button: 'opt-touch-vibration', output: 'opt-touch-vibration-value', label: 'Vibração' },
-    { key: 'touchSensitivity', button: 'opt-touch-sensitivity', output: 'opt-touch-sensitivity-value', label: 'Sensibilidade do olhar' },
+];
+
+// Todas as linhas de valor, na ordem em que aparecem nas categorias. A lista de
+// categorias (`OPTION_SCREENS`) é quem manda na tela; esta serve para conferir
+// que todo campo tem uma linha e nenhuma tela repete campo.
+export const OPTION_CONTROLS = [
+    ...AUDIO_OPTION_CONTROLS, ...GRAPHICS_OPTION_CONTROLS,
+    ...CONTROL_OPTION_CONTROLS, ...TOUCH_OPTION_CONTROLS,
+];
+
+// As telas do diálogo. `main` é a lista de categorias; as outras trocam a grade
+// no lugar, com o título acompanhando. `open` é o botão que leva à tela e
+// `parent` é para onde "Voltar" retorna — o toque mora dentro de Controles.
+export const OPTION_SCREENS = [
+    { key: 'main', grid: 'options-main-grid', title: 'Opções' },
+    { key: 'audio', grid: 'options-audio-grid', title: 'Áudio', open: 'opt-open-audio', parent: 'main', controls: AUDIO_OPTION_CONTROLS },
+    { key: 'graphics', grid: 'options-graphics-grid', title: 'Gráficos', open: 'opt-open-graphics', parent: 'main', controls: GRAPHICS_OPTION_CONTROLS },
+    { key: 'controls', grid: 'options-controls-grid', title: 'Controles', open: 'opt-open-controls', parent: 'main', controls: CONTROL_OPTION_CONTROLS, keys: true },
+    { key: 'touch', grid: 'options-touch-grid', title: 'Controles de toque', open: 'opt-touch-open', parent: 'controls', controls: TOUCH_OPTION_CONTROLS },
 ];
 
 // Onde o ponteiro caiu na barra, de 0 (esquerda) a 1 (direita). Barra sem
@@ -37,10 +64,10 @@ export function createOptionsView(dialog = document.getElementById('options-dial
     if (!dialog) return null;
 
     // Campo com faixa numérica é barra arrastável (role="slider"); campo de
-    // lista (gráficos, mão) é botão: cada clique passa para o modo seguinte,
-    // como no Minecraft — arrastar numa lista de dois ou quatro modos só daria
-    // saltos.
-    const buildRows = (list) => list.map(({ key, button, output, label }) => {
+    // lista (gráficos, mão, vibração) é botão: cada clique passa para o modo
+    // seguinte, como no Minecraft — arrastar numa lista de dois ou quatro modos
+    // só daria saltos.
+    const buildRows = (list = []) => list.map(({ key, button, output, label }) => {
         const buttonEl = dialog.querySelector(`#${button}`);
         const field = GAME_SETTING_FIELDS[key];
         if (!buttonEl || !field) return null;
@@ -53,18 +80,22 @@ export function createOptionsView(dialog = document.getElementById('options-dial
         return { key, field, label, slider, buttonEl, outputEl: dialog.querySelector(`#${output}`) };
     }).filter(Boolean);
 
-    const rows = [...buildRows(OPTION_CONTROLS), ...buildRows(TOUCH_OPTION_CONTROLS)];
+    const rows = OPTION_SCREENS.flatMap(screen => buildRows(screen.controls));
 
-    // A sub-tela de toque troca a grade e o título no mesmo diálogo; "Voltar"
-    // devolve a grade principal. O resumo no botão evita ter de abrir a tela
-    // para saber como os controles estão.
-    const mainGrid = dialog.querySelector('#options-main-grid');
-    const touchGrid = dialog.querySelector('#options-touch-grid');
+    // Uma tela por vez: as grades, os botões que abrem cada uma, o caminho de
+    // volta e o título de cada categoria.
+    const grids = new Map(OPTION_SCREENS.map(({ key, grid }) => [key, dialog.querySelector(`#${grid}`)]));
+    const openers = new Map(OPTION_SCREENS.filter(screen => screen.open)
+        .map(screen => [screen.key, dialog.querySelector(`#${screen.open}`)]));
+    const parents = new Map(OPTION_SCREENS.filter(screen => screen.parent)
+        .map(screen => [screen.key, screen.parent]));
+    const titles = new Map(OPTION_SCREENS.map(({ key, title }) => [key, title]));
+    const keysScreen = OPTION_SCREENS.find(screen => screen.keys)?.key;
+
     const controlsDetails = dialog.querySelector('.options-controls');
     const title = dialog.querySelector('#options-title');
     const backButton = dialog.querySelector('#btn-options-back');
     const touchSummary = dialog.querySelector('#opt-touch-summary');
-    const touchEntry = dialog.querySelector('#opt-touch-open');
     const editButton = dialog.querySelector('#opt-touch-edit');
 
     // "Editar posições" só existe dentro do mundo e no modo toque: é lá que os
@@ -72,20 +103,34 @@ export function createOptionsView(dialog = document.getElementById('options-dial
     // `touch-mode` ao carregar; no menu do título a linha fica escondida.
     const canEditPositions = () => document.body.classList.contains('touch-mode');
 
-    function showTouchScreen(open) {
-        if (!touchGrid || !mainGrid) return;
-        mainGrid.hidden = open;
-        touchGrid.hidden = !open;
-        if (controlsDetails) controlsDetails.hidden = open;
-        if (backButton) backButton.hidden = !open;
-        if (title) title.textContent = open ? 'Opções de toque' : 'Opções';
-        if (touchEntry) touchEntry.setAttribute('aria-expanded', String(open));
-        if (editButton) editButton.hidden = !canEditPositions();
-        // Ao voltar, o foco vai para o botão que abriu a sub-tela. Ao fechar o
-        // diálogo não: quem devolve o foco ao que estava atrás é o navegador, e
-        // roubar o foco para um botão invisível deixaria o teclado perdido.
-        if (open) dialog.querySelector('#opt-touch-layout')?.focus?.();
-        else if (dialog.open) touchEntry?.focus?.();
+    let screen = 'main';
+
+    function showScreen(next = 'main', { focus = true } = {}) {
+        const target = grids.get(next) ? next : 'main';
+        screen = target;
+        for (const [key, grid] of grids) {
+            // grade que não existe no HTML não pode virar a tela atual
+            if (grid) grid.hidden = key !== target;
+        }
+        // a lista de teclas é da categoria Controles
+        if (controlsDetails) controlsDetails.hidden = target !== keysScreen;
+        if (backButton) backButton.hidden = target === 'main';
+        if (title) title.textContent = titles.get(target) ?? 'Opções';
+        if (editButton) editButton.hidden = target !== 'touch' || !canEditPositions();
+        for (const [key, opener] of openers) opener?.setAttribute('aria-expanded', String(target === key));
+        if (!focus) return;
+        // foco: a primeira linha da categoria aberta não deixa o teclado num
+        // botão que acabou de sair da tela
+        grids.get(target)?.querySelector('button')?.focus?.();
+    }
+
+    function goBack() {
+        const left = screen;
+        showScreen(parents.get(left) ?? 'main', { focus: false });
+        // Ao voltar, o foco vai para o botão que abriu a tela que está sendo
+        // deixada. Ao fechar o diálogo não: quem devolve o foco ao que estava
+        // atrás é o navegador, e roubar o foco deixaria o teclado perdido.
+        openers.get(left)?.focus?.();
     }
 
     const render = (settings) => {
@@ -110,6 +155,7 @@ export function createOptionsView(dialog = document.getElementById('options-dial
 
     let current = loadGameSettings();
     render(current);
+    showScreen('main', { focus: false });
 
     const apply = (key, value) => {
         if (current[key] === value) return;
@@ -160,7 +206,15 @@ export function createOptionsView(dialog = document.getElementById('options-dial
         });
     }
 
-    touchEntry?.addEventListener('click', () => showTouchScreen(true));
+    // Categorias: cada botão troca a grade no lugar; "Voltar" sobe um nível.
+    for (const [key, opener] of openers) {
+        opener?.addEventListener('click', () => showScreen(key));
+    }
+    backButton?.addEventListener('click', goBack);
+    // Fechar e reabrir as opções sempre volta para a lista de categorias: quem
+    // abriu no ESC para ver o volume não quer cair na tela de toque.
+    dialog.addEventListener('close', () => showScreen('main', { focus: false }));
+
     // Fecha a janela e pede ao jogo o modo de edição (o jogo é quem desenha os
     // controles; aqui só se avisa que o jogador quer arrastá-los).
     editButton?.addEventListener('click', () => {
@@ -168,10 +222,6 @@ export function createOptionsView(dialog = document.getElementById('options-dial
         dialog.close();
         document.dispatchEvent(new CustomEvent(TOUCH_EDIT_EVENT));
     });
-    backButton?.addEventListener('click', () => showTouchScreen(false));
-    // Fechar e reabrir as opções sempre volta para a grade principal: quem
-    // abriu no ESC para ver o volume não quer cair na tela de toque.
-    dialog.addEventListener('close', () => showTouchScreen(false));
 
     dialog.querySelector('#btn-options-reset')?.addEventListener('click', () => {
         current = saveGameSettings(DEFAULT_GAME_SETTINGS);
@@ -187,7 +237,13 @@ export function createOptionsView(dialog = document.getElementById('options-dial
     return {
         // As opções podem ser abertas no menu, no ESC do jogo e de novo depois:
         // reler do storage evita mostrar valor velho.
-        refresh: () => { current = loadGameSettings(); render(current); return { ...current }; },
+        refresh: () => {
+            current = loadGameSettings();
+            render(current);
+            showScreen('main', { focus: false });
+            return { ...current };
+        },
         get settings() { return { ...current }; },
+        get screen() { return screen; },
     };
 }
