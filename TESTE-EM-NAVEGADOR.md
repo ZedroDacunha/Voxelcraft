@@ -557,7 +557,10 @@ O chat é a única porta para comandos no jogo (não há console no navegador).
 | Parece a versão antiga | `?sw=0` para confirmar que é cache; depois confira se `npm run stamp` foi rodado (hash novo = URL nova). Imagem de `assets/` também tem hash: se o `?v=` da textura não mudou, o carimbo não foi rodado |
 | Capim largo/achatado ou cintilando | `world-tall-grass.js`: proporção da placa (`√2`) e filtros da textura; `tests/tall-grass.test.mjs` cobre os dois |
 | Porta com faixa escura no meio | A arte tem que ser desenhada na folha inteira (32×64) e recortada nas metades: `tests/door-texture.test.mjs` reprova costura, painel torto e ferragem do lado errado |
-| Nenhuma ovelha aparece | É dia? (`worldSky.day` acima de 0,45). O chão em volta é grama? Já existem quatro vivas? Veja `tests/sheep.test.mjs` — ele cobre nascimento, cores, passeio e o corpo caixa por caixa |
+| Nenhuma ovelha aparece | É dia? (`worldSky.day` acima de 0,45). O chão em volta é grama? Já existem seis vivas? Veja `tests/sheep.test.mjs` — ele cobre nascimento, cores, passeio, rebanho e o corpo caixa por caixa |
+| Ovelhas nascendo sozinhas ou espalhadas pelo pasto | Elas nascem em **bando** (2 a 4, mesmo `herd`, em volta da líder); bandos diferentes ficam a 6 blocos. `tests/sheep.test.mjs` reprova bando de um só |
+| Ovelha correndo atrás do jogador ou fugindo sem motivo | Só o **golpe** faz correr; chegando perto correndo ela apenas para e encara por 1,8 s. Agachado não assusta |
+| Ovelha parada no mesmo lugar para sempre | `pickTarget()` é chamado quando vence o `turnAt` (o bug antigo era ele nunca ser chamado): `tests/sheep.test.mjs` cobre a seguidora indo atrás da líder |
 | Ovelha sem casco, sem brilho no olho ou com a lã lisa demais | O modelo é montado em `createModel` com `SHEEP_TUFTS`, casco e brilho: `tests/sheep.test.mjs` conta os tufos, os cascos, os brilhos e confere que o casco toca o chão |
 | Ovelha mexendo a cabeça sem parar, ou abaixando sem comer nada | Só pasta de vez em quando e só come grama: `tests/sheep.test.mjs` confere o pasto (para, baixa, come a célula da frente) e o crescimento em 5–10 min |
 | Ovelha flutuando ou afundada | O modelo tem o pé em `y = 0` e o grupo é posto na altura do chão: `groundTypeAt`/`surfaceAt` em `world-creature-base.js` |
@@ -573,7 +576,7 @@ O chat é a única porta para comandos no jogo (não há console no navegador).
 
 ## O que **não** precisa ser testado à mão
 
-Já coberto por `npm test` (862 testes):
+Já coberto por `npm test` (903 testes):
 
 - manifest e ícones — tamanho, opacidade, círculo seguro do maskable, favicon
   chapado (`tests/icons.test.mjs`);
@@ -615,3 +618,23 @@ Já coberto por `npm test` (862 testes):
 - [ ] Andando para longe, o balido **enfraquece** e depois de ~20 blocos some.
 - [ ] Com `assets/sounds/sheep-bleat.ogg` na pasta (e Ctrl+F5), o som passa a ser
       o do arquivo; sem o arquivo, continua a síntese.
+
+## 28. Rebanho e susto
+
+- [ ] De dia, aparecem ovelhas **em grupo**: duas a quatro juntas, andando no
+      mesmo canto do pasto (e nunca mais de **seis** no mundo).
+- [ ] As companheiras andam **em volta da líder**; quando a líder se afasta
+      demais (mais de 7 blocos), a seguidora vai atrás dela.
+- [ ] Chegando **correndo** a menos de ~4 blocos (de pé), a ovelha e o bando
+      **param, erguem a cabeça e encaram** o jogador por ~2 s, e depois voltam a
+      pastar. Elas **não** correm.
+- [ ] Chegando **agachado** (ou andando devagar) a mesma distância, elas não se
+      assustam — dá para chegar colado.
+- [ ] Dando um **golpe** (clique com a mão vazia) numa ovelha, ela **corre para
+      longe** por ~3,5 s, mais rápido que o passo normal, e leva o bando junto.
+      O clique duplo não conta duas vezes (espera de 0,35 s).
+- [ ] Outro bando, mais longe, **não** se assusta junto (o contágio é do mesmo
+      grupo).
+- [ ] Sumindo a líder do mundo, uma das outras assume e o grupo continua junto.
+- [ ] O balido de perto continua valendo — e agora toca também no susto do golpe,
+      mais agudo.

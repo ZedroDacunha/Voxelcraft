@@ -22,12 +22,18 @@
  */
 
 import { createCreatureBaseClass, glideHeightAt, hopHeightAt } from './world-creature-base.js';
-import { creatureInReach } from './world-creature.js';
+import { creatureInReach, shouldFlee } from './world-creature.js';
 import { floorDiv as defaultFloorDiv } from './world-grid.js';
 import { hash2 as defaultHash2 } from './world-math.js';
 
 /** Quantas ovelhas cabem no mundo ao mesmo tempo. */
-export const SHEEP_LIMIT = 4;
+export const SHEEP_LIMIT = 6;
+/** O bando nasce junto: de 2 a 4 ovelhas no mesmo canto do pasto. */
+export const SHEEP_HERD_MIN = 2;
+export const SHEEP_HERD_MAX = 4;
+/** Raio (blocos) em que as companheiras nascem em volta da primeira. */
+export const SHEEP_HERD_SPREAD_MIN = 1.4;
+export const SHEEP_HERD_SPREAD_MAX = 3.2;
 /** Intervalo entre tentativas de nascimento (segundos). */
 export const SHEEP_SPAWN_INTERVAL = 6;
 /**
@@ -43,8 +49,31 @@ export const SHEEP_SPAWN_MAX_DISTANCE = 30;
 export const SHEEP_SPAWN_SPREAD = 1.6;
 /** Longe demais, ela sai da cena (some sem morrer). */
 export const SHEEP_DESPAWN_DISTANCE = 44;
-/** Nenhuma nasce colada em outra: ovelha é bicho de pasto, não de fila. */
+/** Bandos diferentes não nascem colados. */
 export const SHEEP_MIN_GAP = 6;
+/** Distância do líder a partir da qual a seguidora vai atrás (blocos). */
+export const SHEEP_FOLLOW_GAP = 7;
+
+// ---------------------------------------------------------------- o susto
+//
+// A regra de quando se assustar é a mesma do Mofim (`shouldFlee`): jogador
+// correndo ou andando rápido e perto assusta; **agachado, não**. O que muda é a
+// resposta, escolhida no P6: perto do jogador ela **para e encara**; no golpe ela
+// **corre para longe**.
+
+/** Raio e velocidade do jogador que assustam (blocos/s). */
+export const SHEEP_ALERT_RADIUS = 4.5;
+export const SHEEP_ALERT_SPEED = 2.2;
+/** Quanto tempo ela fica parada, de cabeça erguida, encarando quem chegou. */
+export const SHEEP_ALERT_TIME = 1.8;
+/** Quanto a cabeça sobe no susto (radianos) e em quanto tempo ela corre. */
+export const SHEEP_ALERT_HEAD_LIFT = 0.45;
+export const SHEEP_FLEE_TIME = 3.5;
+export const SHEEP_FLEE_SPEED = 1.55;
+/** Espera entre dois golpes na mesma ovelha (segundos). */
+export const SHEEP_HIT_COOLDOWN = 0.35;
+/** O susto pega nas companheiras até esta distância (blocos). */
+export const SHEEP_SCARE_SPREAD = 6;
 
 /** Velocidade do pasto (blocos por segundo) — devagar de propósito. */
 export const SHEEP_WANDER_SPEED = 0.55;
@@ -266,6 +295,23 @@ export function legPose(stride) {
     return [swing, -swing, -swing, swing];
 }
 
+/** Quantas ovelhas nascem juntas, a partir de um sorteio de 0 a 1. */
+export function herdSizeFor(roll) {
+    const r = Math.min(0.999999, Math.max(0, Number(roll) || 0));
+    return SHEEP_HERD_MIN + Math.floor(r * (SHEEP_HERD_MAX - SHEEP_HERD_MIN + 1));
+}
+
+/**
+ * Onde nasce uma companheira do bando: um ponto em volta da primeira, em ângulo
+ * e raio sorteados. Função pura — o teste confere o espaçamento sem mundo.
+ */
+export function herdSpotFor({ x, z, seed = 0, attempt = 0, member = 1, hash2: hash = defaultHash2 }) {
+    const angle = hash(seed, attempt * 31 + member, 167) * Math.PI * 2;
+    const radius = SHEEP_HERD_SPREAD_MIN
+        + hash(seed, attempt * 17 + member, 191) * (SHEEP_HERD_SPREAD_MAX - SHEEP_HERD_SPREAD_MIN);
+    return { x: x + Math.cos(angle) * radius, z: z + Math.sin(angle) * radius };
+}
+
 /**
  * A célula de chão que o focinho alcança, dado o rumo dela.
  *
@@ -377,6 +423,7 @@ export function createSheepSystemClass({
             super(world);
             this.nextSpawnAt = 0;
             this.spawnAttempt = 0;
+            this.nextHerd = 1;
             // Células de grama comida esperando crescer de volta (5–10 min).
             this.regrow = [];
             // Pele do focinho, olho e casco: iguais em todas, então são
@@ -612,51 +659,183 @@ export function createSheepSystemClass({
                 if (this.groundTypeAt(point.x, point.z) !== ID.GRASS) continue;
                 if (this.countNear(point.x, point.z, SHEEP_MIN_GAP) > 0) continue;
 
-                const coat = coatFor(hash2(seed, attempt, 173));
-                const model = this.createModel(coat.key);
-                model.group.position.set(point.x, y, point.z);
-                this.world.scene.add(model.group);
-                this.entities.push({
-                    id: this.nextId++,
-                    x: point.x, y, z: point.z,
-                    visualY: y,
-                    targetX: point.x, targetZ: point.z,
-                    heading: hash2(seed, attempt, 211) * Math.PI * 2,
-                    turnAt: at,
-                    // Passada das patas: fase e quanto ela está andando (0..1),
-                    // para as pernas voltarem devagar ao repouso quando ela para.
-                    stride: hash2(seed, attempt, 307) * Math.PI * 2,
-                    walking: 0,
-                    // Pasto: a primeira vem cedo (para o jogador ver), depois de
-                    // vez em quando. `grazeT` é o relógio da pastagem em curso
-                    // (null quando não está pastando) e `bit`, se já mordeu.
-                    // Balido: o primeiro chamado vem depois de um tempo, e ela
-                    // começa "longe" (quem sabe se o jogador já está colado).
-                    nextBleatAt: at + SHEEP_BLEAT_IDLE_MIN
-                        + hash2(seed, attempt, 577) * (SHEEP_BLEAT_IDLE_MAX - SHEEP_BLEAT_IDLE_MIN),
-                    lastBleatAt: -Infinity,
-                    wasNear: false,
-                    grazeAt: at + grazeDelayFor(hash2(seed, attempt, 401), true),
-                    grazeT: null,
-                    grazeFor: 0,
-                    bit: false,
-                    hopFrom: y, hopT: SHEEP_HOP_TIME,
-                    glideFrom: y, glideT: SHEEP_GLIDE_TIME,
-                    coat: coat.key,
-                    ...model,
-                });
+                // O bando nasce junto (2–4), em volta do mesmo ponto: a primeira
+                // é a líder e as outras ficam com ela. Companheiras com chão ruim
+                // (água, encosta) simplesmente não nascem — o bando pode sair
+                // menor que o sorteado.
+                const size = herdSizeFor(hash2(seed, attempt, 271));
+                const herd = this.nextHerd++;
+                for (let member = 0; member < size && this.entities.length < SHEEP_LIMIT; member++) {
+                    const spot = member === 0
+                        ? { x: point.x, z: point.z }
+                        : herdSpotFor({ x: point.x, z: point.z, seed, attempt, member, hash2 });
+                    const spotY = member === 0 ? y : this.surfaceAt(spot.x, spot.z);
+                    if (spotY === null) continue;
+                    if (member > 0) {
+                        if (this.groundTypeAt(spot.x, spot.z) !== ID.GRASS) continue;
+                        // Uma companheira não nasce dentro de outra.
+                        if (this.countNear(spot.x, spot.z, 1.2) > 0) continue;
+                    }
+                    this.spawnSheep(spot, spotY, { at, seed, attempt, member, herd, leader: member === 0 });
+                }
+                if (this.entities.length >= SHEEP_LIMIT) return;
                 return;
             }
         }
 
-        /** Sorteia o próximo trecho de pasto. */
+        /** Põe uma ovelha no mundo, com o estado todo zerado. */
+        spawnSheep(spot, y, { at, seed, attempt, member, herd, leader }) {
+            const coat = coatFor(hash2(seed, attempt + member * 13, 173));
+            const model = this.createModel(coat.key);
+            model.group.position.set(spot.x, y, spot.z);
+            this.world.scene.add(model.group);
+            this.entities.push({
+                id: this.nextId++,
+                x: spot.x, y, z: spot.z,
+                visualY: y,
+                targetX: spot.x, targetZ: spot.z,
+                heading: hash2(seed, attempt + member, 211) * Math.PI * 2,
+                turnAt: at,
+                // Rebanho: quem é do mesmo bando e quem manda nele.
+                herd,
+                leader,
+                // Passada das patas: fase e quanto ela está andando (0..1),
+                // para as pernas voltarem devagar ao repouso quando ela para.
+                stride: hash2(seed, attempt + member, 307) * Math.PI * 2,
+                walking: 0,
+                // Balido: o primeiro chamado vem depois de um tempo, e ela
+                // começa "longe" (quem sabe se o jogador já está colado).
+                nextBleatAt: at + SHEEP_BLEAT_IDLE_MIN
+                    + hash2(seed, attempt + member, 577) * (SHEEP_BLEAT_IDLE_MAX - SHEEP_BLEAT_IDLE_MIN),
+                lastBleatAt: -Infinity,
+                wasNear: false,
+                // Susto: relógios do alerta (parar e encarar) e da fuga (golpe).
+                alertUntil: 0,
+                alertFrom: null,
+                fleeUntil: 0,
+                fleeFrom: null,
+                lastHitAt: -Infinity,
+                // Pasto: a primeira vem cedo (para o jogador ver), depois de
+                // vez em quando. `grazeT` é o relógio da pastagem em curso
+                // (null quando não está pastando) e `bit`, se já mordeu.
+                grazeAt: at + grazeDelayFor(hash2(seed, attempt + member, 401), true),
+                grazeT: null,
+                grazeFor: 0,
+                bit: false,
+                hopFrom: y, hopT: SHEEP_HOP_TIME,
+                glideFrom: y, glideT: SHEEP_GLIDE_TIME,
+                coat: coat.key,
+                ...model,
+            });
+        }
+
+        /**
+         * Quem manda no bando desta ovelha? `null` quando ela mesma é a líder.
+         *
+         * Se a líder saiu de cena, a companheira mais antiga (menor id) assume —
+         * sem isso o bando ficaria sem cabeça e cada uma voltaria a vagar só.
+         */
+        herdLeaderOf(entity) {
+            const bando = this.entities.filter(other => other.herd === entity.herd);
+            const achada = bando.find(other => other.leader);
+            if (achada) return achada === entity ? null : achada;
+            bando.sort((a, b) => a.id - b.id);
+            const nova = bando[0];
+            if (!nova) return null;
+            nova.leader = true;
+            return nova === entity ? null : nova;
+        }
+
+        /**
+         * Sorteia o próximo trecho de pasto.
+         *
+         * A seguidora passeia em volta da **líder**, não de si mesma, e vai atrás
+         * quando fica para trás (`SHEEP_FOLLOW_GAP`). É o que faz um rebanho
+         * parecer um rebanho em vez de quatro ovelhas por acaso no mesmo campo.
+         */
         pickTarget(entity, at) {
+            const leader = entity.leader ? null : this.herdLeaderOf(entity);
+            if (leader) {
+                const distanceToLeader = Math.hypot(leader.x - entity.x, leader.z - entity.z);
+                if (distanceToLeader > SHEEP_FOLLOW_GAP) {
+                    // Ficou para trás: vai direto para o lado dela e revê logo.
+                    entity.targetX = leader.x;
+                    entity.targetZ = leader.z;
+                    entity.turnAt = at + 1.2;
+                    return;
+                }
+            }
+            const center = leader ?? entity;
             const target = wanderTargetFor({
-                x: entity.x, z: entity.z, seed: this.world.seed, id: entity.id, at, hash2,
+                x: center.x, z: center.z, seed: this.world.seed, id: entity.id, at, hash2,
             });
             entity.targetX = target.x;
             entity.targetZ = target.z;
             entity.turnAt = at + target.duration;
+        }
+
+        /**
+         * Susto de chegada: para, ergue a cabeça e encara quem chegou — e o
+         * bando faz o mesmo (contágio). Devolve `true` se foi um susto novo.
+         */
+        alert(entity, at, from) {
+            if (at < entity.alertUntil) return false;
+            entity.alertUntil = at + SHEEP_ALERT_TIME;
+            entity.alertFrom = from ? { x: from.x, z: from.z } : null;
+            // Pastando? a cabeça sobe na hora.
+            entity.grazeT = null;
+            for (const other of this.entities) {
+                if (other === entity || other.herd !== entity.herd) continue;
+                if (Math.hypot(other.x - entity.x, other.z - entity.z) > SHEEP_SCARE_SPREAD) continue;
+                if (at < other.alertUntil) continue;
+                other.alertUntil = at + SHEEP_ALERT_TIME;
+                other.alertFrom = entity.alertFrom;
+                other.grazeT = null;
+            }
+            return true;
+        }
+
+        /**
+         * Golpe: corre para longe de quem bateu, e leva o bando junto. A fuga é
+         * só um passo rápido para uma direção — nada de vida ou morte nesta
+         * parte (a ovelha não morre, ela sai de perto).
+         */
+        flee(entity, at, from) {
+            entity.fleeUntil = at + SHEEP_FLEE_TIME;
+            entity.fleeFrom = from ? { x: from.x, z: from.z } : { x: entity.x - 1, z: entity.z };
+            entity.alertUntil = 0;
+            entity.grazeT = null;
+            const dx = entity.x - entity.fleeFrom.x;
+            const dz = entity.z - entity.fleeFrom.z;
+            const length = Math.hypot(dx, dz) || 1;
+            entity.targetX = entity.x + (dx / length) * 4;
+            entity.targetZ = entity.z + (dz / length) * 4;
+            entity.turnAt = at + SHEEP_FLEE_TIME;
+            for (const other of this.entities) {
+                if (other === entity || other.herd !== entity.herd) continue;
+                if (Math.hypot(other.x - entity.x, other.z - entity.z) > SHEEP_SCARE_SPREAD) continue;
+                if (at < other.fleeUntil) continue;
+                other.fleeUntil = at + SHEEP_FLEE_TIME;
+                other.fleeFrom = entity.fleeFrom;
+                other.alertUntil = 0;
+                other.grazeT = null;
+                other.turnAt = at + SHEEP_FLEE_TIME;
+            }
+            return entity;
+        }
+
+        /**
+         * Golpe na ovelha na mira: ela foge com o bando. Devolve
+         * `{ entity }` ou `null` (nada na mira, ou golpe no cooldown).
+         */
+        hitAt(origin, direction, options = {}) {
+            const target = creatureInReach(this.entities, origin, direction, options);
+            if (!target) return null;
+            const at = now();
+            if (at - target.lastHitAt < SHEEP_HIT_COOLDOWN) return null;
+            target.lastHitAt = at;
+            this.flee(target, at, origin);
+            return { entity: target, herd: target.herd };
         }
 
         update(dt, player, active, { day = 1 } = {}) {
@@ -664,6 +843,10 @@ export function createSheepSystemClass({
             const at = now();
             const playerPos = player?.pos ?? { x: 0, z: 0 };
             const dayNow = Number.isFinite(Number(day)) ? Number(day) : 1;
+            // A mesma conta do Mofim: o susto depende de o jogador estar perto e
+            // **andando rápido**. Agachado não assusta ninguém.
+            const playerSpeed = Math.hypot(Number(player?.vel?.x) || 0, Number(player?.vel?.z) || 0);
+            const crouching = Boolean(player?.crouching);
 
             this.trySpawn(playerPos, at, dayNow);
             this.growBack(at);
@@ -675,6 +858,17 @@ export function createSheepSystemClass({
                     this.removeEntity(e);
                     continue;
                 }
+
+                // Susto: chegou perto correndo (ou andando rápido) e não está
+                // agachado → ela para, ergue a cabeça e encara. O bando encara
+                // junto.
+                if (shouldFlee({
+                    distance: distanceToPlayer,
+                    playerSpeed,
+                    crouching,
+                    scareRadius: SHEEP_ALERT_RADIUS,
+                    scareSpeed: SHEEP_ALERT_SPEED,
+                })) this.alert(e, at, playerPos);
 
                 // Balido: chamado de vez em quando e um "cheguei perto" quando o
                 // jogador entra no raio dela.
@@ -717,10 +911,28 @@ export function createSheepSystemClass({
                         + hash2(e.id, Math.round(at), 811) * (SHEEP_GRAZE_TIME_MAX - SHEEP_GRAZE_TIME_MIN);
                     e.bit = false;
                 }
-                const pastando = e.grazeT !== null;
+                const pastando = e.grazeT !== null && at >= e.alertUntil && at >= e.fleeUntil;
 
+                const fugindo = at < e.fleeUntil;
+                const encarando = !fugindo && at < e.alertUntil;
                 let andou = false;
-                if (!pastando) {
+                if (fugindo) {
+                    // Golpe: corre para longe de quem bateu, com a passada
+                    // acelerada. Encurralada (água, parede), a fuga acaba ali.
+                    const dxf = e.fleeFrom ? e.x - e.fleeFrom.x : 1;
+                    const dzf = e.fleeFrom ? e.z - e.fleeFrom.z : 0;
+                    andou = this.stepToward(e, dxf, dzf, SHEEP_FLEE_SPEED, dt);
+                    if (!andou) e.fleeUntil = 0;
+                } else if (encarando) {
+                    // Susto de chegada: para de andar e vira a cara para quem
+                    // chegou. Sem passo — é o "parar e encarar".
+                    if (e.alertFrom) {
+                        e.heading = Math.atan2(e.alertFrom.x - e.x, e.alertFrom.z - e.z);
+                    }
+                } else if (!pastando) {
+                    // Hora de sortear outro trecho de pasto (ou de voltar para o
+                    // lado da líder, se ficou para trás).
+                    if (at >= e.turnAt) this.pickTarget(e, at);
                     const dx = e.targetX - e.x, dz = e.targetZ - e.z;
                     const distanceToTarget = Math.hypot(dx, dz);
                     if (distanceToTarget > SHEEP_ARRIVE) {
@@ -741,7 +953,7 @@ export function createSheepSystemClass({
 
                 // Passada: a fase só anda quando ela anda, e a amplitude entra e
                 // sai suave para a pata não congelar no meio do passo.
-                if (andou) e.stride += dt * SHEEP_STRIDE_SPEED;
+                if (andou) e.stride += dt * SHEEP_STRIDE_SPEED * (fugindo ? 1.7 : 1);
                 const alvoAmplitude = andou ? 1 : 0;
                 e.walking += (alvoAmplitude - e.walking) * Math.min(1, 8 * dt);
                 const pose = legPose(e.stride);
@@ -756,7 +968,12 @@ export function createSheepSystemClass({
                     const mascando = Math.sin((pastando ? e.grazeT / e.grazeFor : 0) * Math.PI * 6) * 0.05;
                     e.head.rotation.x = pose.rotationX
                         + Math.sin(e.stride * 2) * 0.06 * e.walking
-                        + mascando * envelope;
+                        + mascando * envelope
+                        // No susto a cabeça sobe (focinho para cima, olhando
+                        // quem chegou) e na fuga ela desce um pouco, como quem
+                        // corre de cabeça baixa.
+                        - SHEEP_ALERT_HEAD_LIFT * (encarando ? 1 : 0)
+                        + 0.18 * (fugindo ? 1 : 0);
                     e.head.position.y = pose.y;
                     e.head.position.z = pose.z;
                 }
