@@ -36,6 +36,21 @@ import {
     SHEEP_DESPAWN_DISTANCE,
     SHEEP_LEG_SWING,
     SHEEP_LIMIT,
+    SHEEP_HERD_MIN,
+    SHEEP_HERD_MAX,
+    SHEEP_HERD_SPREAD_MIN,
+    SHEEP_HERD_SPREAD_MAX,
+    SHEEP_FOLLOW_GAP,
+    SHEEP_ALERT_RADIUS,
+    SHEEP_ALERT_SPEED,
+    SHEEP_ALERT_TIME,
+    SHEEP_ALERT_HEAD_LIFT,
+    SHEEP_FLEE_TIME,
+    SHEEP_FLEE_SPEED,
+    SHEEP_HIT_COOLDOWN,
+    SHEEP_SCARE_SPREAD,
+    herdSizeFor,
+    herdSpotFor,
     SHEEP_MIN_GAP,
     SHEEP_ROAM_MAX,
     SHEEP_ROAM_MIN,
@@ -105,12 +120,14 @@ function spawnSome(system, clock, player, { ticks = 200, dt = 0.016, day = 1 } =
     return system.entities;
 }
 
+// Depois do P6 ela nasce em bando (2–4): o helper garante **uma** ovelha para
+// testar e devolve a primeira do bando.
 function spawnOne(system, clock, player) {
     for (let i = 0; i < 200 && system.entities.length === 0; i++) {
         clock.t += 5;
         system.update(0.016, player, true, { day: 1 });
     }
-    assert.equal(system.entities.length, 1, 'a ovelha deveria ter nascido');
+    assert.ok(system.entities.length >= 1, 'a ovelha deveria ter nascido');
     return system.entities[0];
 }
 
@@ -216,35 +233,27 @@ test('as patas andam em diagonal, duas para frente e duas para trás', () => {
 
 // ------------------------------------------------ nascimento no mundo
 
-test('nasce de dia, no capim, entre 16 e 30 blocos e no máximo quatro por vez', () => {
+test('nasce de dia, no capim, entre 16 e 30 blocos e no máximo seis por vez', () => {
     const clock = { t: 0 };
     const world = makeWorld();
     const system = makeSystem(world, clock);
     const player = idlePlayer({ x: 0, z: 0 });
     const ovelhas = spawnSome(system, clock, player);
 
-    // Quatro, escrito à mão: um pasto cheio de ovelha vira zoológico.
-    assert.equal(ovelhas.length, 4, 'enche o pasto até o limite de quatro');
-    assert.equal(SHEEP_LIMIT, 4, 'o limite é quatro');
+    // Seis, escrito à mão: um pasto cheio de ovelha vira zoológico.
+    assert.equal(ovelhas.length, 6, 'enche o pasto até o limite de seis');
+    assert.equal(SHEEP_LIMIT, 6, 'o limite é seis');
 
     for (const sheep of ovelhas) {
         const distance = Math.hypot(sheep.x - player.pos.x, sheep.z - player.pos.z);
-        assert.ok(distance >= 15 && distance <= 31, `nasceu a ${distance} blocos`);
+        assert.ok(distance >= 15 && distance <= 33, `nasceu a ${distance} blocos`);
         assert.equal(sheep.y, GROUND + 1, '(de pé em cima do bloco de grama)');
         assert.ok(SHEEP_COATS.some(coat => coat.key === sheep.coat), 'nasceu com uma das três cores');
     }
 
-    // Não nascem coladas umas nas outras.
-    for (let i = 0; i < ovelhas.length; i++) {
-        for (let j = i + 1; j < ovelhas.length; j++) {
-            const gap = Math.hypot(ovelhas[i].x - ovelhas[j].x, ovelhas[i].z - ovelhas[j].z);
-            assert.ok(gap >= 5, `duas ovelhas a ${gap} blocos uma da outra (nascem espalhadas)`);
-        }
-    }
-
     // O limite vale mesmo com o tempo passando.
     for (let i = 0; i < 200; i++) { clock.t += 10; system.update(0.016, player, true, { day: 1 }); }
-    assert.equal(system.entities.length, 4, 'continua em quatro');
+    assert.equal(system.entities.length, 6, 'continua em seis');
 });
 
 test('de noite não nasce nenhuma ovelha', () => {
@@ -281,9 +290,9 @@ test('no meio de um lago não nasce ovelha', () => {
     assert.equal(system.entities.length, 0);
 });
 
-test('duas ovelhas não nascem no mesmo canto do pasto', () => {
-    // Pasto pequeno: só um quadrado de 4×4 blocos é grama. Com o afastamento
-    // mínimo entre ovelhas, só cabe uma ali — o resto do mundo é pedra.
+test('dois bandos não nascem no mesmo canto do pasto', () => {
+    // Pasto pequeno: só um quadrado de 4×4 blocos é grama. Um bando cabe ali,
+    // dois não — o afastamento entre bandos é maior que a diagonal do pasto.
     const noPasto = (x, z) => x >= 20 && x <= 23 && z >= 0 && z <= 3;
     const clock = { t: 0 };
     const system = makeSystem(
@@ -296,10 +305,14 @@ test('duas ovelhas não nascem no mesmo canto do pasto', () => {
         system.update(0.016, player, true, { day: 1 });
     }
 
-    assert.equal(system.entities.length, 1, 'o pasto de 4×4 não comporta um rebanho');
-    const [sheep] = system.entities;
-    assert.ok(noPasto(Math.floor(sheep.x), Math.floor(sheep.z)), 'a que nasceu ficou na grama');
-    assert.ok(SHEEP_MIN_GAP > 4, 'o afastamento é maior que o próprio canto de pasto');
+    assert.ok(system.entities.length >= 1, 'pelo menos a líder nasceu');
+    const bandos = new Set(system.entities.map(sheep => sheep.herd));
+    assert.equal(bandos.size, 1, 'só um bando no pasto pequeno');
+    for (const sheep of system.entities) {
+        assert.ok(noPasto(Math.floor(sheep.x), Math.floor(sheep.z)), 'todas ficaram na grama');
+    }
+    assert.ok(SHEEP_MIN_GAP >= 6 && SHEEP_MIN_GAP > Math.hypot(4, 4),
+        `o afastamento entre bandos (${SHEEP_MIN_GAP}) é maior que a diagonal do pasto (5,66)`);
 });
 
 // ------------------------------------------------ passeio no mundo
@@ -343,7 +356,7 @@ test('barrada por uma encosta, ela desiste e sorteia outro caminho', () => {
     assert.ok(sheep.turnAt <= clock.t, 'desiste na hora, em vez de insistir contra a parede');
 });
 
-test('ela é mansa: o jogador correndo e colado nela não a espanta', () => {
+test('jogador correndo perto: ela para, ergue a cabeça e encara (sem fugir)', () => {
     const clock = { t: 0 };
     const system = makeSystem(makeWorld(), clock);
     const sheep = spawnOne(system, clock, idlePlayer({ x: 0, z: 0 }));
@@ -351,14 +364,112 @@ test('ela é mansa: o jogador correndo e colado nela não a espanta', () => {
     sheep.turnAt = clock.t + 100;
     sheep.targetX = sheep.x + 1.5;
     sheep.targetZ = sheep.z;
-    const alvoX = sheep.targetX, alvoZ = sheep.targetZ;
 
-    // Jogador correndo em cima dela: no Mofim isso bastaria para o susto.
+    // Jogador correndo em cima dela, de pé: é o susto de chegada.
     const correndo = { pos: { x: sheep.x + 0.4, z: sheep.z }, vel: { x: 6, z: 0 }, crouching: false };
-    for (let i = 0; i < 40; i++) { clock.t += 0.05; system.update(0.05, correndo, true, { day: 1 }); }
+    const startX = sheep.x, startZ = sheep.z;
+    const cabecaAntes = sheep.head.position.y;
+    for (let i = 0; i < 20; i++) { clock.t += 0.05; system.update(0.05, correndo, true, { day: 1 }); }
 
-    assert.equal(sheep.targetX, alvoX, 'o alvo continua o mesmo: ela não foge');
-    assert.equal(sheep.targetZ, alvoZ);
+    assert.ok(sheep.alertUntil > clock.t, 'ela está assustada (alerta ligado)');
+    assert.equal(sheep.fleeUntil, 0, 'susto de chegada não é fuga: ela não corre');
+    const andou = Math.hypot(sheep.x - startX, sheep.z - startZ);
+    assert.ok(andou < 0.05, `ficou parada (andou ${andou})`);
+    // A cabeça sobe: o focinho sai do chão e a cara aponta para quem chegou.
+    // A cabeça ergue exatamente o que a constante manda (fora o resto do
+    // repouso e um resto de passada).
+    assert.ok(Math.abs(SHEEP_HEAD_REST - SHEEP_ALERT_HEAD_LIFT - sheep.head.rotation.x) <= 0.1,
+        `cabeça erguida (${sheep.head.rotation.x}, esperado ~${SHEEP_HEAD_REST - SHEEP_ALERT_HEAD_LIFT})`);
+    assert.ok(sheep.head.position.y >= cabecaAntes - 1e-9, 'o pescoço não desce no susto');
+    const rumo = Math.atan2(correndo.pos.x - sheep.x, correndo.pos.z - sheep.z);
+    assert.ok(Math.abs(sheep.heading - rumo) < 1e-6, 'ela vira a cara para o jogador');
+});
+
+test('perto, mas agachado (ou devagar), ela não se assusta', () => {
+    for (const [nome, player] of [
+        ['agachado', { vel: { x: 6, z: 0 }, crouching: true }],
+        ['andando devagar', { vel: { x: 1.2, z: 0 }, crouching: false }],
+    ]) {
+        const clock = { t: 0 };
+        const system = makeSystem(makeWorld(), clock);
+        const sheep = spawnOne(system, clock, idlePlayer({ x: 0, z: 0 }));
+        sheep.turnAt = clock.t + 100;
+        sheep.targetX = sheep.x + 1.5;
+        sheep.targetZ = sheep.z;
+
+        const perto = { pos: { x: sheep.x + 0.4, z: sheep.z }, ...player };
+        for (let i = 0; i < 20; i++) { clock.t += 0.05; system.update(0.05, perto, true, { day: 1 }); }
+        assert.equal(sheep.alertUntil, 0, `${nome} não assusta`);
+        assert.equal(sheep.fleeUntil, 0, `${nome} não faz fugir`);
+    }
+    assert.ok(SHEEP_ALERT_SPEED > 1.2, 'o limiar de velocidade é maior que o passo lento (1,2)');
+    assert.ok(SHEEP_ALERT_RADIUS > 0, 'o raio do susto é positivo');
+});
+
+test('passado o susto, ela volta a pastar', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const sheep = spawnOne(system, clock, idlePlayer({ x: 0, z: 0 }));
+
+    system.alert(sheep, clock.t, { x: sheep.x + 1, z: sheep.z });
+    assert.ok(sheep.alertUntil > clock.t);
+    // Um passo a mais que o tempo do susto, ainda com o jogador colado:
+    // ele já foi embora (longe), então nada rearma o alerta.
+    const longe = idlePlayer({ x: sheep.x + 30, z: sheep.z + 30 });
+    clock.t += SHEEP_ALERT_TIME + 0.1;
+    system.update(0.05, longe, true, { day: 1 });
+    assert.ok(sheep.alertUntil <= clock.t, 'o susto acabou');
+});
+
+test('golpe: ela corre para longe de quem bateu, mais rápido que o pasto', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const sheep = spawnOne(system, clock, idlePlayer({ x: 0, z: 0 }));
+
+    // Quem bateu está a oeste: a fuga é para leste.
+    const de = { x: sheep.x - 1, y: sheep.y + 0.5, z: sheep.z };
+    const golpe = system.hitAt(de, { x: 1, y: 0, z: 0 }, { maxDistance: 5 });
+    assert.ok(golpe, 'o golpe pegou a ovelha');
+    assert.equal(golpe.entity, sheep);
+    assert.ok(sheep.fleeUntil > clock.t, 'ela está fugindo');
+    assert.equal(sheep.alertUntil, 0, 'fuga não é encarada');
+
+    const startX = sheep.x;
+    // Longe o bastante para não assustar de novo — e dentro do despawn.
+    const longe = idlePlayer({ x: sheep.x + 20, z: sheep.z + 20 });
+    for (let i = 0; i < 10; i++) { clock.t += 0.1; system.update(0.1, longe, true, { day: 1 }); }
+    const andou = sheep.x - startX;
+    assert.ok(andou > 0.6, `correu para longe do golpe (${andou} blocos)`);
+    assert.ok(SHEEP_FLEE_SPEED > SHEEP_WANDER_SPEED * 2, 'a fuga é bem mais rápida que o pasto');
+
+    // Passado o tempo da fuga, o passo volta ao normal.
+    clock.t += SHEEP_FLEE_TIME;
+    system.update(0.05, longe, true, { day: 1 });
+    assert.ok(sheep.fleeUntil <= clock.t, 'a fuga acaba');
+});
+
+test('o golpe não pega duas vezes no mesmo instante (cooldown)', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const sheep = spawnOne(system, clock, idlePlayer({ x: 0, z: 0 }));
+    const de = { x: sheep.x - 1, y: sheep.y + 0.5, z: sheep.z };
+    const dir = { x: 1, y: 0, z: 0 };
+
+    assert.ok(system.hitAt(de, dir, { maxDistance: 5 }), 'o primeiro golpe vale');
+    assert.equal(system.hitAt(de, dir, { maxDistance: 5 }), null, 'o segundo, no mesmo instante, não');
+    clock.t += SHEEP_HIT_COOLDOWN + 0.01;
+    assert.ok(system.hitAt(de, dir, { maxDistance: 5 }), 'passado o cooldown, vale de novo');
+});
+
+test('o golpe longe da mira não pega ninguém', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    spawnOne(system, clock, idlePlayer({ x: 0, z: 0 }));
+    const de = { x: 0, y: 0, z: 0 };
+    // Mirando para o lado oposto ao da ovelha.
+    assert.equal(system.hitAt(de, { x: -1, y: 0, z: 0 }, { maxDistance: 5 }), null, 'mirou para o outro lado');
+    assert.equal(system.hitAt(de, { x: 1, y: 0, z: 0 }, { maxDistance: 5 }), null, 'longe demais');
+    assert.equal(system.hitAt(de, null, { maxDistance: 5 }), null, 'sem direção não há golpe');
 });
 
 test('longe demais, a ovelha sai da cena', () => {
@@ -986,20 +1097,21 @@ test('a ovelha bale quando o jogador chega perto, e avisa a distância', () => {
     const { system, ouvidos } = makeBleatSystem(makeWorld(), clock);
     const longe = idlePlayer({ x: 0, z: 0 });
     const sheep = spawnOne(system, clock, longe);
-    assert.equal(ouvidos.length, 0, 'nascendo longe, ela não bale');
+    // P6: ela nasce em bando, então o teste escuta **esta** ovelha.
+    const meus = () => ouvidos.filter(ouvido => ouvido.entity === sheep);
+    assert.equal(meus().length, 0, 'nascendo longe, ela não bale');
 
     // O jogador aparece do lado dela.
     const perto = idlePlayer({ x: sheep.x, z: sheep.z });
     clock.t += 0.05;
     system.update(0.05, perto, true, { day: 1 });
-    assert.equal(ouvidos.length, 1, 'um balido');
-    assert.equal(ouvidos[0].reason, 'near');
-    assert.equal(ouvidos[0].entity, sheep);
-    assert.ok(ouvidos[0].distance < SHEEP_BLEAT_NEAR_RADIUS + 0.01);
+    assert.equal(meus().length, 1, 'um balido');
+    assert.equal(meus()[0].reason, 'near');
+    assert.ok(meus()[0].distance < SHEEP_BLEAT_NEAR_RADIUS + 0.01);
 
     // Ficando lá, ela não repete.
     for (let i = 0; i < 10; i++) { clock.t += 0.05; system.update(0.05, perto, true, { day: 1 }); }
-    assert.equal(ouvidos.length, 1, 'e não vira zumbido');
+    assert.equal(meus().length, 1, 'e não vira zumbido');
 });
 
 test('de vez em quando ela bale sozinha, mesmo com o jogador longe', () => {
@@ -1030,4 +1142,169 @@ test('game.js toca os dois balidos com o volume caindo pela distância', () => {
     assert.match(source, /audio\.play\(near \? 'sheep-bleat-near' : 'sheep-bleat'/);
     assert.match(source, /gainScale: falloff \*/, 'o volume cai com a distância');
     assert.match(source, /import \{ SHEEP_BLEAT_RANGE/, 'o alcance vem do módulo da ovelha, não é número solto');
+});
+
+// ------------------------------------------------ o rebanho (P6)
+
+test('o bando nasce junto: de duas a quatro ovelhas, todas do mesmo herd', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const player = idlePlayer({ x: 0, z: 0 });
+    const ovelhas = spawnOne(system, clock, player) && system.entities;
+
+    // Duas a quatro, escrito à mão: ovelha sozinha não é rebanho, e mais que
+    // quatro vira nuvem de lã.
+    assert.ok(ovelhas.length >= 2 && ovelhas.length <= 4, `nasceram ${ovelhas.length}`);
+    const bandos = new Set(ovelhas.map(sheep => sheep.herd));
+    assert.equal(bandos.size, 1, 'todas do mesmo bando');
+    assert.equal(ovelhas.filter(sheep => sheep.leader).length, 1, 'uma líder, e só uma');
+    assert.ok(ovelhas[0].leader, 'a primeira que nasce é a líder');
+
+    // Nascem juntas, não empilhadas.
+    for (let i = 1; i < ovelhas.length; i++) {
+        const gap = Math.hypot(ovelhas[i].x - ovelhas[0].x, ovelhas[i].z - ovelhas[0].z);
+        assert.ok(gap >= SHEEP_HERD_SPREAD_MIN - 0.01, `companheira a ${gap} blocos (não nasce dentro)`);
+        assert.ok(gap <= SHEEP_HERD_SPREAD_MAX + 0.01, `companheira a ${gap} blocos (não nasce no outro pasto)`);
+    }
+    assert.ok(SHEEP_HERD_MIN === 2 && SHEEP_HERD_MAX === 4, 'o bando é de duas a quatro');
+});
+
+test('herdSizeFor sorteia de dois a quatro, e herdSpotFor fica no raio do bando', () => {
+    // Valores escritos à mão (e não a constante de novo).
+    assert.equal(herdSizeFor(0), 2);
+    assert.equal(herdSizeFor(0.33), 2);
+    assert.equal(herdSizeFor(0.34), 3);
+    assert.equal(herdSizeFor(0.66), 3);
+    assert.equal(herdSizeFor(0.67), 4);
+    assert.equal(herdSizeFor(1), 4);
+    assert.equal(herdSizeFor(-5), 2, 'sorteio fora da faixa não quebra');
+    assert.equal(herdSizeFor(9), 4);
+
+    const pontos = new Set();
+    for (let member = 1; member <= 3; member++) {
+        const spot = herdSpotFor({ x: 10, z: -4, seed: 77, attempt: 2, member });
+        const raio = Math.hypot(spot.x - 10, spot.z + 4);
+        assert.ok(raio >= SHEEP_HERD_SPREAD_MIN - 1e-9, `raio ${raio} menor que o mínimo`);
+        assert.ok(raio <= SHEEP_HERD_SPREAD_MAX + 1e-9, `raio ${raio} maior que o máximo`);
+        pontos.add(`${spot.x.toFixed(4)},${spot.z.toFixed(4)}`);
+    }
+    assert.equal(pontos.size, 3, 'cada companheira em um canto diferente');
+});
+
+test('a seguidora vai atrás da líder quando fica para trás', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const player = idlePlayer({ x: 0, z: 0 });
+    const ovelhas = spawnOne(system, clock, player) && system.entities;
+    const lider = ovelhas.find(sheep => sheep.leader);
+    const seguidora = ovelhas.find(sheep => !sheep.leader);
+    if (!seguidora) return; // bando de uma só não existe (o mínimo é 2)
+
+    // A líder "andou" para longe da seguidora.
+    lider.x = seguidora.x + SHEEP_FOLLOW_GAP + 3;
+    lider.z = seguidora.z;
+    seguidora.turnAt = clock.t;
+
+    system.update(0.016, idlePlayer({ x: lider.x + 20, z: lider.z + 20 }), true, { day: 1 });
+
+    // A líder se mexe no mesmo quadro, então o alvo é o ponto dela de agora.
+    const dalider = Math.hypot(seguidora.targetX - lider.x, seguidora.targetZ - lider.z);
+    assert.ok(dalider < 0.05, `o alvo da seguidora é a líder (ficou a ${dalider})`);
+});
+
+test('a seguidora pastoreia em volta da líder, não de si mesma', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const ovelhas = spawnOne(system, clock, idlePlayer({ x: 0, z: 0 })) && system.entities;
+    const lider = ovelhas.find(sheep => sheep.leader);
+    const seguidora = ovelhas.find(sheep => !sheep.leader);
+    if (!seguidora) return;
+
+    // Colada na líder: o alvo sorteado tem de cair perto **dela**.
+    seguidora.x = lider.x + 0.5;
+    seguidora.z = lider.z;
+    seguidora.turnAt = clock.t;
+    system.update(0.016, idlePlayer({ x: lider.x + 20, z: lider.z + 20 }), true, { day: 1 });
+
+    const dalider = Math.hypot(seguidora.targetX - lider.x, seguidora.targetZ - lider.z);
+    assert.ok(dalider <= SHEEP_ROAM_MAX * 2, `o alvo ficou a ${dalider} da líder`);
+});
+
+test('sumindo a líder, a próxima do bando assume', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const ovelhas = spawnOne(system, clock, idlePlayer({ x: 0, z: 0 })) && system.entities;
+    const lider = ovelhas.find(sheep => sheep.leader);
+    const seguidora = ovelhas.find(sheep => !sheep.leader);
+    if (!seguidora) return;
+
+    system.removeEntity(lider);
+    const nova = system.herdLeaderOf(seguidora);
+    assert.equal(nova, null, 'sozinha no comando, ela não persegue ninguém');
+    assert.ok(seguidora.leader, 'ela virou a líder');
+});
+
+test('o susto se espalha pelo bando, mas não para o bando do lado', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const ovelhas = spawnOne(system, clock, idlePlayer({ x: 0, z: 0 })) && system.entities;
+    const [primeira, segunda] = ovelhas;
+    if (!segunda) return;
+    // `entities` é a mesma lista: guarda o bando antes de entrar a estranha.
+    const bando = [...ovelhas];
+
+    // Um estranho de outro bando, colado na primeira.
+    const estranha = { ...segunda, id: 9999, herd: 424242, leader: true, alertUntil: 0, fleeUntil: 0 };
+    estranha.x = primeira.x + 0.5;
+    estranha.z = primeira.z;
+    system.entities.push(estranha);
+
+    system.alert(primeira, clock.t, { x: primeira.x + 1, z: primeira.z });
+
+    assert.ok(primeira.alertUntil > clock.t, 'a assustada está alerta');
+    for (const outra of bando.slice(1)) {
+        assert.ok(outra.alertUntil > clock.t, 'a companheira do bando encara junto');
+    }
+    assert.equal(estranha.alertUntil, 0, 'o bando do lado não é contaminado');
+    assert.ok(SHEEP_SCARE_SPREAD >= SHEEP_HERD_SPREAD_MAX, 'o contágio alcança o bando inteiro');
+    assert.ok(SHEEP_ALERT_TIME > 0, 'o susto dura um tempo');
+});
+
+test('o golpe também se espalha: o bando foge junto', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const ovelhas = spawnOne(system, clock, idlePlayer({ x: 0, z: 0 })) && system.entities;
+    const alvo = ovelhas[0];
+    const de = { x: alvo.x - 1, y: alvo.y + 0.5, z: alvo.z };
+
+    const golpe = system.hitAt(de, { x: 1, y: 0, z: 0 }, { maxDistance: 5 });
+    assert.ok(golpe);
+    for (const outra of ovelhas) {
+        assert.ok(outra.fleeUntil > clock.t, `a ovelha ${outra.id} fugiu junto`);
+    }
+    assert.ok(SHEEP_FLEE_TIME > SHEEP_ALERT_TIME, 'a fuga dura mais que o susto de chegada');
+});
+
+test('o rebanho não passa de seis no mundo, com o tempo passando', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const player = idlePlayer({ x: 0, z: 0 });
+    spawnSome(system, clock, player);
+    assert.equal(system.entities.length, SHEEP_LIMIT);
+    assert.equal(SHEEP_LIMIT, 6, 'seis é o limite escrito à mão');
+
+    for (let i = 0; i < 500; i++) {
+        clock.t += 5;
+        system.update(0.05, player, true, { day: 1 });
+        assert.ok(system.entities.length <= SHEEP_LIMIT, `passou do limite (${system.entities.length})`);
+    }
+});
+
+test('game.js dá velocidade e agachamento à ovelha e liga o golpe nela', () => {
+    const source = readFileSync(new URL('../game.js', import.meta.url), 'utf8');
+    assert.match(source, /sheepSystem\.update\(dt, \{ pos: player\.pos, vel: player\.vel, crouching: isCrouching \}/,
+        'o susto precisa saber a velocidade e se o jogador está agachado');
+    assert.match(source, /const assustada = sheepSystem\.hitAt\(camera\.position, creatureAim, aim\)/,
+        'o golpe do jogador assusta a ovelha');
+    assert.match(source, /audio\.play\('sheep-bleat-near', \{ gainScale:[^}]*\}\)/, 'e ela bale assustada');
 });

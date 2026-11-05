@@ -1810,6 +1810,17 @@ function strikeCreature() {
             return true;
         }
     }
+    // Golpe na ovelha: ela leva o susto, corre para longe e leva o bando junto.
+    const assustada = sheepSystem.hitAt(camera.position, creatureAim, aim);
+    if (assustada) {
+        // Balido de susto: o mesmo som de perto, mais agudo e mais baixo — o
+        // bastante para o jogador entender que ela não gostou, sem virar grito.
+        audio.play('sheep-bleat-near', { gainScale: 0.55, rate: 1.24 });
+        startPunch(handAnim);
+        resetMining();
+        haptic('punch');
+        return true;
+    }
     if (!creatureInReach(creatureSystem.entities, camera.position, creatureAim, aim)) return false;
     // Só rouba o quadro da mineração quando o golpe realmente acontece; no
     // cooldown, minerar continua normalmente.
@@ -4709,8 +4720,10 @@ function animate() {
         creatureSystem.update(dt, { pos: player.pos, vel: player.vel, crouching: isCrouching }, true,
             { night: 1 - worldSky.day });
         // A ovelha é o contrário: de dia ela está no pasto (`worldSky.day` perto
-        // de 1). Mansa por enquanto — só vaga.
-        sheepSystem.update(dt, { pos: player.pos }, true, { day: worldSky.day });
+        // de 1). Mansa, mas desconfiada: o jogador chegando rápido (e não
+        // agachado) faz o bando parar e encarar.
+        sheepSystem.update(dt, { pos: player.pos, vel: player.vel, crouching: isCrouching }, true,
+            { day: worldSky.day });
         updateSurvival(dt);
         updateItemEntities(dt);
         breakParticles.update(dt);
