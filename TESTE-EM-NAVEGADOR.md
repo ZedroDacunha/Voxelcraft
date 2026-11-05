@@ -95,6 +95,16 @@ aparelho do jogador.
 - [ ] No celular, o botão **Pausar** abre o mesmo cartão e dá para arrastar as
       barras com o dedo.
 
+## 7. Mofim (criatura da noite)
+
+- [ ] Ao anoitecer aparece algum Mofim por perto; ele anda, pula degraus e chia.
+- [ ] De vez em quando ele faz um **voo curto**: sai do chão, sobe ~1,5 bloco e
+      pousa adiante (não é o tempo todo — é a cada 11–22 s por bicho).
+- [ ] Encurralado na beira de um lago, ele **voa** para a margem em vez de ficar
+      tremendo contra a água.
+- [ ] Correndo perto ele se assusta; **agachado** não; um golpe assusta e
+      empurra. Ao amanhecer ele sobe e some, sem deixar pó.
+
 ## Se algo falhar
 
 | Sintoma | Onde olhar |
