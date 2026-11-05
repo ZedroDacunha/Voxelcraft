@@ -262,7 +262,7 @@ test('toque curto usa o item; segurar cava; arrastar olha', () => {
     assert.match(game, /leftHeld = false;\n {16}pressButton\('break', false\);/);
     assert.match(game, /clearTouchAim\(\);\n {12}updateTarget\(\);/);
     // sair do jogo, morrer ou abrir inventário também encerra o gesto
-    assert.match(game, /stopTouchGesture\(\);\n {4}resetMining\(\);/);
+    assert.match(game, /stopTouchGesture\(\);\n {4}stopHaptics\(\);\n {4}resetMining\(\);/);
     // e nenhum botão de toque fica desenhado como apertado
     assert.match(game, /for \(const button of document\.querySelectorAll\('\.touch-btn\.pressed'\)\)/);
 });

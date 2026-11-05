@@ -43,6 +43,14 @@ export const GAME_SETTING_FIELDS = Object.freeze({
         min: 0.8, max: 1.4, step: 0.1, default: 1,
         format: value => `${Math.round(value * 100)}%`,
     }),
+    // Vibração do toque: o celular confirma quebrar/cavar, colocar, passo, dano
+    // e botão apertado. Lista de dois modos, porque é liga/desliga.
+    touchVibration: Object.freeze({
+        choices: Object.freeze(['on', 'off']),
+        labels: Object.freeze({ on: 'Ligada', off: 'Desligada' }),
+        default: 'on',
+        format: value => GAME_SETTING_FIELDS.touchVibration.labels[value] ?? 'Ligada',
+    }),
 });
 
 export const DEFAULT_GAME_SETTINGS = Object.freeze(Object.fromEntries(

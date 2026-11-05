@@ -71,6 +71,7 @@ import {
 } from './world-touch-controls.js';
 import { getSharedAudio } from './world-audio.js';
 import { touchLayoutState, touchStickRadius } from './world-touch-layout.js';
+import { canVibrate, createHapticState, hapticPattern, vibrationEnabled } from './world-haptics.js';
 import { rightClickIntent } from './world-interaction-rules.js';
 import { loadGameSettings, onGameSettingsChange } from './world-game-settings.js';
 import { advanceStarvation, deathTitle, HUNGER_WARNINGS, hungerStage } from './world-survival-rules.js';
@@ -1751,6 +1752,7 @@ function breakBlock(x, y, z) {
     // iguais seguidos soam como um clique repetido.
     const breakSound = materialSoundName(type, 'break');
     if (breakSound) audio.play(breakSound, { rate: stepPitch() });
+    haptic('break');
 }
 
 // Golpe em Mofim. A mira é a da câmera e o alcance é curto: se acertou, o bicho
@@ -1772,6 +1774,7 @@ function strikeCreature() {
     if (!creatureSystem.hitFrom(camera.position, creatureAim, aim)) return false;
     startPunch(handAnim);
     resetMining();
+    haptic('punch');
     return true;
 }
 
@@ -2700,12 +2703,31 @@ const touchAim = { on: false, hit: null, dir: new THREE.Vector3() };
 // cada mudança — mexer no ESC muda na hora.
 let touchScale = 1;
 
+// Vibração: só no modo toque, só com a opção ligada e só onde o aparelho sabe
+// vibrar (o Safari do iPhone não sabe). Padrão e folga mínima vêm de
+// world-haptics.js; aqui só se chama `navigator.vibrate`.
+const hapticState = createHapticState();
+let hapticOn = vibrationEnabled(GAME_SETTINGS);
+
+function haptic(event) {
+    if (!touchMode || !hapticOn || !canVibrate(navigator)) return;
+    const pattern = hapticPattern(event, hapticState, { now: performance.now() });
+    if (pattern) navigator.vibrate(pattern);
+}
+
+// Cancelar é diferente de "não vibrar": um padrão longo (dano) pode estar no
+// meio quando o jogador pausa ou morre, e ele não pode continuar no bolso.
+function stopHaptics() {
+    if (canVibrate(navigator)) navigator.vibrate(0);
+}
+
 function applyTouchLayout(settings = GAME_SETTINGS) {
     const state = touchLayoutState(settings);
     touchScale = state.size;
     document.body.classList.toggle('touch-left', state.lefty);
     document.body.classList.toggle('touch-right', !state.lefty);
     document.body.style.setProperty('--touch-scale', String(state.size));
+    hapticOn = vibrationEnabled(settings);
 }
 
 function playing() {
@@ -2722,6 +2744,7 @@ function resetInputFlags() {
     touchStick.pointerId = null;
     touchStick.x = touchStick.y = 0;
     stopTouchGesture();
+    stopHaptics();
     resetMining();
     cancelEating();
     resetTouchStickVisual();
@@ -2961,6 +2984,7 @@ function takeDamage(amount, source = 'generic') {
     // Dano bloqueado por invulnerabilidade sai antes, sem som.
     const sound = damageSoundFor({ damage: amount, dead: health <= 0 });
     if (sound) audio.play(sound.name, { gainScale: sound.gainScale, rate: stepPitch() });
+    haptic('hurt');
     if (health <= 0) die(source);
 }
 
@@ -3362,6 +3386,7 @@ function playFootsteps(dt, inWater) {
             rate: stepPitch(),
         });
     }
+    haptic('step');
 }
 
 // =====================================================================
@@ -3833,6 +3858,7 @@ async function init() {
             startPunch(handAnim);
             const placeSound = materialSoundName(placedType, 'place');
             if (placeSound) audio.play(placeSound, { rate: stepPitch() });
+            haptic('place');
         } else if (placedType === ID.WOOD_DOOR_BOTTOM) {
             showToast('A porta precisa de apoio sólido e de dois blocos livres');
         }
@@ -4007,6 +4033,7 @@ async function init() {
             button.addEventListener('pointerdown', (event) => {
                 event.preventDefault();
                 if (!playing()) return;
+                haptic('button');
                 button.setPointerCapture?.(event.pointerId);
                 if (id === 'jump') { jumpHeld = true; pressButton(id, true); return; }
                 if (id === 'break') { leftHeld = true; pressButton(id, true); return; }

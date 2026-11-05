@@ -20,6 +20,7 @@ export const OPTION_CONTROLS = [
 export const TOUCH_OPTION_CONTROLS = [
     { key: 'touchLayout', button: 'opt-touch-layout', output: 'opt-touch-layout-value', label: 'Mão' },
     { key: 'touchButtonSize', button: 'opt-touch-size', output: 'opt-touch-size-value', label: 'Tamanho dos botões' },
+    { key: 'touchVibration', button: 'opt-touch-vibration', output: 'opt-touch-vibration-value', label: 'Vibração' },
 ];
 
 // Onde o ponteiro caiu na barra, de 0 (esquerda) a 1 (direita). Barra sem
