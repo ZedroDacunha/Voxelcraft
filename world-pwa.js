@@ -7,9 +7,9 @@
 // - **documento** (o index.html): rede primeiro. Se sair uma versão nova, o
 //   jogador recebe na hora; sem rede, cai no cache e o jogo abre.
 // - **demais arquivos**: cache primeiro, com atualização em segundo plano
-//   (stale-while-revalidate). Os módulos já vêm com `?v=<hash>` no importmap,
-//   então "servir do cache" nunca entrega código velho — hash diferente é URL
-//   diferente.
+//   (stale-while-revalidate). Os módulos já vêm com `?v=<hash>` no importmap e
+//   as imagens de `assets/` com o hash em `asset-versions.js`, então "servir do
+//   cache" nunca entrega arquivo velho — hash diferente é URL diferente.
 //
 // A lista do que guardar **não mora aqui**: o worker a lê do próprio
 // index.html na instalação (importmap + `<link>`s), que é a mesma lista de URLs
