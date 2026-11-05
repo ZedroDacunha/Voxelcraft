@@ -47,6 +47,20 @@ export const HOP_DURATION = 0.26;
 export const HOP_HEIGHT = 0.42;
 /** Descida: em vez de cair seco, ele planeja com as asas abertas. */
 export const GLIDE_DURATION = 0.42;
+/**
+ * Voo curto: sai do chão, cruza alguns blocos no ar e pousa adiante.
+ *
+ * É curto de propósito. O Mofim tem asa e plana, então voar é o que se espera
+ * dele — mas bicho que voa o tempo todo deixa de ser bicho de chão: o susto, o
+ * pulo de degrau e o planeio perderiam o sentido. Por isso são dois casos só:
+ * **escapar** quando o chão não dá passagem, e um **passeio** de vez em quando.
+ */
+export const FLIGHT_DURATION = 0.75;
+export const FLIGHT_HEIGHT = 1.5;
+export const FLIGHT_DISTANCE = 2.6;
+/** Espera entre um voo de passeio e outro (segundos, sorteada na faixa). */
+export const FLIGHT_IDLE_MIN = 11;
+export const FLIGHT_IDLE_MAX = 22;
 /** Vida do bicho: três golpes de mão (cada golpe ainda o assusta). */
 export const MOFIM_HEALTH = 3;
 /** Tempo que o corpo fica aceso depois de levar dano (segundos). */
@@ -136,9 +150,11 @@ export function creatureInReach(entities, origin, direction, {
         // Sumindo ao amanhecer ele já não é alvo: bater num bicho que está
         // desaparecendo roubaria o quadro da mineração sem acertar nada.
         if (entity.leaving) continue;
-        // O corpo do Mofim fica a ~0,45 do chão onde está a origem dele.
+        // O corpo do Mofim fica a ~0,45 do chão onde está a origem dele — e, no
+        // ar (pulo, planeio, voo), a altura que vale é a que se vê.
+        const bodyY = Number.isFinite(entity.visualY) ? entity.visualY : entity.y;
         const ex = entity.x - origin.x;
-        const ey = entity.y + 0.45 - origin.y;
+        const ey = bodyY + 0.45 - origin.y;
         const ez = entity.z - origin.z;
         const distance = Math.hypot(ex, ey, ez);
         if (distance > reach || distance > maxDistance || distance === 0) continue;
@@ -206,6 +222,37 @@ export function glideHeightAt(from, to, progress) {
     if (progress >= 1) return to;
     const queda = 1 - progress;
     return to + (from - to) * queda * queda;
+}
+
+/**
+ * Altura do corpo durante o voo curto.
+ *
+ * Arco único: sai de `from`, sobe `height` acima da reta e desce em `to` — o
+ * pico cai no meio do trajeto. Linear puro passaria raspando no chão, e o
+ * "voo" viraria um deslize.
+ */
+export function flightHeightAt(from, to, progress, height = FLIGHT_HEIGHT) {
+    if (!(progress > 0)) return from;
+    if (progress >= 1) return to;
+    const p = Number(progress);
+    return from + (to - from) * p + height * Math.sin(Math.PI * p);
+}
+
+/**
+ * Vale sair voando agora? Devolve o motivo (`'escape'`, `'wander'`) ou `null`.
+ *
+ * - **`'escape'`**: fugindo e o chão não deu passagem (lago, encosta, buraco).
+ *   Não espera sorteio: é a saída do bicho encurralado.
+ * - **`'wander'`**: passeio de vez em quando, no relógio de `nextFlightAt` —
+ *   voar a toda hora achataria o resto do comportamento.
+ * - **`null`**: fica no chão. Quem foge com o caminho livre corre: voar seria
+ *   fuga fácil demais.
+ */
+export function flightFor({ at, nextFlightAt = Infinity, fleeing = false, blocked = false } = {}) {
+    if (blocked) return fleeing ? 'escape' : null;
+    const now = Number(at);
+    if (!Number.isFinite(now)) return null;
+    return now >= Number(nextFlightAt) ? 'wander' : null;
 }
 
 /** Gira um vetor 2D: usado para desviar de encostas enquanto foge. */
@@ -324,6 +371,9 @@ export function createCreatureSystemClass({
                     leaving: false, leaveT: 0, leaveFromY: y,
                     hopFrom: 0, hopTo: 0, hopT: HOP_DURATION,
                     glideFrom: y, glideT: GLIDE_DURATION, visualY: y, glidePitch: 0,
+                    flight: null,
+                    nextFlightAt: at + FLIGHT_IDLE_MIN
+                        + hash2(seed, attempt, 401) * (FLIGHT_IDLE_MAX - FLIGHT_IDLE_MIN),
                     ...model,
                 });
                 return;
@@ -372,7 +422,9 @@ export function createCreatureSystemClass({
             // Empurrão: o bicho recua um dedo na direção do golpe. Sem isso o
             // dano não teria resposta visível além do clarão.
             const dx = target.x - origin.x, dz = target.z - origin.z;
-            if (Math.hypot(dx, dz) > 1e-4) {
+            // No ar o empurrão brigaria com o arco do voo: o dano ainda conta,
+            // só não mexe no corpo até ele pousar.
+            if (!target.flight && Math.hypot(dx, dz) > 1e-4) {
                 this.stepToward(target, dx, dz, KNOCKBACK_DISTANCE, 1);
             }
             if (target.health > 0) return { entity: target, killed: false };
@@ -405,6 +457,87 @@ export function createCreatureSystemClass({
             }
             e.x = nx; e.z = nz; e.y = ny;
             e.heading = Math.atan2(dirX, dirZ);
+            return true;
+        }
+
+        /**
+         * O ar do caminho está livre até a altura do pico? Sem esta checagem o
+         * voo atravessaria a encosta: o Mofim tem asa, não é fantasma.
+         *
+         * A conta começa na altura do corpo (e não na do pouso): uma parede de
+         * dois blocos no meio do caminho barra o voo, um degrau de um bloco não
+         * — é o mesmo critério do passo, só que pelo ar.
+         */
+        flightPathClear(e, toX, toZ, toY) {
+            const peak = Math.max(e.y, toY) + FLIGHT_HEIGHT;
+            const floorY = Math.floor(Number.isFinite(e.visualY) ? e.visualY : e.y) + 1;
+            const steps = Math.max(1, Math.ceil(Math.hypot(toX - e.x, toZ - e.z) / 0.5));
+            for (let i = 1; i <= steps; i++) {
+                const t = i / steps;
+                const bx = Math.floor(e.x + (toX - e.x) * t);
+                const bz = Math.floor(e.z + (toZ - e.z) * t);
+                for (let cy = floorY; cy <= Math.floor(peak); cy++) {
+                    if (!this.isClear(this.world.getBlock(bx, cy, bz))) return false;
+                }
+            }
+            return true;
+        }
+
+        /**
+         * Onde este voo curto pousa? Anda `FLIGHT_DISTANCE` na direção pedida e
+         * procura chão firme com o ar livre no caminho; se não houver, tenta
+         * voos mais curtos. Sem pouso, não há voo.
+         */
+        flightTarget(e, dirX, dirZ) {
+            const length = Math.hypot(dirX, dirZ);
+            if (!(length > 1e-6)) return null;
+            const ux = dirX / length, uz = dirZ / length;
+            for (const distance of [FLIGHT_DISTANCE, FLIGHT_DISTANCE * 0.7, FLIGHT_DISTANCE * 0.45]) {
+                const x = e.x + ux * distance;
+                const z = e.z + uz * distance;
+                const y = this.surfaceAt(x, z);
+                if (y === null) continue;
+                if (!this.flightPathClear(e, x, z, y)) continue;
+                return { x, y, z };
+            }
+            return null;
+        }
+
+        /** Levanta voo na direção pedida. Devolve `false` se não há onde pousar. */
+        startFlight(e, dirX, dirZ, at) {
+            // O relógio do próximo passeio anda mesmo quando o voo não sai: é o
+            // que evita tentar voar a cada quadro contra a mesma parede.
+            e.nextFlightAt = at + FLIGHT_IDLE_MIN
+                + hash2(this.world.seed + e.id * 7919, e.id, 401) * (FLIGHT_IDLE_MAX - FLIGHT_IDLE_MIN);
+            const target = this.flightTarget(e, dirX, dirZ);
+            if (!target) return false;
+            e.flight = {
+                t: 0,
+                duration: FLIGHT_DURATION,
+                fromX: e.x, fromZ: e.z, fromY: e.visualY,
+                toX: target.x, toZ: target.z, toY: target.y,
+            };
+            // O arco do voo manda no corpo agora; nada de pulo/planeio pendente.
+            e.hopT = HOP_DURATION;
+            e.glideT = GLIDE_DURATION;
+            return true;
+        }
+
+        /** Um quadro do voo. Devolve `true` enquanto o corpo está no ar. */
+        updateFlight(e, dt) {
+            const f = e.flight;
+            if (!f) return false;
+            f.t = Math.min(f.duration, f.t + dt);
+            const p = f.duration > 0 ? f.t / f.duration : 1;
+            e.x = f.fromX + (f.toX - f.fromX) * p;
+            e.z = f.fromZ + (f.toZ - f.fromZ) * p;
+            e.visualY = flightHeightAt(f.fromY, f.toY, p);
+            e.heading = Math.atan2(f.toX - f.fromX, f.toZ - f.fromZ);
+            if (p >= 1) {
+                e.x = f.toX; e.z = f.toZ;
+                e.y = f.toY; e.visualY = f.toY;
+                e.flight = null;
+            }
             return true;
         }
 
@@ -498,31 +631,59 @@ export function createCreatureSystemClass({
                     e.chirpPending = null;
                 }
 
-                if (fleeing) {
-                    this.fleeStep(e, dxp, dzp, dt);
-                } else {
-                    if (at >= e.turnAt) {
-                        const seed = this.world.seed + e.id * 104729 + Math.floor(at * 0.2);
-                        const angle = hash2(seed, e.id, 7) * Math.PI * 2;
-                        const distancia = 1.5 + hash2(seed, e.id, 13) * 3;
-                        e.targetX = e.x + Math.cos(angle) * distancia;
-                        e.targetZ = e.z + Math.sin(angle) * distancia;
-                        e.turnAt = at + 2 + hash2(seed, e.id, 23) * 3;
+                // Voo curto. No ar, o arco manda no corpo: nem passo, nem alvo
+                // de passeio. Quem decide sair voando é `flightFor`.
+                const flying = this.updateFlight(e, dt);
+                if (!flying) {
+                    if (fleeing) {
+                        // Primeiro o caminho direto para longe. Se ele está
+                        // barrado (lago, encosta), o bicho tenta o ar antes de
+                        // sair desviando pelo chão — e, se não houver onde
+                        // pousar, desvia como sempre desviou.
+                        if (!this.stepToward(e, dxp, dzp, FLEE_SPEED, dt)) {
+                            const voou = flightFor({ at, fleeing: true, blocked: true }) === 'escape'
+                                && this.startFlight(e, dxp, dzp, at);
+                            if (!voou) this.fleeStep(e, dxp, dzp, dt);
+                        }
+                    } else {
+                        // Passeio: de vez em quando um voo curto no rumo do alvo.
+                        if (flightFor({ at, nextFlightAt: e.nextFlightAt }) === 'wander') {
+                            const dirX = (e.targetX - e.x) || Math.sin(e.heading);
+                            const dirZ = (e.targetZ - e.z) || Math.cos(e.heading);
+                            if (!this.startFlight(e, dirX, dirZ, at)) e.nextFlightAt = at + 4;
+                        }
+                        // O passo do passeio não roda no quadro em que ele saiu
+                        // voando (o corpo já está no ar).
+                        if (!e.flight) {
+                            if (at >= e.turnAt) {
+                                const seed = this.world.seed + e.id * 104729 + Math.floor(at * 0.2);
+                                const angle = hash2(seed, e.id, 7) * Math.PI * 2;
+                                const distancia = 1.5 + hash2(seed, e.id, 13) * 3;
+                                e.targetX = e.x + Math.cos(angle) * distancia;
+                                e.targetZ = e.z + Math.sin(angle) * distancia;
+                                e.turnAt = at + 2 + hash2(seed, e.id, 23) * 3;
+                            }
+                            const dx = e.targetX - e.x, dz = e.targetZ - e.z;
+                            const distance = Math.hypot(dx, dz);
+                            // Barrado passeando: sorteia outro alvo em vez de insistir.
+                            if (distance > 0.08 && !this.stepToward(e, dx, dz, WANDER_SPEED, dt)) e.turnAt = at;
+                        }
                     }
-                    const dx = e.targetX - e.x, dz = e.targetZ - e.z;
-                    const distance = Math.hypot(dx, dz);
-                    // Barrado passeando: sorteia outro alvo em vez de insistir.
-                    if (distance > 0.08 && !this.stepToward(e, dx, dz, WANDER_SPEED, dt)) e.turnAt = at;
                 }
 
-                const bob = fleeing ? 0.02 : 0.035;
-                e.hopT = Math.min(HOP_DURATION, e.hopT + dt);
-                e.glideT = Math.min(GLIDE_DURATION, e.glideT + dt);
-                const hopping = e.hopT < HOP_DURATION;
-                const gliding = !hopping && e.glideT < GLIDE_DURATION;
+                // No ar, o arco do voo já pôs o corpo na altura certa: pulo e
+                // planeio não entram, senão brigariam pelo mesmo `visualY`.
+                const airborne = flying || Boolean(e.flight);
+                const bob = airborne ? 0 : (fleeing ? 0.02 : 0.035);
+                if (!airborne) {
+                    e.hopT = Math.min(HOP_DURATION, e.hopT + dt);
+                    e.glideT = Math.min(GLIDE_DURATION, e.glideT + dt);
+                }
+                const hopping = !airborne && e.hopT < HOP_DURATION;
+                const gliding = !airborne && !hopping && e.glideT < GLIDE_DURATION;
                 if (hopping) e.visualY = hopHeightAt(e.hopFrom, e.y, e.hopT / HOP_DURATION);
                 else if (gliding) e.visualY = glideHeightAt(e.glideFrom, e.y, e.glideT / GLIDE_DURATION);
-                else e.visualY = e.y;
+                else if (!airborne) e.visualY = e.y;
                 // Clarão do dano (laranja) e brilho próprio da noite (verde-pálido)
                 // dividem o mesmo emissive: o golpe manda enquanto dura.
                 const flash = Math.max(0, (e.hurtUntil - at) / HURT_FLASH);
@@ -538,12 +699,16 @@ export function createCreatureSystemClass({
                 e.group.rotation.y = e.heading;
                 // Planando, o corpo inclina um pouco para a frente e as asas
                 // abrem na horizontal — é o que faz a descida parecer planeio.
-                const pitchTarget = gliding ? 0.2 : 0;
+                // Voando, ele sobe de peito erguido e desce de bico baixo.
+                const flightProgress = e.flight ? e.flight.t / e.flight.duration : 0;
+                const pitchTarget = airborne
+                    ? (flightProgress < 0.5 ? -0.2 : 0.2)
+                    : (gliding ? 0.2 : 0);
                 e.glidePitch += (pitchTarget - e.glidePitch) * Math.min(1, 10 * dt);
                 e.group.rotation.x = e.glidePitch;
-                const wingBase = gliding ? 0.03 : 0.25;
-                const flapSpeed = gliding ? 5 : (fleeing ? 22 : 8);
-                const flapAmp = gliding ? 0.07 : (fleeing ? 0.36 : 0.18);
+                const wingBase = airborne ? 0.02 : (gliding ? 0.03 : 0.25);
+                const flapSpeed = airborne ? 26 : (gliding ? 5 : (fleeing ? 22 : 8));
+                const flapAmp = airborne ? 0.5 : (gliding ? 0.07 : (fleeing ? 0.36 : 0.18));
                 const flap = Math.sin(at * flapSpeed + e.phase) * flapAmp;
                 e.leftWing.rotation.z = -wingBase + flap;
                 e.rightWing.rotation.z = wingBase - flap;

@@ -20,6 +20,13 @@ import {
     NIGHT_SPAWN_THRESHOLD,
     SCARE_DURATION,
     SCARE_RADIUS,
+    SPAWN_MIN_DISTANCE,
+    SPAWN_MAX_DISTANCE,
+    FLIGHT_DISTANCE,
+    FLIGHT_DURATION,
+    FLIGHT_HEIGHT,
+    flightFor,
+    flightHeightAt,
     SCARE_SPEED,
     WANDER_SPEED,
     chirpFor,
@@ -131,17 +138,28 @@ test('nasce no capim, a uma distância segura e no máximo três por vez', () =>
     const world = makeWorld();
     const system = makeSystem(world, clock);
     const player = idlePlayer({ x: 0, y: GROUND + 1, z: 0 });
+    // A distância que importa é a do **nascimento**: depois ele passeia e voa,
+    // e cobrar isso ao fim de 200 s de mundo seria cobrar do passeio.
+    const nascimentos = [];
+    let vistos = 0;
 
     for (let i = 0; i < 200; i++) {
         clock.t += 1;
         system.update(0.016, player, true);
+        for (const e of system.entities.slice(vistos)) {
+            nascimentos.push({ distance: Math.hypot(e.x, e.z), y: e.y });
+        }
+        vistos = system.entities.length;
     }
 
     assert.equal(system.entities.length, CREATURE_LIMIT, 'enche até o limite e para');
+    assert.ok(nascimentos.length >= CREATURE_LIMIT, 'nasceram pelo menos três');
+    for (const { distance, y } of nascimentos) {
+        assert.ok(distance >= SPAWN_MIN_DISTANCE && distance <= SPAWN_MAX_DISTANCE,
+            `nasceu a ${distance.toFixed(1)} do jogador`);
+        assert.equal(y, GROUND + 1, 'em cima da grama');
+    }
     for (const e of system.entities) {
-        const distance = Math.hypot(e.x, e.z);
-        assert.ok(distance >= 9 && distance <= 24, `nasceu a ${distance.toFixed(1)} do jogador`);
-        assert.equal(e.y, GROUND + 1, 'em cima da grama');
         assert.equal(e.group.parent, world.scene, 'o modelo entrou na cena');
     }
 });
@@ -742,4 +760,117 @@ test('quem está indo embora não leva golpe', () => {
     const origin = { x: 0, y: GROUND + 1.45, z: 0 };
     assert.equal(creatureInReach(system.entities, origin, { x: 1, y: 0, z: 0 }), null);
     assert.equal(system.hitFrom(origin, { x: 1, y: 0, z: 0 }), null, 'e o golpe atravessa');
+});
+
+// ------------------------------------------------ voo curto
+
+test('o arco do voo sobe no meio e pousa onde foi pedido', () => {
+    const from = 11, to = 11;
+    assert.equal(flightHeightAt(from, to, 0), from);
+    assert.equal(flightHeightAt(from, to, 1), to);
+    assert.ok(Math.abs(flightHeightAt(from, to, 0.5) - (from + FLIGHT_HEIGHT)) < 1e-9,
+        'o pico fica no meio do trajeto, uma altura acima');
+    for (let p = 0; p <= 1; p += 0.05) {
+        assert.ok(flightHeightAt(from, to, p) >= from - 1e-9, `não desce abaixo do chão (p = ${p.toFixed(2)})`);
+    }
+    // descendo de um lugar mais alto para um mais baixo, o arco fica acima da reta
+    const reta = (14 + 10) / 2;
+    assert.ok(flightHeightAt(14, 10, 0.5) > reta + FLIGHT_HEIGHT * 0.9, 'voa em arco, não em rampa');
+    assert.equal(flightHeightAt(14, 10, 1), 10, 'e pousa exatamente no destino');
+});
+
+test('a regra do voo: encurralado escapa, o passeio é de vez em quando', () => {
+    // fugindo com o chão barrado: sai voando na hora, sem esperar sorteio
+    assert.equal(flightFor({ at: 0, nextFlightAt: 50, fleeing: true, blocked: true }), 'escape');
+    // fugindo com o caminho livre: corre, não voa (senão a fuga ficava fácil)
+    assert.equal(flightFor({ at: 99, nextFlightAt: 100, fleeing: true }), null);
+    // passeando: só depois do relógio do próximo voo
+    assert.equal(flightFor({ at: 30, nextFlightAt: 20 }), 'wander');
+    assert.equal(flightFor({ at: 10, nextFlightAt: 20 }), null);
+    // barrado sem estar fugindo não é motivo para voar
+    assert.equal(flightFor({ at: 30, nextFlightAt: 20, blocked: true }), null);
+});
+
+test('voo de passeio: sai do chão, cruza o ar e pousa adiante', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 14 });
+    const creature = spawnOne(system, world, clock, player);
+
+    creature.x = 0.5; creature.z = 0.5; creature.y = GROUND + 1; creature.visualY = GROUND + 1;
+    creature.targetX = 6; creature.targetZ = 0.5;
+    creature.nextFlightAt = clock.t; // chegou a hora do passeio voador
+
+    clock.t += 0.05;
+    system.update(0.05, player, true);
+    assert.ok(creature.flight, 'levantou voo');
+    assert.equal(creature.flight.duration, FLIGHT_DURATION, 'voo curto: menos de um segundo no ar');
+
+    let pico = -Infinity;
+    for (let i = 0; i < 40 && creature.flight; i++) {
+        clock.t += 0.05;
+        system.update(0.05, player, true);
+        pico = Math.max(pico, creature.group.position.y);
+    }
+
+    assert.equal(creature.flight, null, 'pousou');
+    assert.equal(creature.y, GROUND + 1, 'de volta ao chão');
+    assert.ok(creature.x > 0.5 + FLIGHT_DISTANCE * 0.7, `avançou no ar (x = ${creature.x.toFixed(2)})`);
+    assert.ok(pico > GROUND + 1 + FLIGHT_HEIGHT * 0.5, `o corpo subiu (pico em ${pico.toFixed(2)})`);
+});
+
+test('encurralado no meio do lago, ele voa até a margem em vez de tremer parado', () => {
+    const clock = { t: 0 };
+    const seco = makeWorld();
+    // Ilhota de uma célula na origem; a outra margem começa em x = 3.
+    const margem = (x, z) => (x === 0 && z === 0) || (x >= 3 && x <= 6 && Math.abs(z) <= 2);
+    const lago = makeWorld({ above: (x, z) => (margem(x, z) ? 0 : ID.WATER) });
+
+    const perseguidor = walkerPlayer({ x: -1.5, y: GROUND + 1, z: 0.5 });
+    const system = makeSystem(seco, clock);
+    const creature = spawnOne(system, seco, clock, perseguidor);
+    // Daqui para baixo o chão é a ilhota: água em volta em todas as direções.
+    system.world = lago;
+
+    creature.x = 0.5; creature.z = 0.5; creature.y = GROUND + 1; creature.visualY = GROUND + 1;
+    creature.targetX = 0.5; creature.targetZ = 0.5;
+
+    // Ele anda até a beirada da ilhota; quando o passo para longe cai na água,
+    // levanta voo.
+    for (let i = 0; i < 30 && !creature.flight; i++) {
+        clock.t += 0.05;
+        system.update(0.05, perseguidor, true);
+    }
+    assert.ok(creature.flight, 'sem chão para correr, ele levantou voo');
+
+    for (let i = 0; i < 40 && creature.flight; i++) {
+        clock.t += 0.05;
+        system.update(0.05, perseguidor, true);
+    }
+
+    assert.equal(creature.flight, null, 'pousou');
+    assert.ok(creature.x >= 3, `pousou na outra margem (x = ${creature.x.toFixed(2)})`);
+    assert.equal(creature.y, GROUND + 1, 'em cima da grama da margem');
+});
+
+test('parede de dois blocos barra o voo: ele não atravessa a encosta', () => {
+    const clock = { t: 0 };
+    // Chão plano e, a partir de x = 2, uma parede de dois blocos.
+    const world = makeWorld({ heightAt: x => (x >= 2 ? GROUND + 2 : GROUND) });
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 14 });
+    const creature = spawnOne(system, world, clock, player);
+
+    creature.x = 0.5; creature.z = 0.5; creature.y = GROUND + 1; creature.visualY = GROUND + 1;
+    creature.nextFlightAt = clock.t;
+
+    for (let i = 0; i < 60; i++) {
+        clock.t += 0.05;
+        creature.targetX = 6; creature.targetZ = 0.5;
+        creature.nextFlightAt = Math.min(creature.nextFlightAt, clock.t);
+        system.update(0.05, player, true);
+        assert.ok(creature.x < 2, `parou antes da parede (x = ${creature.x.toFixed(2)})`);
+    }
+    assert.equal(creature.y, GROUND + 1, 'nunca subiu a parede');
 });
