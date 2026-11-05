@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="Voxel">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
-<link rel="stylesheet" href="styles.css?v=7207c8aecb">
+<link rel="stylesheet" href="styles.css?v=c2a825f3ef">
 <link rel="stylesheet" href="inventory.css?v=3c73d92add">
 <!-- importmap:start (gerado por tools/stamp-importmap.mjs; não editar à mão) -->
 <script type="importmap">
@@ -21,7 +21,7 @@
     "three/addons/": "./vendor/three/addons/",
     "./game-pause-menu.js": "./game-pause-menu.js?v=b592dfec15",
     "./game-pointer-lock.js": "./game-pointer-lock.js?v=cf53899b88",
-    "./game.js": "./game.js?v=0821daeba0",
+    "./game.js": "./game.js?v=cc78186256",
     "./inventory-a11y.js": "./inventory-a11y.js?v=25f3dab87d",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
     "./inventory-layout.js": "./inventory-layout.js?v=439823a409",
@@ -89,7 +89,7 @@
     "./world-terrain.js": "./world-terrain.js?v=5f100389a1",
     "./world-textures.js": "./world-textures.js?v=c5974a8dca",
     "./world-tool-rules.js": "./world-tool-rules.js?v=85347f4434",
-    "./world-touch-controls.js": "./world-touch-controls.js?v=41b584a6c6",
+    "./world-touch-controls.js": "./world-touch-controls.js?v=c3db53145d",
     "./world-water-sounds.js": "./world-water-sounds.js?v=b620be020b",
     "./world-water.js": "./world-water.js?v=e16cf2152e",
     "./world-waterfall.js": "./world-waterfall.js?v=80c041820a",
@@ -306,7 +306,7 @@
             <p><kbd>F3</kbd> depuração · <kbd>F4</kbd> qualidade · botão esquerdo minera, botão direito usa ou coloca</p>
             <p>Na água, segure <kbd>C</kbd> para mergulhar e <kbd>Espaço</kbd> para subir; solte e pressione <kbd>Espaço</kbd> de novo para outro impulso na superfície.</p>
         </details>
-        <p id="menu-touch-hint" style="display: none;">No toque: joystick à esquerda, arraste na tela para olhar, botões à direita (Cavar, Usar, Pular, Agachar, Mochila e Pausar).</p>
+        <p id="menu-touch-hint" style="display: none;">No toque: joystick à esquerda, arraste na tela para olhar. Toque num bloco para usar e segure para cavar; os botões à direita são Pular, Cavar, Usar, Agachar, Mochila e Pausar.</p>
     </div>
 </div>
 
@@ -337,16 +337,16 @@
         <div id="touch-stick-knob"></div>
     </div>
     <div id="touch-actions">
-        <button class="classic-btn touch-btn" type="button" data-touch="crouch">Agachar</button>
-        <button class="classic-btn touch-btn" type="button" data-touch="use">Usar</button>
-        <button class="classic-btn touch-btn" type="button" data-touch="break">Cavar</button>
-        <button class="classic-btn touch-btn" type="button" data-touch="jump">Pular</button>
+        <button class="classic-btn touch-btn" type="button" data-touch="crouch" aria-label="Agachar" title="Agachar (alterna)"><svg class="touch-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 20.5 4.5 12.5h4.6V3.5h5.8v9h4.6z"/></svg></button>
+        <button class="classic-btn touch-btn" type="button" data-touch="use" aria-label="Usar" title="Usar o item na mão"><svg class="touch-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M13.2 11.6V5a1.5 1.5 0 0 1 3 0v6.4h.6V6.6a1.5 1.5 0 0 1 3 0v5h.6V8a1.5 1.5 0 0 1 3 0v8c0 3.6-2.4 6.6-6 6.6h-1.2c-1.7 0-2.9-.7-3.8-1.9l-4.2-5.4a1.7 1.7 0 0 1 2.5-2.3l2 1.8z"/></svg></button>
+        <button class="classic-btn touch-btn" type="button" data-touch="break" aria-label="Cavar" title="Cavar (segure)"><svg class="touch-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M3.4 9.8C8.4 4.9 15.9 4.4 20.8 7.3l-1.7 3.3c-4.1-1.9-9.4-1.4-13 1.6z"/><path d="M12.9 8.9 15.4 10 9.4 20.5 6.4 19.6z"/></svg></button>
+        <button class="classic-btn touch-btn" type="button" data-touch="jump" aria-label="Pular" title="Pular (segure para subir)"><svg class="touch-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 3.5 19.5 11.5h-4.6V20.5H9.1V11.5H4.5z"/></svg></button>
     </div>
     <div id="touch-top">
-        <button class="classic-btn touch-btn" type="button" data-touch="inventory">Mochila</button>
-        <button class="classic-btn touch-btn" type="button" data-touch="pause">Pausar</button>
+        <button class="classic-btn touch-btn" type="button" data-touch="inventory" aria-label="Mochila" title="Mochila"><svg class="touch-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M6.6 9.6h10.8A2.6 2.6 0 0 1 20 12.2v7.4a2.4 2.4 0 0 1-2.4 2.4H6.4A2.4 2.4 0 0 1 4 19.6v-7.4a2.6 2.6 0 0 1 2.6-2.6zM4 14.6h16v1.8H4zM10.2 16.8h3.6v2.6h-3.6z"/><path d="M9.2 9.6V7.4h5.6v2.2z"/></svg></button>
+        <button class="classic-btn touch-btn" type="button" data-touch="pause" aria-label="Pausar" title="Pausar"><svg class="touch-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><rect x="6.5" y="5" width="4" height="14"/><rect x="13.5" y="5" width="4" height="14"/></svg></button>
     </div>
-    <p id="touch-hint">Arraste na tela para olhar · empurre o joystick até o fim para correr</p>
+    <p id="touch-hint">Arraste para olhar · toque no bloco para usar · segure para cavar</p>
 </div>
 <script type="module" src="world-menu.js?v=848a925210"></script>
 </body>

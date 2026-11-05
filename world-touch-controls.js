@@ -14,6 +14,10 @@ export const TOUCH_STICK_RADIUS = 58;
 export const TOUCH_DEAD_ZONE = 0.3;
 export const TOUCH_RUN_THRESHOLD = 0.88;
 export const TOUCH_LOOK_SENSITIVITY = 0.0045;
+// Dedo parado na tela: até este tempo ainda é um toque curto (usar); depois
+// vira "segurar" (cavar). A folga em pixels separa tremida de arrasto.
+export const TOUCH_HOLD_MS = 240;
+export const TOUCH_LOOK_SLOP = 12;
 
 /**
  * Heurística de "este aparelho tem dedo".
@@ -108,6 +112,51 @@ export function lookAfterDrag(current, dx, dy, {
         yaw: yaw - mx * scale,
         pitch: Math.max(-limit, Math.min(limit, pitch - my * scale)),
     };
+}
+
+/**
+ * Ponto da tela → coordenadas normalizadas da câmera (-1..1, y para cima).
+ *
+ * É o que permite o dedo escolher o bloco: o mesmo par que o mouse usa para
+ * mirar no centro da tela vale para qualquer ponto. Fora da tela e valores
+ * estranhos são travados na borda em vez de virar NaN (um NaN envenenaria a
+ * câmera e o mundo pararia de ser desenhado).
+ */
+export function ndcFromPoint(clientX, clientY, width, height) {
+    const w = Number(width);
+    const h = Number(height);
+    if (!(w > 0) || !(h > 0)) return { x: 0, y: 0 };
+    const px = Number(clientX);
+    const py = Number(clientY);
+    const clamp = value => Math.max(-1, Math.min(1, value));
+    return {
+        x: Number.isFinite(px) ? clamp((px / w) * 2 - 1) : 0,
+        y: Number.isFinite(py) ? clamp(1 - (py / h) * 2) : 0,
+    };
+}
+
+/**
+ * O que um dedo na tela está fazendo.
+ *
+ * - `look`: andou mais que a folga — está olhando em volta;
+ * - `hold`: ficou parado tempo bastante — está cavando o bloco sob o dedo;
+ * - `tap`: soltou cedo e sem andar — é um toque curto (usar/colocar);
+ * - `wait`: ainda não deu para saber (dedo no chão, pouco tempo).
+ *
+ * A ordem importa: quem arrastou nunca vira toque, nem que fique parado depois.
+ */
+export function touchGesture({ dx = 0, dy = 0, elapsed = 0, released = false } = {}, {
+    slop = TOUCH_LOOK_SLOP,
+    holdMs = TOUCH_HOLD_MS,
+} = {}) {
+    const tolerance = Number(slop) > 0 ? Number(slop) : TOUCH_LOOK_SLOP;
+    const hold = Number(holdMs) >= 0 ? Number(holdMs) : TOUCH_HOLD_MS;
+    const mx = Number.isFinite(Number(dx)) ? Number(dx) : 0;
+    const my = Number.isFinite(Number(dy)) ? Number(dy) : 0;
+    if (Math.hypot(mx, my) >= tolerance) return 'look';
+    const age = Number.isFinite(Number(elapsed)) ? Math.max(0, Number(elapsed)) : 0;
+    if (age >= hold) return 'hold';
+    return released ? 'tap' : 'wait';
 }
 
 /**

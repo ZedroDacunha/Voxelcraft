@@ -5,15 +5,19 @@ import { readFileSync } from 'node:fs';
 import {
     TOUCH_BUTTONS,
     TOUCH_DEAD_ZONE,
+    TOUCH_HOLD_MS,
     TOUCH_LOOK_SENSITIVITY,
+    TOUCH_LOOK_SLOP,
     TOUCH_RUN_THRESHOLD,
     TOUCH_STICK_RADIUS,
     isTouchDevice,
     lookAfterDrag,
     movementFromStick,
+    ndcFromPoint,
     stickKnobOffset,
     stickVector,
     touchButtonById,
+    touchGesture,
 } from '../world-touch-controls.js';
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -190,4 +194,93 @@ test('nenhum caminho de entrada ignora o modo toque', () => {
     assert.match(game, /if \(touchMode\) \{\n        syncPauseMenu\(\);\n        return;\n    \}/);
     // e se o lock falhar num aparelho de toque, cai no toque em vez de travar
     assert.match(game, /if \(touchMode\) \{ beginTouchPlay\(\); return true; \}/);
+});
+
+// --- toque no mundo (o dedo é a mira) -----------------------------------
+
+test('dedo parado é toque curto; parado demais vira segurar; andar vira olhar', () => {
+    // ainda no ar, sem andar e sem tempo: nada decidido
+    assert.equal(touchGesture({ elapsed: 0 }), 'wait');
+    // soltou cedo e parado: toque curto = usar
+    assert.equal(touchGesture({ elapsed: 90, released: true }), 'tap');
+    // chegou no tempo e continua com o dedo: segurar = cavar
+    assert.equal(touchGesture({ elapsed: TOUCH_HOLD_MS }), 'hold');
+    assert.equal(touchGesture({ elapsed: TOUCH_HOLD_MS * 4 }), 'hold');
+    // andou mais que a folga: olhar, mesmo que solte depois
+    assert.equal(touchGesture({ dx: TOUCH_LOOK_SLOP, elapsed: 10 }), 'look');
+    assert.equal(touchGesture({ dx: 40, dy: -30, elapsed: 10, released: true }), 'look');
+    // a folga é um raio, não dois eixos separados: diagonal conta inteira
+    assert.equal(touchGesture({ dx: 9, dy: 9, elapsed: 10 }), 'look');
+    assert.equal(touchGesture({ dx: 5, dy: 5, elapsed: 10 }), 'wait');
+    // soltar depois de já estar cavando não vira toque curto
+    assert.equal(touchGesture({ elapsed: TOUCH_HOLD_MS, released: true }), 'hold');
+});
+
+test('o gesto sobrevive a números estranhos', () => {
+    assert.equal(touchGesture(), 'wait');
+    assert.equal(touchGesture({ dx: NaN, dy: undefined, elapsed: -50, released: true }), 'tap');
+    assert.equal(touchGesture({ elapsed: Infinity }), 'wait', 'tempo infinito não é tempo passado');
+    // folga zero não pode transformar qualquer tremida em arrasto: volta ao padrão
+    assert.equal(touchGesture({ dx: 1 }, { slop: 0 }), 'wait');
+    assert.equal(touchGesture({ dx: 30 }, { slop: 0 }), 'look');
+});
+
+test('ponto da tela vira direção de câmera com o y invertido', () => {
+    // centro da tela é o centro da câmera
+    assert.deepEqual(ndcFromPoint(400, 300, 800, 600), { x: 0, y: 0 });
+    // cantos: esquerda/baixo e direita/cima
+    assert.deepEqual(ndcFromPoint(0, 600, 800, 600), { x: -1, y: -1 });
+    assert.deepEqual(ndcFromPoint(800, 0, 800, 600), { x: 1, y: 1 });
+    // metade da tela
+    assert.deepEqual(ndcFromPoint(600, 150, 800, 600), { x: 0.5, y: 0.5 });
+    // fora da tela (barra de endereço, teclado aberto) é travado na borda
+    assert.deepEqual(ndcFromPoint(-50, -50, 800, 600), { x: -1, y: 1 });
+    assert.deepEqual(ndcFromPoint(9000, 9000, 800, 600), { x: 1, y: -1 });
+    // tela sem tamanho e valores estranhos não viram NaN
+    assert.deepEqual(ndcFromPoint(10, 10, 0, 0), { x: 0, y: 0 });
+    assert.deepEqual(ndcFromPoint(NaN, NaN, 800, 600), { x: 0, y: 0 });
+});
+
+test('o jogo usa o dedo como mira, sem congelar o alvo', () => {
+    // a direção vem do ponto tocado, pelo mesmo par NDC que o mouse usaria
+    assert.match(game, /const ndc = ndcFromPoint\(clientX, clientY, width, height\);/);
+    assert.match(game, /touchRaycaster\.setFromCamera\(touchNdc, camera\);/);
+    // e o alvo é recalculado a cada quadro a partir da direção: quebrar um bloco
+    // não pode deixar a mira apontando para o buraco que ficou no lugar
+    assert.match(game, /if \(touchAim\.on\) \{[\s\S]{0,300}?currentHit = raycastVoxels\(camera\.position, touchAim\.dir, REACH, WORLD_RAYCAST_ACCESS\);/);
+    // o golpe no Mofim segue a mesma linha do dedo
+    assert.match(game, /if \(touchAim\.on\) creatureAim\.copy\(touchAim\.dir\);/);
+});
+
+test('toque curto usa o item; segurar cava; arrastar olha', () => {
+    // o relógio do "segurar" não pode depender de pointermove
+    assert.match(game, /touchLook\.holdTimer = setTimeout\(\(\) => \{/);
+    assert.match(game, /\}, TOUCH_HOLD_MS\);/);
+    assert.match(game, /function startBreaking\(\) \{\n {12}touchLook\.mode = 'hold';/);
+    assert.match(game, /leftHeld = true;\n {12}pressButton\('break', true\);/);
+    // soltar sempre desliga a escavação e devolve a mira para a câmera
+    assert.match(game, /leftHeld = false;\n {16}pressButton\('break', false\);/);
+    assert.match(game, /clearTouchAim\(\);\n {12}updateTarget\(\);/);
+    // sair do jogo, morrer ou abrir inventário também encerra o gesto
+    assert.match(game, /stopTouchGesture\(\);\n {4}resetMining\(\);/);
+    // e nenhum botão de toque fica desenhado como apertado
+    assert.match(game, /for \(const button of document\.querySelectorAll\('\.touch-btn\.pressed'\)\)/);
+});
+
+test('os controles são só ícones, mas continuam dizendo o que fazem', () => {
+    const buttons = [...html.matchAll(/<button[^>]*data-touch="(\w+)"[^>]*>([\s\S]*?)<\/button>/g)];
+    assert.equal(buttons.length, TOUCH_BUTTONS.length, 'um botão no HTML para cada botão do módulo');
+    for (const [, id, inner] of buttons) {
+        const label = touchButtonById(id).label;
+        assert.match(inner, /^<svg class="touch-icon"/, `${id}: só o ícone dentro do botão`);
+        assert.ok(!inner.replace(/<[^>]*>/g, '').trim(), `${id}: sem texto solto no botão`);
+        assert.match(inner, /aria-hidden="true"/, `${id}: o ícone não é lido em voz alta`);
+        assert.match(html, new RegExp(`data-touch="${id}"[^>]*aria-label="${label}"`),
+            `${id}: aria-label com o nome do módulo`);
+        assert.ok(!/touch-btn[^>]*>[^<]*[A-Za-zÀ-ú]/.test(html), `${id}: nada de rótulo escrito`);
+    }
+    // ícone desenhado no CSS, sem imagem externa para baixar/offline
+    assert.match(css, /\.touch-icon \{ width: 34px; height: 34px; fill: currentColor;/);
+    assert.match(css, /\.touch-btn \{ display: grid; place-items: center; width: 64px; height: 64px;/);
+    assert.ok(!/data-touch="[^"]+"[^>]*><img/.test(html), 'sem <img> nos botões');
 });
