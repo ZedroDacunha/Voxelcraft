@@ -402,9 +402,14 @@ No celular, dá para fazer o mesmo sem entrar num mundo.
 
 Abra o jogo e pare na tela inicial (só olhar, não precisa entrar em mundo).
 
-- [ ] O título é **VOXEL** grande em cima e **SANDBOX** menor embaixo, letras de
-      pedra com profundidade na diagonal e inclinação leve.
-- [ ] O granulado da pedra aparece nas letras (não é cor chapada).
+- [ ] O título é **VOXELCRAFT**, numa linha só, em letras grossas de pedra com a
+      laje escura saindo na diagonal e inclinação leve — no estilo do logo
+      clássico do Minecraft.
+- [ ] O mosaico de pedra aparece nas letras (manchas claras e escuras, não cor
+      chapada) e cada letra tem o topo mais claro que a base.
+- [ ] Embaixo das letras aparece a **faixa clara** do fundo da laje, seguida da
+      massa escura e de um contorno preto.
+- [ ] A palavra se lê inteira: V-O-X-E-L-C-R-A-F-T, sem letra colada nem sumida.
 - [ ] A frase `um mundo de blocos!` **não** aparece mais.
 - [ ] A borda das letras fica nítida em qualquer tamanho de janela — sem
       serrilhado, mesmo em tela grande.

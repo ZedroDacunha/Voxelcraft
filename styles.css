@@ -205,13 +205,13 @@
     .menu-mark { display: grid; place-items: center; width: 22px; height: 22px; border: 2px solid #fff; background: #54723e;
         box-shadow: 2px 2px 0 #26351f; font: 900 14px/1 monospace; }
     .title-screen-center { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 14px 0 24px; }
-    /* O título: letras de pedra montadas em blocos, extrudadas na diagonal e
-       inclinadas, no espírito dos menus clássicos de jogos voxel. O desenho é um
-       SVG inline (sem recurso externo), então a borda fica nítida de 360 px a 4K
-       e a altura fica limitada para os botões nunca saírem da tela. */
+    /* O título: VOXELCRAFT numa linha só, em letras de pedra sobre uma laje
+       escura extrudada na diagonal — o logo clássico dos jogos voxel. O desenho é
+       um SVG inline (sem recurso externo), então a borda fica nítida de 360 px a
+       4K, e a largura é limitada para os botões nunca saírem da tela. */
     .title-screen-logo { position: relative; display: flex; justify-content: center;
-        width: min(86vw, 620px, calc(46vh * 1.909)); margin: 0 0 clamp(28px, 5vh, 48px);
-        filter: drop-shadow(5px 7px 0 rgba(0, 0, 0, .45)); }
+        width: min(90vw, 860px, calc(46vh * 5.3658)); margin: 0 0 clamp(24px, 4.5vh, 44px);
+        filter: drop-shadow(4px 6px 0 rgba(0, 0, 0, .4)); }
     .title-logo-art { display: block; width: 100%; height: auto; overflow: visible; }
     .title-screen-actions { display: grid; gap: 8px; width: min(360px, calc(100vw - 40px)); }
     .classic-btn { position: relative; min-height: 34px; box-sizing: border-box; padding: 6px 16px; border: 2px solid #171717; border-radius: 0;
@@ -422,7 +422,7 @@
     }
     @media (max-height: 540px) {
         #title-screen { padding-block: 10px; }
-        .title-screen-logo { margin-bottom: 18px; width: min(70vw, 420px, calc(33vh * 1.909)); }
+        .title-screen-logo { margin-bottom: 14px; width: min(76vw, 560px, calc(28vh * 5.3658)); }
         .title-screen-actions { gap: 5px; width: min(320px, calc(100vw - 40px)); }
         .classic-btn-wide { min-height: 32px; }
     }
