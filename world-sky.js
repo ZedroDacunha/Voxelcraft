@@ -1,3 +1,26 @@
+/**
+ * Direção do sol para uma hora do dia (fração 0..1, onde 0,25 é o meio-dia).
+ *
+ * Pura de propósito: o menu precisa dela **antes** de desenhar (para abrir com o
+ * sol em quadro) e os testes precisam dela sem WebGL. O céu usa a mesma função,
+ * então não há duas contas de sol no projeto.
+ *
+ * O `z = 0.3` fixo é o que dá inclinação à trajetória: sem ele o sol nasceria
+ * exatamente a leste, passaria pelo zênite e se poria a oeste, e a luz bateria
+ * de frente em tudo ao meio-dia.
+ */
+export function sunDirectionAt(worldTime, target = { x: 0, y: 0, z: 0 }) {
+    const angle = (Number(worldTime) || 0) * Math.PI * 2;
+    const x = Math.cos(angle);
+    const y = Math.sin(angle);
+    const z = 0.3;
+    const length = Math.hypot(x, y, z) || 1;
+    target.x = x / length;
+    target.y = y / length;
+    target.z = z / length;
+    return target;
+}
+
 export function createWorldSkySystem({
     THREE,
     clamp01,
@@ -61,7 +84,7 @@ export function createWorldSkySystem({
         fogNear = null, fogFar = null }) {
         if (!sunMesh || !moonMesh || !starPoints) return;
         const angle = worldTime * Math.PI * 2;
-        sunDirection.set(Math.cos(angle), Math.sin(angle), 0.3).normalize();
+        sunDirectionAt(worldTime, sunDirection);
         const elevation = sunDirection.y;
         const day = smoothstep(-0.12, 0.28, elevation);
         const warm = clamp01(1 - Math.abs(elevation) / 0.3) * 0.9;
