@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="Voxel">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
-<link rel="stylesheet" href="styles.css?v=e907495264">
+<link rel="stylesheet" href="styles.css?v=bdc8a6d7eb">
 <link rel="stylesheet" href="inventory.css?v=3c73d92add">
 <!-- importmap:start (gerado por tools/stamp-importmap.mjs; não editar à mão) -->
 <script type="importmap">
@@ -21,7 +21,7 @@
     "three/addons/": "./vendor/three/addons/",
     "./game-pause-menu.js": "./game-pause-menu.js?v=b592dfec15",
     "./game-pointer-lock.js": "./game-pointer-lock.js?v=cf53899b88",
-    "./game.js": "./game.js?v=e858b9ec4b",
+    "./game.js": "./game.js?v=0f4e03b13a",
     "./inventory-a11y.js": "./inventory-a11y.js?v=25f3dab87d",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
     "./inventory-layout.js": "./inventory-layout.js?v=439823a409",
@@ -68,7 +68,7 @@
     "./world-mineral-blocks.js": "./world-mineral-blocks.js?v=4c39bc041e",
     "./world-mineral-textures.js": "./world-mineral-textures.js?v=ab422ad968",
     "./world-minerals.js": "./world-minerals.js?v=2f66ff7350",
-    "./world-options-view.js": "./world-options-view.js?v=eb0e1797f2",
+    "./world-options-view.js": "./world-options-view.js?v=1138541393",
     "./world-ore-generation.js": "./world-ore-generation.js?v=7fe35588d3",
     "./world-point-lights.js": "./world-point-lights.js?v=495370ce08",
     "./world-pwa.js": "./world-pwa.js?v=634eb5dc1b",
@@ -92,6 +92,7 @@
     "./world-tool-rules.js": "./world-tool-rules.js?v=85347f4434",
     "./world-touch-controls.js": "./world-touch-controls.js?v=c3db53145d",
     "./world-touch-layout.js": "./world-touch-layout.js?v=f8dda2fcd5",
+    "./world-touch-positions.js": "./world-touch-positions.js?v=3c17e2f5d1",
     "./world-water-sounds.js": "./world-water-sounds.js?v=b620be020b",
     "./world-water.js": "./world-water.js?v=e16cf2152e",
     "./world-waterfall.js": "./world-waterfall.js?v=80c041820a",
@@ -192,6 +193,9 @@
             </button>
             <button type="button" class="classic-btn option-btn" id="opt-touch-vibration" aria-label="Vibração">
                 <span class="option-text"><span class="option-name">Vibração</span>: <span class="option-value" id="opt-touch-vibration-value">Ligada</span></span>
+            </button>
+            <button type="button" class="classic-btn option-btn" id="opt-touch-edit" aria-label="Editar posições">
+                <span class="option-text"><span class="option-name">Editar posições</span></span>
             </button>
         </div>
 
@@ -366,6 +370,10 @@
         <button class="classic-btn touch-btn" type="button" data-touch="pause" aria-label="Pausar" title="Pausar"><svg class="touch-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><rect x="6.5" y="5" width="4" height="14"/><rect x="13.5" y="5" width="4" height="14"/></svg></button>
     </div>
     <p id="touch-hint">Arraste para olhar · toque no bloco para usar · segure para cavar</p>
+    <div id="touch-edit-bar" hidden>
+        <button class="classic-btn touch-edit-btn" type="button" id="btn-touch-positions-reset">Restaurar</button>
+        <button class="classic-btn touch-edit-btn" type="button" id="btn-touch-positions-done">Pronto</button>
+    </div>
 </div>
 <script type="module" src="world-menu.js?v=848a925210"></script>
 </body>

@@ -277,6 +277,34 @@ Menu → Opções → Configurações de toque → **Vibração: Ligada** (padr�
       antes: a opção existe, mas nada vibra.
 - [ ] Fechar e abrir o jogo mantém a escolha de vibração.
 
+## 16. Posição livre dos botões
+
+No meio do jogo (modo toque), ESC → Opções → Configurações de toque →
+**Editar posições**.
+
+- [ ] A janela de opções fecha, o cartão de pausa some e a tela escurece com os
+      controles em cima, cada peça com **contorno tracejado**.
+- [ ] A barra do topo tem **Restaurar** e **Pronto** (e a dica de jogar some).
+- [ ] **Arrastar o joystick** para o canto direito: ele anda e o jogador **não**
+      anda junto (o modo de edição não move o personagem).
+- [ ] Arrastar cada botão (Pular, Cavar, Usar, Agachar, Mochila, Pausar) para
+      onde o polegar alcança; o contorno fica **cheio** enquanto arrasta.
+- [ ] Nenhuma peça consegue sair da tela (some a metade do dedo na borda? ela
+      para com uma folga de ~6 px).
+- [ ] **Pronto** volta para o menu de pausa; ao continuar o jogo, cada peça está
+      onde foi deixada e **funciona** ali (pular, cavar, usar, mochila, pausar).
+- [ ] **Restaurar** (dentro da edição) devolve tudo ao lugar de fábrica na hora.
+- [ ] **Opções → Restaurar padrões** também devolve as peças ao lugar.
+- [ ] Girar o celular com as peças fora do lugar: elas continuam na mesma
+      posição **relativa** e não somem da tela.
+- [ ] Fechar o jogo e voltar: as posições continuam salvas.
+- [ ] Mudar **Destro/Canhoto** depois de arrastar: o espelho vale como base e o
+      deslocamento soma por cima (nada desaparece).
+- [ ] Aumentar o **Tamanho dos botões** depois de arrastar: as peças continuam
+      presas dentro da tela.
+- [ ] No menu do título (sem mundo aberto), a linha **Editar posições** não
+      aparece.
+
 ## Se algo falhar
 
 | Sintoma | Onde olhar |

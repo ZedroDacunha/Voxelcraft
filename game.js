@@ -72,6 +72,11 @@ import {
 import { getSharedAudio } from './world-audio.js';
 import { touchLayoutState, touchStickRadius } from './world-touch-layout.js';
 import { canVibrate, createHapticState, hapticPattern, vibrationEnabled } from './world-haptics.js';
+import {
+    TOUCH_EDIT_EVENT, TOUCH_EDIT_MARGIN, TOUCH_PIECES, TOUCH_RESET_EVENT,
+    clampOffsetPx, emptyTouchPositions, loadTouchPositions, offsetPercent, offsetPixels,
+    saveTouchPositions,
+} from './world-touch-positions.js';
 import { rightClickIntent } from './world-interaction-rules.js';
 import { loadGameSettings, onGameSettingsChange } from './world-game-settings.js';
 import { advanceStarvation, deathTitle, HUNGER_WARNINGS, hungerStage } from './world-survival-rules.js';
@@ -2721,6 +2726,104 @@ function stopHaptics() {
     if (canVibrate(navigator)) navigator.vibrate(0);
 }
 
+// --- posição livre dos controles ------------------------------------------
+// Cada peça guarda um deslocamento em % da tela (world-touch-positions.js). O
+// CSS recebe o deslocamento em `--touch-dx/--touch-dy`, somado ao lugar natural
+// da grade: quem nunca arrastou nada vê o layout de sempre.
+let touchPositions = loadTouchPositions();
+let touchEditing = false;
+
+function touchPieceElement(piece) {
+    return piece === 'stick'
+        ? document.getElementById('touch-stick')
+        : document.querySelector(`#touch-ui [data-touch="${piece}"]`);
+}
+
+function viewportSize() {
+    return { width: window.innerWidth, height: window.innerHeight };
+}
+
+function applyTouchPositions() {
+    const viewport = viewportSize();
+    for (const piece of TOUCH_PIECES) {
+        const el = touchPieceElement(piece);
+        if (!el) continue;
+        const offset = offsetPixels(touchPositions[piece], viewport);
+        el.style.setProperty('--touch-dx', `${offset.x.toFixed(1)}px`);
+        el.style.setProperty('--touch-dy', `${offset.y.toFixed(1)}px`);
+    }
+}
+
+// Arrasto de uma peça no modo de edição. O retângulo "natural" (sem
+// deslocamento) é medido uma vez no começo: é a partir dele que o clamp sabe
+// quanto a peça ainda pode andar antes de sair da tela.
+const touchDrag = { pointerId: null, piece: null, el: null, rect: null, natural: null, start: null, offset: null };
+
+function beginPieceDrag(event, piece, el) {
+    if (!touchEditing) return false;
+    event.preventDefault();
+    event.stopPropagation();
+    const offset = offsetPixels(touchPositions[piece], viewportSize());
+    const rect = el.getBoundingClientRect();
+    touchDrag.pointerId = event.pointerId;
+    touchDrag.piece = piece;
+    touchDrag.el = el;
+    touchDrag.rect = { width: rect.width, height: rect.height };
+    touchDrag.natural = { left: rect.left - offset.x, top: rect.top - offset.y };
+    touchDrag.start = { x: event.clientX, y: event.clientY };
+    touchDrag.offset = offset;
+    el.classList.add('dragging');
+    el.setPointerCapture?.(event.pointerId);
+    return true;
+}
+
+function movePieceDrag(event) {
+    if (touchDrag.pointerId === null || event.pointerId !== touchDrag.pointerId) return;
+    event.preventDefault();
+    const viewport = viewportSize();
+    const next = clampOffsetPx({
+        naturalLeft: touchDrag.natural.left,
+        naturalTop: touchDrag.natural.top,
+        width: touchDrag.rect.width,
+        height: touchDrag.rect.height,
+        offsetX: touchDrag.offset.x + (event.clientX - touchDrag.start.x),
+        offsetY: touchDrag.offset.y + (event.clientY - touchDrag.start.y),
+        viewportWidth: viewport.width,
+        viewportHeight: viewport.height,
+        margin: TOUCH_EDIT_MARGIN,
+    });
+    touchPositions[touchDrag.piece] = offsetPercent(next, viewport);
+    touchDrag.el?.style.setProperty('--touch-dx', `${next.x.toFixed(1)}px`);
+    touchDrag.el?.style.setProperty('--touch-dy', `${next.y.toFixed(1)}px`);
+}
+
+function endPieceDrag(event) {
+    if (touchDrag.pointerId === null) return;
+    if (event && event.pointerId !== touchDrag.pointerId) return;
+    touchDrag.el?.classList.remove('dragging');
+    touchDrag.pointerId = null;
+    touchDrag.piece = null;
+    touchDrag.el = null;
+    // grava a cada solta: se o navegador fechar, o que ficou arrastado ficou
+    touchPositions = saveTouchPositions(touchPositions);
+}
+
+// Modo de edição: o mundo fica pausado atrás (borrado), a hotbar sai da frente e
+// os controles viram peças arrastáveis. Quem entra é a tela de opções, pelo
+// evento TOUCH_EDIT_EVENT.
+function setTouchEditing(on) {
+    if (!touchMode || touchEditing === on) return;
+    // O modo de edição é da pausa: entrar com o mundo correndo deixaria o jogo
+    // rodando atrás de peças arrastáveis (e o jogador parado sem saber por quê).
+    if (on && playing()) return;
+    touchEditing = on;
+    document.body.classList.toggle('touch-editing', on);
+    endPieceDrag();
+    resetInputFlags();
+    if (on) applyTouchPositions();
+    syncPauseMenu();
+}
+
 function applyTouchLayout(settings = GAME_SETTINGS) {
     const state = touchLayoutState(settings);
     touchScale = state.size;
@@ -2780,9 +2883,13 @@ function resetTouchStickVisual() {
 function syncTouchUi() {
     const ui = document.getElementById('touch-ui');
     if (!ui) return;
-    const visible = touchMode && touchActive && !inventoryOpen && !dead;
+    const visible = touchMode && (touchActive || touchEditing) && !inventoryOpen && !dead;
     if (ui.hidden !== !visible) ui.hidden = !visible;
+    const editBar = document.getElementById('touch-edit-bar');
+    if (editBar) editBar.hidden = !touchEditing;
     if (!visible) return;
+    // editando, a dica de jogar sai da frente: ali o dedo arrasta peças
+    if (touchEditing) return;
     if (ui.dataset.hintShown) return;
     ui.dataset.hintShown = '1';
     setTimeout(() => ui.classList.add('hint-hidden'), 7000);
@@ -2863,6 +2970,17 @@ function applyGameSettings(settings, { quiet = false } = {}) {
 }
 applyGameSettings(GAME_SETTINGS, { quiet: true });
 onGameSettingsChange(settings => applyGameSettings(settings));
+applyTouchPositions();
+
+// A tela de opções mora em outro módulo (world-menu.js): o pedido de edição e o
+// "Restaurar padrões" chegam aqui por evento no documento.
+document.addEventListener(TOUCH_EDIT_EVENT, () => setTouchEditing(true));
+document.addEventListener(TOUCH_RESET_EVENT, () => {
+    touchPositions = loadTouchPositions();
+    applyTouchPositions();
+});
+// Girar o celular muda a relação % ↔ px: reaplica em vez de deixar a peça torta.
+window.addEventListener('resize', applyTouchPositions);
 
 // =====================================================================
 // 7. HUD E STATUS DE SOBREVIVÊNCIA
@@ -3912,6 +4030,7 @@ async function init() {
         }
 
         stick.addEventListener('pointerdown', (event) => {
+            if (touchEditing) return; // editando, o dedo move a peça, não o jogador
             if (!playing() || inventoryOpen || touchStick.pointerId !== null) return;
             event.preventDefault();
             touchStick.pointerId = event.pointerId;
@@ -3969,6 +4088,7 @@ async function init() {
         }
 
         canvas.addEventListener('pointerdown', (event) => {
+            if (touchEditing) return; // o fundo não faz nada enquanto se arrasta peças
             if (!playing() || event.pointerType === 'mouse' || touchLook.pointerId !== null) return;
             event.preventDefault();
             touchLook.pointerId = event.pointerId;
@@ -4032,6 +4152,7 @@ async function init() {
             const hold = id === 'jump' || id === 'break';
             button.addEventListener('pointerdown', (event) => {
                 event.preventDefault();
+                if (touchEditing) return; // editando, o botão é peça e não ação
                 if (!playing()) return;
                 haptic('button');
                 button.setPointerCapture?.(event.pointerId);
@@ -4053,6 +4174,25 @@ async function init() {
                 });
             }
         }
+
+        // --- modo de edição: cada peça arrasta para onde o jogador quiser ---
+        // Fora do modo de edição `beginPieceDrag` devolve false na hora: os
+        // mesmos elementos continuam sendo joystick e botões de ação.
+        for (const piece of TOUCH_PIECES) {
+            const el = touchPieceElement(piece);
+            if (!el) continue;
+            el.addEventListener('pointerdown', (event) => beginPieceDrag(event, piece, el));
+        }
+        document.addEventListener('pointermove', movePieceDrag, { passive: false });
+        document.addEventListener('pointerup', endPieceDrag);
+        document.addEventListener('pointercancel', endPieceDrag);
+
+        document.getElementById('btn-touch-positions-done')?.addEventListener('click', () => setTouchEditing(false));
+        document.getElementById('btn-touch-positions-reset')?.addEventListener('click', () => {
+            touchPositions = emptyTouchPositions();
+            touchPositions = saveTouchPositions(touchPositions);
+            applyTouchPositions();
+        });
 
         // Hotbar: no toque não existe roda do mouse, então cada casa é um botão.
         for (let i = 0; i < 9; i++) {
