@@ -166,6 +166,20 @@ aparelho do jogador.
 - [ ] O tufo de capim **na mão** do jogador continua parado.
 - [ ] Nenhum outro bloco (grama baixa, folhas, flores) passou a se mexer.
 
+## 11. O pó ao vento
+
+- [ ] O rastro do Mofim vai **para o mesmo lado** que o capim verga. O teste de
+      ouro é olhar os dois juntos: eles têm de concordar.
+- [ ] Numa fase de **vento** (som de vento tocando), o rastro é levado bem mais
+      longe do que no silêncio — no silêncio ele quase só sobe.
+- [ ] Quando a **rajada** aperta, o pó acelera junto com o capim, na mesma hora.
+- [ ] As partículas **não andam em bloco**: cada uma tem seu tempo (o rastro
+      farfalha em vez de deslizar como uma placa).
+- [ ] A nuvem do **pouso** também é levada pelo vento.
+- [ ] Sem vento (silêncio), o pó sobe reto e cai para trás — como era antes.
+- [ ] Pausando (ESC), o pó **congela** no ar; ao voltar, retoma de onde estava.
+- [ ] O pó atravessa parede (é fumaça), mas desbota em 1,5 s sem deixar sujeira.
+
 ## Se algo falhar
 
 | Sintoma | Onde olhar |

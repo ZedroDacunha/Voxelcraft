@@ -4,12 +4,19 @@ import { readFileSync } from 'node:fs';
 
 import {
     WIND_ATTACK,
+    WIND_DUST_IDLE,
+    WIND_DUST_SPEED,
+    WIND_GUST_BASE,
+    WIND_GUST_SPEED,
+    WIND_GUST_SWING,
     WIND_RELEASE,
     WIND_SWAY_FULL,
     WIND_SWAY_IDLE,
     configureWindSway,
     updateWindSway,
     windDirectionFor,
+    windDustSpeed,
+    windGust,
     windStep,
     windSwayAmount,
     windTargetFor,
@@ -161,4 +168,60 @@ test('o jogo liga o vento ao capim e o atualiza com o ambiente', () => {
     assert.match(source, /updateWindSway\(tallGrassMaterials, windState\.time, windState\.level\)/,
         'e é entregue aos materiais todo quadro');
     assert.match(source, /updateGrassWind\(dt\)/, 'chamado no laço do jogo');
+});
+
+// ------------------------------------------------ a rajada (capim e pó juntos)
+
+test('a rajada nunca sopra ao contrário: fica entre 0,5 e 1', () => {
+    assert.ok(Math.abs(windGust(0, 0) - WIND_GUST_BASE) < 1e-12, 'sem tempo, o valor de repouso');
+    for (let t = 0; t < 20; t += 0.37) {
+        for (const phase of [0, 1.1, 3.14, 6]) {
+            const gust = windGust(t, phase);
+            assert.ok(gust >= WIND_GUST_BASE - WIND_GUST_SWING - 1e-12, `nunca abaixo do piso (${gust.toFixed(3)})`);
+            assert.ok(gust <= WIND_GUST_BASE + WIND_GUST_SWING + 1e-12, `nem acima do teto (${gust.toFixed(3)})`);
+        }
+    }
+});
+
+test('fases diferentes desencontram as rajadas', () => {
+    const a = windGust(1, 0);
+    const b = windGust(1, Math.PI);
+    assert.ok(Math.abs(a - b) > 0.1, 'dois tufos vizinhos não batem asa juntos');
+    assert.equal(windGust(1, 0), windGust(1, 0), 'mas cada um é previsível');
+    assert.ok(Number.isFinite(windGust(NaN, NaN)), 'entrada inválida não vira NaN');
+});
+
+test('o pó acelera na mesma proporção em que o capim verga', () => {
+    assert.ok(Math.abs(windDustSpeed(0) - WIND_DUST_SPEED * WIND_DUST_IDLE) < 1e-12, 'calado: 25%');
+    assert.ok(Math.abs(windDustSpeed(1) - WIND_DUST_SPEED) < 1e-12, 'cheio: 100%');
+    assert.equal(windDustSpeed(-2), windDustSpeed(0), 'recorta embaixo');
+    assert.equal(windDustSpeed(9), windDustSpeed(1), 'e em cima');
+    // A mesma fração do capim: é o que faz os dois parecerem o MESMO vento.
+    const fracaoCapim = windSwayAmount(0) / windSwayAmount(1);
+    assert.ok(Math.abs(fracaoCapim - WIND_DUST_IDLE) < 1e-9,
+        `capim parado mantém ${(fracaoCapim * 100).toFixed(0)}% e o pó também`);
+});
+
+test('o shader do capim usa as mesmas constantes da rajada', () => {
+    const material = fakeMaterial();
+    configureWindSway(material);
+    const shader = fakeShader();
+    material.onBeforeCompile(shader);
+    const esperado = `${WIND_GUST_BASE} + ${WIND_GUST_SWING} * sin(uWindTime * ${WIND_GUST_SPEED} + windPhase)`;
+    assert.ok(shader.vertexShader.includes(esperado),
+        'os números do capim e do pó vêm da mesma fonte — não há como saírem do compasso');
+});
+
+test('o mesmo vento chega ao pó do Mofim', () => {
+    const creature = readFileSync(new URL('../world-creature.js', import.meta.url), 'utf8');
+    assert.match(creature, /this\.dust\.update\(dt, this\.wind\(\)\)/,
+        'o sistema de pó precisa receber o vento');
+
+    const dust = readFileSync(new URL('../world-creature-dust.js', import.meta.url), 'utf8');
+    assert.match(dust, /windDustSpeed\(wind\.level\)/, 'e usa a velocidade do módulo do vento');
+    assert.match(dust, /windGust\(windTime, slot\.phase\)/, 'com a rajada, por partícula');
+
+    const game = readFileSync(new URL('../game.js', import.meta.url), 'utf8');
+    assert.match(game, /wind: \(\) => \(\{[\s\S]{0,160}?windState\.level,[\s\S]{0,80}?windState\.time,/,
+        'o jogo entrega direção, intensidade e tempo do vento');
 });

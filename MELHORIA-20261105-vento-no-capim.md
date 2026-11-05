@@ -120,9 +120,9 @@ Suíte: **623 → 633 testes**.
 
 ## Próximo passo (PR próprio)
 
-**O pó do Mofim soprado por este mesmo vento** — `windDirectionFor` e `windStep`
-já são exportados justamente para ele. Aí a frase fecha: o rastro do bicho vai
-para onde o capim está indo.
+**O pó do Mofim soprado por este mesmo vento** — feito no PR seguinte, em
+[pó ao vento](MELHORIA-20261105-po-ao-vento.md). A frase fechou: o rastro do bicho
+vai para onde o capim está indo.
 
 ## Como conferir no jogo
 

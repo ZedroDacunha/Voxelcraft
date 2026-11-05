@@ -1272,6 +1272,14 @@ const CreatureSystem = createCreatureSystemClass({
     // Pó do rastro: sai de graça na qualidade alta, pela metade em 0,75 e não
     // sai em Baixa (escala 0,5) — partícula é a primeira coisa que se corta.
     dustQuality: () => dustScaleFor(gfx.mode),
+    // O pó é soprado pelo mesmo vento que verga o capim: mesma direção (uma por
+    // mundo) e mesma intensidade (a fase do ambiente, com rampa).
+    wind: () => ({
+        x: windDirection.x,
+        z: windDirection.z,
+        level: windState.level,
+        time: windState.time,
+    }),
     // Mofim derrubado: o corpo some e deixa pó luminoso no lugar. Um punhado
     // (ou dois, conforme o bicho) — três pós + uma tábua viram uma lanterna.
     onDeath: entity => {
@@ -2572,6 +2580,8 @@ function updateAmbient(dt) {
 // rampa — sem isso o capim pararia de um quadro para o outro no fim da fase.
 // Pausa, menu e aba escondida congelam o vento em vez de zerá-lo.
 const windState = { time: 0, level: 0 };
+// Direção do vento do mundo; preenchida em init() (o pó e o capim leem daqui).
+let windDirection = { x: 1, z: 0 };
 
 function updateGrassWind(dt) {
     if (!playing() || dead || document.hidden) return;
@@ -3514,7 +3524,7 @@ async function init() {
     });
     // Vento: uma direção por mundo, sortida da semente. O capim balança com o
     // que se ouve — a intensidade é atualizada todo quadro em updateGrassWind.
-    const windDirection = windDirectionFor(SEED);
+    windDirection = windDirectionFor(SEED);
     for (const material of tallGrassMaterials) configureWindSway(material, { direction: windDirection });
     tallGrassMaterial = tallGrassMaterials[1];
     const grassGeometries = Array.from({ length: 3 }, (_, variant) => createTallGrassGeometry(variant));

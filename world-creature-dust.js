@@ -1,3 +1,5 @@
+import { windDustSpeed, windGust } from './world-wind.js';
+
 /**
  * Rastro de pó luminoso do Mofim.
  *
@@ -116,7 +118,7 @@ export function createCreatureDust({
             mesh.visible = false;
             mesh.scale.setScalar(DUST_SIZE);
             scene.add(mesh);
-            slots.push({ mesh, vx: 0, vy: 0, vz: 0, life: 0 });
+            slots.push({ mesh, vx: 0, vy: 0, vz: 0, life: 0, phase: 0 });
         }
     }
 
@@ -145,6 +147,9 @@ export function createCreatureDust({
             slot.vy = DUST_RISE * (0.5 + random()) * (air || burst ? 1.6 : 1);
             slot.vz = (random() - 0.5) * DUST_DRIFT * 2;
             slot.life = lifetime;
+            // Fase da rajada por partícula: o pó inteiro subindo em sincronia
+            // pareceria uma placa, não poeira.
+            slot.phase = random() * Math.PI * 2;
             mesh.material = materials[0];
             mesh.scale.setScalar(DUST_SIZE);
             mesh.visible = true;
@@ -153,8 +158,20 @@ export function createCreatureDust({
         return born;
     }
 
-    function update(dt) {
+    /**
+     * Um passo de vida.
+     *
+     * `wind = { x, z, level, time }` vem do jogo (ver `world-wind.js`). O vento
+     * entra como **deslocamento**, separado do arrasto da partícula: o arrasto
+     * freia o empurrão do nascimento, mas não pode frear o vento — senão o pó
+     * pararia no ar e a poeira "andando sozinha" pareceria bug.
+     */
+    function update(dt, wind = null) {
         if (!(dt > 0)) return;
+        const dirX = Number(wind?.x) || 0;
+        const dirZ = Number(wind?.z) || 0;
+        const push = wind ? windDustSpeed(wind.level) : 0;
+        const windTime = Number(wind?.time) || 0;
         for (const slot of slots) {
             if (!slot.mesh.visible) continue;
             slot.life -= dt;
@@ -164,9 +181,10 @@ export function createCreatureDust({
                 continue;
             }
             const mesh = slot.mesh;
-            mesh.position.x += slot.vx * dt;
+            const gust = push > 0 ? windGust(windTime, slot.phase) : 0;
+            mesh.position.x += (slot.vx + dirX * push * gust) * dt;
             mesh.position.y += slot.vy * dt;
-            mesh.position.z += slot.vz * dt;
+            mesh.position.z += (slot.vz + dirZ * push * gust) * dt;
             // Desacelera: o pó vai ficando para trás enquanto sobe.
             const arrasto = Math.exp(-1.8 * dt);
             slot.vx *= arrasto;
@@ -202,6 +220,20 @@ export function createCreatureDust({
         },
         get capacity() {
             return maxParticles;
+        },
+        /** Posições vivas — para depuração e para os testes verem o rastro. */
+        livePositions() {
+            const out = [];
+            for (const slot of slots) {
+                if (!slot.mesh.visible) continue;
+                out.push({
+                    x: slot.mesh.position.x,
+                    y: slot.mesh.position.y,
+                    z: slot.mesh.position.z,
+                    life: slot.life,
+                });
+            }
+            return out;
         },
     };
 }

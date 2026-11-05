@@ -416,6 +416,9 @@ export function createCreatureSystemClass({
     // Quanto de rastro de pó o modo gráfico comporta (0 = nenhum). O jogo passa
     // uma função para poder mudar em Gráficos sem recriar o bicho.
     dustQuality = () => 1,
+    // Vento que empurra esse pó: `{ x, z, level, time }` ou null. Vem do jogo
+    // (world-wind.js); aqui só se repassa ao sistema de partículas.
+    wind = () => null,
 }) {
     class CreatureSystem {
         constructor(world) {
@@ -432,6 +435,7 @@ export function createCreatureSystemClass({
             // os três da noite.
             this.dust = createCreatureDust({ THREE, getScene: () => this.world.scene });
             this.dustQuality = typeof dustQuality === 'function' ? dustQuality : () => 1;
+            this.wind = typeof wind === 'function' ? wind : () => null;
             this.materials = {
                 body: new THREE.MeshLambertMaterial({ color: 0x438f78 }),
                 belly: new THREE.MeshLambertMaterial({ color: 0xb7d8a1 }),
@@ -1117,8 +1121,9 @@ export function createCreatureSystemClass({
                 e.leftHind.rotation.z = flap * 0.3;
                 e.rightHind.rotation.z = -flap * 0.3;
             }
-            // O pó envelhece uma vez por quadro, não uma vez por bicho.
-            this.dust.update(dt);
+            // O pó envelhece uma vez por quadro, não uma vez por bicho — e é
+            // soprado pelo vento do mundo (o mesmo que verga o capim).
+            this.dust.update(dt, this.wind());
         }
     }
     return CreatureSystem;
