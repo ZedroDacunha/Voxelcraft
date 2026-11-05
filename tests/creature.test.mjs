@@ -5,6 +5,7 @@ import * as THREE from '../vendor/three/three.module.js';
 import { BLOCKS, ID } from '../world-catalog.js';
 import {
     CHIRP_COOLDOWN,
+    CHIRP_PULSE_DURATION,
     CHIRP_RANGE,
     GLIDE_DURATION,
     CREATURE_LIMIT,
@@ -13,7 +14,6 @@ import {
     HIT_COOLDOWN,
     HOP_DURATION,
     HOP_HEIGHT,
-    HURT_FLASH,
     KNOCKBACK_DISTANCE,
     LEAVE_DURATION,
     MOFIM_HEALTH,
@@ -44,6 +44,7 @@ import {
     SCARE_SPEED,
     WANDER_SPEED,
     chirpFor,
+    chirpPulse,
     createCreatureSystemClass,
     creatureInReach,
     glideHeightAt,
@@ -278,6 +279,10 @@ test('o dano acende o corpo do Mofim e apaga sozinho', () => {
     assert.notEqual(creature.bodyMaterial, system.materials.body);
 
     creature.x = 2; creature.z = 0; creature.y = GROUND + 1;
+    // Este teste é sobre o golpe: sem chilreio no meio (o pulso dele também
+    // acende o corpo, e não é o que está sendo medido aqui).
+    creature.nextIdleAt = Infinity;
+    creature.chirpPending = null;
     clock.t = 60;
     system.update(0.016, player, true);
     const descansando = creature.bodyMaterial.emissive.r;
@@ -285,11 +290,15 @@ test('o dano acende o corpo do Mofim e apaga sozinho', () => {
     assert.ok(creature.bodyMaterial.emissive.g > descansando, 'e esse brilho é verde');
 
     system.hitFrom({ x: 0, y: GROUND + 1.45, z: 0 }, { x: 1, y: 0, z: 0 });
+    creature.chirpPending = null; // idem: o clarão medido é o do dano
     system.update(0.016, player, true);
     assert.ok(creature.bodyMaterial.emissive.r > 0.5, 'acende no golpe');
 
-    clock.t += HURT_FLASH + 0.01;
-    system.update(0.016, player, true);
+    // Passado o clarão (e o pulso do grito do susto), o corpo volta ao normal.
+    for (let i = 0; i < 12; i++) {
+        clock.t += 0.05;
+        system.update(0.05, player, true);
+    }
     assert.ok(creature.bodyMaterial.emissive.r < 0.12, 'e volta ao brilho da noite');
 });
 
@@ -1359,4 +1368,49 @@ test('a asa de trás acompanha o bater com atraso', () => {
     const traseira = creature.leftHind.rotation.z;
     assert.ok(Math.sign(pivo) !== Math.sign(traseira) || Math.abs(traseira) < 0.02,
         'a traseira vai para o lado oposto ao da dianteira');
+});
+
+// ------------------------------------------------ pulso de luz do chilreio
+
+test('o pulso do chilreio sobe cheio e apaga em meio segundo', () => {
+    assert.equal(chirpPulse(0), 0, 'sem pulso pendente, apagado');
+    assert.equal(chirpPulse(CHIRP_PULSE_DURATION), 1, 'acabou de chiar: cheio');
+    assert.ok(Math.abs(chirpPulse(CHIRP_PULSE_DURATION / 2) - 0.5) < 1e-9, 'e cai pela metade');
+    assert.equal(chirpPulse(-3), 0, 'negativo não conta');
+    assert.equal(chirpPulse(undefined), 0, 'nada pendente, nada de luz');
+});
+
+test('quando ele chia, a luzinha incha e depois apaga', () => {
+    const clock = { t: 0 };
+    const world = makeWorld();
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, y: GROUND + 1, z: 14 });
+    const creature = spawnOne(system, world, clock, player);
+    // Ele nasce longe (20–30 blocos) e o chilreio só alcança 16: o jogador chega
+    // para perto, parado, para poder ouvir.
+    player.pos.x = creature.x + 2;
+    player.pos.z = creature.z;
+
+    clock.t += 0.05;
+    system.update(0.05, player, true);
+    assert.equal(creature.lightPulse, 0, 'parado, sem pulso');
+
+    const tamanhoCalmo = creature.glowMesh.scale.x;
+    // Força um chilreio agora (sem esperar o cooldown de um chiado anterior).
+    creature.lastChirpAt = -Infinity;
+    creature.nextIdleAt = clock.t;
+    clock.t += 0.05;
+    system.update(0.05, player, true);
+    assert.ok(creature.lightPulse > 0.7, `o chiado acendeu (${creature.lightPulse.toFixed(2)})`);
+    const tamanhoAceso = creature.glowMesh.scale.x;
+    assert.ok(tamanhoAceso > tamanhoCalmo, 'e a luzinha cresceu no desenho');
+
+    // Meio segundo depois, apagou.
+    for (let i = 0; i < 12; i++) {
+        clock.t += 0.05;
+        system.update(0.05, player, true);
+    }
+    assert.equal(creature.lightPulse, 0, 'e apagou sozinho');
+    // O tamanho calmo respira com a noite; o que importa é ter voltado a encolher.
+    assert.ok(creature.glowMesh.scale.x < tamanhoAceso, 'e a luzinha voltou a encolher');
 });

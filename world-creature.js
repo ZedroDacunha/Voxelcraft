@@ -174,6 +174,20 @@ export const CHIRP_RANGE = 16;
 export const CHIRP_COOLDOWN = 1.2;
 export const CHIRP_IDLE_MIN = 7;
 export const CHIRP_IDLE_MAX = 15;
+/**
+ * Pulso de luz do chilreio: a luzinha incha junto com o som e apaga em 0,45 s.
+ *
+ * É o que amarra som e luz — quem ouve o chiado vê de onde ele veio, e a luz
+ * deixa de ser um enfeite parado.
+ */
+export const CHIRP_PULSE_DURATION = 0.45;
+
+/** Quanto do pulso ainda resta (0..1), a partir do tempo que falta. */
+export function chirpPulse(restante, duration = CHIRP_PULSE_DURATION) {
+    const r = Number(restante);
+    if (!(r > 0) || !(duration > 0)) return 0;
+    return Math.min(1, r / duration);
+}
 
 /**
  * O jogador assusta o Mofim agora?
@@ -570,6 +584,9 @@ export function createCreatureSystemClass({
                     health: MOFIM_HEALTH, hurtUntil: 0,
                     blinkAt: at + BLINK_MIN + hash2(seed, attempt, 617) * (BLINK_MAX - BLINK_MIN),
                     blinkT: 0,
+                    // Pulso de luz do chilreio (0 = apagado). O jogo lê isto para
+                    // fazer a PointLight do bicho inchar junto com o som.
+                    pulseT: 0, lightPulse: 0,
                     // Chegada ao anoitecer: nasce longe e vem andando até perto.
                     arriving: true, arriveAt: at,
                     leaving: false, leaveT: 0, leaveFromY: y,
@@ -885,6 +902,7 @@ export function createCreatureSystemClass({
                     const flashSaindo = Math.max(0, (e.hurtUntil - at) / HURT_FLASH);
                     e.bodyMaterial.emissive.setRGB(flashSaindo * 0.85, flashSaindo * 0.45, flashSaindo * 0.12);
                     e.eyeMaterial.emissive.setRGB(0, 0, 0);
+                    e.lightPulse = 0;
                     e.glowMesh.scale.setScalar(GLOW_SIZE * (1 - gone));
                     if (gone >= 1) this.removeEntity(e);
                     continue;
@@ -906,6 +924,8 @@ export function createCreatureSystemClass({
                 if (reason) {
                     e.lastChirpAt = at;
                     e.chirpPending = null;
+                    // O chiado acende a luzinha; ela apaga no meio segundo seguinte.
+                    e.pulseT = CHIRP_PULSE_DURATION;
                     if (reason === 'idle') {
                         const seed = this.world.seed + e.id * 7919 + Math.floor(at);
                         e.nextIdleAt = at + CHIRP_IDLE_MIN
@@ -993,16 +1013,25 @@ export function createCreatureSystemClass({
                 // dividem o mesmo emissive: o golpe manda enquanto dura.
                 const flash = Math.max(0, (e.hurtUntil - at) / HURT_FLASH);
                 const glow = nightGlow(nightNow, at + e.phase);
+                // Pulso do chilreio: anda no tempo do quadro (não no da varredura
+                // de luzes) e vale para o desenho e para a PointLight.
+                e.pulseT = Math.max(0, e.pulseT - dt);
+                const pulso = chirpPulse(e.pulseT);
+                e.lightPulse = pulso;
                 e.bodyMaterial.emissive.setRGB(
-                    flash * 0.85 + glow * 0.35,
-                    flash * 0.45 + glow * 0.75,
-                    flash * 0.12 + glow * 0.45,
+                    flash * 0.85 + glow * 0.35 + pulso * 0.30,
+                    flash * 0.45 + glow * 0.75 + pulso * 0.24,
+                    flash * 0.12 + glow * 0.45 + pulso * 0.10,
                 );
                 // Olhos: de dia são dois pontos escuros; à noite, duas luzinhas.
                 // É o que faz o bicho ser visto no escuro — o corpo, à noite, é
                 // quase silhueta.
                 const luz = Math.min(1, glow / 0.16);
-                e.eyeMaterial.emissive.setRGB(0.95 * luz, 0.68 * luz, 0.26 * luz);
+                e.eyeMaterial.emissive.setRGB(
+                    0.95 * luz + pulso * 0.6,
+                    0.68 * luz + pulso * 0.45,
+                    0.26 * luz + pulso * 0.2,
+                );
                 // Piscada: os dois fecham juntos por um instante, de vez em quando.
                 e.blinkT = Math.max(0, e.blinkT - dt);
                 if (at >= e.blinkAt) {
@@ -1015,7 +1044,7 @@ export function createCreatureSystemClass({
                 // Respiração: o corpo sobe e desce um fio, devagar, sem parar.
                 e.torso.scale.y = TORSO_HEIGHT * (1 + 0.03 * Math.sin(at * 2.1 + e.phase));
                 // A luzinha da antena cresce no escuro.
-                e.glowMesh.scale.setScalar(GLOW_SIZE * (1 + 1.4 * luz));
+                e.glowMesh.scale.setScalar(GLOW_SIZE * (1 + 1.4 * luz + 1.1 * pulso));
                 e.group.position.set(e.x, e.visualY + Math.sin(at * 3 + e.phase) * bob, e.z);
                 e.group.rotation.y = e.heading;
                 // Planando, o corpo inclina um pouco para a frente e as asas
