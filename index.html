@@ -21,7 +21,7 @@
     "three/addons/": "./vendor/three/addons/",
     "./game-pause-menu.js": "./game-pause-menu.js?v=b592dfec15",
     "./game-pointer-lock.js": "./game-pointer-lock.js?v=cf53899b88",
-    "./game.js": "./game.js?v=0f4e03b13a",
+    "./game.js": "./game.js?v=f0875feb01",
     "./inventory-a11y.js": "./inventory-a11y.js?v=25f3dab87d",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
     "./inventory-layout.js": "./inventory-layout.js?v=439823a409",
@@ -50,7 +50,7 @@
     "./world-furnace-effects.js": "./world-furnace-effects.js?v=b5fc477140",
     "./world-furnace-rules.js": "./world-furnace-rules.js?v=195bb6a8fc",
     "./world-furnace-sounds.js": "./world-furnace-sounds.js?v=a844b58f3c",
-    "./world-game-settings.js": "./world-game-settings.js?v=cb73284714",
+    "./world-game-settings.js": "./world-game-settings.js?v=df442e3502",
     "./world-graphics-quality.js": "./world-graphics-quality.js?v=1aafc939df",
     "./world-grid.js": "./world-grid.js?v=be11481d71",
     "./world-hand-animation.js": "./world-hand-animation.js?v=5db4d45ae7",
@@ -68,7 +68,7 @@
     "./world-mineral-blocks.js": "./world-mineral-blocks.js?v=4c39bc041e",
     "./world-mineral-textures.js": "./world-mineral-textures.js?v=ab422ad968",
     "./world-minerals.js": "./world-minerals.js?v=2f66ff7350",
-    "./world-options-view.js": "./world-options-view.js?v=1138541393",
+    "./world-options-view.js": "./world-options-view.js?v=007667fa39",
     "./world-ore-generation.js": "./world-ore-generation.js?v=7fe35588d3",
     "./world-point-lights.js": "./world-point-lights.js?v=495370ce08",
     "./world-pwa.js": "./world-pwa.js?v=634eb5dc1b",
@@ -90,7 +90,7 @@
     "./world-terrain.js": "./world-terrain.js?v=5f100389a1",
     "./world-textures.js": "./world-textures.js?v=c5974a8dca",
     "./world-tool-rules.js": "./world-tool-rules.js?v=85347f4434",
-    "./world-touch-controls.js": "./world-touch-controls.js?v=c3db53145d",
+    "./world-touch-controls.js": "./world-touch-controls.js?v=790519aae2",
     "./world-touch-layout.js": "./world-touch-layout.js?v=f8dda2fcd5",
     "./world-touch-positions.js": "./world-touch-positions.js?v=3c17e2f5d1",
     "./world-water-sounds.js": "./world-water-sounds.js?v=b620be020b",
@@ -184,6 +184,10 @@
         </div>
 
         <div class="options-grid" id="options-touch-grid" hidden>
+            <button type="button" class="classic-btn option-btn option-slider" id="opt-touch-sensitivity" aria-label="Sensibilidade do olhar">
+                <span class="option-track" aria-hidden="true"><span class="option-knob"></span></span>
+                <span class="option-text"><span class="option-name">Sensibilidade do olhar</span>: <span class="option-value" id="opt-touch-sensitivity-value">80%</span></span>
+            </button>
             <button type="button" class="classic-btn option-btn" id="opt-touch-layout" aria-label="Mão">
                 <span class="option-text"><span class="option-name">Mão</span>: <span class="option-value" id="opt-touch-layout-value">Destro</span></span>
             </button>

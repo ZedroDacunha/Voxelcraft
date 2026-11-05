@@ -18,6 +18,7 @@ import {
     stickVector,
     touchButtonById,
     touchGesture,
+    touchLookSensitivity,
 } from '../world-touch-controls.js';
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -127,11 +128,13 @@ test('o olhar não passa do limite vertical nem estoura', () => {
     assert.equal(weird.pitch, 0);
 });
 
-test('a sensibilidade das opções vale também no toque', () => {
-    const slow = lookAfterDrag({ yaw: 0, pitch: 0 }, 100, 0, { sensitivity: TOUCH_LOOK_SENSITIVITY * 0.5 });
-    const fast = lookAfterDrag({ yaw: 0, pitch: 0 }, 100, 0, { sensitivity: TOUCH_LOOK_SENSITIVITY * 2 });
-    assert.ok(Math.abs(fast.yaw) > Math.abs(slow.yaw));
-    assert.match(game, /sensitivity: TOUCH_LOOK_SENSITIVITY \* LOOK_SENSITIVITY/);
+test('a sensibilidade do olhar vale também no toque', () => {
+    // o mesmo arrasto, três posições da barra do dedo
+    const turn = (touchSensitivity) => lookAfterDrag({ yaw: 0, pitch: 0 }, 100, 0, { sensitivity: touchLookSensitivity({ touchSensitivity }) });
+    assert.ok(Math.abs(turn(2).yaw) > Math.abs(turn(1).yaw));
+    assert.ok(Math.abs(turn(1).yaw) > Math.abs(turn(0.5).yaw));
+    // no toque quem manda é a barra do toque, não a do mouse
+    assert.match(game, /sensitivity: touchLookScale,/);
 });
 
 // --- botões e fiação ----------------------------------------------------

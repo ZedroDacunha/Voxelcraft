@@ -305,6 +305,25 @@ No meio do jogo (modo toque), ESC → Opções → Configurações de toque →
 - [ ] No menu do título (sem mundo aberto), a linha **Editar posições** não
       aparece.
 
+## 17. Sensibilidade do olhar no toque
+
+No celular (modo toque), ESC → Opções → Configurações de toque →
+**Sensibilidade do olhar** (primeira linha da sub-tela).
+
+- [ ] A linha mostra **80%** de fábrica, com trilho e cursor de barra.
+- [ ] Arrastar a barra até **50%**: voltar ao jogo e arrastar o dedo na tela gira
+      **devagar** (dá para parar em qualquer ponto do horizonte).
+- [ ] Arrastar até **200%**: o mesmo arrasto gira o dobro, e ainda assim o olhar
+      **para** no limite de cima/baixo (não vira cambalhota).
+- [ ] **A barra do mouse não muda o dedo**: em Opções, mexer em "Sensibilidade
+      do mouse" e voltar ao jogo — o giro do dedo continua o mesmo.
+- [ ] Olhar para cima no máximo em 200%: o teto vertical continua valendo.
+- [ ] Tocar curto e segurar continuam funcionando igual (usar/cavar não dependem
+      da barra).
+- [ ] Fechar e abrir o jogo mantém o valor; **Restaurar padrões** volta para 80%.
+- [ ] A barra funciona também no teclado (setas de 5 em 5, `Home`/`End` nos
+      extremos) e no menu do título, antes de entrar no mundo.
+
 ## Se algo falhar
 
 | Sintoma | Onde olhar |

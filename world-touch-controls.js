@@ -10,10 +10,29 @@
 // Este módulo é só a matemática: vetor do joystick, zona morta, corrida no fim
 // do curso e o delta de olhar. Nada de DOM, para poder testar sem navegador.
 
+import { DEFAULT_GAME_SETTINGS } from './world-game-settings.js';
+
 export const TOUCH_STICK_RADIUS = 58;
 export const TOUCH_DEAD_ZONE = 0.3;
 export const TOUCH_RUN_THRESHOLD = 0.88;
 export const TOUCH_LOOK_SENSITIVITY = 0.0045;
+
+/**
+ * Quantos radianos o dedo gira por pixel arrastado.
+ *
+ * A base (`TOUCH_LOOK_SENSITIVITY`) é de fábrica; em cima dela vem a opção
+ * "Sensibilidade do olhar" das Configurações de toque (0,5 a 2, padrão 80%).
+ * Ela é **independente** da sensibilidade do mouse de propósito: quem joga no
+ * celular deitado no sofá e no PC não fica refém de uma barra só. Valor
+ * estranho (storage velho, campo ausente) cai no padrão do jogo, nunca em zero
+ * — zero travaria o olhar e o jogador não saberia por quê.
+ */
+export function touchLookSensitivity(settings) {
+    const value = Number(settings?.touchSensitivity);
+    const scale = Number.isFinite(value) && value > 0 ? value : DEFAULT_GAME_SETTINGS.touchSensitivity;
+    return TOUCH_LOOK_SENSITIVITY * scale;
+}
+
 // Dedo parado na tela: até este tempo ainda é um toque curto (usar); depois
 // vira "segurar" (cavar). A folga em pixels separa tremida de arrasto.
 export const TOUCH_HOLD_MS = 240;

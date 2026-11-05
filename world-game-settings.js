@@ -51,6 +51,14 @@ export const GAME_SETTING_FIELDS = Object.freeze({
         default: 'on',
         format: value => GAME_SETTING_FIELDS.touchVibration.labels[value] ?? 'Ligada',
     }),
+    // Quanto o dedo gira por pixel arrastado. É uma barra própria, separada da
+    // do mouse: o gesto é outro (dedo na tela contra mouse com pointer lock) e
+    // quem joga nos dois não pode ficar refém de uma barra só. 80% de fábrica
+    // porque o giro antigo era um pouco nervoso no celular.
+    touchSensitivity: Object.freeze({
+        min: 0.5, max: 2, step: 0.05, default: 0.8,
+        format: value => `${Math.round(value * 100)}%`,
+    }),
 });
 
 export const DEFAULT_GAME_SETTINGS = Object.freeze(Object.fromEntries(
