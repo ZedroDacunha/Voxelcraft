@@ -60,6 +60,10 @@ const ITEM_ALIASES = Object.freeze({
     dust: 'MOFIM_DUST',
     glowdust: 'MOFIM_DUST',
     seeds: 'WHEAT_SEEDS',
+    wool: 'WOOL_WHITE',
+    la: 'WOOL_WHITE',
+    shears: 'SHEARS',
+    scissors: 'SHEARS',
 });
 
 /**

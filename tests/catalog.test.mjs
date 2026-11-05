@@ -105,3 +105,63 @@ test('o pó luminoso é item de pilha e a receita da lanterna usa três pós', (
     inv.slots[4] = null;
     assert.equal(matchRecipe(inv, 3), null);
 });
+
+test('a tesoura é item próprio: duas barras de ferro na diagonal', () => {
+    const shears = ITEMS[ID.SHEARS];
+    assert.ok(shears, 'a tesoura existe');
+    assert.equal(shears.name, 'Tesoura');
+    assert.equal(shears.maxStack, 1, 'ferramenta não stacka');
+    assert.deepEqual(shears.tool, { type: 'shears', tier: 1, speed: 1 });
+    assert.ok(shears.maxDurability > 0, 'gasta com o uso');
+    assert.equal(shears.block, undefined, 'não vira bloco');
+    assert.equal(BLOCKS[ID.SHEARS], undefined, 'não existe bloco de tesoura');
+
+    const inv = new Inventory(9);
+    inv.slots[0] = { id: ID.IRON_INGOT, count: 1 };
+    inv.slots[4] = { id: ID.IRON_INGOT, count: 1 };
+    assert.deepEqual(matchRecipe(inv, 3), { id: ID.SHEARS, count: 1 });
+
+    // Uma barra só não faz tesoura (e nem o ferro com outra coisa no lugar).
+    inv.slots[4] = null;
+    assert.equal(matchRecipe(inv, 3), null);
+});
+
+test('a lã vem em três cores: fardo, bloco e a receita de quatro fardos', () => {
+    const cores = [
+        ['WHITE', 'branca', TILE.WOOL_WHITE],
+        ['GRAY', 'cinza', TILE.WOOL_GRAY],
+        ['BLACK', 'preta', TILE.WOOL_BLACK],
+    ];
+    for (const [key, label, tile] of cores) {
+        const wool = ITEMS[ID['WOOL_' + key]];
+        assert.equal(wool.name, `Lã ${label}`);
+        assert.equal(wool.maxStack, 64, 'fardo stacka');
+        assert.equal(wool.block, undefined, 'o fardo é material, não bloco');
+        assert.deepEqual(wool.sprite, { kind: 'wool', mat: key.toLowerCase() });
+
+        const blockId = ID['WOOL_BLOCK_' + key];
+        const block = BLOCKS[blockId];
+        assert.equal(block.name, `Bloco de lã ${label}`);
+        assert.equal(block.drop, blockId, 'quebrar devolve o bloco');
+        assert.equal(block.tiles.top, tile);
+        assert.equal(block.solid, true, 'é sólido como um bloco normal');
+        assert.ok(block.hardness <= 1, 'quebra rápido com a mão');
+        assert.equal(ITEMS[blockId].block, blockId, 'o item do bloco coloca o bloco');
+
+        // Quatro fardos da mesma cor viram o bloco daquela cor.
+        const inv = new Inventory(9);
+        for (const index of [0, 1, 3, 4]) inv.slots[index] = { id: ID['WOOL_' + key], count: 1 };
+        assert.deepEqual(matchRecipe(inv, 3), { id: blockId, count: 1 });
+    }
+
+    // Cores diferentes não se misturam.
+    const misturado = new Inventory(9);
+    for (const [index, id] of [[0, ID.WOOL_WHITE], [1, ID.WOOL_WHITE], [3, ID.WOOL_WHITE], [4, ID.WOOL_GRAY]]) {
+        misturado.slots[index] = { id, count: 1 };
+    }
+    assert.equal(matchRecipe(misturado, 3), null);
+
+    assert.equal(new Set(cores.map(([, , tile]) => tile)).size, 3, 'um tile por cor, sem reaproveitar');
+    assert.equal(new Set(cores.map(([key]) => ID['WOOL_' + key])).size, 3);
+    assert.equal(new Set(cores.map(([key]) => ID['WOOL_BLOCK_' + key])).size, 3);
+});

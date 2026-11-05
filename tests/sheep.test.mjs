@@ -15,9 +15,15 @@ import {
     SHEEP_GRAZE_TIME_MIN,
     SHEEP_HEAD_REST,
     headPoseFor,
+    woolCountFor,
     SHEEP_NECK_Y,
     SHEEP_REGROW_LIMIT,
     SHEEP_REGROW_MIN,
+    SHEEP_WOOL_GRAZE_BONUS,
+    SHEEP_WOOL_ITEMS,
+    SHEEP_WOOL_MAX,
+    SHEEP_WOOL_MIN,
+    SHEEP_WOOL_REGROW_MIN,
     SHEEP_DAY_THRESHOLD,
     SHEEP_DESPAWN_DISTANCE,
     SHEEP_LEG_SWING,
@@ -755,4 +761,147 @@ test('com a cabeça no chão, o focinho encosta na grama da frente (sem entrar n
     const ondeEmPe = new THREE.Vector3();
     focinho.getWorldPosition(ondeEmPe);
     assert.ok(ondeEmPe.y - onde.y > 0.5, 'pastando, o focinho desce mais de meio bloco');
+});
+
+// ------------------------------------------------ a lã e a tesoura
+
+test('cada cor de lã tem o seu fardo no catálogo', () => {
+    assert.deepEqual(Object.keys(SHEEP_WOOL_ITEMS).sort(), ['black', 'gray', 'white']);
+    for (const coat of SHEEP_COATS) {
+        assert.ok(SHEEP_WOOL_ITEMS[coat.key], `a lã ${coat.label} precisa de um item`);
+    }
+    // Uma cor não aponta para o item de outra.
+    assert.equal(new Set(Object.values(SHEEP_WOOL_ITEMS)).size, 3);
+});
+
+test('tosquiada, ela fica com uma camada de lã baixa e lisa: sem tufos, sem topete', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const comLa = system.createModel('white');
+    const tosada = system.createModel('white', { sheared: true });
+
+    assert.equal(comLa.tufts.length, SHEEP_TUFTS.length, 'com lã, os tufos existem');
+    assert.equal(tosada.tufts.length, 0, 'tosquiada, não sobra tufo');
+
+    const caraComLa = comLa.head.children.map(child => child.name);
+    const caraTosada = tosada.head.children.map(child => child.name);
+    assert.ok(caraComLa.includes('topknot'));
+    assert.ok(!caraTosada.includes('topknot'), 'o topete vai junto com a lã');
+    // Continua sendo a mesma ovelha: cara e quatro patas no lugar.
+    for (const parte of ['skull', 'muzzle', 'eye', 'glint', 'ear']) {
+        assert.ok(caraTosada.includes(parte), `a peça ${parte} fica`);
+    }
+    assert.equal(caraTosada.filter(nome => nome === 'ear').length, 2);
+    assert.equal(tosada.legs.length, 4);
+
+    // E o corpo encolhe: a camada de lã tosada é mais baixa e mais curta.
+    const corpoComLa = comLa.group.children.find(child => child.name === 'body');
+    const corpoTosado = tosada.group.children.find(child => child.name === 'body');
+    assert.ok(corpoTosado.scale.y < corpoComLa.scale.y, 'a lã tosada é mais baixa');
+    assert.ok(corpoTosado.scale.z < corpoComLa.scale.z, 'e mais curta');
+    assert.equal(tosada.sheared, true);
+    assert.equal(comLa.sheared, false);
+
+    // O casco e o brilho do olho continuam: não são lã.
+    const casco = tosada.legs[0].children.find(child => child.name === 'hoof');
+    assert.ok(casco, 'o casco fica');
+});
+
+// Mira de teste: dois blocos atrás da ovelha, na altura do corpo, olhando para ela.
+function aimAt(sheep) {
+    return {
+        origin: { x: sheep.x, y: sheep.visualY + 0.45, z: sheep.z - 2 },
+        direction: { x: 0, y: 0, z: 1 },
+    };
+}
+
+test('a tesoura tira a lã: de um a três fardos, na cor da ovelha', () => {
+    const world = makeWorld();
+    const clock = { t: 0 };
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, z: 0 });
+    const sheep = spawnOne(system, clock, player);
+
+    const { origin, direction } = aimAt(sheep);
+    const tosado = system.shearAt(origin, direction, { reach: 3 });
+    assert.ok(tosado, 'a ovelha na mira é tosquiada');
+    assert.equal(tosado.entity, sheep);
+    assert.equal(tosado.coat, sheep.coat, 'a lã sai na cor dela');
+    assert.ok(tosado.count >= SHEEP_WOOL_MIN && tosado.count <= SHEEP_WOOL_MAX,
+        `saiu ${tosado.count} fardo(s), e devia ser de 1 a 3`);
+
+    assert.equal(sheep.sheared, true, 'ela fica tosquiada');
+    assert.equal(sheep.tufts.length, 0, 'e o corpo é o tosado');
+    assert.ok(sheep.woolAt > clock.t, 'e fica com a lã marcada para voltar');
+    // A tosquiada continua na cena, no mesmo lugar.
+    assert.ok(system.world.scene.children.includes(sheep.group));
+
+    // Sem lã, a tesoura não tem o que cortar.
+    assert.equal(system.shearAt(origin, direction, { reach: 3 }), null, 'não se tosquia duas vezes');
+});
+
+test('a tesoura só pega a ovelha que está na mira', () => {
+    const world = makeWorld();
+    const clock = { t: 0 };
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, z: 0 });
+    const sheep = spawnOne(system, clock, player);
+
+    // De costas para ela, a mira não é ovelha nenhuma.
+    const deCostas = system.shearAt(
+        { x: sheep.x, y: sheep.visualY + 0.45, z: sheep.z - 2 },
+        { x: 0, y: 0, z: -1 },
+        { reach: 3 },
+    );
+    assert.equal(deCostas, null, 'mirar para o lado não tosquia');
+    // E longe demais também não.
+    const longe = system.shearAt(
+        { x: sheep.x, y: sheep.visualY + 0.45, z: sheep.z - 8 },
+        { x: 0, y: 0, z: 1 },
+        { reach: 3 },
+    );
+    assert.equal(longe, null, 'fora do alcance não tosquia');
+    assert.equal(sheep.sheared, false, 'e ela continua com lã');
+});
+
+test('a lã volta em cinco a oito minutos, e pastar adianta o relógio', () => {
+    const world = makeWorld();
+    const clock = { t: 0 };
+    const system = makeSystem(world, clock);
+    const player = idlePlayer({ x: 0, z: 0 });
+    const sheep = spawnOne(system, clock, player);
+
+    const { origin, direction } = aimAt(sheep);
+    system.shearAt(origin, direction, { reach: 3 });
+    const espera = sheep.woolAt - clock.t;
+    assert.ok(espera > 298 && espera <= 481, `a lã volta em ${espera.toFixed(1)} s, e devia ser 300–480`);
+    assert.ok(SHEEP_WOOL_REGROW_MIN >= 300, 'cinco minutos é o mínimo');
+
+    // Uma pastagem adianta o relógio da lã.
+    const antes = sheep.woolAt;
+    grazeNow(system, clock, player, sheep);
+    grazeUntilBite(system, clock, player, sheep);
+    assert.equal(sheep.woolAt, antes - SHEEP_WOOL_GRAZE_BONUS, 'cada pastagem adianta 90 s');
+    assert.equal(sheep.sheared, true, 'mas ainda não voltou');
+
+    // No prazo, a lã volta e o modelo é o de sempre.
+    clock.t = sheep.woolAt + 0.01;
+    system.update(0.016, player, true, { day: 1 });
+    assert.equal(sheep.sheared, false, 'a lã voltou');
+    assert.equal(sheep.tufts.length, SHEEP_TUFTS.length, 'com os tufos de volta');
+    assert.ok(sheep.head.children.some(child => child.name === 'topknot'), 'e o topete');
+    assert.ok(system.world.scene.children.includes(sheep.group), 'continua na cena');
+});
+
+test('a tosquia dá de um a três fardos, e as três quantias acontecem', () => {
+    assert.equal(woolCountFor(0), 1);
+    assert.equal(woolCountFor(0.4), 2);
+    assert.equal(woolCountFor(0.9), 3, 'o terço de cima dá três');
+    const vistos = new Set();
+    for (let i = 0; i < 3000; i++) vistos.add(woolCountFor(i / 3000));
+    assert.deepEqual([...vistos].sort(), [1, 2, 3], 'não é sempre a mesma quantia');
+    for (const roll of [0, 0.5, 1, -1, 2, Number.NaN]) {
+        const count = woolCountFor(roll);
+        assert.ok(count >= 1 && count <= 3, `${roll} deu ${count}`);
+    }
 });

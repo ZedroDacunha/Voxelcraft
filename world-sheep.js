@@ -22,6 +22,7 @@
  */
 
 import { createCreatureBaseClass, glideHeightAt, hopHeightAt } from './world-creature-base.js';
+import { creatureInReach } from './world-creature.js';
 import { floorDiv as defaultFloorDiv } from './world-grid.js';
 import { hash2 as defaultHash2 } from './world-math.js';
 
@@ -109,6 +110,25 @@ export const SHEEP_REGROW_MIN = 300;
 export const SHEEP_REGROW_MAX = 600;
 /** Quantas células ficam na fila de crescimento; as mais antigas saem. */
 export const SHEEP_REGROW_LIMIT = 128;
+
+// ---------------------------------------------------------------- a lã e a tesoura
+
+/** Quantos fardos de lã saem de uma tosquia. */
+export const SHEEP_WOOL_MIN = 1;
+export const SHEEP_WOOL_MAX = 3;
+/** Depois de tosquiada, a lã volta entre cinco e oito minutos. */
+export const SHEEP_WOOL_REGROW_MIN = 300;
+export const SHEEP_WOOL_REGROW_MAX = 480;
+/** Cada pastagem enquanto tosquiada adianta o crescimento (segundos). */
+export const SHEEP_WOOL_GRAZE_BONUS = 90;
+/**
+ * Cor da lã → nome do item no catálogo. Fica aqui, e não no jogo, para o teste
+ * conferir que as três cores têm item; quem troca o nome pelo ID é o `game.js`,
+ * que é o único que conhece o catálogo.
+ */
+export const SHEEP_WOOL_ITEMS = Object.freeze({
+    white: 'WOOL_WHITE', gray: 'WOOL_GRAY', black: 'WOOL_BLACK',
+});
 
 // ---------------------------------------------------------------- a arte da ovelha
 //
@@ -271,6 +291,15 @@ export function headPoseFor(envelope) {
     };
 }
 
+/**
+ * Quantos fardos saem de uma tosquia, a partir de um sorteio de 0 a 1: um, dois
+ * ou três, em partes iguais.
+ */
+export function woolCountFor(roll) {
+    const r = Math.min(0.999999, Math.max(0, Number(roll) || 0));
+    return SHEEP_WOOL_MIN + Math.floor(r * (SHEEP_WOOL_MAX - SHEEP_WOOL_MIN + 1));
+}
+
 /** Quanto tempo até a próxima pastagem, a partir de um sorteio de 0 a 1. */
 export function grazeDelayFor(roll, first = false) {
     const r = Math.min(1, Math.max(0, Number(roll) || 0));
@@ -332,7 +361,7 @@ export function createSheepSystemClass({
          * casco andam juntos, como perna de verdade — antes a caixa girava no
          * próprio centro e o casco ficaria plantado no chão.
          */
-        createModel(coatKey = 'white') {
+        createModel(coatKey = 'white', { sheared = false } = {}) {
             const group = new THREE.Group();
             const wool = this.coatMaterials.get(coatKey) ?? this.coatMaterials.get('white');
             const part = (x, y, z, sx, sy, sz, material, name) => {
@@ -341,8 +370,15 @@ export function createSheepSystemClass({
                 return mesh;
             };
 
-            part(0, 0.62, 0, 0.54, 0.46, 0.78, wool, 'body');
-            const tufts = SHEEP_TUFTS.map(tuft => part(
+            // Tosquiada: a lã vira **uma camada baixa e lisa** (corpo menor, sem
+            // tufos e sem topete). É o desenho escolhido no comparativo: parece
+            // corte de cabelo, e não outro bicho. Com lã, o corpo é o miolo mais
+            // os nove tufos.
+            const body = sheared
+                ? { x: 0, y: 0.61, z: 0, sx: 0.5, sy: 0.42, sz: 0.74 }
+                : { x: 0, y: 0.62, z: 0, sx: 0.54, sy: 0.46, sz: 0.78 };
+            part(body.x, body.y, body.z, body.sx, body.sy, body.sz, wool, 'body');
+            const tufts = sheared ? [] : SHEEP_TUFTS.map(tuft => part(
                 tuft.x, tuft.y, tuft.z, tuft.sx, tuft.sy, tuft.sz, wool, 'tuft',
             ));
 
@@ -361,7 +397,7 @@ export function createSheepSystemClass({
             };
 
             naCabeca(0, 0.8, 0.52, 0.36, 0.32, 0.32, wool, 'skull');
-            naCabeca(0, 0.99, 0.48, 0.2, 0.12, 0.18, wool, 'topknot');
+            if (!sheared) naCabeca(0, 0.99, 0.48, 0.2, 0.12, 0.18, wool, 'topknot');
             naCabeca(0, 0.73, 0.7, 0.24, 0.16, 0.06, this.materials.skin, 'muzzle');
 
             const eyes = [];
@@ -395,9 +431,11 @@ export function createSheepSystemClass({
                 return hip;
             });
 
-            const tail = part(0, 0.78, -0.5, 0.14, 0.16, 0.12, wool, 'tail');
+            const tail = sheared
+                ? part(0, 0.74, -0.48, 0.12, 0.14, 0.1, wool, 'tail')
+                : part(0, 0.78, -0.5, 0.14, 0.16, 0.12, wool, 'tail');
 
-            return { group, head, tufts, eyes, glints, ears, legs, tail, coat: coatKey };
+            return { group, head, tufts, eyes, glints, ears, legs, tail, coat: coatKey, sheared };
         }
 
         // ------------------------------------------------------------ pastar
@@ -421,6 +459,8 @@ export function createSheepSystemClass({
                 this.world.setBlock(cell.x, gy + 1, cell.z, 0);
             }
             this.queueRegrow(cell.x, gy, cell.z, at);
+            // Tosquiada, cada pastagem adianta o crescimento da lã.
+            if (entity.sheared) entity.woolAt -= SHEEP_WOOL_GRAZE_BONUS;
             return true;
         }
 
@@ -453,6 +493,57 @@ export function createSheepSystemClass({
                 }
                 if (this.world.setBlock?.(cell.x, cell.y, cell.z, ID.GRASS)) this.regrow.splice(i, 1);
             }
+        }
+
+        // ------------------------------------------------------------ a lã
+
+        /**
+         * Veste ou tira a lã: troca o modelo inteiro e acerta o relógio do
+         * crescimento.
+         *
+         * Trocar o modelo (em vez de esconder peças) é o que deixa a ovelha
+         * tosquiada ser **menor** que a com lã: são dois corpos diferentes, não
+         * o mesmo corpo com peças apagadas. Acontece duas vezes na vida de cada
+         * tosquia, então o custo de remontar não aparece.
+         */
+        setSheared(entity, sheared, at) {
+            const where = { x: entity.x, y: entity.visualY, z: entity.z, rot: entity.group.rotation.y };
+            this.world.scene.remove(entity.group);
+            const model = this.createModel(entity.coat, { sheared });
+            model.group.position.set(where.x, where.y, where.z);
+            model.group.rotation.y = where.rot;
+            this.world.scene.add(model.group);
+            Object.assign(entity, model);
+            entity.sheared = sheared;
+            entity.woolAt = sheared
+                ? at + SHEEP_WOOL_REGROW_MIN
+                    + hash2(entity.id, 617) * (SHEEP_WOOL_REGROW_MAX - SHEEP_WOOL_REGROW_MIN)
+                : 0;
+            return entity;
+        }
+
+        /**
+         * A ovelha na mira que ainda tem lã, ou `null`.
+         *
+         * Reaproveita a mira do golpe (`creatureInReach`): tosquiar é acertar o
+         * mesmo alvo que o golpe acertaria, só que com tesoura na mão.
+         */
+        sheepInReach(origin, direction, options = {}) {
+            return creatureInReach(this.entities.filter(entity => !entity.sheared), origin, direction, options);
+        }
+
+        /**
+         * Tosquia a ovelha na mira. Devolve `{ entity, coat, count }` — com a cor
+         * da lã, que é o que o jogo precisa para soltar o fardo certo — ou `null`
+         * quando não há ovelha com lã ali.
+         */
+        shearAt(origin, direction, options = {}) {
+            const target = this.sheepInReach(origin, direction, options);
+            if (!target) return null;
+            const at = now();
+            const count = woolCountFor(hash2(target.id, Math.round(at * 10), 941));
+            this.setSheared(target, true, at);
+            return { entity: target, coat: target.coat, count };
         }
 
         trySpawn(playerPos, at, day = 1) {
@@ -527,6 +618,10 @@ export function createSheepSystemClass({
                     continue;
                 }
 
+                // Lã de volta: a ovelha tosquiada cresce de novo quando o
+                // relógio (adiantado pelas pastagens) chega.
+                if (e.sheared && at >= e.woolAt) this.setSheared(e, false, at);
+
                 // Pasto: para, abaixa a cabeça, morde (no meio do tempo) e sobe.
                 if (e.grazeT !== null) {
                     e.grazeT += dt;
@@ -549,8 +644,6 @@ export function createSheepSystemClass({
 
                 let andou = false;
                 if (!pastando) {
-                    if (at >= e.turnAt) this.pickTarget(e, at);
-
                     const dx = e.targetX - e.x, dz = e.targetZ - e.z;
                     const distanceToTarget = Math.hypot(dx, dz);
                     if (distanceToTarget > SHEEP_ARRIVE) {

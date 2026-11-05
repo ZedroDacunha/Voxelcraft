@@ -145,13 +145,15 @@ function makeAudio({ volume, ...overrides } = {}) {
 test('todas as receitas são válidas e os nomes de arquivo são previsíveis', () => {
     assert.deepEqual(SOUND_NAMES, [
         'ui-click', 'ui-hover',
-        'step-grass', 'step-dirt', 'step-stone', 'step-wood', 'step-sand',
-        'break-grass', 'break-dirt', 'break-stone', 'break-wood', 'break-sand',
-        'hit-grass', 'hit-dirt', 'hit-stone', 'hit-wood', 'hit-sand',
+        'step-grass', 'step-dirt', 'step-stone', 'step-wood', 'step-sand', 'step-wool',
+        'break-grass', 'break-dirt', 'break-stone', 'break-wood', 'break-sand', 'break-wool',
+        'hit-grass', 'hit-dirt', 'hit-stone', 'hit-wood', 'hit-sand', 'hit-wool',
         'furnace-light', 'furnace-out', 'furnace-done',
         'hurt', 'death',
         'mofim-chirp',
         'water-splash', 'water-exit', 'water-dive', 'swim-stroke',
+        'place-wool',
+        'shear',
         'door-open', 'door-close',
         'place-grass', 'place-dirt', 'place-stone', 'place-wood', 'place-sand',
     ]);

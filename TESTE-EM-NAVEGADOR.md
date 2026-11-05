@@ -488,6 +488,10 @@ vez de aparecer parada ao lado — então o teste é esperar e procurar.
       muda** — ovelha come grama, não praia.
 - [ ] A terra comida **volta a ser grama em 5 a 10 minutos** (deixe a tela
       aberta e volte). Se você puser outro bloco no lugar, o seu bloco fica.
+- [ ] Com a **tesoura** na mão, clicar na ovelha a deixa **tosquiada** (lã baixa
+      e lisa, sem topete) e solta de um a três fardos da cor dela — o resto está
+      na seção 26.
+- [ ] Tosquiada, ela **continua pastando**, e cada pastagem adianta a volta da lã.
 - [ ] Chegar correndo, de perto, agachado ou não, **não espanta** a ovelha: é
       mansa (o susto só entra na parte 6).
 - [ ] Subir um degrau de **um** bloco ela sobe; um barranco de dois ela contorna.
@@ -579,3 +583,23 @@ Já coberto por `npm test` (862 testes):
   do `index.html` real;
 - importmap, hashes de cache e `index.html` carimbado
   (`tests/cache-versioning.test.mjs`).
+
+## 26. Lã e tesoura
+
+- [ ] Na bancada, **duas barras de ferro na diagonal** fazem uma **tesoura**
+      (uma barra sozinha não faz nada).
+- [ ] Com a tesoura na mão, clicar numa ovelha a **tosquia**: ela fica com a lã
+      baixa e lisa, sem os tufos e sem o topete, e cai no chão de **1 a 3 fardos
+      de lã da cor dela** (branca, cinza ou preta).
+- [ ] Clicar de novo na mesma ovelha **não tosquia** (ela está sem lã) e o clique
+      não quebra o chão atrás dela.
+- [ ] Tosquiar gasta a **durabilidade** da tesoura (a barra de durabilidade no
+      inventário desce um ponto).
+- [ ] A lã volta em **5 a 8 minutos**; cada pastagem dela adianta esse relógio.
+      Quando volta, os tufos e o topete reaparecem.
+- [ ] Quatro fardos **da mesma cor** na bancada fazem o **bloco de lã** daquela
+      cor (2×2). Misturar cores não fecha receita.
+- [ ] O bloco de lã quebra na mão, rápido, com som **abafado** — e o passo em
+      cima dele também é macio.
+- [ ] `/give la 4` dá lã branca e `/give tesoura` dá a tesoura (o `/help` lista os
+      itens com o nome que aparece no jogo).

@@ -45,7 +45,7 @@ import { boxOverlapsXZ, woodDoorCollision, woodDoorPart, woodDoorShape, woodDoor
 import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld } from './player-physics.js';
 import { canJumpFrom, createJumpState, updateJumpWindow } from './player-jump.js';
 import { createCreatureSystemClass, creatureInReach } from './world-creature.js';
-import { createSheepSystemClass } from './world-sheep.js';
+import { SHEEP_WOOL_ITEMS, createSheepSystemClass } from './world-sheep.js';
 import { createChatState } from './world-chat.js';
 import { COMMAND_PREFIX, runChatCommand } from './world-chat-commands.js';
 import { createChatCompleter, visibleSuggestions } from './world-chat-completion.js';
@@ -191,7 +191,7 @@ const HELD = {
     rotation: { x: 10, y: -30, z: 90 },
     scale: 0.85,
 };
-const HELD_TOOL_KINDS = new Set(['pickaxe', 'axe', 'shovel']);
+const HELD_TOOL_KINDS = new Set(['pickaxe', 'axe', 'shovel', 'shears']);
 
 // =====================================================================
 // 2. SISTEMA DE ÁGUA (catálogo em world-catalog.js)
@@ -1780,6 +1780,24 @@ function strikeCreature() {
     // está atrás dele. Sem isso, qualquer bicho no raio de 3,5 blocos travava a
     // mineração e não dava para quebrar nada em volta.
     const aim = { maxDistance: currentHit ? currentHit.dist : Infinity };
+    // Tesoura na mão: o clique **tosquia** a ovelha em vez de bater. Sem ovelha
+    // com lã na mira, o clique segue o caminho normal (o golpe, ou minerar).
+    if (ITEMS[inventory.slots[selectedSlot]?.id]?.tool?.type === 'shears') {
+        const shorn = sheepSystem.shearAt(camera.position, creatureAim, aim);
+        if (shorn) {
+            const woolId = ID[SHEEP_WOOL_ITEMS[shorn.coat]];
+            spawnItemEntity(woolId, shorn.count,
+                new THREE.Vector3(shorn.entity.x, shorn.entity.visualY + 0.55, shorn.entity.z),
+                new THREE.Vector3(0, 0.5, 0), 0.25);
+            // Tosquiar gasta a tesoura, mas não cansa o jogador como minerar.
+            damageTool(selectedSlot, 1);
+            audio.play('shear', { gainScale: 0.9, rate: stepPitch() });
+            startPunch(handAnim);
+            resetMining();
+            haptic('punch');
+            return true;
+        }
+    }
     if (!creatureInReach(creatureSystem.entities, camera.position, creatureAim, aim)) return false;
     // Só rouba o quadro da mineração quando o golpe realmente acontece; no
     // cooldown, minerar continua normalmente.

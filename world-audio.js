@@ -38,6 +38,9 @@ export const SOUND_RECIPES = Object.freeze({
     }),
     // Quebrar: ruído com baque grave embaixo. Material duro tem corte mais
     // brilhante e baque mais curto/seco; material macio é abafado e some devagar.
+    'step-wool': Object.freeze({
+        kind: 'noise', cut: 700, cutTo: 320, q: 0.5, attack: 0.008, duration: 0.12, gain: 0.06,
+    }),
     'break-grass': Object.freeze({
         kind: 'noise', cut: 1500, cutTo: 600, q: 0.7, attack: 0.002, duration: 0.16, gain: 0.16,
         thump: Object.freeze({ from: 180, to: 90, duration: 0.11, gain: 0.10 }),
@@ -61,6 +64,10 @@ export const SOUND_RECIPES = Object.freeze({
     // Batida: cada golpe durante a mineração, antes do bloco cair. Mais curta e
     // mais discreta que o quebrar — é a percussão que segura o ritmo, não o
     // evento. Sem baque: o grave fica reservado para o impacto final.
+    'break-wool': Object.freeze({
+        kind: 'noise', cut: 820, cutTo: 300, q: 0.5, attack: 0.002, duration: 0.17, gain: 0.13,
+        thump: Object.freeze({ from: 120, to: 70, duration: 0.10, gain: 0.06 }),
+    }),
     'hit-grass': Object.freeze({
         kind: 'noise', cut: 1600, cutTo: 900, q: 0.7, attack: 0.001, duration: 0.05, gain: 0.075,
     }),
@@ -80,6 +87,9 @@ export const SOUND_RECIPES = Object.freeze({
     }),
     // Forno: acender (crepitar que abre), apagar (sopro de cinza) e o item que
     // ficou pronto (golpe curto, quase metálico). Sem laço enquanto queima.
+    'hit-wool': Object.freeze({
+        kind: 'noise', cut: 900, cutTo: 520, q: 0.5, attack: 0.004, duration: 0.05, gain: 0.07,
+    }),
     'furnace-light': Object.freeze({
         kind: 'noise', cut: 2400, cutTo: 700, q: 0.6, attack: 0.03, duration: 0.50, gain: 0.13,
         thump: Object.freeze({ from: 130, to: 85, duration: 0.28, gain: 0.05 }),
@@ -124,6 +134,15 @@ export const SOUND_RECIPES = Object.freeze({
     }),
     // Porta: rangido de dobradiça (ruído longo com ressonância) + batente de
     // madeira (baque). Abrir é mais lento e mais grave; fechar é um golpe seco.
+    'place-wool': Object.freeze({
+        kind: 'noise', cut: 700, cutTo: 420, q: 0.5, attack: 0.004, duration: 0.08, gain: 0.09,
+        thump: Object.freeze({ from: 120, to: 80, duration: 0.05, gain: 0.05 }),
+    }),
+    // Tosquia: a tesoura cortando lã. Ruído curto e fino, sem baque — o baque
+    // é do golpe, e tosquiar não é golpe.
+    'shear': Object.freeze({
+        kind: 'noise', cut: 2800, cutTo: 1500, q: 1.1, attack: 0.003, duration: 0.13, gain: 0.15,
+    }),
     'door-open': Object.freeze({
         kind: 'noise', cut: 1100, cutTo: 420, q: 3.2, attack: 0.02, duration: 0.26, gain: 0.13,
         thump: Object.freeze({ from: 170, to: 105, duration: 0.09, gain: 0.07 }),

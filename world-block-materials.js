@@ -3,7 +3,7 @@
 // passo, de quebra e de colocação de uma vez.
 import { ID } from './world-catalog.js';
 
-export const BLOCK_MATERIALS = Object.freeze(['grass', 'dirt', 'stone', 'wood', 'sand']);
+export const BLOCK_MATERIALS = Object.freeze(['grass', 'dirt', 'stone', 'wood', 'sand', 'wool']);
 
 const MATERIAL_BY_BLOCK = new Map();
 
@@ -19,6 +19,8 @@ assign('wood', [ID.LOG, ID.PLANKS, ID.CRAFTING_TABLE, ID.CHEST,
     ID.WOOD_DOOR_BOTTOM, ID.WOOD_DOOR_TOP,
     ID.WOOD_DOOR_BOTTOM_OPEN, ID.WOOD_DOOR_TOP_OPEN]);
 assign('sand', [ID.SAND]);
+// Lã é macia em tudo: passo abafado, quebra muda, colocação fofa.
+assign('wool', [ID.WOOL_BLOCK_WHITE, ID.WOOL_BLOCK_GRAY, ID.WOOL_BLOCK_BLACK]);
 
 // Material do bloco, ou null quando ele não produz som de material (ar, tocha,
 // água — que tem som próprio de fluxo/natação).

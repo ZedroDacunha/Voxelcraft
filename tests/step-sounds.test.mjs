@@ -17,7 +17,7 @@ import {
 import { SOUND_RECIPES } from '../world-audio.js';
 
 test('cada material tem receita de som própria', () => {
-    assert.deepEqual(STEP_MATERIALS, ['grass', 'dirt', 'stone', 'wood', 'sand']);
+    assert.deepEqual(STEP_MATERIALS, ['grass', 'dirt', 'stone', 'wood', 'sand', 'wool']);
     for (const material of STEP_MATERIALS) {
         assert.ok(SOUND_RECIPES[`step-${material}`], `falta a receita step-${material}`);
     }
@@ -39,6 +39,9 @@ test('o bloco pisado escolhe o material', () => {
         [ID.CHEST]: 'wood',
         [ID.WOOD_DOOR_BOTTOM]: 'wood',
         [ID.SAND]: 'sand',
+        [ID.WOOL_BLOCK_WHITE]: 'wool',
+        [ID.WOOL_BLOCK_GRAY]: 'wool',
+        [ID.WOOL_BLOCK_BLACK]: 'wool',
     };
     for (const [id, material] of Object.entries(expected)) {
         assert.equal(stepMaterialFor(Number(id)), material, `bloco ${Number(id)}`);

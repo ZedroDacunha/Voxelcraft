@@ -10,7 +10,8 @@ export const TILE = { GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, STONE: 3, WOOD: 4, C
                GRASS_TOP_ALT: 19, GRASS_SIDE_ALT: 20, DIRT_ALT: 21, STONE_ALT: 22, LEAVES_ALT: 23,
                SAND: 24, WATER: 25, TORCH_FLAME: 26, COPPER_ORE: 27, CHEST_FRONT: 28,
                FURNACE_FRONT_ON: 29, FURNACE_SIDE: 30, CHEST_FRONT_OPEN: 31,
-               WOOD_DOOR_UPPER: 32, WOOD_DOOR_LOWER: 33, MOFIM_LANTERN: 34 };
+               WOOD_DOOR_UPPER: 32, WOOD_DOOR_LOWER: 33, MOFIM_LANTERN: 34,
+               WOOL_WHITE: 35, WOOL_GRAY: 36, WOOL_BLACK: 37 };
 export const TILE_PX = 32;
 
 const allFaces = (t) => ({ top: t, side: t, bottom: t });
@@ -34,7 +35,13 @@ export const ID = { GRASS: 1, STONE: 2, LOG: 3, DIRT: 4, COBBLE: 5, PLANKS: 6, L
              WOOD_DOOR_BOTTOM_OPEN: 89, WOOD_DOOR_TOP_OPEN: 90,
              // Recurso do Mofim: o pó luminoso que ele solta e a lanterna que
              // se faz com ele (bloco sólido que emite luz).
-             MOFIM_DUST: 91, MOFIM_LANTERN: 92 };
+             MOFIM_DUST: 91, MOFIM_LANTERN: 92,
+             // Lã da ovelha: os blocos (93–95) e os fardos de lã que ela solta
+             // ao ser tosquiada (96–98). Quatro fardos da mesma cor viram um
+             // bloco. 99 fica com a tesoura, que é item puro (não vira bloco).
+             WOOL_BLOCK_WHITE: 93, WOOL_BLOCK_GRAY: 94, WOOL_BLOCK_BLACK: 95,
+             WOOL_WHITE: 96, WOOL_GRAY: 97, WOOL_BLACK: 98,
+             SHEARS: 99 };
 
 export const BLOCKS = {
     [ID.GRASS]: { name: 'Grama',      hardness: 0.6, drop: ID.DIRT,   tool: 'shovel', tiles: { top: TILE.GRASS_TOP, side: TILE.GRASS_SIDE, bottom: TILE.DIRT } },
@@ -81,6 +88,11 @@ export const BLOCKS = {
         name: 'Lanterna de mofim', hardness: 0.8, drop: ID.MOFIM_LANTERN, tool: null,
         light: 13, tiles: allFaces(TILE.MOFIM_LANTERN),
     },
+    // Lã: bloco macio, quebra rápido com a mão e não pede ferramenta. As três
+    // cores vêm da ovelha (branca, cinza e preta), cada uma com o seu bloco.
+    [ID.WOOL_BLOCK_WHITE]: { name: 'Bloco de lã branca', hardness: 0.6, drop: ID.WOOL_BLOCK_WHITE, tool: null, tiles: allFaces(TILE.WOOL_WHITE) },
+    [ID.WOOL_BLOCK_GRAY]: { name: 'Bloco de lã cinza', hardness: 0.6, drop: ID.WOOL_BLOCK_GRAY, tool: null, tiles: allFaces(TILE.WOOL_GRAY) },
+    [ID.WOOL_BLOCK_BLACK]: { name: 'Bloco de lã preta', hardness: 0.6, drop: ID.WOOL_BLOCK_BLACK, tool: null, tiles: allFaces(TILE.WOOL_BLACK) },
     [ID.WATER]: { name: 'Água',      hardness: 100, drop: null, tool: null, render: 'liquid', solid: false, collectible: false, tiles: allFaces(TILE.WATER) }, // Água só existe no mundo
 };
 
@@ -142,6 +154,24 @@ ITEMS[ID.WHEAT_SEEDS] = {
 ITEMS[ID.MOFIM_DUST] = {
     name: 'Pó luminoso', maxStack: 64,
     sprite: { kind: 'mofim-dust', mat: 'glow' }, iconTile: nextTile++,
+};
+
+// Fardos de lã: um item por cor, que stacka. É o que a ovelha solta.
+for (const [key, label, color] of [['WHITE', 'branca', 'white'], ['GRAY', 'cinza', 'gray'], ['BLACK', 'preta', 'black']]) {
+    ITEMS[ID['WOOL_' + key]] = {
+        name: `Lã ${label}`, maxStack: 64,
+        sprite: { kind: 'wool', mat: color }, iconTile: nextTile++,
+    };
+}
+
+// A tesoura não é uma quarta "espécie" de ferramenta: `TOOL_KINDS` define os IDs
+// das ferramentas por material (base + índice) e enfiar mais um tipo ali
+// renumeraria picareta, machado e pá de todos os materiais — e os saves com
+// isso. Ela é item próprio, com `tool.type` para o jogo reconhecer.
+ITEMS[ID.SHEARS] = {
+    name: 'Tesoura', maxStack: 1, maxDurability: 238,
+    tool: { type: 'shears', tier: 1, speed: 1 },
+    sprite: { kind: 'shears', mat: 'iron' }, iconTile: nextTile++,
 };
 
 const TOOL_MATS = {
@@ -272,6 +302,14 @@ defRecipe([[ID.PLANKS, ID.PLANKS], [ID.PLANKS, ID.PLANKS], [ID.PLANKS, ID.PLANKS
 // Pó luminoso + tábuas: a lanterna do Mofim. Três pós por lanterna é o que faz
 // valer a pena caçar (cada bicho solta um ou dois).
 defRecipe([[ID.MOFIM_DUST, ID.MOFIM_DUST], [ID.MOFIM_DUST, ID.PLANKS]], ID.MOFIM_LANTERN);
+// Tesoura: duas barras de ferro na diagonal (como no Minecraft — reconhecível
+// sem tutorial). Ela não mina mais rápido nada: serve para tosquiar.
+defRecipe([[ID.IRON_INGOT, null], [null, ID.IRON_INGOT]], ID.SHEARS);
+// Quatro fardos da mesma cor viram o bloco daquela cor. Sem mistura: lã cinza
+// não entra na receita da branca.
+defRecipe([[ID.WOOL_WHITE, ID.WOOL_WHITE], [ID.WOOL_WHITE, ID.WOOL_WHITE]], ID.WOOL_BLOCK_WHITE);
+defRecipe([[ID.WOOL_GRAY, ID.WOOL_GRAY], [ID.WOOL_GRAY, ID.WOOL_GRAY]], ID.WOOL_BLOCK_GRAY);
+defRecipe([[ID.WOOL_BLACK, ID.WOOL_BLACK], [ID.WOOL_BLACK, ID.WOOL_BLACK]], ID.WOOL_BLOCK_BLACK);
 
 function shapesEqual(a, b) {
     if (a.length !== b.length || a[0].length !== b[0].length) return false;
