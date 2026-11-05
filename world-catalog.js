@@ -41,7 +41,9 @@ export const ID = { GRASS: 1, STONE: 2, LOG: 3, DIRT: 4, COBBLE: 5, PLANKS: 6, L
              // bloco. 99 fica com a tesoura, que é item puro (não vira bloco).
              WOOL_BLOCK_WHITE: 93, WOOL_BLOCK_GRAY: 94, WOOL_BLOCK_BLACK: 95,
              WOOL_WHITE: 96, WOOL_GRAY: 97, WOOL_BLACK: 98,
-             SHEARS: 99 };
+             SHEARS: 99,
+             // 100 é a carne que a ovelha solta quando morre (crua, comestível).
+             MUTTON: 100 };
 
 export const BLOCKS = {
     [ID.GRASS]: { name: 'Grama',      hardness: 0.6, drop: ID.DIRT,   tool: 'shovel', tiles: { top: TILE.GRASS_TOP, side: TILE.GRASS_SIDE, bottom: TILE.DIRT } },
@@ -211,6 +213,13 @@ for (const m of toolMaterials) {
 
 ITEMS[ID.APPLE]    = { name: 'Maçã', maxStack: 64, food: { hunger: 4, sat: 2.4 }, sprite: { kind: 'apple', mat: 'food' }, iconTile: nextTile++ };
 ITEMS[ID.CHARCOAL] = { name: 'Carvão vegetal', maxStack: 64, sprite: { kind: 'charcoal', mat: 'coal' }, iconTile: nextTile++ };
+// Carne crua da ovelha: come menos que a maçã (é carne de bicho magro), mas
+// alimenta — e sai **sempre**, com lã ou sem, enquanto a lã só sai de quem
+// ainda está com o velo.
+ITEMS[ID.MUTTON] = {
+    name: 'Carne de ovelha', maxStack: 64, food: { hunger: 3, sat: 1.6 },
+    sprite: { kind: 'mutton', mat: 'meat' }, iconTile: nextTile++,
+};
 ITEMS[ID.TORCH].sprite = { kind: 'torch', mat: 'wood' };
 
 // O atlas é uma grade fixa, não uma fileira única: com 16 colunas a largura

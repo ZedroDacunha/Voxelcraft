@@ -102,6 +102,13 @@ export const SOUND_RECIPES = Object.freeze({
     }),
     // Dano: impacto curto com gemido grave descendo. A morte é a mesma ideia
     // esticada — o corpo cai, o tom vai até o fundo do poço.
+    // Golpe num bicho: baque curto e abafado (não é pedra, não é madeira) — o
+    // som que faltava para o clique ter resposta. A morte usa o mesmo som mais
+    // grave e mais comprido, via `rate`, em vez de uma receita nova.
+    'mob-hit': Object.freeze({
+        kind: 'noise', cut: 1400, cutTo: 430, q: 1.1, attack: 0.001, duration: 0.13, gain: 0.17,
+        thump: Object.freeze({ from: 190, to: 96, duration: 0.12, gain: 0.13 }),
+    }),
     'hurt': Object.freeze({
         kind: 'noise', cut: 900, cutTo: 300, q: 1.4, attack: 0.003, duration: 0.18, gain: 0.15,
         thump: Object.freeze({ from: 220, to: 110, duration: 0.16, gain: 0.14 }),

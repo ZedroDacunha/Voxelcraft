@@ -258,6 +258,21 @@ export function createTextureTools(THREE) {
             return (spriteCache[key] = g);
         }
 
+        if (kind === 'mutton') {
+            // Carne crua: um naco rosado de borda escura, duas veias de gordura
+            // clara e a ponta do osso aparecendo no canto de cima.
+            const carne = [178, 66, 62], borda = [122, 38, 40], gordura = [236, 198, 178], osso = [236, 232, 218];
+            for (let y = 3; y <= 12; y++) for (let x = 2; x <= 12; x++) {
+                const dx = (x - 7) / 5, dy = (y - 7.6) / 4.4;
+                const d = dx * dx + dy * dy;
+                if (d > 1) continue;
+                put(x, y, d > 0.6 ? borda : carne);
+            }
+            for (const [x, y] of [[5, 6], [6, 6], [7, 6], [5, 7], [6, 10], [7, 10], [8, 9]]) put(x, y, gordura);
+            for (const [x, y] of [[11, 3], [12, 2], [12, 3], [11, 2]]) put(x, y, osso);
+            return (spriteCache[key] = g);
+        }
+
         if (kind === 'shears') {
             // Tesoura de ferro: duas lâminas cruzadas em X e as argolas embaixo.
             const hc = HEAD_COLORS[mat] ?? HEAD_COLORS.iron;

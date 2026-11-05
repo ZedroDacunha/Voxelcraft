@@ -234,10 +234,13 @@ export function creatureInReach(entities, origin, direction, {
         // desaparecendo roubaria o quadro da mineração sem acertar nada.
         if (entity.leaving) continue;
         // O corpo do Mofim fica a ~0,45 do chão onde está a origem dele — e, no
-        // ar (pulo, planeio, voo), a altura que vale é a que se vê.
+        // ar (pulo, planeio, voo), a altura que vale é a que se vê. Bicho mais
+        // alto (a ovelha) declara a altura do próprio centro em `bodyOffset`:
+        // sem isso a mira tinha de ser no chão para acertar o corpo dela.
         const bodyY = Number.isFinite(entity.visualY) ? entity.visualY : entity.y;
+        const bodyOffset = Number.isFinite(entity.bodyOffset) ? entity.bodyOffset : 0.45;
         const ex = entity.x - origin.x;
-        const ey = bodyY + 0.45 - origin.y;
+        const ey = bodyY + bodyOffset - origin.y;
         const ez = entity.z - origin.z;
         const distance = Math.hypot(ex, ey, ez);
         if (distance > reach || distance > maxDistance || distance === 0) continue;
@@ -248,6 +251,18 @@ export function creatureInReach(entities, origin, direction, {
         if (score < bestScore) { bestScore = score; best = entity; }
     }
     return best;
+}
+
+/**
+ * Quanto do clarão do dano ainda está aceso, de 0 a 1 (1 no instante do golpe,
+ * 0 quando o tempo acaba). É a mesma conta para todos os bichos: o Mofim põe
+ * isso no `emissive` do corpo, a ovelha na lã dela.
+ */
+export function hurtFlashFor(hurtUntil = 0, at = 0, duration = HURT_FLASH) {
+    const span = Number(duration) > 0 ? Number(duration) : HURT_FLASH;
+    const left = Number(hurtUntil) - Number(at);
+    if (!Number.isFinite(left) || left <= 0) return 0;
+    return Math.min(1, left / span);
 }
 
 /**
@@ -818,7 +833,7 @@ export function createCreatureSystemClass({
                     e.rightHind.rotation.z = -flap * 0.3;
                     // O dia chegou: a luzinha apaga junto com ele (antes ela
                     // ficava acesa até o bicho sumir).
-                    const flashSaindo = Math.max(0, (e.hurtUntil - at) / HURT_FLASH);
+                    const flashSaindo = hurtFlashFor(e.hurtUntil, at);
                     e.bodyMaterial.emissive.setRGB(flashSaindo * 0.85, flashSaindo * 0.45, flashSaindo * 0.12);
                     e.eyeMaterial.emissive.setRGB(0, 0, 0);
                     e.lightPulse = 0;
@@ -930,7 +945,7 @@ export function createCreatureSystemClass({
                 else if (!airborne) e.visualY = e.y;
                 // Clarão do dano (laranja) e brilho próprio da noite (verde-pálido)
                 // dividem o mesmo emissive: o golpe manda enquanto dura.
-                const flash = Math.max(0, (e.hurtUntil - at) / HURT_FLASH);
+                const flash = hurtFlashFor(e.hurtUntil, at);
                 const glow = nightGlow(nightNow, at + e.phase);
                 // Pulso do chilreio: anda no tempo do quadro (não no da varredura
                 // de luzes) e vale para o desenho e para a PointLight.

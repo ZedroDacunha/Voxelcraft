@@ -1304,7 +1304,7 @@ test('game.js dá velocidade e agachamento à ovelha e liga o golpe nela', () =>
     const source = readFileSync(new URL('../game.js', import.meta.url), 'utf8');
     assert.match(source, /sheepSystem\.update\(dt, \{ pos: player\.pos, vel: player\.vel, crouching: isCrouching \}/,
         'o susto precisa saber a velocidade e se o jogador está agachado');
-    assert.match(source, /const assustada = sheepSystem\.hitAt\(camera\.position, creatureAim, aim\)/,
+    assert.match(source, /const golpe = sheepSystem\.hitAt\(camera\.position, creatureAim, aim\)/,
         'o golpe do jogador assusta a ovelha');
     assert.match(source, /audio\.play\('sheep-bleat-near', \{ gainScale:[^}]*\}\)/, 'e ela bale assustada');
 });
