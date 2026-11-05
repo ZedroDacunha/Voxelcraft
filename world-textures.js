@@ -241,6 +241,41 @@ export function createTextureTools(THREE) {
             return (spriteCache[key] = g);
         }
 
+        if (kind === 'wool') {
+            // Novelho de lã: quadrado macio com as beiradas irregulares e duas
+            // mechas claras. A cor vem do mat (branca, cinza, preta).
+            const bases = { white: [236, 232, 221], gray: [152, 152, 146], black: [62, 62, 68] };
+            const base = bases[mat] ?? bases.white;
+            const light = base.map(c => Math.min(255, c + 22));
+            const dark = base.map(c => Math.max(0, c - 30));
+            for (let y = 2; y <= 13; y++) for (let x = 2; x <= 13; x++) {
+                const edge = x === 2 || x === 13 || y === 2 || y === 13;
+                if (edge && hash2(x, y, 4471) < 0.42) continue; // beirada felpuda
+                const fuzz = hash2(x, y, 6151);
+                put(x, y, edge ? dark : fuzz > 0.86 ? light : dark);
+            }
+            for (const [x, y] of [[5, 5], [6, 5], [5, 6], [10, 9], [9, 10], [10, 10]]) put(x, y, light);
+            return (spriteCache[key] = g);
+        }
+
+        if (kind === 'shears') {
+            // Tesoura de ferro: duas lâminas cruzadas em X e as argolas embaixo.
+            const hc = HEAD_COLORS[mat] ?? HEAD_COLORS.iron;
+            const blade = (x, y) => put(x, y, hc.l);
+            for (let i = 0; i < 7; i++) {
+                blade(3 + i, 2 + i);       // lâmina de cima (da esquerda para baixo)
+                blade(12 - i, 2 + i);      // lâmina de baixo
+            }
+            for (let i = 0; i < 7; i++) {
+                blade(4 + i, 3 + i);
+                blade(11 - i, 3 + i);
+            }
+            // Pivô no meio e as argolas na ponta de baixo.
+            put(7, 8, hc.d); put(8, 8, hc.d); put(7, 9, hc.d); put(8, 9, hc.d);
+            for (const [x, y] of [[5, 11], [6, 12], [5, 12], [10, 11], [9, 12], [10, 12]]) put(x, y, hc.d);
+            return (spriteCache[key] = g);
+        }
+
         if (kind === 'stick') {
             for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
                 const color = stickColors[stickPixels[y][x]];
@@ -630,6 +665,25 @@ export function createTextureTools(THREE) {
                     if (fleck > 0.975) c += 24;
                     else if (fleck < 0.025) c -= 19;
                     return [c + j(5), c + j(5), c + 2 + j(5)];
+                }
+                // Lã: cor chapada com fiapos curtos de 2 px e uma trama leve na
+                // diagonal. Mancha grande vira sujeira, e ruído puro vira areia —
+                // o que faz ler como lã é a trama curta e regular.
+                case TILE.WOOL_WHITE:
+                case TILE.WOOL_GRAY:
+                case TILE.WOOL_BLACK: {
+                    const base = tile === TILE.WOOL_WHITE ? [234, 230, 219]
+                        : tile === TILE.WOOL_GRAY ? [150, 150, 145]
+                            : [58, 58, 62];
+                    const tuft = hash2(Math.floor(x / 2), Math.floor(y / 2), 7717);
+                    const fuzz = hash2(x, y, 9091);
+                    let shade = 1 + (tuft - 0.5) * 0.13;
+                    if (fuzz > 0.92) shade += 0.09;
+                    else if (fuzz < 0.08) shade -= 0.09;
+                    // Trama: uma linha clara e uma escura a cada oito pixels.
+                    if ((x + y) % 8 === 0) shade -= 0.05;
+                    else if ((x + y) % 8 === 4) shade += 0.04;
+                    return base.map(channel => Math.max(0, Math.min(255, Math.round(channel * shade))));
                 }
                 case TILE.SAND: {
                     const c = 215 + j(12);

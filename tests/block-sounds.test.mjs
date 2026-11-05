@@ -9,7 +9,7 @@ import { SOUND_RECIPES } from '../world-audio.js';
 const TORCH_IDS = [ID.TORCH, ID.TORCH_WALL_XP, ID.TORCH_WALL_XN, ID.TORCH_WALL_ZP, ID.TORCH_WALL_ZN];
 
 test('a família de material é única para passo, quebra e colocação', () => {
-    assert.deepEqual(BLOCK_MATERIALS, ['grass', 'dirt', 'stone', 'wood', 'sand']);
+    assert.deepEqual(BLOCK_MATERIALS, ['grass', 'dirt', 'stone', 'wood', 'sand', 'wool']);
     for (const material of BLOCK_MATERIALS) {
         assert.equal(materialSoundName(ID.GRASS, 'step') !== null, true);
         for (const prefix of ['step', 'break', 'place']) {
