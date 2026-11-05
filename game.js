@@ -61,13 +61,13 @@ import { ambientAvailability, createAmbientState, stepAmbient } from './world-am
 import { createWaterfallSoundState, scanWaterfall, updateWaterfallSound, waterfallGain } from './world-waterfall.js';
 import {
     TOUCH_HOLD_MS,
-    TOUCH_LOOK_SENSITIVITY,
     isTouchDevice,
     lookAfterDrag,
     movementFromStick,
     ndcFromPoint,
     stickVector,
     touchGesture,
+    touchLookSensitivity,
 } from './world-touch-controls.js';
 import { getSharedAudio } from './world-audio.js';
 import { touchLayoutState, touchStickRadius } from './world-touch-layout.js';
@@ -2708,6 +2708,11 @@ const touchAim = { on: false, hit: null, dir: new THREE.Vector3() };
 // cada mudança — mexer no ESC muda na hora.
 let touchScale = 1;
 
+// Quanto o dedo gira por pixel arrastado: a base de world-touch-controls.js
+// multiplicada pela opção "Sensibilidade do olhar" (80% de fábrica). É lida a
+// cada mudança de opção, então mexer no ESC gira na hora, sem recarregar.
+let touchLookScale = touchLookSensitivity(GAME_SETTINGS);
+
 // Vibração: só no modo toque, só com a opção ligada e só onde o aparelho sabe
 // vibrar (o Safari do iPhone não sabe). Padrão e folga mínima vêm de
 // world-haptics.js; aqui só se chama `navigator.vibrate`.
@@ -2831,6 +2836,7 @@ function applyTouchLayout(settings = GAME_SETTINGS) {
     document.body.classList.toggle('touch-right', !state.lefty);
     document.body.style.setProperty('--touch-scale', String(state.size));
     hapticOn = vibrationEnabled(settings);
+    touchLookScale = touchLookSensitivity(settings);
 }
 
 function playing() {
@@ -4116,7 +4122,7 @@ async function init() {
             if (gestureAt(event) === 'look') touchLook.mode = 'look';
             if (touchLook.mode !== 'look') return;
             const next = lookAfterDrag(look, event.clientX - touchLook.lastX, event.clientY - touchLook.lastY, {
-                sensitivity: TOUCH_LOOK_SENSITIVITY * LOOK_SENSITIVITY,
+                sensitivity: touchLookScale,
                 maxPitch: MAX_PITCH,
             });
             touchLook.lastX = event.clientX;

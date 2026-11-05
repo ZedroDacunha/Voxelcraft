@@ -31,7 +31,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 ## Testes e validação
 
 ```bash
-npm test           # 701 testes de módulos puros (node --test)
+npm test           # 712 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -84,7 +84,8 @@ capturar o mouse, e sim um joystick e botões na própria tela.
   A zona morta é por eixo (tremor de dedo não anda) e empurrar até o fim **corre**.
 - **Dedo na tela é a mira** (como no Minecraft de celular): o bloco escolhido é o
   que está embaixo do dedo, não o da cruz do centro. Três gestos, um dedo só:
-  - **arrastar** → olha em volta (a sensibilidade das opções vale igual ao mouse);
+  - **arrastar** → olha em volta (a sensibilidade do dedo é uma barra própria,
+    em Configurações de toque);
   - **toque curto parado** → usa/coloca naquele bloco (o mesmo "usar" do botão
     direito do mouse);
   - **segurar parado** (~0,25 s) → cava aquele bloco, e deslizar o dedo cava a
@@ -95,6 +96,7 @@ capturar o mouse, e sim um joystick e botões na própria tela.
 - **Hotbar**: cada casa é um botão (não há roda do mouse).
 - **Opções → Configurações de toque** (sub-tela da mesma janela de Opções, no
   menu e no ESC): **Mão** (Destro/Canhoto espelha joystick, botões e dica),
+  **Sensibilidade do olhar** (50%–200%, 80% de fábrica, separada da do mouse),
   **Tamanho dos botões** (80%–140%, com o joystick e a hotbar acompanhando) e
   **Vibração** (Ligada/Desligada). Fica gravado em `localStorage` junto das
   outras preferências.
