@@ -17,6 +17,7 @@ import { pauseMenuDisplay, shouldShowPauseMenu } from './game-pause-menu.js';
 import { createPointerLockRequester } from './game-pointer-lock.js';
 import { createInventoryAssets } from './inventory-assets.js';
 import { createTextureTools } from './world-textures.js';
+import { itemRenderMode } from './world-block-icons.js';
 import { createWorldSaveCodec, WORLD_SAVE_VERSION } from './world-save-codec.js';
 import { createWorldSaveLoader } from './world-save-loader.js';
 import { createWorldSaveManager } from './world-save-manager.js';
@@ -1536,19 +1537,22 @@ function buildCubeGeo(tiles, size, facing = DEFAULT_BLOCK_FACING) {
 
 function buildSpriteGeo(pix, px, depth) {
     const pos = [], nor = [], col = [], ind = [];
-    const filled = (cx, cy) => cx >= 0 && cx < 16 && cy >= 0 && cy < 16 && pix[cy][cx];
+    // O lado vem da própria arte: o ícone de bloco é 32×32 e os itens, 16×16.
+    // Fixar 16 cortava a arte maior e esticava o pedaço que sobrava.
+    const n = pix.length, meio = n / 2;
+    const filled = (cx, cy) => cx >= 0 && cx < n && cy >= 0 && cy < n && pix[cy][cx];
     const tmp = new THREE.Color();
-    for (let cy = 0; cy < 16; cy++) {
-        for (let cx = 0; cx < 16; cx++) {
+    for (let cy = 0; cy < n; cy++) {
+        for (let cx = 0; cx < n; cx++) {
             const c = pix[cy][cx];
             if (!c) continue;
             tmp.setRGB(c[0] / 255, c[1] / 255, c[2] / 255, THREE.SRGBColorSpace);
-            const gy = 15 - cy;
+            const gy = n - 1 - cy;
             for (const f of FACES) {
                 if (f.dir[2] === 0 && filled(cx + f.dir[0], cy - f.dir[1])) continue;
                 const base = pos.length / 3;
                 for (const k of f.corners) {
-                    pos.push((cx - 8 + k.pos[0]) * px, (gy - 8 + k.pos[1]) * px, (k.pos[2] - 0.5) * depth);
+                    pos.push((cx - meio + k.pos[0]) * px, (gy - meio + k.pos[1]) * px, (k.pos[2] - 0.5) * depth);
                     nor.push(f.dir[0], f.dir[1], f.dir[2]);
                     col.push(tmp.r, tmp.g, tmp.b);
                 }
@@ -1576,7 +1580,7 @@ function getItemGeometry(itemId) {
     if (itemGeometryCache[itemId]) return itemGeometryCache[itemId];
     const item = ITEMS[itemId];
     const block = item.block != null ? BLOCKS[item.block] : null;
-    const geo = item.sprite
+    const geo = itemRenderMode(item) === 'sprite'
         ? buildSpriteGeo(spritePixels(item.sprite.kind, item.sprite.mat), ITEM_SIZE * 1.6 / 16, ITEM_SIZE * 0.25)
         : block?.render === 'instanced'
             ? createTallGrassGeometry({ THREE }).scale(0.4, 0.4, 0.4)
@@ -1595,7 +1599,7 @@ function spawnItemEntity(id, count, pos, vel, delay = 0.5, damage = 0, opts = {}
         }
     }
     const block = ITEMS[id].block != null ? BLOCKS[ITEMS[id].block] : null;
-    const mat = ITEMS[id].sprite ? spriteMaterial :
+    const mat = itemRenderMode(ITEMS[id]) === 'sprite' ? spriteMaterial :
         (block?.render === 'instanced' ? tallGrassMaterial :
             (block?.render === 'cutout' ? world.cutoutMaterial :
                 (block?.render === 'liquid' ? world.water.material : world.material)));
@@ -2009,7 +2013,7 @@ function refreshHeldItem() {
     heldAnchor.scale.setScalar(1);
     if (!id) return;
     const item = ITEMS[id];
-    if (item.sprite) {
+    if (itemRenderMode(item) === 'sprite') {
         if (HELD_TOOL_KINDS.has(item.sprite.kind)) {
             heldAnchor.position.set(HELD.position.x, HELD.position.y, HELD.position.z);
             heldAnchor.rotation.set(

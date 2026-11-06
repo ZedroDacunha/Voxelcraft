@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 const { ID, ITEMS, BLOCKS, TILE, TILE_PX, atlasTileRect } = await import('../world-catalog.js');
-const { createBlockIconPixels, BLOCK_ICON_PX } = await import('../world-block-icons.js');
+const {
+    createBlockIconPixels, BLOCK_ICON_PX, isBlockIcon, itemRenderMode,
+} = await import('../world-block-icons.js');
 
 // ---- fonte de pixels falsa: cada tile vira uma cor chapada
 const corDoTile = (tile) => [tile * 10, tile * 10, tile * 10, 255];
@@ -96,6 +98,26 @@ test('todo bloco coletável tem ícone em 3D com célula própria no atlas', () 
         celulas.set(item.iconTile, bloco.name);
     }
     assert.ok(celulas.size >= 15, `poucos blocos com ícone: ${celulas.size}`);
+});
+
+test('no mundo (mão e item caído) o bloco continua cubo, não o ícone plano', () => {
+    // O ícone de 32×32 é arte de UI. Tratado como sprite plano, ele aparecia
+    // cortado e esticado na mão do jogador — o bug que veio junto com o ícone 3D.
+    for (const [id, bloco] of Object.entries(BLOCKS)) {
+        if (!bloco.collectible) continue;
+        const item = ITEMS[id];
+        if (!item?.sprite) continue;
+        assert.equal(isBlockIcon(item.sprite), item.sprite.kind === 'block', `${bloco.name}: isBlockIcon`);
+        if (item.sprite.kind !== 'block') continue;
+        assert.equal(itemRenderMode(item), 'cube', `${bloco.name} devia renderizar como cubo`);
+    }
+    // Tudo o que é arte plana continua arte plana.
+    for (const id of [ID.STICK, ID.APPLE, ID.CHARCOAL, ID.SHEARS, ID.COAL, ID.MUTTON]) {
+        assert.equal(itemRenderMode(ITEMS[id]), 'sprite', `${ITEMS[id].name} devia ser sprite`);
+    }
+    // A tocha é bloco, mas o desenho dela é a arte de item (graveto + chama).
+    assert.equal(itemRenderMode(ITEMS[ID.TORCH]), 'sprite');
+    assert.equal(itemRenderMode(undefined), 'sprite');
 });
 
 // ---- atlas de mentira: só grava os fillRect

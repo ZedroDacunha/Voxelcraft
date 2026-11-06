@@ -85,6 +85,14 @@ Quem puxa o quê:
 | atlas ignora o tamanho da arte e dobra tudo | 1 |
 | luz invertida (topo escuro) | 3 |
 
+## Correção que veio depois
+
+O ícone deu `sprite` a todo bloco, e três pontos do `game.js` passaram a tratar
+bloco como arte plana — o bloco na mão e no chão apareceram cortados e esticados.
+Ver [`BUG-20261106-bloco-na-mao.md`](BUG-20261106-bloco-na-mao.md): a decisão agora
+é `itemRenderMode(item)` (`'cube'` × `'sprite'`) e o `buildSpriteGeo` aceita arte
+de qualquer tamanho.
+
 ## Próximo passo
 
 Nada pendente aqui. Os demais temas (minérios um por vez) seguem esperando a
