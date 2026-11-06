@@ -723,3 +723,20 @@ Já coberto por `npm test` (922 testes):
       chão — nenhum pé escorregando na grama.
 - [ ] Empurrando contra uma parede/água, as patas **param** (não fica marchando
       no lugar) e ela sorteia outro alvo.
+
+## 34. A vida parada
+
+- [ ] Parada e de perto, a ovelha **respira**: a lã sobe e desce devagar (uns 2 cm
+      no total), sem as patas saírem do chão.
+- [ ] O **rabo** balança de um lado para o outro, num ritmo mais rápido que a
+      respiração.
+- [ ] De vez em quando **uma** orelha treme por um instante — nunca as duas
+      juntas.
+- [ ] A cada alguns segundos ela **espia** para um lado, segura a cabeça virada e
+      volta — e o lado muda de vez em quando.
+- [ ] Pastando com o focinho na grama, ela **não** espia; o espiar volta quando a
+      cabeça sobe.
+- [ ] Num bando, elas **não fazem tudo junto**: cada uma respira, balança a cauda
+      e espia no seu próprio tempo.
+- [ ] Chegando perto correndo, o susto continua mandando: ela para, ergue a
+      cabeça e encara — o espiar sai de cena.

@@ -90,6 +90,10 @@ import {
     approachSpeed,
     strideAdvance,
     walkStep,
+    idlePoseFor,
+    SHEEP_BREATH_LIFT,
+    SHEEP_TAIL_SWAY,
+    SHEEP_IDLE_LOOK,
     coatFor,
     createSheepSystemClass,
     grazeCellFor,
@@ -1860,4 +1864,109 @@ test('saindo do pasto, ela arranca devagar em vez de sair a toda', () => {
     // Meio segundo depois: velocidade de cruzeiro.
     for (let i = 0; i < 10; i++) { clock.t += 0.05; system.update(0.05, longe, true, { day: 1 }); }
     assert.ok(Math.abs(sheep.speed - SHEEP_WANDER_SPEED) < 1e-9, `chegou no cruzeiro (${sheep.speed})`);
+});
+
+test('a vida parada: respira, balança a cauda, treme a orelha e espia', () => {
+    // Respiração: dentro da faixa e mudando com o tempo.
+    const um = idlePoseFor(0, 3);
+    const outro = idlePoseFor(1.2, 3);
+    assert.ok(Math.abs(um.breath) <= SHEEP_BREATH_LIFT + 1e-12);
+    assert.ok(Math.abs(um.breath - outro.breath) > 0.001, 'a respiração muda com o tempo');
+    // Cada ovelha respira na sua fase: o bando não é um coral.
+    assert.ok(Math.abs(idlePoseFor(0.7, 3).breath - idlePoseFor(0.7, 4).breath) > 1e-6,
+        'cada ovelha tem a sua fase');
+
+    // Cauda: vai e vem, dentro da amplitude.
+    let caudaMin = Infinity, caudaMax = -Infinity;
+    for (let t = 0; t < 4; t += 0.02) {
+        const v = idlePoseFor(t, 5).tail;
+        caudaMin = Math.min(caudaMin, v);
+        caudaMax = Math.max(caudaMax, v);
+    }
+    assert.ok(caudaMax > 0.05 && caudaMin < -0.05, `a cauda vai e volta (${caudaMin} a ${caudaMax})`);
+    assert.ok(caudaMax <= SHEEP_TAIL_SWAY + 1e-12 && caudaMin >= -SHEEP_TAIL_SWAY - 1e-12);
+
+    // Orelha: quieta na maior parte do tempo, mas treme em janelas curtas.
+    let quieta = 0, tremendo = 0;
+    const lados = new Set();
+    for (let t = 0; t < 14; t += 0.02) {
+        const v = idlePoseFor(t, 9);
+        if (v.ear > 0.01) { tremendo++; lados.add(v.earSide); } else quieta++;
+    }
+    assert.ok(quieta > tremendo * 8, `a orelha fica quieta quase sempre (${quieta} × ${tremendo})`);
+    assert.ok(tremendo > 0, 'mas treme de vez em quando');
+
+    // Espiar: cabeça reta na maior parte do tempo, virando de vez em quando.
+    let reta = 0, virada = 0;
+    for (let t = 0; t < 14; t += 0.05) {
+        const v = idlePoseFor(t, 9);
+        if (Math.abs(v.look) > 0.05) virada++; else reta++;
+    }
+    assert.ok(reta > virada, `a cabeça fica reta a maior parte do tempo (${reta} × ${virada})`);
+    assert.ok(virada > 0, 'mas espia');
+    assert.ok(Math.abs(idlePoseFor(0, 9).look) <= SHEEP_IDLE_LOOK + 1e-12);
+
+    // Focinho na grama: nada de espiar com a cabeça lá embaixo.
+    for (let t = 0; t < 14; t += 0.3) {
+        assert.ok(Math.abs(idlePoseFor(t, 9, { pasto: 1 }).look) < 1e-12);
+    }
+});
+
+test('parada, ela respira e mexe a cauda sem tirar as patas do chão', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const longe = idlePlayer({ x: 400, z: 400 });
+    const sheep = spawnOne(system, clock, longe);
+
+    // Parada: sem alvo, sem pasto.
+    sheep.grazeT = null;
+    sheep.grazeAt = clock.t + 100;
+    sheep.speed = 0;
+    sheep.targetX = sheep.x;
+    sheep.targetZ = sheep.z;
+    sheep.turnAt = clock.t + 100;
+
+    let corpoMin = Infinity, corpoMax = -Infinity;
+    let caudaMin = Infinity, caudaMax = -Infinity;
+    let olharMin = Infinity, olharMax = -Infinity;
+    // Orelhas: guarda a pose de repouso para ver quem sai dela.
+    const repousoOrelhas = sheep.ears.map(orelha => orelha.userData.baseZ);
+    let vezesComDuas = 0;
+    let vezesComAlguma = 0;
+    const patas = sheep.legs.map(leg => leg.rotation.x);
+    const posY = sheep.legs.map(leg => leg.position.y);
+    const x0 = sheep.x, z0 = sheep.z;
+
+    for (let i = 0; i < 120; i++) {
+        clock.t += 0.05;
+        system.update(0.05, longe, true, { day: 1 });
+        corpoMin = Math.min(corpoMin, sheep.body.position.y);
+        corpoMax = Math.max(corpoMax, sheep.body.position.y);
+        caudaMin = Math.min(caudaMin, sheep.tail.rotation.y);
+        caudaMax = Math.max(caudaMax, sheep.tail.rotation.y);
+        olharMin = Math.min(olharMin, sheep.head.rotation.y);
+        olharMax = Math.max(olharMax, sheep.head.rotation.y);
+        const mexidas = sheep.ears.filter((orelha, i) => Math.abs(orelha.rotation.z - repousoOrelhas[i]) > 1e-6);
+        if (mexidas.length > 1) vezesComDuas++;
+        if (mexidas.length === 1) vezesComAlguma++;
+    }
+
+    assert.ok(corpoMax - corpoMin > 0.01, `a lã sobe e desce (${corpoMax - corpoMin})`);
+    assert.ok(corpoMax - corpoMin <= SHEEP_BREATH_LIFT * 2 + 1e-9, 'sem inflar demais');
+    assert.ok(caudaMax - caudaMin > 0.05, 'a cauda balança');
+
+    // As patas ficam exatamente onde estavam: respiração não é flutuação.
+    sheep.legs.forEach((leg, i) => {
+        assert.equal(leg.rotation.x, patas[i], 'pata parada');
+        assert.equal(leg.position.y, posY[i], 'e plantada no chão');
+    });
+    assert.ok(Math.abs(sheep.x - x0) < 1e-9 && Math.abs(sheep.z - z0) < 1e-9, 'ela não anda parada');
+
+    // Orelha: treme uma de cada vez, nunca as duas juntas.
+    assert.equal(vezesComDuas, 0, 'as duas orelhas nunca tremem juntas');
+    assert.ok(vezesComAlguma > 0, 'mas alguma treme em 6 s');
+
+    // Em 6 s ela espia para os lados em algum momento (a cabeça sai do zero).
+    assert.ok(olharMax - olharMin > 0.05 || Math.abs(olharMax) + Math.abs(olharMin) > 0.05,
+        `e espia em volta (${olharMin} a ${olharMax})`);
 });
