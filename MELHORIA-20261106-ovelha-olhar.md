@@ -90,6 +90,10 @@ Em pé o pescoço tem ~8 cm e fica **escondido dentro da lã**; pastando estica 
 ~36 cm e aparece ligando o corpo à cabeça. As medidas do focinho não mudaram —
 `headPoseFor` continua mandando na cabeça, o pescoço só a acompanha.
 
+> Depois esta peça foi **engrossada** (0,20 × 0,22 → 0,32 × 0,30) e ganhou uma
+> **gola de lã** no ombro: ver
+> [`MELHORIA-20261106-ovelha-pescoco-grosso.md`](MELHORIA-20261106-ovelha-pescoco-grosso.md).
+
 ## Provas
 
 - 76 testes em `tests/sheep.test.mjs` (933 na suíte inteira). Os novos:

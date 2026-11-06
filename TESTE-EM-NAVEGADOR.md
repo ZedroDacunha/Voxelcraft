@@ -697,3 +697,15 @@ Já coberto por `npm test` (922 testes):
       **não** se espalha pelo bando inteiro em cadeia: quem está longe do acontecido
       continua pastando.
 - [ ] Agachado ou com o jogador longe, nada muda: ovelha mansa, no pasto.
+
+## 32. O pescoço grosso e a gola
+
+- [ ] De perto, o pescoço tem **grossura de pescoço**: dá para ver que ele é quase
+      tão largo quanto a cabeça, e não um cano fino saindo da lã.
+- [ ] Onde ele entra no corpo existe uma **gola de lã** em volta do ombro — o peito
+      fica fofo e a junta não aparece como uma costura reta.
+- [ ] **Em pé**, o pescoço não aparece: fica escondido dentro da gola.
+- [ ] **Pastando**, ele estica e sai por baixo da gola, ligando o corpo à cabeça
+      sem vão nenhum — e a gola **não** desce junto: fica no ombro.
+- [ ] Olhando de lado, o pescoço acompanha a cabeça e continua encaixado.
+- [ ] Tosquiada, a ovelha continua com o pescoço ligado ao corpo.

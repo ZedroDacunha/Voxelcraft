@@ -58,6 +58,9 @@ import {
     SHEEP_NECK_ANCHOR_Z,
     SHEEP_NECK_HEAD_Y,
     SHEEP_NECK_HEAD_Z,
+    SHEEP_NECK_WIDTH,
+    SHEEP_NECK_DEPTH,
+    SHEEP_RUFF_PARTS,
     SHEEP_NECK_Z,
     SHEEP_NOTICE_CHANCE,
     SHEEP_NOTICE_DELAY_MAX,
@@ -1642,4 +1645,65 @@ test('levantar a cabeça do pasto é animação, não pulo', () => {
     assert.ok(sheep.lookAmount > 0 && sheep.lookAmount < 1, `o susto entra aos poucos (${sheep.lookAmount})`);
     assert.ok(meio > noChao + 0.01, 'a cabeça já subiu um pouco');
     assert.ok(meio < repouso - 0.01, 'mas ainda não deu o pulo até em cima');
+});
+
+test('o pescoço é grosso e assenta numa gola de lã no ombro', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const sheep = spawnOne(system, clock, idlePlayer({ x: 400, z: 400 }));
+
+    const pescoco = sheep.group.children.find(child => child.name === 'neck');
+    // Grosso: quase a largura do crânio (0,36) — antes eram 0,2 e, esticado,
+    // virava um cano fino saindo da lã.
+    assert.ok(pescoco.scale.x >= 0.3, `largo o bastante (${pescoco.scale.x})`);
+    assert.ok(pescoco.scale.z >= 0.3, `e fundo o bastante (${pescoco.scale.z})`);
+    assert.equal(pescoco.scale.x, SHEEP_NECK_WIDTH);
+    assert.equal(pescoco.scale.z, SHEEP_NECK_DEPTH);
+
+    // Ainda cabe embaixo da cabeça: mais estreito que o crânio.
+    const cranio = sheep.head.children.find(child => child.name === 'skull');
+    assert.ok(pescoco.scale.x < cranio.scale.x, 'mais estreito que o crânio');
+    assert.ok(pescoco.scale.z < cranio.scale.z, 'e mais raso que o crânio');
+
+    // A gola: três peças em volta do ombro, mais largas que o pescoço.
+    const gola = sheep.group.children.filter(child => child.name === 'ruff');
+    assert.equal(gola.length, SHEEP_RUFF_PARTS.length, 'a gola é feita de peças');
+    assert.ok(gola.length >= 3, 'três peças dão volume ao peito');
+    const principal = gola[0];
+    assert.ok(principal.scale.x > pescoco.scale.x, 'a gola é mais larga que o pescoço');
+    assert.ok(Math.abs(principal.position.y - SHEEP_NECK_ANCHOR_Y) < 0.1, 'sentada no ombro');
+    assert.ok(Math.abs(principal.position.z - SHEEP_NECK_ANCHOR_Z) < 0.1, 'e na frente dele');
+
+    // É da mesma lã do corpo: a ovelha continua uma peça só de cor.
+    const corpo = sheep.group.children.find(child => child.name === 'body');
+    for (const pedaco of gola) {
+        assert.equal(pedaco.material.color.getHex(), corpo.material.color.getHex());
+        assert.equal(pedaco.material, pescoco.material, 'a gola é da mesma lã do pescoço');
+    }
+});
+
+test('em pé o pescoço some na gola; pastando ele sai por baixo dela', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const longe = idlePlayer({ x: 400, z: 400 });
+    const sheep = spawnOne(system, clock, longe);
+
+    const pescoco = sheep.group.children.find(child => child.name === 'neck');
+    const gola = sheep.group.children.filter(child => child.name === 'ruff');
+    const baseDaGola = Math.min(...gola.map(pedaco => pedaco.position.y - pedaco.scale.y / 2));
+    const topoDoPescoco = () => pescoco.position.y
+        + Math.cos(pescoco.rotation.x) * pescoco.scale.y / 2;
+
+    sheep.grazeT = null;
+    system.update(0.001, longe, true, { day: 1 });
+    assert.ok(topoDoPescoco() > baseDaGola, 'em pé, o pescoço não aparece abaixo da gola');
+
+    sheep.grazeFor = 4;
+    sheep.grazeT = 2;
+    system.update(0.001, longe, true, { day: 1 });
+    assert.ok(topoDoPescoco() < baseDaGola - 0.1,
+        `pastando, ele sai por baixo da gola (${topoDoPescoco()} vs ${baseDaGola})`);
+    // E continua ligado na cabeça, com a gola parada no ombro.
+    assert.ok(Math.abs(topoDoPescoco() - (sheep.head.position.y + SHEEP_NECK_HEAD_Y)) < 0.02);
+    assert.ok(Math.abs(gola[0].position.y - SHEEP_RUFF_PARTS[0].y) < 1e-12, 'a gola não segue a cabeça');
 });
