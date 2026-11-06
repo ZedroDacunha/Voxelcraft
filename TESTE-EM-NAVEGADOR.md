@@ -787,3 +787,17 @@ Já coberto por `npm test` (922 testes):
 - [ ] Ao **amanhecer**, um Mofim caindo termina de cair (não sai voando no meio).
 - [ ] Longe do jogador, o corpo sai de cena na hora — não se vê o cadáver
       distante.
+
+## 38. O golpe é o mesmo em todo bicho
+
+- [ ] Batendo no **Mofim** e na **ovelha**, a resposta é igual: clarão, corpo
+      amassado (mais baixo e mais largo por um instante), recuo que desliza e
+      freia, lascas e som.
+- [ ] Batendo **seguido**, o mesmo bicho não leva dois golpes no mesmo instante —
+      nem trocando de alvo no meio do swing.
+- [ ] A ovelha morre no **quarto** golpe e o Mofim no **terceiro** — sem nenhum
+      dos dois cair antes nem aguentar um golpe a mais.
+- [ ] Morrendo, os dois **tombam** e só então somem; o que eles soltam sai no
+      golpe fatal, com o corpo ainda no chão.
+- [ ] Um Mofim que **não** foge (por exemplo, no ar) continua com a trava do
+      golpe: dois cliques seguidos não tiram dois pontos de vida dele.

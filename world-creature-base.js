@@ -17,6 +17,8 @@
  * É o mesmo limite do jogador: um degrau de terra se sobe, um barranco de dois
  * blocos se contorna.
  */
+import { HIT_COOLDOWN, HURT_FLASH, KNOCKBACK_DISTANCE } from './world-mob-hit.js';
+
 export const CREATURE_STEP_UP = 1;
 
 /** Altura do arco de salto ao subir um degrau (blocos). */
@@ -210,6 +212,55 @@ export function createCreatureBaseClass({
             const pose = dyingPoseFor(e.dieT, { side: e.dieSide ?? 1 });
             if (pose.done) this.removeEntity(e);
             return pose;
+        }
+
+        /**
+         * O golpe num bicho, em um lugar só: tira vida, acende o clarão, empurra
+         * o corpo e — quando a vida acaba — derruba (o corpo tomba e só então
+         * sai do mundo).
+         *
+         * Todo mob ganha isso de graça ao estender a base: o que é da espécie
+         * vem por `onHurt` (fugir, assustar-se), `dropsFor` (o que solta) e
+         * `onDeath` (o jogo põe os itens no chão). Devolve `{ entity, killed,
+         * drops }` ou `null` quando o bicho não leva o golpe agora (já caído,
+         * ainda no cooldown ou sem vida declarada).
+         */
+        takeHit(entity, {
+            at = 0,
+            damage = 1,
+            from = null,
+            flash = HURT_FLASH,
+            cooldown = HIT_COOLDOWN,
+            knockback = KNOCKBACK_DISTANCE,
+            onHurt = null,
+            dropsFor = null,
+            onDeath = null,
+        } = {}) {
+            if (!entity || entity.dying) return null;
+            // A trava do bicho: dois golpes do mesmo corpo não saem no mesmo
+            // instante, venha o segundo de onde vier.
+            // A folga de 1e-9 é a mesma de `attackReady`: somar o cooldown em
+            // ponto flutuante (10 + 0,35 = 10,349999…) não pode travar um golpe
+            // que deveria entrar.
+            const ultimo = Number(entity.lastHitAt);
+            if (Number.isFinite(ultimo) && at - ultimo < cooldown - 1e-9) return null;
+            entity.lastHitAt = at;
+            entity.health = (Number(entity.health) || 0) - Math.max(0, Number(damage) || 0);
+            entity.hurtUntil = at + flash;
+            // Recuo: o corpo desliza na direção contrária ao golpe, freando.
+            // No ar (voo) o empurrão brigaria com o arco: o dano conta, o corpo
+            // não se mexe até pousar.
+            const dx = entity.x - (from?.x ?? entity.x - 1);
+            const dz = entity.z - (from?.z ?? entity.z);
+            if (!entity.flight && knockback > 0 && Math.hypot(dx, dz) > 1e-4) {
+                this.pushAway(entity, dx, dz, knockback);
+            }
+            onHurt?.(entity, { at, from, damage });
+            if (entity.health > 0) return { entity, killed: false, drops: null };
+            const drops = dropsFor ? dropsFor(entity) : null;
+            this.startDying(entity, at);
+            onDeath?.({ entity, killed: true, drops });
+            return { entity, killed: true, drops };
         }
 
         /** Tira o bicho do mundo e solta o material dele (não é compartilhado). */

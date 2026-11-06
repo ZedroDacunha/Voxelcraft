@@ -22,10 +22,13 @@
  */
 
 import { createCreatureBaseClass, glideHeightAt, hopHeightAt } from './world-creature-base.js';
+// Susto (a regra do "quem chega perto") continua no Mofim, que a inventou; o
+// golpe — mira, clarão, reação do corpo e morte — mora no kit compartilhado.
+import { shouldFlee } from './world-creature.js';
 import {
-    creatureInReach, hurtFlashFor, shouldFlee,
-    HURT_EAR_FLAT, HURT_HEAD_KICK, HURT_SPREAD, HURT_SQUASH,
-} from './world-creature.js';
+    creatureInReach, hurtFlashFor, hurtScaleFor,
+    HIT_COOLDOWN, HURT_EAR_FLAT, HURT_FLASH, HURT_HEAD_KICK, KNOCKBACK_DISTANCE,
+} from './world-mob-hit.js';
 import { floorDiv as defaultFloorDiv } from './world-grid.js';
 import { hash2 as defaultHash2 } from './world-math.js';
 
@@ -85,7 +88,7 @@ export const SHEEP_ALERT_HEAD_LIFT = 0.45;
 export const SHEEP_FLEE_TIME = 3.5;
 export const SHEEP_FLEE_SPEED = 1.55;
 /** Espera entre dois golpes na mesma ovelha (segundos). */
-export const SHEEP_HIT_COOLDOWN = 0.35;
+export const SHEEP_HIT_COOLDOWN = HIT_COOLDOWN;
 /** O susto pega nas companheiras até esta distância (blocos). */
 export const SHEEP_SCARE_SPREAD = 6;
 /**
@@ -93,9 +96,9 @@ export const SHEEP_SCARE_SPREAD = 6;
  */
 export const SHEEP_HEALTH = 4;
 /** Clarão do dano no corpo dela — o mesmo tempo do Mofim. */
-export const SHEEP_HURT_FLASH = 0.22;
+export const SHEEP_HURT_FLASH = HURT_FLASH;
 /** Empurrão do golpe, em blocos: é o que dá peso à batida. */
-export const SHEEP_KNOCKBACK = 0.35;
+export const SHEEP_KNOCKBACK = KNOCKBACK_DISTANCE;
 /**
  * Altura do **centro do corpo** dela, que é o que a mira precisa acertar.
  * O Mofim usa 0,45 (é baixinho); a ovelha tem o lombo bem mais alto.
@@ -1291,52 +1294,41 @@ export function createSheepSystemClass({
         }
 
         /**
-         * Golpe na ovelha na mira: ela foge com o bando. Devolve
-         * `{ entity }` ou `null` (nada na mira, ou golpe no cooldown).
-         */
-        /**
          * Golpe na ovelha: tira um de vida, acende o clarão, empurra o corpo e
          * manda ela correr (com o bando junto).
          *
+         * A vida, o clarão, o recuo e a morte com queda vêm do kit da base
+         * (`takeHit`); o que é da ovelha é a fuga em bando e o que ela solta.
          * Devolve `{ entity, herd, killed, drops }` — `drops` só vem preenchido
          * quando ela morre, e quem põe os itens no chão é o `game.js` (via
-         * `onDeath`). `null` quando não há ovelha na mira ou o golpe anterior
-         * ainda está no cooldown.
+         * `onDeath`). `null` quando não há ovelha na mira, o golpe anterior
+         * ainda está no cooldown ou o corpo já está caindo.
          */
         hitAt(origin, direction, options = {}) {
             const target = creatureInReach(this.entities, origin, direction, options);
             if (!target) return null;
             const at = now();
-            if (at - target.lastHitAt < SHEEP_HIT_COOLDOWN) return null;
-            target.lastHitAt = at;
-            target.health -= 1;
-            target.hurtUntil = at + SHEEP_HURT_FLASH;
-            // Empurrão: o corpo recua na direção do golpe. É o peso da batida —
-            // sem ele o dano só apareceria como um piscar.
-            const dx = target.x - (origin?.x ?? target.x - 1);
-            const dz = target.z - (origin?.z ?? target.z);
-            if (Math.hypot(dx, dz) > 1e-4) {
-                // Recuo freando (0,16 s): o corpo desliza no golpe em vez de
-                // pular 35 cm no mesmo quadro.
-                this.pushAway(target, dx, dz, SHEEP_KNOCKBACK);
-            }
-            this.flee(target, at, origin);
-            if (target.health > 0) {
-                return { entity: target, herd: target.herd, killed: false, drops: null };
-            }
-            // Sem vida: solta o que tinha e sai de cena.
-            const drops = sheepDropsFor({
-                coat: target.coat,
-                sheared: target.sheared,
-                woolRoll: hash2(target.id, 419),
-                meatRoll: hash2(target.id, 421),
+            const golpe = this.takeHit(target, {
+                at,
+                from: origin,
+                flash: SHEEP_HURT_FLASH,
+                cooldown: SHEEP_HIT_COOLDOWN,
+                knockback: SHEEP_KNOCKBACK,
+                // Ovelha que leva golpe corre para longe levando o bando.
+                onHurt: entity => this.flee(entity, at, origin),
+                // Sem vida: solta o que tinha (lã, se ainda tiver velo, e carne).
+                dropsFor: entity => sheepDropsFor({
+                    coat: entity.coat,
+                    sheared: entity.sheared,
+                    woolRoll: hash2(entity.id, 419),
+                    meatRoll: hash2(entity.id, 421),
+                }),
+                // O corpo tomba no lugar e só some no fim da queda: os itens
+                // caem agora, com a ovelha ainda no chão.
+                onDeath: morte => onDeath?.({ ...morte, herd: target.herd }),
             });
-            const morte = { entity: target, herd: target.herd, killed: true, drops };
-            // O corpo tomba no lugar e só some no fim da queda: os itens caem
-            // agora, com a ovelha ainda no chão.
-            this.startDying(target, at);
-            onDeath?.(morte);
-            return morte;
+            if (!golpe) return null;
+            return { entity: golpe.entity, herd: target.herd, killed: golpe.killed, drops: golpe.drops };
         }
 
         update(dt, player, active, { day = 1 } = {}) {
@@ -1606,11 +1598,8 @@ export function createSheepSystemClass({
                 // Impacto: amassa o corpo na altura e alarga nos lados, junto
                 // com o clarão do material (0,22 s).
                 const impacto = hurtFlashFor(e.hurtUntil, at, SHEEP_HURT_FLASH);
-                e.group.scale.set(
-                    1 + HURT_SPREAD * impacto,
-                    1 - HURT_SQUASH * impacto,
-                    1 + HURT_SPREAD * impacto,
-                );
+                const amassado = hurtScaleFor(impacto);
+                e.group.scale.set(amassado.x, amassado.y, amassado.z);
             }
         }
     }
