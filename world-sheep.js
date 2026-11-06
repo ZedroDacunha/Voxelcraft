@@ -158,15 +158,33 @@ export const SHEEP_HEAD_TILT = 1.0;
  * Sem ela, a cabeça descia 0,36 bloco para pastar e **flutuava solta** no ar —
  * o bicho parecia desmontar. O pescoço nasce no ombro, encontra a cabeça e
  * estica o quanto for preciso, então o vão é sempre zero.
+ *
+ * Grosso de propósito: no primeiro desenho ele tinha 0,2 de lado e, esticado,
+ * virava um cano fino saindo da lã. Agora tem quase a largura do crânio (0,36) e
+ * assenta na gola.
  */
-export const SHEEP_NECK_WIDTH = 0.2;
-export const SHEEP_NECK_DEPTH = 0.22;
+export const SHEEP_NECK_WIDTH = 0.32;
+export const SHEEP_NECK_DEPTH = 0.3;
 /** Onde o pescoço nasce (dentro do corpo, na frente de cima). */
 export const SHEEP_NECK_ANCHOR_Y = 0.72;
 export const SHEEP_NECK_ANCHOR_Z = 0.3;
 /** Onde ele encontra a cabeça (relativo ao pivô dela). */
 export const SHEEP_NECK_HEAD_Y = 0.06;
 export const SHEEP_NECK_HEAD_Z = -0.02;
+
+/**
+ * A gola: lã em volta do ombro, onde o pescoço entra no corpo.
+ *
+ * O pescoço é um bloco liso; sozinho, ele atravessa a lã do corpo numa linha
+ * reta e o encaixe aparece como uma costura. Três peças em volta do ombro
+ * escondem a junta e fazem o peito parecer fofo — é o que dá o volume que a
+ * caixa do corpo não tem. Elas ficam paradas no corpo (não seguem a cabeça).
+ */
+export const SHEEP_RUFF_PARTS = Object.freeze([
+    Object.freeze({ x: 0, y: 0.78, z: 0.34, sx: 0.46, sy: 0.18, sz: 0.2 }),
+    Object.freeze({ x: -0.25, y: 0.74, z: 0.31, sx: 0.14, sy: 0.18, sz: 0.18 }),
+    Object.freeze({ x: 0.25, y: 0.74, z: 0.31, sx: 0.14, sy: 0.18, sz: 0.18 }),
+]);
 
 // ---------------------------------------------------------------- o olhar
 
@@ -676,6 +694,12 @@ export function createSheepSystemClass({
             neck.rotation.x = inicio.rotationX;
             neck.scale.y = inicio.length;
 
+            // A gola em volta do ombro: as três peças que escondem onde o
+            // pescoço entra no corpo (e dão o peito fofo).
+            const ruff = SHEEP_RUFF_PARTS.map(pedaco => part(
+                pedaco.x, pedaco.y, pedaco.z, pedaco.sx, pedaco.sy, pedaco.sz, wool, 'ruff',
+            ));
+
             const head = new THREE.Group();
             head.name = 'head';
             head.position.set(0, SHEEP_NECK_Y, SHEEP_NECK_Z);
@@ -726,7 +750,7 @@ export function createSheepSystemClass({
                 ? part(0, 0.74, -0.48, 0.12, 0.14, 0.1, wool, 'tail')
                 : part(0, 0.78, -0.5, 0.14, 0.16, 0.12, wool, 'tail');
 
-            return { group, head, neck, tufts, eyes, glints, ears, legs, tail, coat: coatKey, sheared, woolMaterial: wool };
+            return { group, head, neck, ruff, tufts, eyes, glints, ears, legs, tail, coat: coatKey, sheared, woolMaterial: wool };
         }
 
         // ------------------------------------------------------------ pastar
