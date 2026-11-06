@@ -136,12 +136,16 @@ test('o item de cobre não se confunde com o de carvão', () => {
     assert.ok(brilho(cobre) > brilho(carvaoMedia) + 60, 'e o cobre é bem mais claro que o carvão');
 });
 
-test('só o cobre bruto tem arte desenhada; ferro e ouro seguem no genérico', () => {
-    assert.equal(rawItemMaskFor('iron'), null);
-    assert.equal(rawItemMaskFor('gold'), null);
+test('cada minério bruto tem a sua arte; o ouro segue no genérico', () => {
+    assert.equal(rawItemMaskFor('gold'), null, 'o ouro ainda não tem arte desenhada');
+    // O ferro ganhou a arte dele depois (PR do ferro bruto): máscara própria,
+    // que não é a do cobre.
+    const ferroMascara = rawItemMaskFor('iron');
+    assert.ok(ferroMascara, 'o ferro bruto tem máscara');
+    assert.notEqual(ferroMascara.join(''), MASCARA.join(''), 'ferro e cobre não usam o mesmo desenho');
     const ferro = createMineralSpritePixels('raw', 'iron');
     assert.ok(ferro, 'o ferro bruto continua com sprite');
-    assert.notEqual(JSON.stringify(ferro), JSON.stringify(sprite), 'ferro e cobre não são o mesmo desenho');
+    assert.notEqual(JSON.stringify(ferro), JSON.stringify(sprite), 'ferro e cobre não são o mesmo sprite');
 });
 
 test('a arte é determinística e não sai da faixa 0–255', () => {

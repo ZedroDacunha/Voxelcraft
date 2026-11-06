@@ -947,3 +947,18 @@ Abra o inventário (ou olhe a barra) com **Cobre bruto** — dá para pegar com
       inventário, sem quadrado em volta.
 - [ ] O **Ferro bruto** continua com o desenho antigo (três bolhas) — só o cobre
       mudou nesta rodada.
+
+## 49. O item de ferro bruto
+
+Abra o inventário com **Ferro bruto** (`/give raw_iron`) e ponha ao lado de
+**Cobre bruto**, de **Ouro bruto** e de **Carvão**.
+
+- [ ] O ferro bruto aparece como **quatro grumos**, com o maior em cima **à
+      direita** — o cobre tem o maior em cima à esquerda: os dois itens não são o
+      mesmo desenho.
+- [ ] A cor é **pêssego** (mais clara e menos saturada que o laranja do cobre);
+      de relance dá para dizer qual é qual.
+- [ ] Cada grumo tem beirada clara em cima/à esquerda e escura embaixo/à direita.
+- [ ] Fora dos grumos o ícone é **transparente** (aparece o fundo da casa).
+- [ ] O **Ouro bruto** continua com o desenho antigo (três bolhas) — só o ferro
+      mudou nesta rodada.
