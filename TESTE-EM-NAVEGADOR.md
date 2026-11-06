@@ -801,3 +801,24 @@ Já coberto por `npm test` (922 testes):
       golpe fatal, com o corpo ainda no chão.
 - [ ] Um Mofim que **não** foge (por exemplo, no ar) continua com a trava do
       golpe: dois cliques seguidos não tiram dois pontos de vida dele.
+
+## 39. O minério na pedra de verdade
+
+- [ ] Encostando um bloco de minério num de **pedra**, o fundo dos dois é a
+      **mesma** textura (mesmos estratos, mesmo grão) — não parece outro material.
+- [ ] Os cinco minérios (carvão, cobre, ferro, ouro, diamante) têm esse mesmo
+      fundo de pedra, cada um com o seu veio por cima.
+- [ ] O bloco de pedra **escuro** (variante) também combina com o fundo do
+      minério, só com o sorteio diferente.
+- [ ] De perto, o fundo do minério tem grão e mancha — nada de cinza liso.
+
+## 40. O carvão antracito
+
+- [ ] No escuro de uma caverna, o minério de carvão **salta** da parede de pedra
+      antes de chegar perto: pedaços grandes e escuros, não pintinhas.
+- [ ] De perto, cada pedaço tem beirada clara em cima/à esquerda e escura
+      embaixo/à direita — o relevo do pixel art.
+- [ ] Os pedaços são **quadrados** (blocos de 2×2 px), sem listra fina de 1 px.
+- [ ] O fundo entre os pedaços é a **mesma pedra** do bloco de pedra ao lado.
+- [ ] Quebrando o bloco, o item que cai continua o mesmo carvão de sempre (o item
+      não mudou neste passo).

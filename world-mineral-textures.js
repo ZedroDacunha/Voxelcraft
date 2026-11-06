@@ -1,4 +1,5 @@
 import { TILE } from './world-catalog.js';
+import { hash2 } from './world-math.js';
 
 const ITEM_PALETTES = Object.freeze({
     ingot: Object.freeze({
@@ -87,9 +88,98 @@ export function isMineralOreTile(tile) {
     return Object.hasOwn(ORE_COLORS, tile);
 }
 
-export function createMineralOrePixel(tile, x, y, noise) {
+/**
+ * Minério em pixel art: uma máscara e um relevo automático.
+ *
+ * A máscara é 16×16 "blocos" e cada bloco vale `BLOCO × BLOCO` pixels — é o que dá
+ * o traço chunky (um pedaço de carvão de 3–4 blocos fica com 6–8 px, como no
+ * gênero). A máscara só diz **onde** tem minério; o relevo acende a beirada de
+ * cima/esquerda e escurece a de baixo/direita, o que separa o veio da pedra sem
+ * precisar de contorno desenhado à mão.
+ *
+ * Cada minério ganha a sua máscara e a sua paleta; a conta é a mesma.
+ */
+const BLOCO = 2;
+
+/** Desenha uma máscara com a paleta dada. Devolve `null` fora do veio. */
+function pintarVeio(mascara, paleta) {
+    const dentro = (bx, by) => (mascara[by]?.[bx] ?? '.') === '#';
+    return (x, y) => {
+        const bx = Math.floor(x / BLOCO), by = Math.floor(y / BLOCO);
+        if (!dentro(bx, by)) return null;
+        const cima = dentro(bx, by - 1), esq = dentro(bx - 1, by);
+        const baixo = dentro(bx, by + 1), dir = dentro(bx + 1, by);
+        const n = hash2(bx, by, 6007);
+        // Bloco sozinho (nódulo de 1 bloco) não tem beirada: fica chapado,
+        // senão ele vira um "+" claro no meio da pedra.
+        if (!cima && !esq && !baixo && !dir) return n > 0.5 ? paleta.corpo : paleta.meio;
+        if (!cima || !esq) return paleta.claro;
+        if (!baixo || !dir) return paleta.escuro;
+        if (n > 0.93) return paleta.brilho;
+        return n > 0.62 ? paleta.meio : paleta.corpo;
+    };
+}
+
+/**
+ * Carvão (opção **D · antracito**): poucos pedaços, grandes e densos — quase
+ * metade do bloco. É o carvão que se vê de longe: quando o jogador abre a
+ * caverna, o veio tem de saltar da parede antes de ele chegar perto.
+ */
+const CARVAO = Object.freeze({
+    paleta: Object.freeze({
+        escuro: [21, 21, 26],
+        corpo: [39, 39, 46],
+        meio: [52, 52, 60],
+        claro: [82, 86, 98],
+        brilho: [118, 122, 134],
+    }),
+    mascara: Object.freeze([
+        '................',
+        '...####...####..',
+        '..######.######.',
+        '.#######.######.',
+        '.#######.#######',
+        '..######..#####.',
+        '...####....###..',
+        '................',
+        '....#####.......',
+        '...#######..##..',
+        '..########.####.',
+        '..########.####.',
+        '...#######..##..',
+        '....#####.......',
+        '................',
+        '................',
+    ]),
+});
+
+/** Os veios desenhados à mão. Quem não está aqui ainda usa o veio genérico. */
+const VEIOS = {
+    [TILE.COAL_ORE]: pintarVeio(CARVAO.mascara, CARVAO.paleta),
+};
+
+/** A máscara de um minério (para o teste conferir a arte), ou `null`. */
+export function oreMaskFor(tile) {
+    if (tile === TILE.COAL_ORE) return CARVAO.mascara;
+    return null;
+}
+
+/**
+ * O minério: a **pedra de verdade** (`stonePixel`, a mesma do bloco de pedra) com
+ * os veios por cima.
+ *
+ * Antes o fundo era um cinza liso desenhado aqui, com um ruído próprio: o bloco
+ * de minério não combinava com a pedra ao lado — parecia outro material com
+ * pintinhas. Agora quem manda no fundo é a textura da pedra, que vem de fora
+ * (`stone`) para este módulo não conhecer a arte do resto do mundo.
+ */
+export function createMineralOrePixel(tile, x, y, stone) {
     const palette = ORE_COLORS[tile];
     if (!palette) return null;
+
+    // Minério com veio desenhado (hoje o carvão): o veio por cima, a pedra atrás.
+    const veio = VEIOS[tile];
+    if (veio) return veio(x, y) ?? stone(x, y, 0);
 
     const shift = tile - TILE.COAL_ORE;
     const inOre = ORE_CENTERS.some(([cx, cy], index) => {
@@ -99,6 +189,5 @@ export function createMineralOrePixel(tile, x, y, noise) {
     });
     if (inOre) return palette[(x * 3 + y * 5) % palette.length];
 
-    const shade = 116 + noise(6) - (((x * 13 + y * 7) % 31 === 0) ? 18 : 0);
-    return [shade, shade, shade + 2];
+    return stone(x, y, 0);
 }
