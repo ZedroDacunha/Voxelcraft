@@ -2,7 +2,11 @@ import { hash2, mulberry32 } from './world-math.js';
 import { ATLAS_COLUMNS, ATLAS_ROWS, BLOCKS, ITEMS, TILE, TILE_PX, atlasTileRect } from './world-catalog.js';
 import { createBlockIconPixels } from './world-block-icons.js';
 import { createCoalItemSpritePixels, createMineralOrePixel, createMineralSpritePixels, isMineralOreTile } from './world-mineral-textures.js';
-import { createAxeSpritePixels, createPickaxeSpritePixels } from './world-tool-textures.js';
+import {
+    createAxeSpritePixels,
+    createPickaxeSpritePixels,
+    createShovelSpritePixels,
+} from './world-tool-textures.js';
 
 /**
  * A pedra: mancha em faixas (estrato), grão fino e um respingo aqui e ali.
@@ -770,6 +774,10 @@ export function createTextureTools(THREE) {
         }
 
         if (kind === 'shovel') {
+            // Arte transcrita do desenho clássico (ver world-tool-textures.js).
+            // Material fora da arte cai no desenho antigo abaixo.
+            const arteDaPa = createShovelSpritePixels(mat);
+            if (arteDaPa) return (spriteCache[key] = arteDaPa);
             // A pá mantém o cabo diagonal do graveto; só a cabeça muda para a
             // silhueta compacta e arredondada da referência.
             for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
