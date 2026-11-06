@@ -1007,3 +1007,20 @@ de **Cobre bruto** e de **Carvão**.
 - [ ] O **lingote de ferro** e o **lingote de ouro** continuam no retângulo
       genérico, iguais a antes (só o de cobre foi redesenhado).
 - [ ] Carvão, cobre, ferro, ouro e diamante (itens) continuam como estavam.
+
+## 53. O item de lingote de ferro
+
+Abra o inventário com **Lingote de ferro** (`/give iron_ingot`) e ponha ao lado de
+**Lingote de cobre**, **Ferro bruto** e **Lingote de ouro**.
+
+- [ ] O lingote de ferro é a **mesma barra** do de cobre: tombada na diagonal,
+      face de cima clara, pontas afinando.
+- [ ] A cor é **cinza-azulada com contraste alto**: contorno quase preto e face
+      bem clara.
+- [ ] Ao lado do **lingote de cobre**, os dois se distinguem na hora (ferro frio,
+      cobre quente).
+- [ ] Ao lado do **ferro bruto** (grumos), não se confunde.
+- [ ] O **lingote de ouro** continua no retângulo genérico, igual a antes.
+- [ ] Fora da barra o ícone é **transparente**.
+- [ ] Os outros itens (carvão, cobre, ferro e ouro brutos, diamante, lingote de
+      cobre) continuam como estavam.

@@ -340,9 +340,18 @@ const LINGOTE_PALETAS = Object.freeze({
         [246, 182, 132],
         [255, 236, 206],
     ]),
+    // Ferro “forjado”: o cinza-azulado do ferro, com contraste alto — contorno
+    // quase preto e face bem clara, que é o que faz a barra ler de longe.
+    iron: Object.freeze([
+        [38, 42, 46],
+        [98, 106, 114],
+        [112, 120, 128],
+        [192, 202, 208],
+        [232, 240, 246],
+    ]),
 });
 
-/** Os lingotes com arte desenhada (o de cobre, por enquanto). */
+/** Os lingotes com arte desenhada: o de cobre e o de ferro (o de ouro falta). */
 const ARTES_ITEM_LINGOTE = Object.freeze(Object.fromEntries(
     Object.entries(LINGOTE_PALETAS).map(([material, paleta]) => [material, Object.freeze({ paleta, grade: LINGOTE_GRADE })]),
 ));
