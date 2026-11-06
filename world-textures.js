@@ -2,6 +2,7 @@ import { hash2, mulberry32 } from './world-math.js';
 import { ATLAS_COLUMNS, ATLAS_ROWS, BLOCKS, ITEMS, TILE, TILE_PX, atlasTileRect } from './world-catalog.js';
 import { createBlockIconPixels } from './world-block-icons.js';
 import { createCoalItemSpritePixels, createMineralOrePixel, createMineralSpritePixels, isMineralOreTile } from './world-mineral-textures.js';
+import { createPickaxeSpritePixels } from './world-tool-textures.js';
 
 /**
  * A pedra: mancha em faixas (estrato), grão fino e um respingo aqui e ali.
@@ -749,6 +750,11 @@ export function createTextureTools(THREE) {
         }
 
         if (kind === 'pickaxe') {
+            // Arte transcrita do desenho clássico (ver world-tool-textures.js):
+            // um desenho só, uma paleta por material. Material fora da arte cai no
+            // desenho antigo abaixo, para nada quebrar.
+            const arte = createPickaxeSpritePixels(mat);
+            if (arte) return (spriteCache[key] = arte);
             // Cabo em mapa separado para permitir ajustar a haste e a cabeça
             // sem que uma parte altere a silhueta da outra.
             for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
