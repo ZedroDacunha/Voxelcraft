@@ -915,3 +915,19 @@ de um bloco de ferro, um de cobre e um de pedra.
       embaixo/à direita, em blocos de 2×2 px, e nenhuma pepita é um pixel solto.
 - [ ] O fundo entre as pepitas é a **mesma pedra** do bloco de pedra ao lado.
 - [ ] Carvão, cobre e ferro continuam com os veios deles (nada mudou).
+
+## 47. O diamante em estilhaços
+
+Ande até uma parede com **minério de diamante** (ou `/give diamond_ore`) e ponha
+ao lado de um bloco de ouro, um de ferro e um de pedra.
+
+- [ ] O diamante aparece como **lascas pequenas e irregulares espalhadas** pelo
+      bloco — nem pedaço gordo como o carvão, nem pepita redonda como o ouro.
+- [ ] A cor é **ciano-gelo**: é o único minério frio da parede. Ao lado do ouro,
+      do ferro e do cobre, salta aos olhos na hora.
+- [ ] De longe, o diamante se anuncia na parede sem virar um bloco azul inteiro.
+- [ ] De perto, cada lasca tem beirada clara em cima/à esquerda e escura
+      embaixo/à direita, em blocos de 2×2 px, e nenhuma lasca é um pixel solto.
+- [ ] O fundo entre as lascas é a **mesma pedra** do bloco de pedra ao lado.
+- [ ] Carvão, cobre, ferro e ouro continuam com os veios deles (nada mudou).
+- [ ] Nenhum minério do jogo ficou no veio genérico (losangos miúdos listrados).
