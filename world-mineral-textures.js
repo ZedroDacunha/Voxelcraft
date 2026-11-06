@@ -339,12 +339,47 @@ const OURO = Object.freeze({
     ]),
 });
 
+/**
+ * Diamante (opção **B · estilhaços**): doze estilhaços pequenos e irregulares
+ * espalhados pelo bloco. O diamante é o fim da progressão: em vez de poucos
+ * pedaços gordos, lascas soltas — o ciano-gelo pisca pelo bloco inteiro e não
+ * deixa dúvida contra a pedra cinza.
+ */
+const DIAMANTE = Object.freeze({
+    paleta: Object.freeze({
+        escuro: [24, 88, 112],
+        corpo: [48, 152, 176],
+        meio: [80, 196, 216],
+        claro: [136, 232, 240],
+        brilho: [216, 253, 255],
+    }),
+    mascara: Object.freeze([
+        '................',
+        '..#....##.......',
+        '.###...##..##...',
+        '..#........###..',
+        '.....###....#...',
+        '..##.##.........',
+        '..##......##....',
+        '.........###....',
+        '...##...##......',
+        '..###..###..##..',
+        '....#.......###.',
+        '..##..##.....#..',
+        '..##..###.......',
+        '.....###.##.....',
+        '...##...###.....',
+        '...#.....#......',
+    ]),
+});
+
 /** Os veios desenhados à mão. Quem não está aqui ainda usa o veio genérico. */
 const VEIOS_ARTE = {
     [TILE.COAL_ORE]: CARVAO,
     [TILE.COPPER_ORE]: COBRE,
     [TILE.IRON_ORE]: FERRO,
     [TILE.GOLD_ORE]: OURO,
+    [TILE.DIAMOND_ORE]: DIAMANTE,
 };
 
 const VEIOS = Object.fromEntries(
@@ -369,8 +404,7 @@ export function createMineralOrePixel(tile, x, y, stone) {
     const palette = ORE_COLORS[tile];
     if (!palette) return null;
 
-    // Minério com veio desenhado (carvão, cobre, ferro, ouro): o veio por cima,
-    // a pedra atrás.
+    // Minério com veio desenhado (os cinco, agora): o veio por cima, a pedra atrás.
     const veio = VEIOS[tile];
     if (veio) return veio(x, y) ?? stone(x, y, 0);
 
