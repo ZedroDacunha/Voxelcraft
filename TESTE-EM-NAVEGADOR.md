@@ -1024,3 +1024,21 @@ Abra o inventário com **Lingote de ferro** (`/give iron_ingot`) e ponha ao lado
 - [ ] Fora da barra o ícone é **transparente**.
 - [ ] Os outros itens (carvão, cobre, ferro e ouro brutos, diamante, lingote de
       cobre) continuam como estavam.
+
+## 54. O item de lingote de ouro (e a família dos lingotes completa)
+
+Abra o inventário com **Lingote de ouro** (`/give gold_ingot`) e ponha ao lado de
+**Lingote de cobre**, **Lingote de ferro** e **Ouro bruto**.
+
+- [ ] O lingote de ouro é a **mesma barra** do cobre e do ferro (diagonal, face de
+      cima clara, pontas afinando).
+- [ ] A cor é **dourada com contraste alto**: contorno quase preto, face bem
+      amarela, reflexo quase branco.
+- [ ] Os três lingotes lado a lado se distinguem na hora: **ouro amarelo**,
+      **cobre laranja**, **ferro azul-acinzentado**.
+- [ ] O ouro **não** se parece com o cobre (que é mais avermelhado) nem com o
+      ouro bruto (grumos).
+- [ ] Fora da barra o ícone é **transparente**.
+- [ ] Nenhum lingote ficou no retângulo chapado antigo — os três mudaram.
+- [ ] Os outros itens (carvão, cobre/ferro/ouro brutos, diamante) continuam como
+      estavam.
