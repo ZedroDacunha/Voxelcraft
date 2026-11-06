@@ -144,21 +144,23 @@ test('o metal é cobre: quente, e não se confunde com o minério bruto', () => 
     assert.ok(cheios(sprite) > cheios(bruto), 'a barra ocupa mais que os grumos');
 });
 
-test('o ouro ainda é o genérico, e ninguém herdou a arte por engano', () => {
-    assert.equal(ingotItemGradeFor('gold'), null, 'o ouro ainda não foi redesenhado');
+test('os outros lingotes têm a mesma forma e outra cor; metal desconhecido é genérico', () => {
     assert.equal(gemItemMaskFor('copper'), null, 'cobre não é gema');
 
-    // Genérico = o retângulo chapado de sempre: 10 × 8 px, sem um pixel a mais.
-    const ouro = createMineralSpritePixels('ingot', 'gold');
-    assert.equal(ouro.flat().filter(Boolean).length, 80, 'o ouro continua no retângulo de 80 px');
-    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-        const dentroDoRetangulo = x >= 3 && x <= 12 && y >= 4 && y <= 11;
-        assert.equal(Boolean(ouro[y][x]), dentroDoRetangulo, `ouro em (${x},${y})`);
+    // Ferro e ouro compartilham a forma, mas cada um tem a sua paleta.
+    for (const material of ['iron', 'gold']) {
+        assert.deepEqual(ingotItemGradeFor(material), GRADE, `${material} compartilha a forma`);
+        assert.notDeepEqual(createMineralSpritePixels('ingot', material), sprite, `${material} não usa a cor do cobre`);
     }
 
-    // O ferro já tem arte, mas com a paleta dele: mesma forma, outra cor.
-    assert.deepEqual(ingotItemGradeFor('iron'), GRADE, 'o ferro compartilha a forma');
-    assert.notDeepEqual(createMineralSpritePixels('ingot', 'iron'), sprite, 'e não a cor');
+    // Genérico = o retângulo chapado de sempre: 10 × 8 px, sem um pixel a mais.
+    // Só um metal fora da arte (estanho) ainda cai nele.
+    const estanho = createMineralSpritePixels('ingot', 'tin');
+    assert.equal(estanho.flat().filter(Boolean).length, 80, 'metal desconhecido continua no retângulo de 80 px');
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+        const dentroDoRetangulo = x >= 3 && x <= 12 && y >= 4 && y <= 11;
+        assert.equal(Boolean(estanho[y][x]), dentroDoRetangulo, `estanho em (${x},${y})`);
+    }
 });
 
 test('a arte é determinística e não sai da faixa 0–255', () => {

@@ -349,9 +349,19 @@ const LINGOTE_PALETAS = Object.freeze({
         [192, 202, 208],
         [232, 240, 246],
     ]),
+    // Ouro “brilhante”: o dourado com contraste alto, como o ferro — contorno
+    // quase preto, face bem quente e reflexo quase branco. É o mais amarelo dos
+    // três, e o que mais lê de longe.
+    gold: Object.freeze([
+        [70, 48, 12],
+        [186, 138, 32],
+        [204, 158, 42],
+        [252, 216, 86],
+        [255, 246, 178],
+    ]),
 });
 
-/** Os lingotes com arte desenhada: o de cobre e o de ferro (o de ouro falta). */
+/** Os lingotes com arte desenhada: cobre, ferro e ouro — todos com a mesma forma. */
 const ARTES_ITEM_LINGOTE = Object.freeze(Object.fromEntries(
     Object.entries(LINGOTE_PALETAS).map(([material, paleta]) => [material, Object.freeze({ paleta, grade: LINGOTE_GRADE })]),
 ));
