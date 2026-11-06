@@ -858,3 +858,14 @@ Abra a barra (1–9) e depois o inventário (E). Vale para todo bloco coletável
       as tábuas.
 - [ ] A tocha continua com o desenho de item (graveto + chama), e não como cubo.
 - [ ] Na lã branca o cubo continua legível sobre o fundo claro do slot.
+
+## 43. O bloco na mão e no chão
+
+- [ ] Segurando um bloco (terra, pedra, tábuas...), a mão mostra o **cubo** de
+      sempre — pequeno, com as três faces, e não um bloco gigante cortado.
+- [ ] O mesmo bloco **caído no chão** (quebre e olhe antes de pegar) também
+      aparece como cubo do tamanho de sempre.
+- [ ] Segurando uma **ferramenta**, a maçã ou o carvão, o desenho plano de sempre
+      continua igual.
+- [ ] A **tocha** na mão continua graveto com chama (não virou cubo).
+- [ ] Na barra e no inventário os ícones continuam em 3D (seção 42).

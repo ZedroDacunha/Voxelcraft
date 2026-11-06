@@ -13,6 +13,23 @@ import { TILE_PX } from './world-catalog.js';
 /** Lado do ícone de bloco, em pixels. Cabe inteiro numa célula do atlas. */
 export const BLOCK_ICON_PX = 32;
 
+/** O sprite é o **ícone** de bloco (arte de UI)? Então ele não é arte plana. */
+export function isBlockIcon(sprite) {
+    return sprite?.kind === 'block';
+}
+
+/**
+ * Como um item aparece **no mundo** (caído no chão ou na mão): `'sprite'` é a
+ * arte plana de 16×16 e `'cube'` é o bloco em 3D de verdade.
+ *
+ * O ícone de bloco é arte de UI: se ele fosse tratado como sprite plano, o
+ * buildSpriteGeo (que trabalha em 16×16) mostraria só um pedaço do cubo
+ * esticado na mão do jogador — foi exatamente esse o bug depois do ícone 3D.
+ */
+export function itemRenderMode(item) {
+    return isBlockIcon(item?.sprite) ? 'cube' : 'sprite';
+}
+
 /**
  * Luz de cada face, em relação à textura original.
  *
