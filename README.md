@@ -28,6 +28,23 @@ python3 -m http.server 8000 --bind 0.0.0.0
 > Abrir `index.html` por `file://` **não** funciona: `type="module"`, o import
 > map e o Web Worker do terreno exigem HTTP.
 
+## Publicando (GitHub Pages)
+
+O jogo fica em <https://zedrodacunha.github.io/Voxelcraft/> e **a publicação é
+automática**: todo push em `main` dispara o workflow **Pages**
+(`.github/workflows/pages.yml`), que empacota o site e publica. O jogo não tem
+etapa de build — o que está no repositório é o que vai para o ar.
+
+- Para publicar na hora, sem esperar um merge: **Actions** → **Pages** →
+  **Run workflow** (branch `main`).
+- A fonte do Pages precisa ser **GitHub Actions** (Settings → Pages → Source).
+  No modo antigo, “Deploy from a branch”, quem publica é o construtor do Pages —
+  o `.nojekyll` na raiz é o que mantém esse caminho funcionando.
+- Site “parado na versão velha” depois de uma publicação costuma ser o **service
+  worker** do PWA: `Ctrl+Shift+R`, ou DevTools → *Application* → *Service
+  workers* → **Unregister** + *Clear site data*. Para depurar sem cache, abra com
+  `?sw=0`.
+
 ## Testes e validação
 
 ```bash

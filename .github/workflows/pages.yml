@@ -1,0 +1,66 @@
+# Publica o jogo no GitHub Pages a cada push em `main`.
+#
+# O jogo não tem etapa de build: o que está no repositório é o que vai para o ar.
+# Mas o Pages deste repositório está com a fonte **GitHub Actions**
+# (Settings → Pages → Source), e nesse modo quem publica é um workflow — sem um
+# workflow de deploy, push em `main` não muda nada no site, por mais builds que
+# tenham passado no CI.
+#
+# Este arquivo é esse deploy. Ele também dispensa o construtor antigo do Pages
+# (o do "Deploy from a branch"), que estava falhando com "Page build failed" por
+# causa do Jekyll — o `.nojekyll` na raiz cobre o caso de alguém voltar para
+# aquele modo.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Um deploy por vez. O que chega durante um deploy espera o anterior terminar em
+# vez de ser cancelado — cancelar no meio é o jeito mais fácil de deixar o site
+# servindo uma versão pela metade.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    name: Publicar no Pages
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Falha cedo, e com mensagem clara, se a fonte do Pages não for
+      # "GitHub Actions".
+      - uses: actions/configure-pages@v5
+
+      # Só o que o navegador pede: a página, os módulos da raiz, `assets/`,
+      # `icons/` e o three.js em `vendor/`. Testes, ferramentas, workflows e a
+      # documentação em `.md` ficam de fora do site.
+      - name: Preparar o site
+        run: |
+          mkdir _site
+          rsync -a \
+            --exclude '.git' --exclude '.github' \
+            --exclude 'tests' --exclude 'tools' \
+            --exclude 'package.json' --exclude '*.md' \
+            ./ _site/
+          ls -A _site | head -20
+
+      - name: Empacotar
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Publicar
+        id: deploy
+        uses: actions/deploy-pages@v4
