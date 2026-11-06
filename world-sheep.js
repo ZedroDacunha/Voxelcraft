@@ -249,6 +249,28 @@ export const SHEEP_LOOK_TILT = 0.22;
  */
 export const SHEEP_PASTO_SMOOTH = 7;
 
+// ---------------------------------------------------------------- a vida parada
+//
+// Parada, a ovelha era uma estátua: só a cabeça do pasto se mexia. Respiração,
+// cauda, orelha e o espiar entram aqui — devagar e fora de fase entre as
+// ovelhas, para o bando não parecer um coral.
+
+/** Ciclos de respiração por segundo (≈ 2,4 s cada) e o quanto a lã sobe. */
+export const SHEEP_BREATH_RATE = 0.42;
+export const SHEEP_BREATH_LIFT = 0.012;
+/** Cauda: velocidade do vai e vem (rad/s) e amplitude (rad). */
+export const SHEEP_TAIL_RATE = 2.1;
+export const SHEEP_TAIL_SWAY = 0.14;
+/** Tremor de orelha: amplitude, duração e o intervalo entre um e outro. */
+export const SHEEP_EAR_TWITCH = 0.22;
+export const SHEEP_EAR_TWITCH_TIME = 0.32;
+export const SHEEP_EAR_TWITCH_MIN = 3.2;
+export const SHEEP_EAR_TWITCH_MAX = 6.5;
+/** Espiar: quanto a cabeça vira (rad) e de quanto em quanto tempo (s). */
+export const SHEEP_IDLE_LOOK = 0.4;
+export const SHEEP_IDLE_LOOK_MIN = 5;
+export const SHEEP_IDLE_LOOK_MAX = 9;
+
 /** A grama comida volta a crescer entre cinco e dez minutos (segundos). */
 export const SHEEP_REGROW_MIN = 300;
 export const SHEEP_REGROW_MAX = 600;
@@ -458,6 +480,57 @@ export function approachSpeed(current, target, dt, {
 export function strideAdvance(phase, distance) {
     const andado = Math.max(0, Number(distance) || 0);
     return (Number(phase) || 0) + andado * SHEEP_STRIDE_PER_BLOCK;
+}
+
+/**
+ * A vida parada, em números prontos para o modelo.
+ *
+ * Cada ovelha tem a **sua** fase (sorteada do `id`), então o bando não respira,
+ * não balança a cauda nem treme a orelha em uníssono. Devolve:
+ *
+ * - `breath`: quanto a lã sobe (metros, ±`SHEEP_BREATH_LIFT`);
+ * - `tail`: giro da cauda (rad, ±`SHEEP_TAIL_SWAY`);
+ * - `ear` / `earSide`: tremor de **uma** orelha, em janelas curtas;
+ * - `look`: o espiar de lado (rad), que some com a cabeça no pasto (`pasto`).
+ */
+export function idlePoseFor(at, id, { pasto = 0 } = {}) {
+    const t = Math.max(0, Number(at) || 0);
+    const seed = Number(id) || 0;
+    const fase = defaultHash2(seed, 7, 907) * Math.PI * 2;
+
+    // Respiração e cauda: dois vaivéns, a cauda mais rápida.
+    const respiracao = Math.sin(t * SHEEP_BREATH_RATE * Math.PI * 2 + fase);
+    const cauda = Math.sin(t * SHEEP_TAIL_RATE + fase * 0.7);
+
+    // Orelha: uma janela curta de tremor a cada 3–6 s, num lado só, sorteado.
+    const intervalo = SHEEP_EAR_TWITCH_MIN
+        + defaultHash2(seed, 11, 911) * (SHEEP_EAR_TWITCH_MAX - SHEEP_EAR_TWITCH_MIN);
+    const dentroDaJanela = (t + fase) % intervalo;
+    const tremor = dentroDaJanela < SHEEP_EAR_TWITCH_TIME
+        ? Math.sin((dentroDaJanela / SHEEP_EAR_TWITCH_TIME) * Math.PI) * SHEEP_EAR_TWITCH
+        : 0;
+    const lado = defaultHash2(seed, Math.floor((t + fase) / intervalo), 913) < 0.5 ? 0 : 1;
+
+    // Espiar: a cada 5–9 s a cabeça vira para um lado, segura e volta.
+    const ciclo = SHEEP_IDLE_LOOK_MIN
+        + defaultHash2(seed, 13, 917) * (SHEEP_IDLE_LOOK_MAX - SHEEP_IDLE_LOOK_MIN);
+    const volta = (t + fase * 0.5) / ciclo;
+    const ponto = volta - Math.floor(volta);
+    const envelope = ponto < 0.12 ? ponto / 0.12
+        : ponto < 0.4 ? 1
+            : ponto < 0.52 ? (0.52 - ponto) / 0.12
+                : 0;
+    const ladoDoOlhar = defaultHash2(seed, Math.floor(volta), 919) < 0.5 ? -1 : 1;
+    // Focinho na grama: espiar fica para depois (a cabeça já está ocupada).
+    const naGrama = Math.min(1, Math.max(0, Number(pasto) || 0));
+
+    return {
+        breath: SHEEP_BREATH_LIFT * respiracao,
+        tail: SHEEP_TAIL_SWAY * cauda,
+        ear: tremor,
+        earSide: lado,
+        look: ladoDoOlhar * SHEEP_IDLE_LOOK * envelope * (1 - naGrama),
+    };
 }
 
 /** Quantas ovelhas nascem juntas, a partir de um sorteio de 0 a 1. */
@@ -752,7 +825,8 @@ export function createSheepSystemClass({
             const body = sheared
                 ? { x: 0, y: 0.61, z: 0, sx: 0.5, sy: 0.42, sz: 0.74 }
                 : { x: 0, y: 0.62, z: 0, sx: 0.54, sy: 0.46, sz: 0.78 };
-            part(body.x, body.y, body.z, body.sx, body.sy, body.sz, wool, 'body');
+            // O miolo da lã é guardado: é ele (com os tufos) que respira.
+            const torso = part(body.x, body.y, body.z, body.sx, body.sy, body.sz, wool, 'body');
             const tufts = sheared ? [] : SHEEP_TUFTS.map(tuft => part(
                 tuft.x, tuft.y, tuft.z, tuft.sx, tuft.sy, tuft.sz, wool, 'tuft',
             ));
@@ -804,6 +878,9 @@ export function createSheepSystemClass({
             const ears = [1, -1].map(side => {
                 const ear = naCabeca(side * 0.26, 0.8, 0.48, 0.28, 0.07, 0.12, wool, 'ear');
                 ear.rotation.z = -side * 0.34;
+                // A pose de repouso fica guardada: o tremor de orelha da vida
+                // parada soma em cima dela, sem perder a orelha caída.
+                ear.userData.baseZ = ear.rotation.z;
                 return ear;
             });
 
@@ -822,11 +899,17 @@ export function createSheepSystemClass({
                 return hip;
             });
 
+            const tailY = sheared ? 0.74 : 0.78;
             const tail = sheared
-                ? part(0, 0.74, -0.48, 0.12, 0.14, 0.1, wool, 'tail')
-                : part(0, 0.78, -0.5, 0.14, 0.16, 0.12, wool, 'tail');
+                ? part(0, tailY, -0.48, 0.12, 0.14, 0.1, wool, 'tail')
+                : part(0, tailY, -0.5, 0.14, 0.16, 0.12, wool, 'tail');
 
-            return { group, head, neck, ruff, tufts, eyes, glints, ears, legs, tail, coat: coatKey, sheared, woolMaterial: wool };
+            return {
+                group, head, neck, ruff, tufts, eyes, glints, ears, legs, tail,
+                // Base da respiração: a lã sobe e desce em cima destes valores.
+                body: torso, bodyY: body.y, tailY,
+                coat: coatKey, sheared, woolMaterial: wool,
+            };
         }
 
         // ------------------------------------------------------------ pastar
@@ -1366,6 +1449,23 @@ export function createSheepSystemClass({
                 e.lookYaw += (querOlhar - e.lookYaw) * suave;
                 e.lookTilt += ((encarando ? SHEEP_LOOK_TILT : 0) - e.lookTilt) * suave;
 
+                // Vida parada: respiração, cauda, orelha e o espiar. Só a lã se
+                // mexe — as patas continuam plantadas no chão.
+                const vida = idlePoseFor(at, e.id, { pasto: e.pastoAmount });
+                const respiro = e.body ? vida.breath : 0;
+                if (e.body) e.body.position.y = e.bodyY + respiro;
+                for (let tufo = 0; tufo < e.tufts.length; tufo++) {
+                    e.tufts[tufo].position.y = SHEEP_TUFTS[tufo].y + respiro;
+                }
+                if (e.tail) {
+                    e.tail.position.y = e.tailY + respiro * 0.6;
+                    e.tail.rotation.y = vida.tail;
+                }
+                for (let orelha = 0; orelha < e.ears.length; orelha++) {
+                    const repouso = e.ears[orelha].userData.baseZ ?? 0;
+                    e.ears[orelha].rotation.z = repouso + (orelha === vida.earSide ? vida.ear : 0);
+                }
+
                 // Cabeça: balanço curto junto com a passada e, no pasto, o
                 // focinho descendo até o chão com uma mastigadinha no meio.
                 if (e.head) {
@@ -1387,7 +1487,8 @@ export function createSheepSystemClass({
                         - SHEEP_ALERT_HEAD_LIFT * e.lookAmount
                         + 0.18 * (fugindo ? 1 : 0);
                     // A cabeça olha: vira no rumo do jogador e inclina de lado.
-                    e.head.rotation.y = e.lookYaw;
+                    // Parada, ela também espia em volta — mas o susto manda.
+                    e.head.rotation.y = e.lookYaw + vida.look * (1 - e.lookAmount);
                     e.head.rotation.z = e.lookTilt;
                     e.head.position.y = pose.y;
                     e.head.position.z = pose.z;
