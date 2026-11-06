@@ -560,6 +560,7 @@ O chat é a única porta para comandos no jogo (não há console no navegador).
 | Nenhuma ovelha aparece | É dia? (`worldSky.day` acima de 0,45). O chão em volta é grama? Já existem seis vivas? Veja `tests/sheep.test.mjs` — ele cobre nascimento, cores, passeio, rebanho e o corpo caixa por caixa |
 | Ovelhas nascendo sozinhas ou espalhadas pelo pasto | Elas nascem em **bando** (2 a 4, mesmo `herd`, em volta da líder); bandos diferentes ficam a 6 blocos. `tests/sheep.test.mjs` reprova bando de um só |
 | Ovelha correndo atrás do jogador ou fugindo sem motivo | Só o **golpe** faz correr; chegando perto correndo ela apenas para e encara por 1,8 s. Agachado não assusta |
+| Clicar num bicho e não acontecer nada | O golpe exige a cruz **em cima do corpo** (abertura de ~31°) e até 3,5 blocos; o corpo tem altura própria (`bodyOffset`: Mofim 0,45; ovelha 0,6) e o bloco na mira ganha 0,75 de folga. `tests/mob-hit.test.mjs` cobre a mira e a folga |
 | Ovelha parada no mesmo lugar para sempre | `pickTarget()` é chamado quando vence o `turnAt` (o bug antigo era ele nunca ser chamado): `tests/sheep.test.mjs` cobre a seguidora indo atrás da líder |
 | Ovelha sem casco, sem brilho no olho ou com a lã lisa demais | O modelo é montado em `createModel` com `SHEEP_TUFTS`, casco e brilho: `tests/sheep.test.mjs` conta os tufos, os cascos, os brilhos e confere que o casco toca o chão |
 | Ovelha mexendo a cabeça sem parar, ou abaixando sem comer nada | Só pasta de vez em quando e só come grama: `tests/sheep.test.mjs` confere o pasto (para, baixa, come a célula da frente) e o crescimento em 5–10 min |
@@ -576,7 +577,7 @@ O chat é a única porta para comandos no jogo (não há console no navegador).
 
 ## O que **não** precisa ser testado à mão
 
-Já coberto por `npm test` (903 testes):
+Já coberto por `npm test` (914 testes):
 
 - manifest e ícones — tamanho, opacidade, círculo seguro do maskable, favicon
   chapado (`tests/icons.test.mjs`);
@@ -638,3 +639,21 @@ Já coberto por `npm test` (903 testes):
 - [ ] Sumindo a líder do mundo, uma das outras assume e o grupo continua junto.
 - [ ] O balido de perto continua valendo — e agora toca também no susto do golpe,
       mais agudo.
+
+## 29. Golpe nos bichos
+
+- [ ] Clicando (mão vazia) numa **ovelha**, ela leva o golpe: o corpo **pisca**,
+      recua um dedo, solta **lascas da cor da lã** e toca um **baque** — e ela
+      corre para longe com o bando.
+- [ ] A ovelha cai no **quarto** golpe (esperando ~0,35 s entre um e outro); o
+      Mofim continua caindo no **terceiro**.
+- [ ] Morta, a ovelha solta no chão de **1 a 3 fardos de lã da cor dela** — mas
+      só se ainda tiver velo; tosquiada, não solta lã.
+- [ ] A **carne de ovelha** cai sempre (1 a 2), com ou sem lã, e é comestível:
+      segurando na mão e usando, a barra de fome sobe (3 de fome, menos que a
+      maçã).
+- [ ] Mirando no **lombo** do bicho o golpe pega (antes o clique se perdia no
+      chão atrás dele); mirando para o lado, não pega em ninguém.
+- [ ] `/give carne` dá a carne (o `/help` lista com o nome do jogo).
+- [ ] Só a ovelha que levou o golpe pisca: as companheiras do bando continuam
+      apagadas.

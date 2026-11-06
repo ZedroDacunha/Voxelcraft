@@ -22,7 +22,7 @@
  */
 
 import { createCreatureBaseClass, glideHeightAt, hopHeightAt } from './world-creature-base.js';
-import { creatureInReach, shouldFlee } from './world-creature.js';
+import { creatureInReach, hurtFlashFor, shouldFlee } from './world-creature.js';
 import { floorDiv as defaultFloorDiv } from './world-grid.js';
 import { hash2 as defaultHash2 } from './world-math.js';
 
@@ -74,6 +74,22 @@ export const SHEEP_FLEE_SPEED = 1.55;
 export const SHEEP_HIT_COOLDOWN = 0.35;
 /** O susto pega nas companheiras até esta distância (blocos). */
 export const SHEEP_SCARE_SPREAD = 6;
+/**
+ * Vida da ovelha: **quatro** golpes (o Mofim, menor, cai em três).
+ */
+export const SHEEP_HEALTH = 4;
+/** Clarão do dano no corpo dela — o mesmo tempo do Mofim. */
+export const SHEEP_HURT_FLASH = 0.22;
+/** Empurrão do golpe, em blocos: é o que dá peso à batida. */
+export const SHEEP_KNOCKBACK = 0.35;
+/**
+ * Altura do **centro do corpo** dela, que é o que a mira precisa acertar.
+ * O Mofim usa 0,45 (é baixinho); a ovelha tem o lombo bem mais alto.
+ */
+export const SHEEP_BODY_OFFSET = 0.6;
+/** Carne que ela solta ao morrer (a lã só sai de quem ainda tem velo). */
+export const SHEEP_MUTTON_MIN = 1;
+export const SHEEP_MUTTON_MAX = 2;
 
 /** Velocidade do pasto (blocos por segundo) — devagar de propósito. */
 export const SHEEP_WANDER_SPEED = 0.55;
@@ -395,6 +411,20 @@ export function woolCountFor(roll) {
     return SHEEP_WOOL_MIN + Math.floor(r * (SHEEP_WOOL_MAX - SHEEP_WOOL_MIN + 1));
 }
 
+/**
+ * O que uma ovelha solta ao morrer.
+ *
+ * A **carne sai sempre** (com velo ou tosquiada); a **lã só sai de quem ainda
+ * tem velo** — tosquiar antes de matar rende a lã na mão, matar uma tosquiada
+ * não rende lã nenhuma. É a regra combinada com o jogador.
+ */
+export function sheepDropsFor({ coat = 'white', sheared = false, woolRoll = 0, meatRoll = 0 } = {}) {
+    const wool = sheared ? 0 : woolCountFor(woolRoll);
+    const r = Math.min(0.999999, Math.max(0, Number(meatRoll) || 0));
+    const mutton = SHEEP_MUTTON_MIN + Math.floor(r * (SHEEP_MUTTON_MAX - SHEEP_MUTTON_MIN + 1));
+    return { coat, wool, mutton };
+}
+
 /** Quanto tempo até a próxima pastagem, a partir de um sorteio de 0 a 1. */
 export function grazeDelayFor(roll, first = false) {
     const r = Math.min(1, Math.max(0, Number(roll) || 0));
@@ -415,6 +445,9 @@ export function createSheepSystemClass({
     // Avisa quem chamou que a ovelha baleu (e por quê). O módulo não conhece
     // áudio: o `game.js` é quem toca, com o volume caindo pela distância.
     onBleat = null,
+    // Avisa quando ela morre, com o que ela solta. O módulo não conhece itens
+    // nem cena: quem põe a lã e a carne no chão é o `game.js`.
+    onDeath = null,
 }) {
     const CreatureBase = createCreatureBaseClass({ THREE, BLOCKS, CHUNK_SIZE, floorDiv });
 
@@ -444,6 +477,20 @@ export function createSheepSystemClass({
         }
 
         /**
+         * A lã de **uma** ovelha: um clone da cor dela.
+         *
+         * O material por cor é compartilhado (economiza material, que é o que
+         * importa num rebanho), mas o clarão do golpe pinta o `emissive` — e se
+         * ele fosse o compartilhado o rebanho inteiro piscava junto. Um clone
+         * por bicho resolve: seis no mundo dão seis materiais, e cada golpe
+         * acende só o corpo de quem levou.
+         */
+        woolMaterialFor(coatKey) {
+            const base = this.coatMaterials.get(coatKey) ?? this.coatMaterials.get('white');
+            return base.clone();
+        }
+
+        /**
          * O corpo da ovelha.
          *
          * Tudo caixa — o estilo do jogo —, mas a lã não é um bloco só: é um
@@ -460,9 +507,11 @@ export function createSheepSystemClass({
          * casco andam juntos, como perna de verdade — antes a caixa girava no
          * próprio centro e o casco ficaria plantado no chão.
          */
-        createModel(coatKey = 'white', { sheared = false } = {}) {
+        createModel(coatKey = 'white', { sheared = false, woolMaterial = null } = {}) {
             const group = new THREE.Group();
-            const wool = this.coatMaterials.get(coatKey) ?? this.coatMaterials.get('white');
+            const wool = woolMaterial
+                ?? this.coatMaterials.get(coatKey)
+                ?? this.coatMaterials.get('white');
             const part = (x, y, z, sx, sy, sz, material, name) => {
                 const mesh = this.addPart(group, material, x, y, z, sx, sy, sz);
                 mesh.name = name;
@@ -534,7 +583,7 @@ export function createSheepSystemClass({
                 ? part(0, 0.74, -0.48, 0.12, 0.14, 0.1, wool, 'tail')
                 : part(0, 0.78, -0.5, 0.14, 0.16, 0.12, wool, 'tail');
 
-            return { group, head, tufts, eyes, glints, ears, legs, tail, coat: coatKey, sheared };
+            return { group, head, tufts, eyes, glints, ears, legs, tail, coat: coatKey, sheared, woolMaterial: wool };
         }
 
         // ------------------------------------------------------------ pastar
@@ -608,7 +657,7 @@ export function createSheepSystemClass({
         setSheared(entity, sheared, at) {
             const where = { x: entity.x, y: entity.visualY, z: entity.z, rot: entity.group.rotation.y };
             this.world.scene.remove(entity.group);
-            const model = this.createModel(entity.coat, { sheared });
+            const model = this.createModel(entity.coat, { sheared, woolMaterial: entity.woolMaterial });
             model.group.position.set(where.x, where.y, where.z);
             model.group.rotation.y = where.rot;
             this.world.scene.add(model.group);
@@ -686,7 +735,7 @@ export function createSheepSystemClass({
         /** Põe uma ovelha no mundo, com o estado todo zerado. */
         spawnSheep(spot, y, { at, seed, attempt, member, herd, leader }) {
             const coat = coatFor(hash2(seed, attempt + member * 13, 173));
-            const model = this.createModel(coat.key);
+            const model = this.createModel(coat.key, { woolMaterial: this.woolMaterialFor(coat.key) });
             model.group.position.set(spot.x, y, spot.z);
             this.world.scene.add(model.group);
             this.entities.push({
@@ -715,6 +764,12 @@ export function createSheepSystemClass({
                 fleeUntil: 0,
                 fleeFrom: null,
                 lastHitAt: -Infinity,
+                // Vida: quatro golpes. `hurtUntil` é o clarão que o golpe acende
+                // no corpo (mesma ideia do Mofim) e `bodyOffset` é a altura que
+                // a mira tem de acertar.
+                health: SHEEP_HEALTH,
+                hurtUntil: 0,
+                bodyOffset: SHEEP_BODY_OFFSET,
                 // Pasto: a primeira vem cedo (para o jogador ver), depois de
                 // vez em quando. `grazeT` é o relógio da pastagem em curso
                 // (null quando não está pastando) e `bit`, se já mordeu.
@@ -828,14 +883,45 @@ export function createSheepSystemClass({
          * Golpe na ovelha na mira: ela foge com o bando. Devolve
          * `{ entity }` ou `null` (nada na mira, ou golpe no cooldown).
          */
+        /**
+         * Golpe na ovelha: tira um de vida, acende o clarão, empurra o corpo e
+         * manda ela correr (com o bando junto).
+         *
+         * Devolve `{ entity, herd, killed, drops }` — `drops` só vem preenchido
+         * quando ela morre, e quem põe os itens no chão é o `game.js` (via
+         * `onDeath`). `null` quando não há ovelha na mira ou o golpe anterior
+         * ainda está no cooldown.
+         */
         hitAt(origin, direction, options = {}) {
             const target = creatureInReach(this.entities, origin, direction, options);
             if (!target) return null;
             const at = now();
             if (at - target.lastHitAt < SHEEP_HIT_COOLDOWN) return null;
             target.lastHitAt = at;
+            target.health -= 1;
+            target.hurtUntil = at + SHEEP_HURT_FLASH;
+            // Empurrão: o corpo recua na direção do golpe. É o peso da batida —
+            // sem ele o dano só apareceria como um piscar.
+            const dx = target.x - (origin?.x ?? target.x - 1);
+            const dz = target.z - (origin?.z ?? target.z);
+            if (Math.hypot(dx, dz) > 1e-4) {
+                this.stepToward(target, dx, dz, SHEEP_KNOCKBACK, 1);
+            }
             this.flee(target, at, origin);
-            return { entity: target, herd: target.herd };
+            if (target.health > 0) {
+                return { entity: target, herd: target.herd, killed: false, drops: null };
+            }
+            // Sem vida: solta o que tinha e sai de cena.
+            const drops = sheepDropsFor({
+                coat: target.coat,
+                sheared: target.sheared,
+                woolRoll: hash2(target.id, 419),
+                meatRoll: hash2(target.id, 421),
+            });
+            const morte = { entity: target, herd: target.herd, killed: true, drops };
+            this.removeEntity(target);
+            onDeath?.(morte);
+            return morte;
         }
 
         update(dt, player, active, { day = 1 } = {}) {
@@ -976,6 +1062,13 @@ export function createSheepSystemClass({
                         + 0.18 * (fugindo ? 1 : 0);
                     e.head.position.y = pose.y;
                     e.head.position.z = pose.z;
+                }
+
+                // Clarão do golpe: a lã dela acende por um instante. Como o
+                // material é só dela, quem pisca é a ovelha que levou o golpe.
+                const clarao = hurtFlashFor(e.hurtUntil, at, SHEEP_HURT_FLASH);
+                if (e.woolMaterial) {
+                    e.woolMaterial.emissive.setRGB(clarao * 0.85, clarao * 0.32, clarao * 0.24);
                 }
 
                 e.group.position.set(e.x, e.visualY, e.z);

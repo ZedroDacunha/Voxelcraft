@@ -49,7 +49,7 @@ import { SHEEP_BLEAT_RANGE, SHEEP_WOOL_ITEMS, createSheepSystemClass } from './w
 import { createChatState } from './world-chat.js';
 import { COMMAND_PREFIX, runChatCommand } from './world-chat-commands.js';
 import { createChatCompleter, visibleSuggestions } from './world-chat-completion.js';
-import { dustScaleFor } from './world-creature-dust.js';
+import { DUST_COLOR, dustScaleFor } from './world-creature-dust.js';
 import { configureWindSway, updateWindSway, windDirectionFor, windStep, windTargetFor } from './world-wind.js';
 import { advanceHandAnimation, countStrikes, createHandAnimation, handSwingAmount, startPunch } from './world-hand-animation.js';
 import { advanceStepTracker, createStepTracker, stepDistanceThisFrame, stepPitch, stepSoundFor } from './world-step-sounds.js';
@@ -1303,6 +1303,19 @@ const SheepSystem = createSheepSystemClass({
             rate: near ? 1.12 : 1,
         });
     },
+    // Morreu: solta a lã (se ainda tinha velo) e a carne — sempre. O balido sai
+    // grave e comprido, como quem não gostou nada do último golpe.
+    onDeath: ({ entity, drops }) => {
+        const onde = new THREE.Vector3(entity.x, entity.visualY + 0.4, entity.z);
+        const impulso = new THREE.Vector3(0, 0.45, 0);
+        if (drops?.wool > 0) {
+            spawnItemEntity(ID[SHEEP_WOOL_ITEMS[drops.coat]], drops.wool, onde, impulso, 0.3);
+        }
+        if (drops?.mutton > 0) {
+            spawnItemEntity(ID.MUTTON, drops.mutton, onde, impulso, 0.3, 0, { noMerge: true });
+        }
+        audio.play('sheep-bleat-near', { gainScale: 0.8, rate: 0.82 });
+    },
 });
 
 // =====================================================================
@@ -1779,7 +1792,29 @@ function breakBlock(x, y, z) {
     haptic('break');
 }
 
-// Golpe em Mofim. A mira é a da câmera e o alcance é curto: se acertou, o bicho
+/**
+ * Folga do bloco na mira para o golpe em bicho.
+ *
+ * O limite continua valendo (não dá para bater em quem está atrás de uma
+ * parede), mas com um dedo de folga: mirando no lombo do bicho a linha segue e
+ * encontra o chão logo **atrás** dele, e sem folga o bloco "na frente" comia o
+ * clique — era por isso que o golpe parecia não fazer nada.
+ */
+const MOB_HIT_BLOCK_SLACK = 0.75;
+
+/**
+ * Lascas no ponto do golpe: a cor do bicho (a lã da ovelha, o pó do Mofim) e um
+ * estouro mais junto e mais curto que o de um bloco quebrado.
+ */
+function mobHitPuff(entity, count = 6) {
+    if (!entity) return;
+    const color = entity.woolMaterial?.color?.getHex?.() ?? DUST_COLOR;
+    const y = (Number.isFinite(entity.visualY) ? entity.visualY : entity.y)
+        + (Number.isFinite(entity.bodyOffset) ? entity.bodyOffset : 0.45);
+    breakParticles.spawn(entity.x, y, entity.z, null, { color, count, spread: 0.35, speed: 0.65 });
+}
+
+// Golpe em bicho. A mira é a da câmera e o alcance é curto: se acertou, o bicho
 // se assusta e o bloco que estava atrás dele não é minerado neste quadro (senão
 // o golpe viraria uma mineração silenciosa do cenário).
 function strikeCreature() {
@@ -1788,10 +1823,9 @@ function strikeCreature() {
     // linha que escolheu o bloco.
     if (touchAim.on) creatureAim.copy(touchAim.dir);
     else camera.getWorldDirection(creatureAim);
-    // O bloco na mira limita o alcance do golpe: se ele está mais perto, o Mofim
-    // está atrás dele. Sem isso, qualquer bicho no raio de 3,5 blocos travava a
-    // mineração e não dava para quebrar nada em volta.
-    const aim = { maxDistance: currentHit ? currentHit.dist : Infinity };
+    // O bloco na mira limita o alcance do golpe — com a folga de
+    // `MOB_HIT_BLOCK_SLACK`, para o bicho encostado no chão não perder o clique.
+    const aim = { maxDistance: currentHit ? currentHit.dist + MOB_HIT_BLOCK_SLACK : Infinity };
     // Tesoura na mão: o clique **tosquia** a ovelha em vez de bater. Sem ovelha
     // com lã na mira, o clique segue o caminho normal (o golpe, ou minerar).
     if (ITEMS[inventory.slots[selectedSlot]?.id]?.tool?.type === 'shears') {
@@ -1810,12 +1844,17 @@ function strikeCreature() {
             return true;
         }
     }
-    // Golpe na ovelha: ela leva o susto, corre para longe e leva o bando junto.
-    const assustada = sheepSystem.hitAt(camera.position, creatureAim, aim);
-    if (assustada) {
-        // Balido de susto: o mesmo som de perto, mais agudo e mais baixo — o
-        // bastante para o jogador entender que ela não gostou, sem virar grito.
-        audio.play('sheep-bleat-near', { gainScale: 0.55, rate: 1.24 });
+    // Golpe na ovelha: tira um de vida, pisca o corpo, empurra e ela corre para
+    // longe levando o bando. O quarto golpe derruba (o `onDeath` solta a lã e a
+    // carne).
+    const golpe = sheepSystem.hitAt(camera.position, creatureAim, aim);
+    if (golpe) {
+        mobHitPuff(golpe.entity, golpe.killed ? 12 : 6);
+        audio.play('mob-hit', { gainScale: 0.85, rate: golpe.killed ? 0.78 : 1 });
+        if (!golpe.killed) {
+            // Balido de susto: o mesmo som de perto, mais agudo e mais baixo.
+            audio.play('sheep-bleat-near', { gainScale: 0.55, rate: 1.24 });
+        }
         startPunch(handAnim);
         resetMining();
         haptic('punch');
@@ -1824,7 +1863,11 @@ function strikeCreature() {
     if (!creatureInReach(creatureSystem.entities, camera.position, creatureAim, aim)) return false;
     // Só rouba o quadro da mineração quando o golpe realmente acontece; no
     // cooldown, minerar continua normalmente.
-    if (!creatureSystem.hitFrom(camera.position, creatureAim, aim)) return false;
+    const mofim = creatureSystem.hitFrom(camera.position, creatureAim, aim);
+    if (!mofim) return false;
+    // Impacto do golpe: lascas na cor do pó dele e o baque que faltava no som.
+    mobHitPuff(mofim.entity, mofim.killed ? 12 : 6);
+    audio.play('mob-hit', { gainScale: 0.85, rate: mofim.killed ? 0.78 : 1 });
     startPunch(handAnim);
     resetMining();
     haptic('punch');

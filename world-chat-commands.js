@@ -64,6 +64,8 @@ const ITEM_ALIASES = Object.freeze({
     la: 'WOOL_WHITE',
     shears: 'SHEARS',
     scissors: 'SHEARS',
+    carne: 'MUTTON',
+    mutton: 'MUTTON',
 });
 
 /**
