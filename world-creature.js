@@ -257,9 +257,9 @@ export function creatureInReach(entities, origin, direction, {
     let best = null;
     let bestScore = Infinity;
     for (const entity of entities) {
-        // Sumindo ao amanhecer ele já não é alvo: bater num bicho que está
-        // desaparecendo roubaria o quadro da mineração sem acertar nada.
-        if (entity.leaving) continue;
+        // Sumindo ao amanhecer (ou já caindo) ele não é alvo: bater num bicho
+        // que está desaparecendo roubaria o quadro da mineração sem acertar nada.
+        if (entity.leaving || entity.dying) continue;
         // O corpo do Mofim fica a ~0,45 do chão onde está a origem dele — e, no
         // ar (pulo, planeio, voo), a altura que vale é a que se vê. Bicho mais
         // alto (a ovelha) declara a altura do próprio centro em `bodyOffset`:
@@ -643,8 +643,9 @@ export function createCreatureSystemClass({
                 this.pushAway(target, dx, dz, KNOCKBACK_DISTANCE);
             }
             if (target.health > 0) return { entity: target, killed: false };
-            // Sem vida: some do mundo e avisa quem chamou (o jogo solta o pó).
-            this.removeEntity(target);
+            // Sem vida: o corpo tomba (e só depois sai do mundo) e o jogo solta
+            // o pó na hora — os itens caem com o bicho ainda no chão.
+            this.startDying(target, at);
             onDeath(target);
             return { entity: target, killed: true };
         }
@@ -848,6 +849,20 @@ export function createCreatureSystemClass({
                     e.leaving = true;
                     e.leaveT = 0;
                     e.leaveFromY = e.visualY;
+                }
+                if (e.dying) {
+                    const pose = this.stepDying(e, dt);
+                    e.group.rotation.z = pose.roll;
+                    e.group.scale.setScalar(pose.scale);
+                    e.group.position.set(e.x, e.visualY, e.z);
+                    // O clarão do golpe apaga durante a queda (congelado, o corpo
+                    // ficaria aceso) e a luzinha da noite se apaga com ele.
+                    const clarao = hurtFlashFor(e.hurtUntil, at);
+                    e.bodyMaterial.emissive.setRGB(clarao * 0.85, clarao * 0.45, clarao * 0.12);
+                    e.eyeMaterial.emissive.setRGB(0, 0, 0);
+                    e.lightPulse = 0;
+                    e.glowMesh.scale.setScalar(GLOW_SIZE * (1 - pose.progress));
+                    continue;
                 }
                 if (e.leaving) {
                     e.leaveT = Math.min(LEAVE_DURATION, e.leaveT + dt);

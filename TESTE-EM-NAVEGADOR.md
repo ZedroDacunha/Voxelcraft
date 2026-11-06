@@ -767,3 +767,23 @@ Já coberto por `npm test` (922 testes):
 - [ ] Na **ovelha**, as duas orelhas deitam e a cabeça dá um tranco para cima.
 - [ ] No **Mofim**, o mesmo amassado aparece junto com o clarão laranja.
 - [ ] Empurrando contra uma parede, o recuo para ali (o bicho não atravessa).
+
+## 37. A morte: tombar antes de sumir
+
+- [ ] Abatendo uma **ovelha** (quatro golpes), ela **não some no ar**: o corpo
+      tomba de lado até o chão, fica um instante caído e **encolhe até sumir**.
+- [ ] A queda inteira leva menos de um segundo — dá para ver o tombo, não é um
+      piscar.
+- [ ] A **lã e a carne** saem no golpe fatal, com o corpo ainda no chão (dá tempo
+      de ver os itens caírem ao lado do cadáver).
+- [ ] Dando mais golpes no corpo caído, ele **não** leva outro golpe, não solta
+      item de novo e **não** é minerado através dele.
+- [ ] Batendo na **líder** do bando, as outras não ficam paradas olhando o corpo:
+      outra assume e o grupo segue.
+- [ ] Uma ovelha caindo **não anda, não pasta e não foge** — nada de patas
+      marchando no chão.
+- [ ] Abatendo um **Mofim**, o mesmo tombo; a luzinha dele apaga e encolhe junto
+      com o corpo, e o clarão laranja do golpe apaga durante a queda.
+- [ ] Ao **amanhecer**, um Mofim caindo termina de cair (não sai voando no meio).
+- [ ] Longe do jogador, o corpo sai de cena na hora — não se vê o cadáver
+      distante.
