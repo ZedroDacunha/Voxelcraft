@@ -2,7 +2,7 @@ import { hash2, mulberry32 } from './world-math.js';
 import { ATLAS_COLUMNS, ATLAS_ROWS, BLOCKS, ITEMS, TILE, TILE_PX, atlasTileRect } from './world-catalog.js';
 import { createBlockIconPixels } from './world-block-icons.js';
 import { createCoalItemSpritePixels, createMineralOrePixel, createMineralSpritePixels, isMineralOreTile } from './world-mineral-textures.js';
-import { createPickaxeSpritePixels } from './world-tool-textures.js';
+import { createAxeSpritePixels, createPickaxeSpritePixels } from './world-tool-textures.js';
 
 /**
  * A pedra: mancha em faixas (estrato), grão fino e um respingo aqui e ali.
@@ -785,6 +785,10 @@ export function createTextureTools(THREE) {
         }
 
         if (kind === 'axe') {
+            // Arte transcrita do desenho clássico (ver world-tool-textures.js).
+            // Material fora da arte cai no desenho antigo abaixo.
+            const arteDoMachado = createAxeSpritePixels(mat);
+            if (arteDoMachado) return (spriteCache[key] = arteDoMachado);
             // Copia o trecho diagonal do próprio graveto; a cabeça é desenhada
             // depois e cobre a ponta, mantendo o encaixe de cada ferramenta.
             const offsetX = kind === 'axe' ? 0 : 2;
