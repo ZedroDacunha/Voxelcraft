@@ -305,11 +305,46 @@ const FERRO = Object.freeze({
     ]),
 });
 
+/**
+ * Ouro (opção **B · pepitas**): treze pepitas miúdas espalhadas pelo bloco, em
+ * vez de poucos pedaços grandes. É o minério mais raro da progressão e o que
+ * mais brilha — pepitas soltas fazem o brilho piscar pelo bloco inteiro, e o
+ * jogador reconhece o ouro de longe mesmo com pouca área pintada.
+ */
+const OURO = Object.freeze({
+    paleta: Object.freeze({
+        escuro: [152, 104, 24],
+        corpo: [200, 144, 24],
+        meio: [232, 184, 40],
+        claro: [248, 216, 96],
+        brilho: [248, 248, 184],
+    }),
+    mascara: Object.freeze([
+        '................',
+        '..##...###......',
+        '.####..###..##..',
+        '..##.......###..',
+        '.....###........',
+        '..##.###..##....',
+        '..##......##....',
+        '................',
+        '...##...###.....',
+        '..###...###.....',
+        '......##....###.',
+        '..##..##....###.',
+        '..##.......###..',
+        '.....##.........',
+        '....###..##.....',
+        '.........###....',
+    ]),
+});
+
 /** Os veios desenhados à mão. Quem não está aqui ainda usa o veio genérico. */
 const VEIOS_ARTE = {
     [TILE.COAL_ORE]: CARVAO,
     [TILE.COPPER_ORE]: COBRE,
     [TILE.IRON_ORE]: FERRO,
+    [TILE.GOLD_ORE]: OURO,
 };
 
 const VEIOS = Object.fromEntries(
@@ -334,7 +369,8 @@ export function createMineralOrePixel(tile, x, y, stone) {
     const palette = ORE_COLORS[tile];
     if (!palette) return null;
 
-    // Minério com veio desenhado (carvão, cobre, ferro): o veio por cima, a pedra atrás.
+    // Minério com veio desenhado (carvão, cobre, ferro, ouro): o veio por cima,
+    // a pedra atrás.
     const veio = VEIOS[tile];
     if (veio) return veio(x, y) ?? stone(x, y, 0);
 

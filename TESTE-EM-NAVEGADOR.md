@@ -900,3 +900,18 @@ de um bloco de cobre e de um de pedra.
       embaixo/à direita, em blocos de 2×2 px.
 - [ ] O fundo entre os pedaços é a **mesma pedra** do bloco de pedra ao lado.
 - [ ] Carvão e cobre continuam com os veios deles (nada mudou nesses dois).
+
+## 46. O ouro em pepitas
+
+Ande até uma parede com **minério de ouro** (ou `/give gold_ore`) e ponha ao lado
+de um bloco de ferro, um de cobre e um de pedra.
+
+- [ ] O ouro aparece como **muitas pepitas miúdas espalhadas** pelo bloco — o
+      oposto do ferro, que são poucos pedaços médios.
+- [ ] A cor é **amarela de verdade** (não laranja): mais clara e mais saturada
+      que o ferro e o cobre, e o verde junto com o vermelho é o que faz o amarelo.
+- [ ] De longe, o ouro salta da parede sem virar um bloco amarelo inteiro.
+- [ ] De perto, cada pepita tem beirada clara em cima/à esquerda e escura
+      embaixo/à direita, em blocos de 2×2 px, e nenhuma pepita é um pixel solto.
+- [ ] O fundo entre as pepitas é a **mesma pedra** do bloco de pedra ao lado.
+- [ ] Carvão, cobre e ferro continuam com os veios deles (nada mudou).
