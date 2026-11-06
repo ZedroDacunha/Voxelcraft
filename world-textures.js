@@ -754,8 +754,8 @@ export function createTextureTools(THREE) {
         }
 
         if (kind === 'pickaxe') {
-            // Arte transcrita do desenho clássico (ver world-tool-textures.js):
-            // um desenho só, uma paleta por material. Material fora da arte cai no
+            // Arte da casa (ver GUIA-DE-ARTE.md e world-tool-textures.js): um
+            // desenho só, uma paleta por material. Material fora da arte cai no
             // desenho antigo abaixo, para nada quebrar.
             const arte = createPickaxeSpritePixels(mat);
             if (arte) return (spriteCache[key] = arte);
@@ -774,8 +774,8 @@ export function createTextureTools(THREE) {
         }
 
         if (kind === 'shovel') {
-            // Arte transcrita do desenho clássico (ver world-tool-textures.js).
-            // Material fora da arte cai no desenho antigo abaixo.
+            // Arte da casa (ver GUIA-DE-ARTE.md). Material fora da arte cai no
+            // desenho antigo abaixo.
             const arteDaPa = createShovelSpritePixels(mat);
             if (arteDaPa) return (spriteCache[key] = arteDaPa);
             // A pá mantém o cabo diagonal do graveto; só a cabeça muda para a
@@ -793,8 +793,8 @@ export function createTextureTools(THREE) {
         }
 
         if (kind === 'axe') {
-            // Arte transcrita do desenho clássico (ver world-tool-textures.js).
-            // Material fora da arte cai no desenho antigo abaixo.
+            // Arte da casa (ver GUIA-DE-ARTE.md). Material fora da arte cai no
+            // desenho antigo abaixo.
             const arteDoMachado = createAxeSpritePixels(mat);
             if (arteDoMachado) return (spriteCache[key] = arteDoMachado);
             // Copia o trecho diagonal do próprio graveto; a cabeça é desenhada

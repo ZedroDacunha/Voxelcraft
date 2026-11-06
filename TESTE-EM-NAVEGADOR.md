@@ -1045,6 +1045,8 @@ Abra o inventário com **Lingote de ouro** (`/give gold_ingot`) e ponha ao lado 
 
 ## 55. O item de picareta
 
+> **Substituída pela seção 58** — a arte foi redesenhada (arte autoral).
+
 Pegue as seis picaretas (`/give picareta de madeira`, `… de pedra`, `… de cobre`,
 `… de ferro`, `… de ouro`, `… de diamante`) e olhe na barra, no inventário e **na
 mão**.
@@ -1062,6 +1064,8 @@ mão**.
 - [ ] Machado e pá continuam com o desenho antigo — é esperado, são as próximas.
 
 ## 56. O item de machado
+
+> **Substituída pela seção 58** — a arte foi redesenhada (arte autoral).
 
 Pegue os seis machados (`/give machado de madeira`, `… de pedra`, `… de cobre`,
 `… de ferro`, `… de ouro`, `… de diamante`) e olhe na barra, no inventário e **na
@@ -1081,6 +1085,8 @@ mão**.
 
 ## 57. O item de pá
 
+> **Substituída pela seção 58** — a arte foi redesenhada (arte autoral).
+
 Pegue as seis pás (`/give pá de madeira`, `… de pedra`, `… de cobre`, `… de
 ferro`, `… de ouro`, `… de diamante`) e olhe na barra, no inventário e **na mão**.
 
@@ -1097,3 +1103,24 @@ ferro`, `… de ouro`, `… de diamante`) e olhe na barra, no inventário e **na
       machado.
 - [ ] A picareta (#119) e o machado (#120) continuam como ficaram.
 - [ ] A **tesoura** segue com o desenho antigo — é a próxima.
+
+## 58. A arte autoral das ferramentas
+
+As três ferramentas foram **redesenhadas** (nada de transcrição). Pegue as seis
+picaretas, os seis machados e as seis pás (`/give picareta de ferro`, `… machado
+de ouro`, `… pá de diamante`) e olhe na barra, no inventário e **na mão**.
+
+- [ ] A **picareta** tem duas pontas: a barra sobe da ponta esquerda (embaixo) até
+      a direita (em cima), com o punho no meio.
+- [ ] O **machado** tem lâmina de topo reto, gume alto e convexo à esquerda e
+      barba curta embaixo — não parece um martelo.
+- [ ] A **pá** é uma concha de topo reto e largo, com vinco no meio.
+- [ ] As três têm o **mesmo cabo de madeira**, com **faixa de couro costurada**
+      logo abaixo do encaixe e outra no punho.
+- [ ] O **contorno é tingido**: pedra puxa azul, ouro puxa verde-escuro, diamante
+      puxa ciano-escuro. Nada de preto puro.
+- [ ] Há **um ponto de acento amarelo-cítrico** em cada ferramenta, no alto.
+- [ ] Os seis materiais se distinguem na hora, e o cobre (nosso) não parece o ouro.
+- [ ] As três **não lembram** os ícones clássicos lado a lado: silhueta diferente.
+- [ ] Na mão e na barra o ícone é o mesmo.
+- [ ] A **tesoura** segue com o desenho antigo — é a próxima, e já nasce no guia.
