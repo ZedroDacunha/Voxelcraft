@@ -128,6 +128,41 @@ const COBRE_BRUTO_ITEM = Object.freeze({
     ]),
 });
 
+/**
+ * Ferro bruto em **arte de item** (16×16 px: cada célula da máscara é um pixel).
+ *
+ * Opção **E · grumos** — o mesmo punhado do cobre, mas espelhado e com outros
+ * tamanhos: se fosse o desenho idêntico, o jogador voltaria a ter dois itens
+ * iguais na barra e só a cor diria qual é qual. A cor é o pêssego do veio do
+ * bloco — mais claro e menos saturado que o laranja do cobre.
+ */
+const FERRO_BRUTO_ITEM = Object.freeze({
+    paleta: Object.freeze({
+        escuro: [88, 64, 48],
+        corpo: [160, 112, 80],
+        meio: [192, 152, 112],
+        claro: [224, 192, 152],
+    }),
+    mascara: Object.freeze([
+        '................',
+        '.........####...',
+        '..##....######..',
+        '.####...######..',
+        '.####....###....',
+        '..##............',
+        '................',
+        '..####...####...',
+        '.#####..######..',
+        '.#####...#####..',
+        '..###....####...',
+        '................',
+        '....####........',
+        '...#####........',
+        '....###.........',
+        '................',
+    ]),
+});
+
 /** Relevo de item: beirada de cima/esquerda clara, de baixo/direita escura. */
 function pintarItem(mascara, paleta, grao) {
     const dentro = (x, y) => (mascara[y]?.[x] ?? '.') === '#';
@@ -159,7 +194,7 @@ export function coalItemMaskFor(camada = 'mineral') {
 }
 
 /** As artes de item dos minérios brutos já desenhadas à mão (as do `raw`). */
-const ARTES_ITEM_BRUTO = Object.freeze({ copper: COBRE_BRUTO_ITEM });
+const ARTES_ITEM_BRUTO = Object.freeze({ copper: COBRE_BRUTO_ITEM, iron: FERRO_BRUTO_ITEM });
 
 /** A máscara da arte de item de um minério bruto (para o teste conferir), ou `null`. */
 export function rawItemMaskFor(material) {
@@ -200,8 +235,8 @@ export function createMineralSpritePixels(kind, material) {
     }
 
     if (kind === 'raw') {
-        // Minério bruto com arte desenhada à mão (cobre, por enquanto): a mesma
-        // máscara + relevo do carvão, em vez do sprite automático de bolhas.
+        // Minério bruto com arte desenhada à mão (cobre e ferro): a mesma máscara
+        // + relevo do carvão, em vez do sprite automático de bolhas.
         const arte = ARTES_ITEM_BRUTO[material];
         if (arte) {
             const pintar = pintarItem(arte.mascara, arte.paleta, false);
