@@ -143,8 +143,10 @@ test('o item de ferro não se confunde com o de cobre', () => {
     assert.ok(diferentes >= 12, `ferro e cobre diferem em ${diferentes} px`);
 });
 
-test('o ouro bruto ainda está no sprite genérico', () => {
-    assert.equal(rawItemMaskFor('gold'), null, 'o ouro é o próximo da fila');
+test('o ouro bruto tem arte própria, e não é a do ferro', () => {
+    const ouroMascara = rawItemMaskFor('gold');
+    assert.ok(ouroMascara, 'o ouro bruto tem máscara');
+    assert.notEqual(ouroMascara.join(''), MASCARA.join(''), 'ferro e ouro não usam o mesmo desenho');
     const ouro = createMineralSpritePixels('raw', 'gold');
     assert.ok(ouro, 'o ouro bruto continua com sprite');
     assert.notEqual(JSON.stringify(ouro), JSON.stringify(sprite), 'ferro e ouro não são o mesmo desenho');

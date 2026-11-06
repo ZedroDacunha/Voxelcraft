@@ -136,16 +136,17 @@ test('o item de cobre não se confunde com o de carvão', () => {
     assert.ok(brilho(cobre) > brilho(carvaoMedia) + 60, 'e o cobre é bem mais claro que o carvão');
 });
 
-test('cada minério bruto tem a sua arte; o ouro segue no genérico', () => {
-    assert.equal(rawItemMaskFor('gold'), null, 'o ouro ainda não tem arte desenhada');
-    // O ferro ganhou a arte dele depois (PR do ferro bruto): máscara própria,
-    // que não é a do cobre.
-    const ferroMascara = rawItemMaskFor('iron');
-    assert.ok(ferroMascara, 'o ferro bruto tem máscara');
-    assert.notEqual(ferroMascara.join(''), MASCARA.join(''), 'ferro e cobre não usam o mesmo desenho');
-    const ferro = createMineralSpritePixels('raw', 'iron');
-    assert.ok(ferro, 'o ferro bruto continua com sprite');
-    assert.notEqual(JSON.stringify(ferro), JSON.stringify(sprite), 'ferro e cobre não são o mesmo sprite');
+test('cada minério bruto tem a sua arte, e o desenho do cobre é só dele', () => {
+    // Ferro e ouro ganharam arte depois do cobre: máscara própria cada um, e
+    // nenhuma é a do cobre.
+    for (const material of ['iron', 'gold']) {
+        const outra = rawItemMaskFor(material);
+        assert.ok(outra, `${material} tem máscara própria`);
+        assert.notEqual(outra.join(''), MASCARA.join(''), `cobre e ${material} não usam o mesmo desenho`);
+        const pixel = createMineralSpritePixels('raw', material);
+        assert.ok(pixel, `${material} continua com sprite`);
+        assert.notEqual(JSON.stringify(pixel), JSON.stringify(sprite), `cobre e ${material} não são o mesmo sprite`);
+    }
 });
 
 test('a arte é determinística e não sai da faixa 0–255', () => {

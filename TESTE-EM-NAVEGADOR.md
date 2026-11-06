@@ -962,3 +962,16 @@ Abra o inventário com **Ferro bruto** (`/give raw_iron`) e ponha ao lado de
 - [ ] Fora dos grumos o ícone é **transparente** (aparece o fundo da casa).
 - [ ] O **Ouro bruto** continua com o desenho antigo (três bolhas) — só o ferro
       mudou nesta rodada.
+
+## 50. O item de ouro bruto
+
+Abra o inventário com **Ouro bruto** (`/give raw_gold`) e ponha ao lado de
+**Cobre bruto**, de **Ferro bruto** e de **Carvão**.
+
+- [ ] O ouro bruto aparece como **oito pepitas miúdas espalhadas** — nem o punhado
+      do carvão, nem os grumos do cobre e do ferro.
+- [ ] A cor é **amarelo quente**: o mais claro e o mais amarelo dos três brutos.
+- [ ] Cada pepita tem beirada clara em cima/à esquerda e escura embaixo/à direita.
+- [ ] Fora das pepitas o ícone é **transparente** (aparece o fundo da casa).
+- [ ] Nenhum item de minério ficou com o desenho genérico de três bolhas.
+- [ ] Cobre e ferro brutos continuam como estavam (nada mudou neles).
