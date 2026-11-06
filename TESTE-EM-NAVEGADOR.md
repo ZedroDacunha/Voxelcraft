@@ -677,3 +677,23 @@ Já coberto por `npm test` (922 testes):
       Minecraft.
 - [ ] Empurrando uma parede o som de passo **não** dispara (não se anda), e um
       respawn/teleporte não vira rajada de passos.
+
+## 31. A ovelha olha, cada uma por si — e o pescoço
+
+- [ ] Pastando, a ovelha **não abre um vão** entre a cabeça e o corpo: dá para ver
+      o pescoço de lã esticado ligando as duas partes. Em pé, ele desaparece na lã.
+- [ ] Chegando **correndo** por trás de uma ovelha, ela continua pastando (não vê
+      de costas). Passando **na frente**, ela pode levantar a cabeça.
+- [ ] Num bando, **não reagem todas juntas**: uma vira primeiro, outra vira um
+      instante depois e uma terceira pode continuar comendo.
+- [ ] A virada é **animação**: a cabeça começa a girar, o corpo vai acompanhando
+      devagar e no fim ela está encarando o jogador — nada de virar de um quadro
+      para o outro.
+- [ ] Enquanto encara, a cabeça fica **um pouco inclinada de lado** (curiosidade)
+      e erguida, sem o focinho na grama.
+- [ ] Quando o susto acaba, a cabeça **volta suave** para a frente e a inclinação
+      some; se ela estava pastando, o focinho desce de novo.
+- [ ] A vizinha de um bando assustado entra no susto **com atraso** — mas o susto
+      **não** se espalha pelo bando inteiro em cadeia: quem está longe do acontecido
+      continua pastando.
+- [ ] Agachado ou com o jogador longe, nada muda: ovelha mansa, no pasto.
