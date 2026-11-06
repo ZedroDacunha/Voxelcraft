@@ -1,4 +1,4 @@
-// Arte das FERRAMENTAS (começando pela picareta).
+// Arte das FERRAMENTAS: picareta e machado.
 //
 // Módulo puro (sem DOM, sem THREE): devolve os pixels do ícone para o
 // `world-textures.js` montar no atlas. Assim a arte pode ser testada no Node.
@@ -116,6 +116,109 @@ export function pickaxeGradeFor(material) {
 /** A paleta da picareta de um material, ou `null`. */
 export function pickaxePaletteFor(material) {
     return PICARETA_PALETAS[material] ?? null;
+}
+
+/**
+ * A **forma do machado** — 16×16, mesma ideia da picareta: `O` contorno,
+ * `1`…`5` a cabeça (do escuro ao reflexo) e `a`…`d` o cabo (do escuro ao claro).
+ *
+ * Transcrita pixel a pixel do desenho clássico: o gume largo em cima à esquerda,
+ * a cabeça afunilando para o encaixe à direita, e o cabo na diagonal até a quina
+ * de baixo. A cabeça do machado tem **cinco** tons (um a mais que a picareta).
+ */
+export const MACHADO_GRADE = Object.freeze([
+    '................',
+    '.........11.....',
+    '........1551....',
+    '.......15341....',
+    '......15333bc...',
+    '......O54323a...',
+    '.......OOb323O..',
+    '........bca33O..',
+    '.......bda.OO...',
+    '......bca.......',
+    '.....bca........',
+    '....bda.........',
+    '...bca..........',
+    '..bda...........',
+    '..aa............',
+    '................',
+]);
+
+/**
+ * Paleta do machado por material: contorno + **cinco** tons de cabeça (mais o
+ * cabo de madeira compartilhado).
+ *
+ * De `wood` a `diamond` são os tons do desenho clássico. O `copper` é do nosso
+ * jogo e foi derivado do cobre fundido dos lingotes, no mesmo degradê.
+ */
+export const MACHADO_PALETAS = Object.freeze({
+    wood: Object.freeze({
+        O: Object.freeze([32, 24, 10]),
+        1: Object.freeze([55, 41, 16]),
+        2: Object.freeze([89, 67, 25]),
+        3: Object.freeze([107, 81, 31]),
+        4: Object.freeze([117, 88, 33]),
+        5: Object.freeze([134, 101, 38]),
+    }),
+    stone: Object.freeze({
+        O: Object.freeze([24, 24, 24]),
+        1: Object.freeze([73, 73, 73]),
+        2: Object.freeze([108, 108, 108]),
+        3: Object.freeze([127, 127, 127]),
+        4: Object.freeze([137, 137, 137]),
+        5: Object.freeze([154, 154, 154]),
+    }),
+    copper: Object.freeze({
+        O: Object.freeze([58, 28, 20]),
+        1: Object.freeze([78, 38, 26]),
+        2: Object.freeze([126, 62, 40]),
+        3: Object.freeze([170, 90, 56]),
+        4: Object.freeze([204, 122, 78]),
+        5: Object.freeze([236, 170, 122]),
+    }),
+    iron: Object.freeze({
+        O: Object.freeze([24, 24, 24]),
+        1: Object.freeze([68, 68, 68]),
+        2: Object.freeze([150, 150, 150]),
+        3: Object.freeze([193, 193, 193]),
+        4: Object.freeze([216, 216, 216]),
+        5: Object.freeze([255, 255, 255]),
+    }),
+    gold: Object.freeze({
+        O: Object.freeze([63, 46, 14]),
+        1: Object.freeze([130, 93, 22]),
+        2: Object.freeze([220, 150, 19]),
+        3: Object.freeze([233, 177, 21]),
+        4: Object.freeze([234, 238, 87]),
+        5: Object.freeze([253, 255, 118]),
+    }),
+    diamond: Object.freeze({
+        O: Object.freeze([8, 37, 32]),
+        1: Object.freeze([14, 63, 54]),
+        2: Object.freeze([30, 138, 119]),
+        3: Object.freeze([39, 178, 154]),
+        4: Object.freeze([43, 199, 172]),
+        5: Object.freeze([51, 235, 203]),
+    }),
+});
+
+/** A grade do machado (para o teste conferir), ou `null`. */
+export function axeGradeFor(material) {
+    return MACHADO_PALETAS[material] ? MACHADO_GRADE : null;
+}
+
+/** A paleta do machado de um material, ou `null`. */
+export function axePaletteFor(material) {
+    return MACHADO_PALETAS[material] ?? null;
+}
+
+/** Pixels do machado (16×16), ou `null` se o material não tem arte. */
+export function createAxeSpritePixels(material) {
+    const cores = MACHADO_PALETAS[material];
+    if (!cores) return null;
+    const paleta = { ...CABO_PALETA, ...cores };
+    return MACHADO_GRADE.map((linha) => Array.from(linha, (c) => (c === '.' ? null : [...paleta[c]])));
 }
 
 /**

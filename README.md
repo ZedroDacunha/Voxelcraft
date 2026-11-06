@@ -48,7 +48,7 @@ etapa de build — o que está no repositório é o que vai para o ar.
 ## Testes e validação
 
 ```bash
-npm test           # 1104 testes de módulos puros (node --test)
+npm test           # 1114 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```

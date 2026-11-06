@@ -1060,3 +1060,21 @@ mão**.
 - [ ] A **barra** e o **inventário** mostram o mesmo ícone (nada de arte
       diferente entre os dois).
 - [ ] Machado e pá continuam com o desenho antigo — é esperado, são as próximas.
+
+## 56. O item de machado
+
+Pegue os seis machados (`/give machado de madeira`, `… de pedra`, `… de cobre`,
+`… de ferro`, `… de ouro`, `… de diamante`) e olhe na barra, no inventário e **na
+mão**.
+
+- [ ] O machado é a **do desenho clássico**: gume largo em cima à esquerda, cabeça
+      afunilando para o encaixe à direita, cabo na diagonal até a quina de baixo.
+- [ ] O **gume tem o fio claro** (cinco pixels de reflexo) e a silhueta tem
+      contorno escuro.
+- [ ] O cabo é de madeira em todos e **é o mesmo cabo da picareta** — as duas
+      parecem da mesma família.
+- [ ] A cabeça muda de material: madeira, pedra, cobre, ferro, ouro e diamante se
+      distinguem na hora.
+- [ ] Na mão e na barra o ícone é o mesmo.
+- [ ] A **picareta** continua como ficou no #119 (nada mudou nela).
+- [ ] A **pá** segue com o desenho antigo — é a próxima.
