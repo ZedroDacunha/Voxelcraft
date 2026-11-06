@@ -237,15 +237,53 @@ const CARVAO = Object.freeze({
     ]),
 });
 
+/**
+ * Cobre (opção **E · escamas**): pedaços alongados na diagonal, como lascas de
+ * metal presas na pedra. Cobre é o minério que o jogador encontra logo depois do
+ * carvão — a cor laranja já o separa; a forma evita que ele vire um bloco laranja
+ * chapado.
+ */
+const COBRE = Object.freeze({
+    paleta: Object.freeze({
+        escuro: [56, 32, 24],
+        corpo: [120, 64, 40],
+        meio: [160, 88, 56],
+        claro: [208, 128, 88],
+        brilho: [248, 176, 120],
+    }),
+    mascara: Object.freeze([
+        '................',
+        '...###..........',
+        '..#####.........',
+        '...####..###....',
+        '....##..#####...',
+        '.........#####..',
+        '..###.....###...',
+        '.#####..........',
+        '.#####....###...',
+        '..###....#####..',
+        '..........####..',
+        '....###....##...',
+        '...#####........',
+        '...####..###....',
+        '....##..#####...',
+        '.........#####..',
+    ]),
+});
+
 /** Os veios desenhados à mão. Quem não está aqui ainda usa o veio genérico. */
-const VEIOS = {
-    [TILE.COAL_ORE]: pintarVeio(CARVAO.mascara, CARVAO.paleta),
+const VEIOS_ARTE = {
+    [TILE.COAL_ORE]: CARVAO,
+    [TILE.COPPER_ORE]: COBRE,
 };
+
+const VEIOS = Object.fromEntries(
+    Object.entries(VEIOS_ARTE).map(([tile, arte]) => [tile, pintarVeio(arte.mascara, arte.paleta)]),
+);
 
 /** A máscara de um minério (para o teste conferir a arte), ou `null`. */
 export function oreMaskFor(tile) {
-    if (tile === TILE.COAL_ORE) return CARVAO.mascara;
-    return null;
+    return VEIOS_ARTE[tile]?.mascara ?? null;
 }
 
 /**
@@ -261,7 +299,7 @@ export function createMineralOrePixel(tile, x, y, stone) {
     const palette = ORE_COLORS[tile];
     if (!palette) return null;
 
-    // Minério com veio desenhado (hoje o carvão): o veio por cima, a pedra atrás.
+    // Minério com veio desenhado (carvão e cobre): o veio por cima, a pedra atrás.
     const veio = VEIOS[tile];
     if (veio) return veio(x, y) ?? stone(x, y, 0);
 
