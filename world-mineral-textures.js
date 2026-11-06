@@ -271,10 +271,45 @@ const COBRE = Object.freeze({
     ]),
 });
 
+/**
+ * Ferro (opção **A · clássico**): cinco pedaços médios e arredondados. O ferro é
+ * o minério "do meio" da progressão — nem raro como o ouro, nem banal como o
+ * carvão. A forma mais neutra é a que melhor combina: a cor pêssego já o separa
+ * do cinza do carvão e do laranja do cobre.
+ */
+const FERRO = Object.freeze({
+    paleta: Object.freeze({
+        escuro: [80, 56, 44],
+        corpo: [152, 104, 76],
+        meio: [184, 132, 96],
+        claro: [216, 176, 136],
+        brilho: [248, 224, 192],
+    }),
+    mascara: Object.freeze([
+        '................',
+        '..###....####...',
+        '.#####..######..',
+        '.#####..######..',
+        '..###....####...',
+        '................',
+        '...###..####....',
+        '..#####.####....',
+        '..####...###....',
+        '...##...........',
+        '................',
+        '..####....###...',
+        '.#####...#####..',
+        '.#####....###...',
+        '..###...........',
+        '................',
+    ]),
+});
+
 /** Os veios desenhados à mão. Quem não está aqui ainda usa o veio genérico. */
 const VEIOS_ARTE = {
     [TILE.COAL_ORE]: CARVAO,
     [TILE.COPPER_ORE]: COBRE,
+    [TILE.IRON_ORE]: FERRO,
 };
 
 const VEIOS = Object.fromEntries(
@@ -299,7 +334,7 @@ export function createMineralOrePixel(tile, x, y, stone) {
     const palette = ORE_COLORS[tile];
     if (!palette) return null;
 
-    // Minério com veio desenhado (carvão e cobre): o veio por cima, a pedra atrás.
+    // Minério com veio desenhado (carvão, cobre, ferro): o veio por cima, a pedra atrás.
     const veio = VEIOS[tile];
     if (veio) return veio(x, y) ?? stone(x, y, 0);
 

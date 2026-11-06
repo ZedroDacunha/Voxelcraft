@@ -884,3 +884,19 @@ lado de um bloco de pedra.
 - [ ] O fundo entre as lascas é a **mesma pedra** do bloco de pedra ao lado.
 - [ ] O carvão continua como estava (pedaços grandes e escuros) — os dois veios
       não se parecem.
+
+## 45. O ferro clássico
+
+Ande até uma parede com **minério de ferro** (ou `/give iron_ore`) e ponha ao lado
+de um bloco de cobre e de um de pedra.
+
+- [ ] O ferro aparece como **cinco pedaços médios e arredondados** — nem migalha
+      como os nódulos, nem filão gordo como o carvão.
+- [ ] A cor é **pêssego** (quente, mais clara e mais “lavada” que o laranja do
+      cobre) — de relance dá para dizer qual é qual.
+- [ ] A pedra ao lado é cinza e o ferro é claramente colorido, a ponto de os dois
+      não se confundirem mesmo com brilho parecido.
+- [ ] De perto, cada pedaço tem beirada clara em cima/à esquerda e escura
+      embaixo/à direita, em blocos de 2×2 px.
+- [ ] O fundo entre os pedaços é a **mesma pedra** do bloco de pedra ao lado.
+- [ ] Carvão e cobre continuam com os veios deles (nada mudou nesses dois).
