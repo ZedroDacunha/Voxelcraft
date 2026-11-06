@@ -89,6 +89,45 @@ const CARVAO_ITEM = Object.freeze({
     }),
 });
 
+/**
+ * Cobre bruto em **arte de item** (16×16 px: cada célula da máscara é um pixel).
+ *
+ * Opção **E · grumos**, a escolhida no comparador: quatro grumos de tamanhos
+ * diferentes, um grande em cima e três embaixo — um punhado apertado, sem ficar
+ * simétrico como o do carvão. Antes o cobre bruto usava o sprite automático de
+ * "minério bruto" (três bolhas redondas com contorno), igual para cobre, ferro e
+ * ouro: dava para trocar os itens de lugar sem ninguém notar.
+ *
+ * A cor é o laranja queimado do veio do bloco, em quatro tons: o item e o bloco
+ * têm de parecer o mesmo material.
+ */
+const COBRE_BRUTO_ITEM = Object.freeze({
+    paleta: Object.freeze({
+        escuro: [104, 56, 40],
+        corpo: [168, 88, 56],
+        meio: [200, 120, 80],
+        claro: [232, 152, 104],
+    }),
+    mascara: Object.freeze([
+        '................',
+        '....####........',
+        '...#####...###..',
+        '...####...#####.',
+        '....##....#####.',
+        '...........###..',
+        '................',
+        '..####...####...',
+        '.#####..######..',
+        '.#####..#####...',
+        '..###....###....',
+        '................',
+        '.....###........',
+        '....####........',
+        '.....###........',
+        '................',
+    ]),
+});
+
 /** Relevo de item: beirada de cima/esquerda clara, de baixo/direita escura. */
 function pintarItem(mascara, paleta, grao) {
     const dentro = (x, y) => (mascara[y]?.[x] ?? '.') === '#';
@@ -117,6 +156,14 @@ export function createCoalItemSpritePixels(camada = 'mineral') {
 /** A máscara da arte de item do carvão (para o teste conferir), ou `null`. */
 export function coalItemMaskFor(camada = 'mineral') {
     return CARVAO_ITEM[camada]?.mascara ?? null;
+}
+
+/** As artes de item dos minérios brutos já desenhadas à mão (as do `raw`). */
+const ARTES_ITEM_BRUTO = Object.freeze({ copper: COBRE_BRUTO_ITEM });
+
+/** A máscara da arte de item de um minério bruto (para o teste conferir), ou `null`. */
+export function rawItemMaskFor(material) {
+    return ARTES_ITEM_BRUTO[material]?.mascara ?? null;
 }
 
 export function createMineralSpritePixels(kind, material) {
@@ -153,6 +200,13 @@ export function createMineralSpritePixels(kind, material) {
     }
 
     if (kind === 'raw') {
+        // Minério bruto com arte desenhada à mão (cobre, por enquanto): a mesma
+        // máscara + relevo do carvão, em vez do sprite automático de bolhas.
+        const arte = ARTES_ITEM_BRUTO[material];
+        if (arte) {
+            const pintar = pintarItem(arte.mascara, arte.paleta, false);
+            return Array.from({ length: 16 }, (_, y) => Array.from({ length: 16 }, (_, x) => pintar(x, y)));
+        }
         const [light, mid, dark] = ITEM_PALETTES.raw[material] || ITEM_PALETTES.raw.iron;
         for (const [cx, cy, rx, ry] of [[6, 8, 3, 3], [10, 6, 2, 2], [10, 10, 3, 2]]) {
             for (let y = cy - ry; y <= cy + ry; y++) for (let x = cx - rx; x <= cx + rx; x++) {
