@@ -267,7 +267,16 @@ test('o golpe empurra o Mofim para longe de quem bateu', () => {
     const antes = creature.x;
     system.hitFrom({ x: 0, y: GROUND + 1.45, z: 0 }, { x: 1, y: 0, z: 0 });
 
-    assert.ok(creature.x > antes + KNOCKBACK_DISTANCE * 0.9, 'recuou na direção do golpe');
+    // O recuo é armado como velocidade (nada de teleporte no mesmo quadro).
+    assert.ok(creature.knockFor > 0 && creature.knockX > 0, 'o empurrão foi armado');
+    assert.equal(creature.x, antes, 'e o corpo ainda está no lugar');
+
+    // Alguns quadros depois: ele deslizou para longe de quem bateu.
+    for (let i = 0; i < 15; i++) {
+        clock.t += 0.016;
+        system.update(0.016, player, true);
+    }
+    assert.ok(creature.x > antes + KNOCKBACK_DISTANCE * 0.9, `recuou na direção do golpe (${creature.x - antes})`);
     assert.equal(creature.z, 0, 'sem escorregar para o lado');
 });
 
@@ -296,6 +305,9 @@ test('o dano acende o corpo do Mofim e apaga sozinho', () => {
     creature.chirpPending = null; // idem: o clarão medido é o do dano
     system.update(0.016, player, true);
     assert.ok(creature.bodyMaterial.emissive.r > 0.5, 'acende no golpe');
+    // O mesmo clarão amassa o corpo: o impacto não é só cor.
+    assert.ok(creature.group.scale.y < 1, `o corpo amassa no golpe (${creature.group.scale.y})`);
+    assert.ok(creature.group.scale.x > 1, `e alarga nos lados (${creature.group.scale.x})`);
 
     // Passado o clarão (e o pulso do grito do susto), o corpo volta ao normal.
     for (let i = 0; i < 12; i++) {

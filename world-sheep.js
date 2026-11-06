@@ -22,7 +22,10 @@
  */
 
 import { createCreatureBaseClass, glideHeightAt, hopHeightAt } from './world-creature-base.js';
-import { creatureInReach, hurtFlashFor, shouldFlee } from './world-creature.js';
+import {
+    creatureInReach, hurtFlashFor, shouldFlee,
+    HURT_EAR_FLAT, HURT_HEAD_KICK, HURT_SPREAD, HURT_SQUASH,
+} from './world-creature.js';
 import { floorDiv as defaultFloorDiv } from './world-grid.js';
 import { hash2 as defaultHash2 } from './world-math.js';
 
@@ -925,8 +928,10 @@ export function createSheepSystemClass({
                 const ear = naCabeca(side * 0.26, 0.8, 0.48, 0.28, 0.07, 0.12, wool, 'ear');
                 ear.rotation.z = -side * 0.34;
                 // A pose de repouso fica guardada: o tremor de orelha da vida
-                // parada soma em cima dela, sem perder a orelha caída.
+                // parada soma em cima dela, sem perder a orelha caída. O lado
+                // também, para o golpe deitar as duas.
                 ear.userData.baseZ = ear.rotation.z;
+                ear.userData.side = side;
                 return ear;
             });
 
@@ -1310,7 +1315,9 @@ export function createSheepSystemClass({
             const dx = target.x - (origin?.x ?? target.x - 1);
             const dz = target.z - (origin?.z ?? target.z);
             if (Math.hypot(dx, dz) > 1e-4) {
-                this.stepToward(target, dx, dz, SHEEP_KNOCKBACK, 1);
+                // Recuo freando (0,16 s): o corpo desliza no golpe em vez de
+                // pular 35 cm no mesmo quadro.
+                this.pushAway(target, dx, dz, SHEEP_KNOCKBACK);
             }
             this.flee(target, at, origin);
             if (target.health > 0) {
@@ -1422,6 +1429,9 @@ export function createSheepSystemClass({
                 // 0 = cabeça no pasto, 1 = cabeça erguida olhando: a passagem é
                 // suave, então ela "levanta a cabeça" em vez de dar um pulo.
                 e.lookAmount += ((encarando ? 1 : 0) - e.lookAmount) * Math.min(1, SHEEP_LOOK_SMOOTH * dt);
+                // Recuo do golpe (se houver) anda por baixo do passo normal.
+                this.stepKnock(e, dt);
+
                 // Para onde ela quer ir e com que pressa. O rumo em si é o
                 // `walkStep` que decide — o corpo não gira num estalo.
                 let rumoX = 0, rumoZ = 0, pressa = 0;
@@ -1515,9 +1525,14 @@ export function createSheepSystemClass({
                     e.tail.position.y = e.tailY + respiro * 0.6;
                     e.tail.rotation.y = vida.tail;
                 }
+                const trancada = hurtFlashFor(e.hurtUntil, at, SHEEP_HURT_FLASH);
                 for (let orelha = 0; orelha < e.ears.length; orelha++) {
                     const repouso = e.ears[orelha].userData.baseZ ?? 0;
-                    e.ears[orelha].rotation.z = repouso + (orelha === vida.earSide ? vida.ear : 0);
+                    const lado = e.ears[orelha].userData.side ?? 1;
+                    e.ears[orelha].rotation.z = repouso
+                        // No golpe, as duas orelhas deitam de vez.
+                        - lado * HURT_EAR_FLAT * trancada
+                        + (orelha === vida.earSide ? vida.ear : 0);
                 }
 
                 // Cabeça: balanço curto junto com a passada e, no pasto, o
@@ -1535,6 +1550,8 @@ export function createSheepSystemClass({
                     e.head.rotation.x = pose.rotationX
                         + Math.sin(e.stride * 2) * 0.06 * e.walking
                         + mascando * envelope
+                        // Golpe: a cabeça dá um tranco para cima.
+                        + HURT_HEAD_KICK * hurtFlashFor(e.hurtUntil, at, SHEEP_HURT_FLASH)
                         // No susto a cabeça sobe (focinho para cima, olhando
                         // quem chegou) e na fuga ela desce um pouco, como quem
                         // corre de cabeça baixa.
@@ -1567,6 +1584,14 @@ export function createSheepSystemClass({
 
                 e.group.position.set(e.x, e.visualY, e.z);
                 e.group.rotation.y = e.heading;
+                // Impacto: amassa o corpo na altura e alarga nos lados, junto
+                // com o clarão do material (0,22 s).
+                const impacto = hurtFlashFor(e.hurtUntil, at, SHEEP_HURT_FLASH);
+                e.group.scale.set(
+                    1 + HURT_SPREAD * impacto,
+                    1 - HURT_SQUASH * impacto,
+                    1 + HURT_SPREAD * impacto,
+                );
             }
         }
     }

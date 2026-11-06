@@ -23,6 +23,25 @@ export const CREATURE_STEP_UP = 1;
 export const CREATURE_HOP_HEIGHT = 0.42;
 
 /**
+ * Quanto tempo o bicho leva para **parar** depois de um empurrão (segundos).
+ *
+ * O golpe empurrava 35 cm no mesmo quadro — um pulo seco. Agora o recuo é uma
+ * velocidade que freia até zero: o corpo desliza um dedo e para, como quem levou
+ * um encontrão.
+ */
+export const KNOCK_TIME = 0.16;
+
+/**
+ * Velocidade inicial do recuo que, freando em linha reta até zero em `time`,
+ * percorre exatamente `distance` blocos (área do triângulo: v · t / 2).
+ */
+export function knockSpeedFor(distance, time = KNOCK_TIME) {
+    const d = Math.max(0, Number(distance) || 0);
+    const t = Math.max(1e-3, Number(time) || KNOCK_TIME);
+    return (2 * d) / t;
+}
+
+/**
  * Altura do corpo durante o pulo do degrau.
  *
  * Sobe até `height` acima do destino e desce até pousar nele — um arco de
@@ -158,6 +177,44 @@ export function createCreatureBaseClass({
             const nx = e.x + Math.sin(e.heading) * passo;
             const nz = e.z + Math.cos(e.heading) * passo;
             return this.moveTo(e, nx, nz) ? passo : 0;
+        }
+
+        /**
+         * Empurrão do golpe: o bicho recua `distance` blocos em `time`, freando
+         * até parar. Não move nada na hora — quem move é o `stepKnock`, um pouco
+         * por quadro.
+         */
+        pushAway(e, dirX, dirZ, distance, time = KNOCK_TIME) {
+            const comprimento = Math.hypot(dirX, dirZ);
+            if (!(comprimento > 1e-6) || !(distance > 0)) return false;
+            const velocidade = knockSpeedFor(distance, time);
+            e.knockX = (dirX / comprimento) * velocidade;
+            e.knockZ = (dirZ / comprimento) * velocidade;
+            e.knockT = 0;
+            e.knockFor = Math.max(1e-3, Number(time) || KNOCK_TIME);
+            return true;
+        }
+
+        /**
+         * Avança o recuo do golpe (se houver) e devolve a distância andada.
+         *
+         * A velocidade cai em linha reta até zero, então o corpo desacelera como
+         * um empurrão de verdade. Bateu em encosta/água? O recuo acaba ali.
+         */
+        stepKnock(e, dt) {
+            if (!(e.knockFor > 0) || !(e.knockT < e.knockFor)) return 0;
+            const passo = Math.min(Number(dt) || 0, e.knockFor - e.knockT);
+            if (!(passo > 0)) return 0;
+            e.knockT += passo;
+            // Velocidade no **meio** do quadro: é a integral certa da reta que
+            // freia até zero, então a soma dos quadros dá o empurrão exato.
+            const freio = 1 - (e.knockT - passo / 2) / e.knockFor;   // 1 → 0
+            const andado = Math.hypot(e.knockX, e.knockZ) * freio * passo;
+            if (!(andado > 1e-9)) { e.knockFor = 0; return 0; }
+            const ok = this.moveTo(e, e.x + e.knockX * freio * passo, e.z + e.knockZ * freio * passo);
+            if (!ok) { e.knockFor = 0; return 0; }
+            if (e.knockT >= e.knockFor) e.knockFor = 0;
+            return andado;
         }
 
         /**

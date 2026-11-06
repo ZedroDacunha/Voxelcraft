@@ -752,3 +752,18 @@ Já coberto por `npm test` (922 testes):
 - [ ] Batendo numa delas, o bando corre junto, mas **fora de ritmo**: uma chega
       antes, outra depois.
 - [ ] A líder continuando a andar, o grupo segue — as de trás alcançam aos poucos.
+
+## 36. O peso do golpe
+
+- [ ] Batendo **seguido** (botão apertado), sai **um golpe por vez** no ritmo do
+      braço — a mão bate e o bicho leva o golpe naquele swing, não antes.
+- [ ] Com **dois bichos** na frente, um swing acerta **um**; o outro leva o
+      próximo golpe, alguns décimos depois.
+- [ ] Acertando um bicho, o clique **não** começa a minerar o bloco atrás dele.
+- [ ] No golpe, o corpo do bicho **desliza para trás e freia** (uns 35 cm em
+      0,15 s) — não pisca de um lugar para o outro.
+- [ ] O corpo **amassa** no impacto (fica um instante mais baixo e mais largo) e
+      volta ao normal junto com o clarão.
+- [ ] Na **ovelha**, as duas orelhas deitam e a cabeça dá um tranco para cima.
+- [ ] No **Mofim**, o mesmo amassado aparece junto com o clarão laranja.
+- [ ] Empurrando contra uma parede, o recuo para ali (o bicho não atravessa).

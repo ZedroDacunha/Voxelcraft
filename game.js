@@ -44,7 +44,7 @@ import { canHarvest, damageTool as damageToolStack, getBreakTime } from './world
 import { boxOverlapsXZ, woodDoorCollision, woodDoorPart, woodDoorShape, woodDoorType } from './world-door.js';
 import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld } from './player-physics.js';
 import { canJumpFrom, createJumpState, updateJumpWindow } from './player-jump.js';
-import { createCreatureSystemClass, creatureInReach } from './world-creature.js';
+import { ATTACK_COOLDOWN, attackReady, createCreatureSystemClass, creatureInReach } from './world-creature.js';
 import { SHEEP_BLEAT_RANGE, SHEEP_WOOL_ITEMS, createSheepSystemClass } from './world-sheep.js';
 import { createChatState } from './world-chat.js';
 import { COMMAND_PREFIX, runChatCommand } from './world-chat-commands.js';
@@ -1750,6 +1750,9 @@ function createCrackAssets() {
 }
 
 const mining = { active: false, x: 0, y: 0, z: 0, progress: 0, cooldown: 0 };
+// Quando o braço deu o último golpe em bicho (segundos). É a cadência **do
+// jogador**, e não de cada bicho: um swing, um golpe.
+let lastAttackAt = -Infinity;
 
 function resetMining() {
     mining.active = false;
@@ -1827,6 +1830,15 @@ function strikeCreature() {
     // O bloco na mira limita o alcance do golpe — com a folga de
     // `MOB_HIT_BLOCK_SLACK`, para o bicho encostado no chão não perder o clique.
     const aim = { maxDistance: currentHit ? currentHit.dist + MOB_HIT_BLOCK_SLACK : Infinity };
+    // Cadência **do braço**: um golpe a cada `ATTACK_COOLDOWN`, com qualquer
+    // bicho. Enquanto o braço não volta, o quadro continua sendo do combate —
+    // apontar para um bicho nunca vira mineração do bloco atrás dele.
+    const agora = performance.now() * 0.001;
+    const bichoNaMira = Boolean(
+        creatureInReach(sheepSystem.entities, camera.position, creatureAim, aim)
+        || creatureInReach(creatureSystem.entities, camera.position, creatureAim, aim),
+    );
+    if (bichoNaMira && !attackReady(lastAttackAt, agora)) return true;
     // Tesoura na mão: o clique **tosquia** a ovelha em vez de bater. Sem ovelha
     // com lã na mira, o clique segue o caminho normal (o golpe, ou minerar).
     if (ITEMS[inventory.slots[selectedSlot]?.id]?.tool?.type === 'shears') {
@@ -1850,6 +1862,7 @@ function strikeCreature() {
     // carne).
     const golpe = sheepSystem.hitAt(camera.position, creatureAim, aim);
     if (golpe) {
+        lastAttackAt = agora;
         mobHitPuff(golpe.entity, golpe.killed ? 12 : 6);
         audio.play('mob-hit', { gainScale: 0.85, rate: golpe.killed ? 0.78 : 1 });
         if (!golpe.killed) {
@@ -1866,6 +1879,7 @@ function strikeCreature() {
     // cooldown, minerar continua normalmente.
     const mofim = creatureSystem.hitFrom(camera.position, creatureAim, aim);
     if (!mofim) return false;
+    lastAttackAt = agora;
     // Impacto do golpe: lascas na cor do pó dele e o baque que faltava no som.
     mobHitPuff(mofim.entity, mofim.killed ? 12 : 6);
     audio.play('mob-hit', { gainScale: 0.85, rate: mofim.killed ? 0.78 : 1 });
