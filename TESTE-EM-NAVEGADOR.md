@@ -1078,3 +1078,22 @@ mão**.
 - [ ] Na mão e na barra o ícone é o mesmo.
 - [ ] A **picareta** continua como ficou no #119 (nada mudou nela).
 - [ ] A **pá** segue com o desenho antigo — é a próxima.
+
+## 57. O item de pá
+
+Pegue as seis pás (`/give pá de madeira`, `… de pedra`, `… de cobre`, `… de
+ferro`, `… de ouro`, `… de diamante`) e olhe na barra, no inventário e **na mão**.
+
+- [ ] A pá é a **do desenho clássico**: lâmina redonda em cima à direita, encaixada
+      no cabo, e o cabo na diagonal até a quina de baixo à esquerda.
+- [ ] A lâmina tem o **arco iluminado** em cima (oito pixels de reflexo) e o
+      contorno escuro por fora.
+- [ ] A ponta do cabo **afina** em duas linhas curtas e mais escuras.
+- [ ] O cabo é de madeira em todos e **é o mesmo cabo da picareta e do machado** —
+      as três parecem da mesma família.
+- [ ] A lâmina muda de material: madeira, pedra, cobre, ferro, ouro e diamante se
+      distinguem na hora.
+- [ ] Na mão e na barra o ícone é o mesmo, e a pá **não** parece a picareta nem o
+      machado.
+- [ ] A picareta (#119) e o machado (#120) continuam como ficaram.
+- [ ] A **tesoura** segue com o desenho antigo — é a próxima.

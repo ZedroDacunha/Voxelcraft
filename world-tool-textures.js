@@ -1,4 +1,4 @@
-// Arte das FERRAMENTAS: picareta e machado.
+// Arte das FERRAMENTAS: picareta, machado e pá.
 //
 // Módulo puro (sem DOM, sem THREE): devolve os pixels do ícone para o
 // `world-textures.js` montar no atlas. Assim a arte pode ser testada no Node.
@@ -219,6 +219,104 @@ export function createAxeSpritePixels(material) {
     if (!cores) return null;
     const paleta = { ...CABO_PALETA, ...cores };
     return MACHADO_GRADE.map((linha) => Array.from(linha, (c) => (c === '.' ? null : [...paleta[c]])));
+}
+
+/**
+ * A **forma da pá** — 16×16, no mesmo alfabeto das outras: `O` contorno,
+ * `1`…`4` a lâmina (do escuro ao reflexo) e `a`…`d` o cabo.
+ *
+ * Transcrita pixel a pixel do desenho clássico: a lâmina **redonda** em cima à
+ * direita, encaixada no cabo, que desce na diagonal até a quina de baixo à
+ * esquerda. A lâmina tem **quatro** tons (como a picareta, um a menos que o
+ * machado).
+ */
+export const PA_GRADE = Object.freeze([
+    '................',
+    '................',
+    '...........11O..',
+    '..........1442O.',
+    '.........14324O.',
+    '........143234O.',
+    '.........b234O..',
+    '........bda4O...',
+    '.......bda.O....',
+    '......bca.......',
+    '.....bda........',
+    '....bca.........',
+    '..bbda..........',
+    '..bda...........',
+    '...aa...........',
+    '................',
+]);
+
+/**
+ * Paleta da pá por material: contorno + **quatro** tons de lâmina (mais o cabo
+ * de madeira compartilhado).
+ *
+ * De `wood` a `diamond` são os tons do desenho clássico; o `copper` é do nosso
+ * jogo, derivado do cobre fundido dos lingotes.
+ */
+export const PA_PALETAS = Object.freeze({
+    wood: Object.freeze({
+        O: Object.freeze([32, 24, 10]),
+        1: Object.freeze([55, 41, 16]),
+        2: Object.freeze([107, 81, 31]),
+        3: Object.freeze([117, 88, 33]),
+        4: Object.freeze([134, 101, 38]),
+    }),
+    stone: Object.freeze({
+        O: Object.freeze([24, 24, 24]),
+        1: Object.freeze([73, 73, 73]),
+        2: Object.freeze([127, 127, 127]),
+        3: Object.freeze([137, 137, 137]),
+        4: Object.freeze([154, 154, 154]),
+    }),
+    copper: Object.freeze({
+        O: Object.freeze([58, 28, 20]),
+        1: Object.freeze([78, 38, 26]),
+        2: Object.freeze([170, 90, 56]),
+        3: Object.freeze([198, 118, 76]),
+        4: Object.freeze([232, 164, 116]),
+    }),
+    iron: Object.freeze({
+        O: Object.freeze([24, 24, 24]),
+        1: Object.freeze([68, 68, 68]),
+        2: Object.freeze([193, 193, 193]),
+        3: Object.freeze([216, 216, 216]),
+        4: Object.freeze([255, 255, 255]),
+    }),
+    gold: Object.freeze({
+        O: Object.freeze([63, 46, 14]),
+        1: Object.freeze([130, 93, 22]),
+        2: Object.freeze([233, 177, 21]),
+        3: Object.freeze([234, 238, 87]),
+        4: Object.freeze([253, 255, 118]),
+    }),
+    diamond: Object.freeze({
+        O: Object.freeze([8, 37, 32]),
+        1: Object.freeze([14, 63, 54]),
+        2: Object.freeze([39, 178, 154]),
+        3: Object.freeze([43, 199, 172]),
+        4: Object.freeze([51, 235, 203]),
+    }),
+});
+
+/** A grade da pá (para o teste conferir), ou `null`. */
+export function shovelGradeFor(material) {
+    return PA_PALETAS[material] ? PA_GRADE : null;
+}
+
+/** A paleta da pá de um material, ou `null`. */
+export function shovelPaletteFor(material) {
+    return PA_PALETAS[material] ?? null;
+}
+
+/** Pixels da pá (16×16), ou `null` se o material não tem arte. */
+export function createShovelSpritePixels(material) {
+    const cores = PA_PALETAS[material];
+    if (!cores) return null;
+    const paleta = { ...CABO_PALETA, ...cores };
+    return PA_GRADE.map((linha) => Array.from(linha, (c) => (c === '.' ? null : [...paleta[c]])));
 }
 
 /**
