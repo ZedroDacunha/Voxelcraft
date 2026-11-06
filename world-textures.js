@@ -1,5 +1,6 @@
 import { hash2, mulberry32 } from './world-math.js';
-import { ATLAS_COLUMNS, ATLAS_ROWS, ITEMS, TILE, TILE_PX, atlasTileRect } from './world-catalog.js';
+import { ATLAS_COLUMNS, ATLAS_ROWS, BLOCKS, ITEMS, TILE, TILE_PX, atlasTileRect } from './world-catalog.js';
+import { createBlockIconPixels } from './world-block-icons.js';
 import { createCoalItemSpritePixels, createMineralOrePixel, createMineralSpritePixels, isMineralOreTile } from './world-mineral-textures.js';
 
 /**
@@ -567,9 +568,20 @@ export function createTextureTools(THREE) {
             d: hc.d.map((channel, i) => Math.round(channel * 0.78 + hc.l[i] * 0.22)),
         };
     };
+    // O ícone de bloco amostra a arte de verdade do tile, então precisa da mesma
+    // fonte de pixels que o atlas usa. Ela é criada uma vez só.
+    let fonteDeTiles = null;
+    const pixelDoTile = () => (fonteDeTiles ??= createTilePixelSource());
+
     function spritePixels(kind, mat) {
         const key = kind + ':' + mat;
         if (spriteCache[key]) return spriteCache[key];
+        // Bloco na barra/inventário: cubo isométrico de 32×32 (ver world-block-icons.js).
+        if (kind === 'block') {
+            const bloco = BLOCKS[Number(mat)];
+            if (!bloco) return null;
+            return (spriteCache[key] = createBlockIconPixels(bloco.tiles, pixelDoTile()));
+        }
         const mineralSprite = createMineralSpritePixels(kind, mat);
         if (mineralSprite) return (spriteCache[key] = mineralSprite);
         const g = Array.from({ length: 16 }, () => Array(16).fill(null));
@@ -837,11 +849,14 @@ export function createTextureTools(THREE) {
             if (!item.sprite) continue;
             const pix = spritePixels(item.sprite.kind, item.sprite.mat);
             const { x: originX, y: originY } = atlasTileRect(item.iconTile);
-            for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+            // Ícone de 16 px é dobrado (2×2); o de bloco já vem em 32 px e ocupa a
+            // célula inteira, 1:1 — é o que dá o detalhe do cubo.
+            const escala = Math.max(1, Math.round(TILE_PX / pix.length));
+            for (let y = 0; y < pix.length; y++) for (let x = 0; x < pix.length; x++) {
                 const c = pix[y][x];
                 if (!c) continue;
                 ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
-                ctx.fillRect(originX + x * 2, originY + y * 2, 2, 2);
+                ctx.fillRect(originX + x * escala, originY + y * escala, escala, escala);
             }
         }
     
