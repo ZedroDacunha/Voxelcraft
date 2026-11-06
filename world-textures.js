@@ -1,6 +1,6 @@
 import { hash2, mulberry32 } from './world-math.js';
 import { ATLAS_COLUMNS, ATLAS_ROWS, ITEMS, TILE, TILE_PX, atlasTileRect } from './world-catalog.js';
-import { createMineralOrePixel, createMineralSpritePixels, isMineralOreTile } from './world-mineral-textures.js';
+import { createCoalItemSpritePixels, createMineralOrePixel, createMineralSpritePixels, isMineralOreTile } from './world-mineral-textures.js';
 
 /**
  * A pedra: mancha em faixas (estrato), grão fino e um respingo aqui e ali.
@@ -619,18 +619,17 @@ export function createTextureTools(THREE) {
             return (spriteCache[key] = g);
         }
 
-        if (kind === 'apple' || kind === 'charcoal') {
+        // Carvão vegetal: arte própria (madeira queimada, três gravetos). Antes ele era
+        // uma elipse chapada e ficava quase igual ao mineral na barra de itens.
+        if (kind === 'charcoal') return (spriteCache[key] = createCoalItemSpritePixels('vegetal'));
+
+        if (kind === 'apple') {
             for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-                if (kind === 'apple') {
-                    const dx = (x - 7.5) / 4.5, dy = (y - 9.5) / 4.5;
-                    if (dx * dx + dy * dy <= 1)
-                        put(x, y, ((x === 6 && y === 7) || (x === 5 && y === 8)) ? [240, 110, 100] : (dx + dy > 0.9 ? [150, 25, 30] : [205, 40, 45]));
-                } else {
-                    const dx = (x - 7.5) / 5, dy = (y - 9) / 3.6;
-                    if (dx * dx + dy * dy <= 1) put(x, y, (x + y) % 3 === 0 ? [75, 75, 82] : [38, 38, 44]);
-                }
+                const dx = (x - 7.5) / 4.5, dy = (y - 9.5) / 4.5;
+                if (dx * dx + dy * dy <= 1)
+                    put(x, y, ((x === 6 && y === 7) || (x === 5 && y === 8)) ? [240, 110, 100] : (dx + dy > 0.9 ? [150, 25, 30] : [205, 40, 45]));
             }
-            if (kind === 'apple') { put(8, 4, [110, 70, 30]); put(8, 5, [110, 70, 30]); put(9, 4, [60, 150, 50]); put(10, 4, [60, 150, 50]); }
+            put(8, 4, [110, 70, 30]); put(8, 5, [110, 70, 30]); put(9, 4, [60, 150, 50]); put(10, 4, [60, 150, 50]);
             return (spriteCache[key] = g);
         }
 

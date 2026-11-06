@@ -820,5 +820,21 @@ Já coberto por `npm test` (922 testes):
       embaixo/à direita — o relevo do pixel art.
 - [ ] Os pedaços são **quadrados** (blocos de 2×2 px), sem listra fina de 1 px.
 - [ ] O fundo entre os pedaços é a **mesma pedra** do bloco de pedra ao lado.
-- [ ] Quebrando o bloco, o item que cai continua o mesmo carvão de sempre (o item
-      não mudou neste passo).
+- [ ] Quebrando o bloco, cai o item de carvão mineral (a arte do **item** mudou
+      depois, na seção 41).
+
+## 41. Os dois itens de carvão
+
+Pegue os dois carvões (`/give coal` e `/give charcoal`) e deixe lado a lado na
+barra. Na mão, o ícone aparece grande na tela.
+
+- [ ] **Dá para dizer qual é qual sem ler o nome**: o mineral é um punhado de
+      pedaços gordos e **cinza-azulado**; o vegetal são três gravetos finos e
+      **marrons**.
+- [ ] Cada pedaço tem beirada clara em cima/à esquerda e escura embaixo/à direita
+      (o relevo), em vez do amontoado chapado de antes.
+- [ ] Nos gravetos do vegetal há **riscos escuros** no meio do pedaço (o grão da
+      madeira queimada) — no mineral não tem nada disso.
+- [ ] Nenhum dos dois encosta na borda do quadradinho: sobra um pixel de respiro.
+- [ ] Na barra de itens (ícone pequeno) a diferença continua legível — não vira
+      dois borrões escuros iguais.
