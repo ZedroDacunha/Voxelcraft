@@ -740,3 +740,15 @@ Já coberto por `npm test` (922 testes):
       e espia no seu próprio tempo.
 - [ ] Chegando perto correndo, o susto continua mandando: ela para, ergue a
       cabeça e encara — o espiar sai de cena.
+
+## 35. O rebanho no seu ritmo
+
+- [ ] Olhando um bando andando, elas **não andam em pelotão**: uma puxa um pouco
+      à frente, outra fica um pouco atrás, e a distância entre elas muda.
+- [ ] Quando a líder se afasta, as seguidoras vão atrás e param **em volta dela**,
+      cada uma num canto — não viram um monte no mesmo ponto.
+- [ ] Depois do reencontro, nenhuma fica **em cima** da outra nem do corpo da
+      líder.
+- [ ] Batendo numa delas, o bando corre junto, mas **fora de ritmo**: uma chega
+      antes, outra depois.
+- [ ] A líder continuando a andar, o grupo segue — as de trás alcançam aos poucos.
