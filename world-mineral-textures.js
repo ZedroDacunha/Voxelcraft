@@ -87,7 +87,16 @@ export function isMineralOreTile(tile) {
     return Object.hasOwn(ORE_COLORS, tile);
 }
 
-export function createMineralOrePixel(tile, x, y, noise) {
+/**
+ * O minério: a **pedra de verdade** (`stonePixel`, a mesma do bloco de pedra) com
+ * os veios por cima.
+ *
+ * Antes o fundo era um cinza liso desenhado aqui, com um ruído próprio: o bloco
+ * de minério não combinava com a pedra ao lado — parecia outro material com
+ * pintinhas. Agora quem manda no fundo é a textura da pedra, que vem de fora
+ * (`stone`) para este módulo não conhecer a arte do resto do mundo.
+ */
+export function createMineralOrePixel(tile, x, y, stone) {
     const palette = ORE_COLORS[tile];
     if (!palette) return null;
 
@@ -99,6 +108,5 @@ export function createMineralOrePixel(tile, x, y, noise) {
     });
     if (inOre) return palette[(x * 3 + y * 5) % palette.length];
 
-    const shade = 116 + noise(6) - (((x * 13 + y * 7) % 31 === 0) ? 18 : 0);
-    return [shade, shade, shade + 2];
+    return stone(x, y, 0);
 }

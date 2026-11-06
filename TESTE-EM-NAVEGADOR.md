@@ -801,3 +801,13 @@ Já coberto por `npm test` (922 testes):
       golpe fatal, com o corpo ainda no chão.
 - [ ] Um Mofim que **não** foge (por exemplo, no ar) continua com a trava do
       golpe: dois cliques seguidos não tiram dois pontos de vida dele.
+
+## 39. O minério na pedra de verdade
+
+- [ ] Encostando um bloco de minério num de **pedra**, o fundo dos dois é a
+      **mesma** textura (mesmos estratos, mesmo grão) — não parece outro material.
+- [ ] Os cinco minérios (carvão, cobre, ferro, ouro, diamante) têm esse mesmo
+      fundo de pedra, cada um com o seu veio por cima.
+- [ ] O bloco de pedra **escuro** (variante) também combina com o fundo do
+      minério, só com o sorteio diferente.
+- [ ] De perto, o fundo do minério tem grão e mancha — nada de cinza liso.
