@@ -15,7 +15,6 @@ const ITEM_PALETTES = Object.freeze({
 });
 
 const GEM_COLORS = Object.freeze({ light: [157, 250, 235], mid: [53, 204, 194], dark: [25, 119, 144] });
-const COAL_VEINS = Object.freeze([[5, 9, 3], [9, 7, 4], [10, 10, 3]]);
 const ORE_COLORS = Object.freeze({
     [TILE.COAL_ORE]: [[35, 35, 40], [52, 52, 58], [70, 70, 76]],
     [TILE.IRON_ORE]: [[151, 105, 78], [183, 132, 96], [211, 160, 120]],
@@ -24,6 +23,101 @@ const ORE_COLORS = Object.freeze({
     [TILE.COPPER_ORE]: [[139, 75, 48], [189, 103, 65], [219, 140, 93]],
 });
 const ORE_CENTERS = [[7, 7], [22, 6], [15, 18], [26, 25], [5, 26]];
+
+/**
+ * Os dois carvões em **arte de item** (16×16 px: cada célula da máscara é um pixel).
+ *
+ * Opção **E · punhado**: três pedaços. O mineral é pedra — preto frio, cinza-azulado
+ * nas beiradas; o vegetal é madeira queimada — marrom-preto, fosco, com falhas de
+ * grão. Cor **e** forma diferentes: os dois não se confundem na barra de itens,
+ * que era o problema da arte antiga (as duas eram um amontoado chapado).
+ */
+const CARVAO_ITEM = Object.freeze({
+    mineral: Object.freeze({
+        paleta: Object.freeze({
+            escuro: [16, 16, 24],
+            corpo: [40, 40, 48],
+            meio: [56, 56, 64],
+            claro: [96, 96, 112],
+        }),
+        mascara: Object.freeze([
+            '................',
+            '......####......',
+            '.....######.....',
+            '.....######.....',
+            '......####......',
+            '................',
+            '..####....####..',
+            '.######..######.',
+            '.######..######.',
+            '..####....####..',
+            '................',
+            '.....######.....',
+            '....########....',
+            '....########....',
+            '.....######.....',
+            '................',
+        ]),
+        grao: false,
+    }),
+    vegetal: Object.freeze({
+        paleta: Object.freeze({
+            escuro: [24, 24, 16],
+            corpo: [56, 48, 40],
+            meio: [72, 56, 48],
+            claro: [104, 88, 72],
+        }),
+        mascara: Object.freeze([
+            '................',
+            '....####........',
+            '...######.......',
+            '...######.......',
+            '....####........',
+            '................',
+            '.........#####..',
+            '........######..',
+            '........######..',
+            '.........#####..',
+            '................',
+            '.....###........',
+            '....#####.......',
+            '....#####.......',
+            '.....###........',
+            '................',
+        ]),
+        grao: true,
+    }),
+});
+
+/** Relevo de item: beirada de cima/esquerda clara, de baixo/direita escura. */
+function pintarItem(mascara, paleta, grao) {
+    const dentro = (x, y) => (mascara[y]?.[x] ?? '.') === '#';
+    return (x, y) => {
+        if (!dentro(x, y)) return null;
+        const cima = dentro(x, y - 1), esq = dentro(x - 1, y);
+        const baixo = dentro(x, y + 1), dir = dentro(x + 1, y);
+        if (!cima || !esq) return paleta.claro;
+        if (!baixo || !dir) return paleta.escuro;
+        const n = hash2(x, y, 4242);
+        let cor = n > 0.55 ? paleta.meio : paleta.corpo;
+        // Madeira queimada: riscos curtos no meio do pedaço (o mineral não tem).
+        if (grao && hash2(Math.floor(x / 4), Math.floor(y / 2), 9091) > 0.74) cor = paleta.escuro;
+        return cor;
+    };
+}
+
+/** O sprite do item de carvão: `camada` é `'mineral'` ou `'vegetal'`. */
+export function createCoalItemSpritePixels(camada = 'mineral') {
+    const arte = CARVAO_ITEM[camada];
+    if (!arte) return null;
+    const pintar = pintarItem(arte.mascara, arte.paleta, arte.grao);
+    return Array.from({ length: 16 }, (_, y) => Array.from({ length: 16 }, (_, x) => pintar(x, y)));
+}
+
+/** A máscara da arte de item do carvão (para o teste conferir), ou `null`. */
+export function coalItemMaskFor(camada = 'mineral') {
+    return CARVAO_ITEM[camada]?.mascara ?? null;
+}
 
 export function createMineralSpritePixels(kind, material) {
     if (!['ingot', 'gem', 'raw', 'coal'].includes(kind)) return null;
@@ -71,17 +165,7 @@ export function createMineralSpritePixels(kind, material) {
         return pixels;
     }
 
-    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-        let shade = null;
-        for (const [cx, cy, radius] of COAL_VEINS) {
-            const dx = x - cx, dy = y - cy;
-            if (dx * dx + dy * dy <= radius * radius) {
-                shade = (x + 2 * y) % 5 === 0 ? [91, 91, 99] : [37, 37, 43];
-            }
-        }
-        if (shade) put(x, y, shade);
-    }
-    return pixels;
+    return createCoalItemSpritePixels('mineral');
 }
 
 export function isMineralOreTile(tile) {
