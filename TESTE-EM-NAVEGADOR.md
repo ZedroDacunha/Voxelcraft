@@ -869,3 +869,18 @@ Abra a barra (1–9) e depois o inventário (E). Vale para todo bloco coletável
       continua igual.
 - [ ] A **tocha** na mão continua graveto com chama (não virou cubo).
 - [ ] Na barra e no inventário os ícones continuam em 3D (seção 42).
+
+## 44. O cobre em escamas
+
+Ande até uma parede com **minério de cobre** (ou `/give copper_ore`) e ponha ao
+lado de um bloco de pedra.
+
+- [ ] O cobre aparece como **lascas alongadas na diagonal**, e não como os
+      losangos miúdos que ele tinha antes.
+- [ ] A cor é **laranja quente** (bem diferente do carvão, que é preto-azulado).
+- [ ] De longe, o cobre salta da parede sem virar um bloco laranja inteiro.
+- [ ] De perto, cada pedaço tem beirada clara em cima/à esquerda e escura
+      embaixo/à direita (o relevo), e os pedaços são quadrados (blocos de 2×2 px).
+- [ ] O fundo entre as lascas é a **mesma pedra** do bloco de pedra ao lado.
+- [ ] O carvão continua como estava (pedaços grandes e escuros) — os dois veios
+      não se parecem.

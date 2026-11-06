@@ -127,11 +127,12 @@ test('a arte é determinística e não sai da faixa 0–255', () => {
 test('o veio antigo do carvão (losangos listrados) não existe mais', () => {
     // O veio velho pintava `paleta[(x * 3 + y * 5) % 3]` nos losangos: listras de
     // 1 px. Hoje tudo é bloco de 2×2 — se sobrar listra, a troca não pegou.
+    // Só dentro do veio: na pedra o grão muda de pixel em pixel de propósito.
     for (let y = 0; y < TILE_PX; y++) for (let x = 1; x < TILE_PX; x++) {
-        const a = cor(x, y), b = cor(x - 1, y);
-        if (chave(a) !== chave(b) && chave(a) !== chave(cor(x, y - 1 < 0 ? 0 : y))) {
-            // muda de cor no meio de um bloco só se a coluna for par (limite de bloco)
-            assert.equal(x % BLOCO, 0, `transição fora do limite de bloco em (${x},${y})`);
-        }
+        const by = Math.floor(y / BLOCO);
+        if (!dentro(Math.floor(x / BLOCO), by) || !dentro(Math.floor((x - 1) / BLOCO), by)) continue;
+        if (chave(cor(x, y)) === chave(cor(x - 1, y))) continue;
+        // muda de cor no meio de um bloco só se a coluna for par (limite de bloco)
+        assert.equal(x % BLOCO, 0, `transição fora do limite de bloco em (${x},${y})`);
     }
 });
