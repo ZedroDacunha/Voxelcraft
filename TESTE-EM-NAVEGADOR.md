@@ -838,3 +838,23 @@ barra. Na mão, o ícone aparece grande na tela.
 - [ ] Nenhum dos dois encosta na borda do quadradinho: sobra um pixel de respiro.
 - [ ] Na barra de itens (ícone pequeno) a diferença continua legível — não vira
       dois borrões escuros iguais.
+
+## 42. Os blocos em 3D no inventário
+
+Abra a barra (1–9) e depois o inventário (E). Vale para todo bloco coletável.
+
+- [ ] Cada bloco aparece como um **cubo visto de quina**: face de cima, lateral
+      esquerda e lateral direita — não mais uma face esticada.
+- [ ] A face de cima é a mais clara e a lateral direita a mais escura; dá para
+      contar as três faces de longe.
+- [ ] As quinas de baixo do quadradinho são **vazias** (fundo do slot aparece): o
+      bloco tem silhueta de cubo, não de quadrado.
+- [ ] Cada bloco mostra a **sua** arte nas três faces: grama verde em cima e terra
+      nos lados; madeira com o anel no topo e o veio nas laterais; pedregulho
+      pedregulho mesmo.
+- [ ] No **forno** e no **baú** a frente (a boca do forno, a fechadura) aparece na
+      lateral direita.
+- [ ] O ícone tem detalhe: nada de borrão — de perto dá para ver o grão da pedra e
+      as tábuas.
+- [ ] A tocha continua com o desenho de item (graveto + chama), e não como cubo.
+- [ ] Na lã branca o cubo continua legível sobre o fundo claro do slot.

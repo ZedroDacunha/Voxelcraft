@@ -37,9 +37,9 @@ const THREE = {
 };
 
 const { createTextureTools } = await import('../world-textures.js');
+const tools = createTextureTools(THREE);
 
 test('createAtlasTexture usa a grade e não desenha fora do canvas', () => {
-    const tools = createTextureTools(THREE);
     const texture = tools.createAtlasTexture();
     const canvas = texture.image;
 
@@ -64,9 +64,13 @@ test('todo tile e todo ícone caem dentro da própria célula', () => {
     for (const item of Object.values(ITEMS)) {
         if (!item.sprite) continue;
         const rect = atlasTileRect(item.iconTile);
+        // Ícone de 16 px entra dobrado (2×2); o de bloco já vem em 32 px e cai 1:1
+        // na célula — o tamanho vem da arte, não de uma constante.
+        const arte = tools.spritePixels(item.sprite.kind, item.sprite.mat);
+        const escala = TILE_PX / arte.length;
         assert.ok(
-            draws.some(d => d.w === 2 && inside(rect, d)),
-            `ícone de ${item.name} não foi desenhado na célula ${JSON.stringify(rect)}`,
+            draws.some(d => d.w === escala && inside(rect, d)),
+            `ícone de ${item.name} não foi desenhado na célula ${JSON.stringify(rect)} (escala ${escala})`,
         );
     }
 });

@@ -56,8 +56,8 @@ export const BLOCKS = {
     [ID.CRAFTING_TABLE]: { name: 'Bancada',    hardness: 2.5, drop: ID.CRAFTING_TABLE, tool: 'axe', station: 'crafting',
          tiles: { top: TILE.CRAFT_TOP, side: TILE.CRAFT_SIDE, bottom: TILE.PLANKS } },
     [ID.FURNACE]: { name: 'Forno',      hardness: 3.5, drop: ID.FURNACE, tool: 'pickaxe', requiresTool: true, minTier: 1, station: 'furnace',
-         icon: TILE.FURNACE_FRONT, tiles: { top: TILE.FURNACE_TOP, side: TILE.FURNACE_SIDE, front: TILE.FURNACE_FRONT, bottom: TILE.COBBLE } },
-    [ID.CHEST]: { name: 'Baú',     hardness: 2.5, drop: ID.CHEST, tool: 'axe', station: 'chest', icon: TILE.CHEST_FRONT,
+         tiles: { top: TILE.FURNACE_TOP, side: TILE.FURNACE_SIDE, front: TILE.FURNACE_FRONT, bottom: TILE.COBBLE } },
+    [ID.CHEST]: { name: 'Baú',     hardness: 2.5, drop: ID.CHEST, tool: 'axe', station: 'chest',
           tiles: { top: TILE.CHEST_TOP, side: TILE.CHEST_SIDE, front: TILE.CHEST_FRONT, bottom: TILE.CHEST_TOP } },
     [ID.WOOD_DOOR_BOTTOM]: {
         name: 'Porta de carvalho', hardness: 3, drop: ID.WOOD_DOOR, tool: 'axe', collectible: false,
@@ -138,12 +138,24 @@ BlockCatalog.isOpaque = function isOpaque(blockId) {
 };
 
 export const ITEMS = {};
+// Cada ícone de item ocupa a sua própria célula no atlas, a começar depois dos
+// tiles do mundo. A contagem começa aqui porque os blocos — logo abaixo — já
+// consomem as primeiras células com os ícones em 3D.
+let nextTile = Object.keys(TILE).length;
+// Bloco na barra/inventário: ícone em 3D. O sprite `block` monta o cubo
+// isométrico a partir dos tiles do próprio bloco (world-block-icons.js), então
+// cada bloco ganha a sua célula no atlas em vez de reaproveitar a do tile.
 for (const [id, b] of Object.entries(BLOCKS)) {
     if (!b.collectible) continue;
-    ITEMS[id] = { name: b.name, maxStack: 64, block: Number(id), iconTile: b.icon ?? b.tiles.top };
+    ITEMS[id] = {
+        name: b.name,
+        maxStack: 64,
+        block: Number(id),
+        sprite: { kind: 'block', mat: String(Number(id)) },
+        iconTile: nextTile++,
+    };
 }
 
-let nextTile = Object.keys(TILE).length;
 ITEMS[ID.STICK] = { name: 'Graveto', maxStack: 64, sprite: { kind: 'stick', mat: 'wood' }, iconTile: nextTile++ };
 ITEMS[ID.WOOD_DOOR] = {
     name: 'Porta de carvalho', maxStack: 64, block: ID.WOOD_DOOR_BOTTOM,
