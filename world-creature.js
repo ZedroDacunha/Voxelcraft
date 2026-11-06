@@ -17,6 +17,7 @@
 import {
     CREATURE_HOP_HEIGHT, createCreatureBaseClass, glideHeightAt, hopHeightAt,
 } from './world-creature-base.js';
+import { creatureInReach, hurtFlashFor, hurtScaleFor } from './world-mob-hit.js';
 import { floorDiv as defaultFloorDiv } from './world-grid.js';
 import { hash2 as defaultHash2 } from './world-math.js';
 import { DUST_LANDING_PUFF, createCreatureDust, dustStep } from './world-creature-dust.js';
@@ -68,11 +69,16 @@ export const SCARE_RADIUS = 7;
 export const SCARE_SPEED = 2.2;
 /** Quanto tempo ele continua fugindo depois do susto (segundos). */
 export const SCARE_DURATION = 4.5;
-/** Alcance e abertura do golpe: o corpo cabe numa caixa de ~1 bloco a 3,5. */
-export const HIT_REACH = 3.5;
-export const HIT_MIN_DOT = 0.86; // ~31° de abertura: mirar no bicho, não "perto dele"
-/** Um mesmo Mofim não leva dois golpes no mesmo instante (evita spam com o botão segurado). */
-export const HIT_COOLDOWN = 0.35;
+/**
+ * O golpe em bicho mora no kit (`world-mob-hit.js`), igual para todas as
+ * espécies. Reexportado aqui porque o Mofim foi o primeiro e o resto do jogo
+ * (e os testes) sempre importaram daqui.
+ */
+export {
+    creatureInReach, hurtFlashFor, hurtScaleFor,
+    HIT_COOLDOWN, HIT_MIN_DOT, HIT_REACH, HURT_EAR_FLAT, HURT_FLASH, HURT_HEAD_KICK,
+    HURT_SQUASH, HURT_SPREAD, KNOCKBACK_DISTANCE,
+} from './world-mob-hit.js';
 /**
  * Cadência **do braço**: um golpe a cada 0,45 s, com qualquer bicho.
  *
@@ -134,18 +140,6 @@ export const CROSS_SPEED = 6.5;
 export const CROSS_COOLDOWN = 6;
 /** Vida do bicho: três golpes de mão (cada golpe ainda o assusta). */
 export const MOFIM_HEALTH = 3;
-/** Tempo que o corpo fica aceso depois de levar dano (segundos). */
-export const HURT_FLASH = 0.22;
-/** Empurrão do golpe, em blocos (para o bicho "sentir" o impacto). */
-export const KNOCKBACK_DISTANCE = 0.35;
-/**
- * Reação do corpo no golpe: encolhe na altura, alarga nos lados e as orelhas
- * deitam — o mesmo "clarão" que acende o material dura o impacto todo.
- */
-export const HURT_SQUASH = 0.09;
-export const HURT_SPREAD = 0.05;
-export const HURT_HEAD_KICK = 0.32;
-export const HURT_EAR_FLAT = 0.45;
 /**
  * Piscada: os olhos fecham por um instante de vez em quando.
  *
@@ -236,60 +230,6 @@ export function shouldFlee({
     if (crouching) return false;
     if (!(distance <= scareRadius)) return false;
     return playerSpeed >= scareSpeed;
-}
-
-/**
- * Qual Mofim está na mira do golpe? Devolve o mais próximo que estiver dentro do
- * alcance e da abertura, ou `null`.
- *
- * Aceita posições simples (`{x, y, z}`) — nada de Three aqui.
- */
-export function creatureInReach(entities, origin, direction, {
-    reach = HIT_REACH,
-    minDot = HIT_MIN_DOT,
-    // Quem estiver mais longe que isso não leva o golpe: no jogo é a distância
-    // do bloco na mira — se o bloco está na frente, o Mofim está atrás dele.
-    maxDistance = Infinity,
-} = {}) {
-    if (!entities?.length || !direction) return null;
-    const length = Math.hypot(direction.x, direction.y, direction.z) || 1;
-    const dx = direction.x / length, dy = direction.y / length, dz = direction.z / length;
-    let best = null;
-    let bestScore = Infinity;
-    for (const entity of entities) {
-        // Sumindo ao amanhecer (ou já caindo) ele não é alvo: bater num bicho
-        // que está desaparecendo roubaria o quadro da mineração sem acertar nada.
-        if (entity.leaving || entity.dying) continue;
-        // O corpo do Mofim fica a ~0,45 do chão onde está a origem dele — e, no
-        // ar (pulo, planeio, voo), a altura que vale é a que se vê. Bicho mais
-        // alto (a ovelha) declara a altura do próprio centro em `bodyOffset`:
-        // sem isso a mira tinha de ser no chão para acertar o corpo dela.
-        const bodyY = Number.isFinite(entity.visualY) ? entity.visualY : entity.y;
-        const bodyOffset = Number.isFinite(entity.bodyOffset) ? entity.bodyOffset : 0.45;
-        const ex = entity.x - origin.x;
-        const ey = bodyY + bodyOffset - origin.y;
-        const ez = entity.z - origin.z;
-        const distance = Math.hypot(ex, ey, ez);
-        if (distance > reach || distance > maxDistance || distance === 0) continue;
-        const dot = (ex * dx + ey * dy + ez * dz) / distance;
-        if (dot < minDot) continue;
-        // Mais perto e mais alinhado ganha; distância domina.
-        const score = distance - dot;
-        if (score < bestScore) { bestScore = score; best = entity; }
-    }
-    return best;
-}
-
-/**
- * Quanto do clarão do dano ainda está aceso, de 0 a 1 (1 no instante do golpe,
- * 0 quando o tempo acaba). É a mesma conta para todos os bichos: o Mofim põe
- * isso no `emissive` do corpo, a ovelha na lã dela.
- */
-export function hurtFlashFor(hurtUntil = 0, at = 0, duration = HURT_FLASH) {
-    const span = Number(duration) > 0 ? Number(duration) : HURT_FLASH;
-    const left = Number(hurtUntil) - Number(at);
-    if (!Number.isFinite(left) || left <= 0) return 0;
-    return Math.min(1, left / span);
 }
 
 /**
@@ -622,32 +562,25 @@ export function createCreatureSystemClass({
         /**
          * O jogador deu um golpe? Assusta o Mofim atingido, tira-lhe um ponto de
          * vida e devolve `{ entity, killed }` — ou `null` se não acertou ninguém.
-         * Chamar a cada quadro com o botão apertado é seguro: `HIT_COOLDOWN`
-         * impede que um clique vire vários golpes.
+         *
+         * A vida, o clarão, o recuo e a morte com queda vêm do kit da base
+         * (`takeHit`): o que é do Mofim é só o susto — quem bate, ele foge.
+         * Chamar a cada quadro com o botão apertado é seguro: o cooldown do
+         * bicho impede que um clique vire vários golpes.
          */
         hitFrom(origin, direction, options = {}) {
-            const at = now();
             const target = creatureInReach(this.entities, origin, direction, options);
-            if (!target || at - target.lastHitAt < HIT_COOLDOWN) return null;
-            this.scare(target, at, origin);
-            target.health -= 1;
-            target.hurtUntil = at + HURT_FLASH;
-            // Empurrão: o bicho recua um dedo na direção do golpe. Sem isso o
-            // dano não teria resposta visível além do clarão.
-            const dx = target.x - origin.x, dz = target.z - origin.z;
-            // No ar o empurrão brigaria com o arco do voo: o dano ainda conta,
-            // só não mexe no corpo até ele pousar.
-            if (!target.flight && Math.hypot(dx, dz) > 1e-4) {
-                // Empurrão de verdade: o corpo recua freando por 0,16 s, em vez
-                // de pular 35 cm no mesmo quadro.
-                this.pushAway(target, dx, dz, KNOCKBACK_DISTANCE);
-            }
-            if (target.health > 0) return { entity: target, killed: false };
-            // Sem vida: o corpo tomba (e só depois sai do mundo) e o jogo solta
-            // o pó na hora — os itens caem com o bicho ainda no chão.
-            this.startDying(target, at);
-            onDeath(target);
-            return { entity: target, killed: true };
+            if (!target) return null;
+            const at = now();
+            const golpe = this.takeHit(target, {
+                at,
+                from: origin,
+                onHurt: entity => this.scare(entity, at, origin),
+                // O jogo solta o pó luminoso na hora (com o corpo ainda no chão).
+                onDeath: morte => onDeath(morte.entity),
+            });
+            if (!golpe) return null;
+            return { entity: golpe.entity, killed: golpe.killed };
         }
 
         /**
@@ -1055,12 +988,10 @@ export function createCreatureSystemClass({
                 e.wasAirborne = noArDeVerdade;
                 e.group.rotation.y = e.heading;
                 // Impacto: o corpo amassa no quadro do golpe e volta ao normal
-                // junto com o clarão — é o que dá o "peso" que faltava.
-                e.group.scale.set(
-                    1 + HURT_SPREAD * flash,
-                    1 - HURT_SQUASH * flash,
-                    1 + HURT_SPREAD * flash,
-                );
+                // junto com o clarão — é o que dá o "peso" que faltava. A conta
+                // é a mesma para todo bicho (`hurtScaleFor`).
+                const amassado = hurtScaleFor(flash);
+                e.group.scale.set(amassado.x, amassado.y, amassado.z);
                 // Planando, o corpo inclina um pouco para a frente e as asas
                 // abrem na horizontal — é o que faz a descida parecer planeio.
                 // Voando, ele sobe de peito erguido e desce de bico baixo.

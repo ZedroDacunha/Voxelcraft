@@ -44,7 +44,8 @@ import { canHarvest, damageTool as damageToolStack, getBreakTime } from './world
 import { boxOverlapsXZ, woodDoorCollision, woodDoorPart, woodDoorShape, woodDoorType } from './world-door.js';
 import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld } from './player-physics.js';
 import { canJumpFrom, createJumpState, updateJumpWindow } from './player-jump.js';
-import { ATTACK_COOLDOWN, attackReady, createCreatureSystemClass, creatureInReach } from './world-creature.js';
+import { ATTACK_COOLDOWN, attackReady, createCreatureSystemClass } from './world-creature.js';
+import { creatureInReach } from './world-mob-hit.js';
 import { SHEEP_BLEAT_RANGE, SHEEP_WOOL_ITEMS, createSheepSystemClass } from './world-sheep.js';
 import { createChatState } from './world-chat.js';
 import { COMMAND_PREFIX, runChatCommand } from './world-chat-commands.js';
