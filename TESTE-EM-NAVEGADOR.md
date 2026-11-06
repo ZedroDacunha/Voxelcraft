@@ -1042,3 +1042,21 @@ Abra o inventário com **Lingote de ouro** (`/give gold_ingot`) e ponha ao lado 
 - [ ] Nenhum lingote ficou no retângulo chapado antigo — os três mudaram.
 - [ ] Os outros itens (carvão, cobre/ferro/ouro brutos, diamante) continuam como
       estavam.
+
+## 55. O item de picareta
+
+Pegue as seis picaretas (`/give picareta de madeira`, `… de pedra`, `… de cobre`,
+`… de ferro`, `… de ouro`, `… de diamante`) e olhe na barra, no inventário e **na
+mão**.
+
+- [ ] A picareta é a **do desenho clássico**: cabeça em barra em cima, haste
+      descendo à direita e cabo na diagonal até a quina de baixo à esquerda.
+- [ ] Tem **contorno escuro** fechando a silhueta e **dois pixels de reflexo** na
+      cabeça (o gume brilhando).
+- [ ] O **cabo é de madeira** em todas; só a **cabeça** muda de material.
+- [ ] Madeira (marrom), pedra (cinza), cobre (alaranjado), ferro (branco
+      acinzentado), ouro (amarelo) e diamante (ciano) se distinguem na hora.
+- [ ] Na **mão**, a picareta aparece com o mesmo desenho e a mesma cor.
+- [ ] A **barra** e o **inventário** mostram o mesmo ícone (nada de arte
+      diferente entre os dois).
+- [ ] Machado e pá continuam com o desenho antigo — é esperado, são as próximas.
