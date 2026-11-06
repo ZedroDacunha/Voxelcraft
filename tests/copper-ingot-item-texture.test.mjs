@@ -144,20 +144,21 @@ test('o metal é cobre: quente, e não se confunde com o minério bruto', () => 
     assert.ok(cheios(sprite) > cheios(bruto), 'a barra ocupa mais que os grumos');
 });
 
-test('cada lingote tem a sua arte: o de ferro e o de ouro ainda são o genérico', () => {
-    assert.equal(ingotItemGradeFor('iron'), null, 'o ferro ainda não foi redesenhado');
+test('o ouro ainda é o genérico, e ninguém herdou a arte por engano', () => {
     assert.equal(ingotItemGradeFor('gold'), null, 'o ouro ainda não foi redesenhado');
     assert.equal(gemItemMaskFor('copper'), null, 'cobre não é gema');
 
     // Genérico = o retângulo chapado de sempre: 10 × 8 px, sem um pixel a mais.
-    for (const material of ['iron', 'gold']) {
-        const px = createMineralSpritePixels('ingot', material);
-        assert.equal(px.flat().filter(Boolean).length, 80, `${material} continua no retângulo de 80 px`);
-        for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-            const dentroDoRetangulo = x >= 3 && x <= 12 && y >= 4 && y <= 11;
-            assert.equal(Boolean(px[y][x]), dentroDoRetangulo, `${material} em (${x},${y})`);
-        }
+    const ouro = createMineralSpritePixels('ingot', 'gold');
+    assert.equal(ouro.flat().filter(Boolean).length, 80, 'o ouro continua no retângulo de 80 px');
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+        const dentroDoRetangulo = x >= 3 && x <= 12 && y >= 4 && y <= 11;
+        assert.equal(Boolean(ouro[y][x]), dentroDoRetangulo, `ouro em (${x},${y})`);
     }
+
+    // O ferro já tem arte, mas com a paleta dele: mesma forma, outra cor.
+    assert.deepEqual(ingotItemGradeFor('iron'), GRADE, 'o ferro compartilha a forma');
+    assert.notDeepEqual(createMineralSpritePixels('ingot', 'iron'), sprite, 'e não a cor');
 });
 
 test('a arte é determinística e não sai da faixa 0–255', () => {
