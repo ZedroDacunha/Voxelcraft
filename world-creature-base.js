@@ -139,8 +139,32 @@ export function createCreatureBaseClass({
             const length = Math.hypot(dirX, dirZ);
             if (!(length > 1e-6)) return false;
             const step = speed * dt;
-            const nx = e.x + (dirX / length) * step;
-            const nz = e.z + (dirZ / length) * step;
+            if (!this.moveTo(e, e.x + (dirX / length) * step, e.z + (dirZ / length) * step)) return false;
+            e.heading = Math.atan2(dirX, dirZ);
+            return true;
+        }
+
+        /**
+         * Dá um passo **no rumo em que o corpo está** (`e.heading`), sem mexer
+         * nele. Devolve a distância andada — `0` quando o chão barra.
+         *
+         * É o par do `stepToward` para quem gira o corpo antes de andar: bicho
+         * de quatro patas não anda de lado nem de costas, então quem quer
+         * virar suave vira o `heading` primeiro e chama este passo depois.
+         */
+        stepHeading(e, distance) {
+            const passo = Number(distance) || 0;
+            if (!(passo > 0)) return 0;
+            const nx = e.x + Math.sin(e.heading) * passo;
+            const nz = e.z + Math.cos(e.heading) * passo;
+            return this.moveTo(e, nx, nz) ? passo : 0;
+        }
+
+        /**
+         * O passo em si: confere o chão, arma pulo/planeio e move o bicho. É a
+         * conta que o `stepToward` e o `stepHeading` têm em comum.
+         */
+        moveTo(e, nx, nz) {
             const ny = this.surfaceAt(nx, nz);
             if (ny === null || Math.abs(ny - e.y) > CREATURE_STEP_UP) return false;
             if (ny > e.y) {
@@ -152,7 +176,6 @@ export function createCreatureBaseClass({
                 e.glideT = 0;
             }
             e.x = nx; e.z = nz; e.y = ny;
-            e.heading = Math.atan2(dirX, dirZ);
             return true;
         }
 
