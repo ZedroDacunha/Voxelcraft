@@ -1185,7 +1185,8 @@ export function createSheepSystemClass({
          * sem isso o bando ficaria sem cabeça e cada uma voltaria a vagar só.
          */
         herdLeaderOf(entity) {
-            const bando = this.entities.filter(other => other.herd === entity.herd);
+            // Quem está caindo não manda mais no bando.
+            const bando = this.entities.filter(other => other.herd === entity.herd && !other.dying);
             const achada = bando.find(other => other.leader);
             if (achada) return achada === entity ? null : achada;
             bando.sort((a, b) => a.id - b.id);
@@ -1331,7 +1332,9 @@ export function createSheepSystemClass({
                 meatRoll: hash2(target.id, 421),
             });
             const morte = { entity: target, herd: target.herd, killed: true, drops };
-            this.removeEntity(target);
+            // O corpo tomba no lugar e só some no fim da queda: os itens caem
+            // agora, com a ovelha ainda no chão.
+            this.startDying(target, at);
             onDeath?.(morte);
             return morte;
         }
@@ -1354,6 +1357,22 @@ export function createSheepSystemClass({
                 const distanceToPlayer = Math.hypot(e.x - playerPos.x, e.z - playerPos.z);
                 if (distanceToPlayer > SHEEP_DESPAWN_DISTANCE) {
                     this.removeEntity(e);
+                    continue;
+                }
+
+                // Caindo: o corpo tomba de lado, encolhe no fim e sai do mundo.
+                // Nada de pasto, susto ou passo enquanto isso.
+                if (e.dying) {
+                    const pose = this.stepDying(e, dt);
+                    e.group.rotation.z = pose.roll;
+                    e.group.scale.setScalar(pose.scale);
+                    e.group.position.set(e.x, e.visualY, e.z);
+                    // O clarão do golpe continua apagando enquanto o corpo cai:
+                    // congelado, ele deixaria o cadáver aceso por 0,8 s.
+                    if (e.woolMaterial) {
+                        const clarao = hurtFlashFor(e.hurtUntil, at, SHEEP_HURT_FLASH);
+                        e.woolMaterial.emissive.setRGB(clarao * 0.85, clarao * 0.32, clarao * 0.24);
+                    }
                     continue;
                 }
 

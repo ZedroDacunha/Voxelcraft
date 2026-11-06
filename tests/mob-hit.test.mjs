@@ -111,7 +111,15 @@ test('a ovelha tem quatro golpes de vida; o Mofim, três', () => {
     assert.ok(ultimo, 'o quarto golpe pega');
     assert.equal(ultimo.killed, true, 'o quarto derruba');
     assert.equal(sheep.health, 0);
-    assert.ok(!system.entities.includes(sheep), 'saiu do mundo');
+
+    // O corpo tomba antes de sair do mundo.
+    assert.ok(system.entities.includes(sheep), 'continua no mundo, caindo');
+    assert.ok(sheep.dying, 'marcado como caído');
+    for (let i = 0; i < 40 && system.entities.includes(sheep); i++) {
+        clock.t += 0.05;
+        system.update(0.05, { pos: { x: 0, z: 0 } }, true, { day: 1 });
+    }
+    assert.ok(!system.entities.includes(sheep), 'e só depois sai do mundo');
 });
 
 test('cada golpe acende o corpo por um instante e empurra ela para trás', () => {

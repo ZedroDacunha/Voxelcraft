@@ -338,18 +338,26 @@ test('três golpes derrubam o Mofim e avisam quem chamou', () => {
 
     const ultimo = system.hitFrom(origin, { x: 1, y: 0, z: 0 });
     assert.equal(ultimo.killed, true, 'o último golpe derruba');
-    assert.equal(system.entities.length, 0, 'saiu da lista de bichos');
-    assert.equal(world.scene.children.length, cenas - 1, 'e saiu da cena');
     assert.equal(deaths.length, 1, 'avisou uma vez só');
     assert.equal(deaths[0].id, creature.id, 'com o Mofim que morreu');
     assert.equal(deaths[0].y, GROUND + 1, 'no lugar do corpo');
     assert.ok(deaths[0].x > 1.9, 'onde ele caiu');
 
-    // Morto, ele não volta a andar no quadro seguinte (outro pode nascer no
-    // lugar, mas não esse).
+    // O corpo **tomba** antes de sair: nada de sumir no quadro do golpe.
+    assert.ok(system.entities.includes(creature), 'continua no mundo, caindo');
+    assert.ok(creature.dying, 'marcado como caído');
+    assert.equal(world.scene.children.length, cenas, 'e ainda na cena');
     system.update(0.016, player, true);
-    assert.ok(!system.entities.includes(creature), 'o Mofim derrubado não volta');
-    assert.equal(deaths.length, 1, 'e ninguém mais morre');
+    assert.ok(Math.abs(creature.group.rotation.z) > 0, 'já começou a tombar');
+
+    // No fim da queda ele sai — e não volta.
+    for (let i = 0; i < 40 && system.entities.includes(creature); i++) {
+        clock.t += 0.05;
+        system.update(0.05, player, true);
+    }
+    assert.ok(!system.entities.includes(creature), 'saiu da lista de bichos');
+    assert.ok(!world.scene.children.includes(creature.group), 'e saiu da cena');
+    assert.equal(deaths.length, 1, 'avisou uma vez só');
 });
 
 test('golpe no vazio não assusta ninguém', () => {

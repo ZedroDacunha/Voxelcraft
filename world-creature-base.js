@@ -42,6 +42,46 @@ export function knockSpeedFor(distance, time = KNOCK_TIME) {
 }
 
 /**
+ * A queda: quanto tempo o corpo leva para tombar, ficar caído e sumir (s).
+ *
+ * Antes o bicho era arrancado do mundo no quadro do golpe — sumia no ar, sem
+ * tombar. Agora ele cai de lado, fica um instante no chão e só então sai, com o
+ * corpo encolhendo no fim para não estourar na tela.
+ */
+export const DYING_TIME = 0.8;
+/** Fração da queda gasta só para tombar (o resto é o corpo caído sumindo). */
+export const DYING_TIP = 0.45;
+/** Fração final em que o corpo encolhe até sumir. */
+export const DYING_FADE = 0.2;
+
+/**
+ * A pose da queda para um tempo caído (0..`DYING_TIME`).
+ *
+ * `roll` é o giro em Z (o corpo tombando de lado), `scale` o encolhimento do fim
+ * e `done` avisa que já pode sair do mundo. A conta é pura: quem desenha é a
+ * criatura.
+ */
+export function dyingPoseFor(t, {
+    time = DYING_TIME, tip = DYING_TIP, fade = DYING_FADE, side = 1,
+} = {}) {
+    const total = Math.max(0.05, Number(time) || DYING_TIME);
+    const tempo = Math.min(total, Math.max(0, Number(t) || 0));
+    const p = tempo / total;
+    // Tumba rápido e assenta: a curva é a de queda (1 − (1 − x)²), não uma reta.
+    const queda = Math.min(1, p / Math.max(0.01, Number(tip) || DYING_TIP));
+    const assentar = 1 - (1 - queda) ** 2;
+    const sumindo = p > 1 - Math.max(0.01, Number(fade) || DYING_FADE)
+        ? (1 - p) / Math.max(0.01, Number(fade) || DYING_FADE)
+        : 1;
+    return {
+        roll: (Number(side) || 1) * (Math.PI / 2) * assentar,
+        scale: Math.max(0.02, Math.min(1, sumindo)),
+        progress: p,
+        done: tempo >= total,
+    };
+}
+
+/**
  * Altura do corpo durante o pulo do degrau.
  *
  * Sobe até `height` acima do destino e desce até pousar nele — um arco de
@@ -135,6 +175,41 @@ export function createCreatureBaseClass({
             mesh.receiveShadow = false;
             group.add(mesh);
             return mesh;
+        }
+
+        /**
+         * Começa a cair: o bicho **não** sai do mundo na hora — o corpo tomba,
+         * fica caído e só então some (`stepDying`).
+         *
+         * Devolve `false` se ele já estava caindo (o segundo golpe não derruba
+         * de novo).
+         */
+        startDying(e, at = 0) {
+            if (e.dying) return false;
+            e.dying = true;
+            e.dieT = 0;
+            e.diedAt = Number(at) || 0;
+            // Cai sempre para o lado "de fora" do golpe: par ou ímpar dá o lado.
+            e.dieSide = (Number(e.id) || 0) % 2 === 0 ? 1 : -1;
+            // Nada mais de vida: sem fuga, sem susto, sem pasto, sem recuo.
+            e.fleeUntil = 0;
+            e.fleeFrom = null;
+            e.alertUntil = 0;
+            e.alertAt = 0;
+            e.grazeT = null;
+            e.knockFor = 0;
+            return true;
+        }
+
+        /**
+         * Um quadro de queda: devolve a pose do corpo e tira o bicho do mundo
+         * quando o tempo acaba. Quem chama só desenha.
+         */
+        stepDying(e, dt) {
+            e.dieT = Math.min(DYING_TIME, (Number(e.dieT) || 0) + Math.max(0, Number(dt) || 0));
+            const pose = dyingPoseFor(e.dieT, { side: e.dieSide ?? 1 });
+            if (pose.done) this.removeEntity(e);
+            return pose;
         }
 
         /** Tira o bicho do mundo e solta o material dele (não é compartilhado). */
@@ -240,6 +315,8 @@ export function createCreatureBaseClass({
         countNear(x, z, gap) {
             let total = 0;
             for (const entity of this.entities) {
+                // Quem está caindo já não ocupa lugar no mundo.
+                if (entity.dying) continue;
                 if ((entity.x - x) ** 2 + (entity.z - z) ** 2 < gap * gap) total++;
             }
             return total;
