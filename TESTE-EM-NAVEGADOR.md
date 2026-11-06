@@ -931,3 +931,19 @@ ao lado de um bloco de ouro, um de ferro e um de pedra.
 - [ ] O fundo entre as lascas é a **mesma pedra** do bloco de pedra ao lado.
 - [ ] Carvão, cobre, ferro e ouro continuam com os veios deles (nada mudou).
 - [ ] Nenhum minério do jogo ficou no veio genérico (losangos miúdos listrados).
+
+## 48. O item de cobre bruto
+
+Abra o inventário (ou olhe a barra) com **Cobre bruto** — dá para pegar com
+`/give raw_copper` — e ponha ao lado de **Carvão** e de **Ferro bruto**.
+
+- [ ] O cobre bruto aparece como **quatro grumos de tamanhos diferentes** (um
+      grande em cima, três embaixo), e não mais como três bolhas redondas.
+- [ ] A silhueta é diferente da do carvão (três pedaços iguais), então os dois se
+      distinguem mesmo em preto e branco.
+- [ ] A cor é **laranja queimado**, a mesma família do veio do bloco de cobre.
+- [ ] Cada grumo tem beirada clara em cima/à esquerda e escura embaixo/à direita.
+- [ ] Fora dos grumos o ícone é **transparente**: aparece o fundo da casa do
+      inventário, sem quadrado em volta.
+- [ ] O **Ferro bruto** continua com o desenho antigo (três bolhas) — só o cobre
+      mudou nesta rodada.
