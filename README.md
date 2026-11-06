@@ -48,7 +48,7 @@ etapa de build — o que está no repositório é o que vai para o ar.
 ## Testes e validação
 
 ```bash
-npm test           # 1127 testes de módulos puros (node --test)
+npm test           # 1112 testes de módulos puros (node --test)
 npm run check      # sintaxe de todos os módulos + importmap em dia
 npm run stamp      # regrava os hashes de cache no index.html
 ```
@@ -325,6 +325,17 @@ npm run stamp
 ```
 
 Se esquecer, o teste `cache-versioning` e o `npm run check` reprovam.
+
+## Arte
+
+A arte do jogo é **nossa**: ícones desenhados aqui, em 16×16, com paleta,
+contorno tingido e as faixas de couro que assinam a família das ferramentas. As
+regras estão em [`GUIA-DE-ARTE.md`](GUIA-DE-ARTE.md), e os testes de
+`tests/art-style.test.mjs` cobram cada uma delas — inclusive **nenhuma silhueta
+igual à do sprite clássico**.
+
+O Voxelcraft é um projeto de fã, **não oficial**: não tem vínculo com a Mojang ou
+a Microsoft, e não usa arte, som, código ou marca de nenhum jogo comercial.
 
 ## Convenções do projeto
 
