@@ -73,6 +73,25 @@ export const HIT_REACH = 3.5;
 export const HIT_MIN_DOT = 0.86; // ~31° de abertura: mirar no bicho, não "perto dele"
 /** Um mesmo Mofim não leva dois golpes no mesmo instante (evita spam com o botão segurado). */
 export const HIT_COOLDOWN = 0.35;
+/**
+ * Cadência **do braço**: um golpe a cada 0,45 s, com qualquer bicho.
+ *
+ * O limite por bicho sozinho não bastava: com dois na frente dava para acertar
+ * os dois em quadros seguidos com um swing só. Agora o swing é do jogador — a
+ * mão bate uma vez, e a próxima só depois de a animação ter acontecido.
+ */
+export const ATTACK_COOLDOWN = 0.45;
+
+/** O braço já pode dar outro golpe? */
+export function attackReady(lastAttackAt, at, cooldown = ATTACK_COOLDOWN) {
+    const ultimo = Number(lastAttackAt);
+    const agora = Number(at);
+    if (!Number.isFinite(agora)) return false;
+    if (!Number.isFinite(ultimo)) return true;
+    // A folga de 1e-9 é de propósito: 10 + 0,45 em ponto flutuante dá
+    // 10,449999…, e sem ela o golpe seguinte ficava preso por um fio.
+    return agora - ultimo >= Math.max(0, Number(cooldown) || 0) - 1e-9;
+}
 export const HOP_DURATION = 0.26;
 /** Altura do arco do pulo (mesma da base das criaturas). */
 export const HOP_HEIGHT = CREATURE_HOP_HEIGHT;
@@ -119,6 +138,14 @@ export const MOFIM_HEALTH = 3;
 export const HURT_FLASH = 0.22;
 /** Empurrão do golpe, em blocos (para o bicho "sentir" o impacto). */
 export const KNOCKBACK_DISTANCE = 0.35;
+/**
+ * Reação do corpo no golpe: encolhe na altura, alarga nos lados e as orelhas
+ * deitam — o mesmo "clarão" que acende o material dura o impacto todo.
+ */
+export const HURT_SQUASH = 0.09;
+export const HURT_SPREAD = 0.05;
+export const HURT_HEAD_KICK = 0.32;
+export const HURT_EAR_FLAT = 0.45;
 /**
  * Piscada: os olhos fecham por um instante de vez em quando.
  *
@@ -611,7 +638,9 @@ export function createCreatureSystemClass({
             // No ar o empurrão brigaria com o arco do voo: o dano ainda conta,
             // só não mexe no corpo até ele pousar.
             if (!target.flight && Math.hypot(dx, dz) > 1e-4) {
-                this.stepToward(target, dx, dz, KNOCKBACK_DISTANCE, 1);
+                // Empurrão de verdade: o corpo recua freando por 0,16 s, em vez
+                // de pular 35 cm no mesmo quadro.
+                this.pushAway(target, dx, dz, KNOCKBACK_DISTANCE);
             }
             if (target.health > 0) return { entity: target, killed: false };
             // Sem vida: some do mundo e avisa quem chamou (o jogo solta o pó).
@@ -875,6 +904,8 @@ export function createCreatureSystemClass({
                 // Voo curto. No ar, o arco manda no corpo: nem passo, nem alvo
                 // de passeio. Quem decide sair voando é `flightFor`.
                 const flying = this.updateFlight(e, dt);
+                // Recuo do golpe: desliza e freia, por baixo do passo normal.
+                if (!flying) this.stepKnock(e, dt);
                 if (!flying) {
                     if (fleeing) {
                         // Primeiro o caminho direto para longe. Se ele está
@@ -1008,6 +1039,13 @@ export function createCreatureSystemClass({
                 }
                 e.wasAirborne = noArDeVerdade;
                 e.group.rotation.y = e.heading;
+                // Impacto: o corpo amassa no quadro do golpe e volta ao normal
+                // junto com o clarão — é o que dá o "peso" que faltava.
+                e.group.scale.set(
+                    1 + HURT_SPREAD * flash,
+                    1 - HURT_SQUASH * flash,
+                    1 + HURT_SPREAD * flash,
+                );
                 // Planando, o corpo inclina um pouco para a frente e as asas
                 // abrem na horizontal — é o que faz a descida parecer planeio.
                 // Voando, ele sobe de peito erguido e desce de bico baixo.

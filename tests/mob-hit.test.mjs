@@ -10,7 +10,11 @@ import { readFileSync } from 'node:fs';
 
 import * as THREE from '../vendor/three/three.module.js';
 import { BLOCKS, ID, ITEMS } from '../world-catalog.js';
-import { creatureInReach, hurtFlashFor, HURT_FLASH, MOFIM_HEALTH } from '../world-creature.js';
+import {
+    ATTACK_COOLDOWN, creatureInReach, hurtFlashFor, attackReady,
+    HURT_EAR_FLAT, HURT_FLASH, HURT_HEAD_KICK, HURT_SPREAD, HURT_SQUASH, MOFIM_HEALTH,
+} from '../world-creature.js';
+import { KNOCK_TIME, knockSpeedFor } from '../world-creature-base.js';
 import { createBreakParticleSystem } from '../world-break-particles.js';
 import { resolveItem } from '../world-chat-commands.js';
 import {
@@ -122,12 +126,15 @@ test('cada golpe acende o corpo por um instante e empurra ela para trás', () =>
     assert.ok(sheep.hurtUntil > clock.t, 'o clarão está aceso');
     assert.ok(Math.abs(sheep.hurtUntil - (clock.t + SHEEP_HURT_FLASH)) < 1e-9, 'pelo tempo da constante');
 
-    // Um quadro depois: a lã dela brilha.
+    // O golpe não teleporta: o recuo é uma velocidade que freia por ~0,16 s.
+    assert.ok(Math.abs(sheep.x - antes) < 1e-9, 'no quadro do golpe o corpo ainda está no lugar');
+
+    // Um quadro depois: a lã dela brilha — e ela já começou a recuar.
     system.update(0.016, player, true, { day: 1 });
     assert.ok(sheep.woolMaterial.emissive.r > 0.3, `a lã acendeu (${sheep.woolMaterial.emissive.r})`);
-
-    // O corpo recuou na direção contrária ao golpe (que veio do oeste).
-    assert.ok(sheep.x - antes >= SHEEP_KNOCKBACK - 0.05, `empurrão de ${sheep.x - antes} blocos`);
+    const recuo = sheep.x - antes;
+    assert.ok(recuo > 0, `o corpo recuou na direção contrária ao golpe (${recuo})`);
+    assert.ok(recuo < SHEEP_KNOCKBACK, `mas aos poucos, não de um pulo (${recuo})`);
     assert.ok(SHEEP_KNOCKBACK > 0.2 && SHEEP_KNOCKBACK < 1, 'empurrão curto: é um recuo, não um voo');
 
     // Passado o clarão, a lã volta ao normal.
@@ -295,4 +302,80 @@ test('game.js bate nos dois bichos com som, lascas e o item da morte', () => {
     assert.match(source, /onDeath: \(\{ entity, drops \}\) => \{/);
     assert.match(source, /spawnItemEntity\(ID\[SHEEP_WOOL_ITEMS\[drops\.coat\]\], drops\.wool/);
     assert.match(source, /spawnItemEntity\(ID\.MUTTON, drops\.mutton/);
+});
+
+// ------------------------------------------------ o peso do golpe
+
+test('o recuo do golpe desliza, freia e para (não é teleporte)', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const bicho = { x: 0, z: 0, y: GROUND, visualY: GROUND, heading: 0 };
+
+    assert.ok(system.pushAway(bicho, 1, 0, SHEEP_KNOCKBACK));
+    assert.equal(bicho.x, 0, 'empurrar não move o corpo na hora');
+    assert.ok(knockSpeedFor(SHEEP_KNOCKBACK) > SHEEP_KNOCKBACK / KNOCK_TIME, 'a velocidade sai da conta do tempo');
+
+    const primeiro = system.stepKnock(bicho, 0.016);
+    assert.ok(primeiro > 0, 'o primeiro quadro já desliza');
+    assert.ok(primeiro < SHEEP_KNOCKBACK * 0.25, `mas é um fio, não o pulo inteiro (${primeiro})`);
+
+    let total = primeiro;
+    for (let i = 0; i < 20; i++) total += system.stepKnock(bicho, 0.016);
+    assert.ok(Math.abs(total - SHEEP_KNOCKBACK) < 0.02, `o recuo total é o empurrão (${total})`);
+    assert.ok(Math.abs(bicho.x - SHEEP_KNOCKBACK) < 0.02, 'e o corpo foi junto');
+    const fim = bicho.x;
+    assert.equal(system.stepKnock(bicho, 0.016), 0, 'o recuo acaba');
+    assert.equal(bicho.x, fim, 'sem continuar andando sozinho depois');
+
+    // Barrado (parede/água): o recuo para ali em vez de atravessar. O mundo do
+    // teste arredonda o chão para o bloco, então a parede começa no bloco x = 1.
+    const contraParede = makeSystem(makeWorld({ heightAt: (x) => (x >= 1 ? GROUND + 4 : GROUND) }), { t: 0 });
+    const preso = { x: 0, z: 0, y: GROUND, visualY: GROUND, heading: 0 };
+    contraParede.pushAway(preso, 1, 0, 2);
+    for (let i = 0; i < 20; i++) contraParede.stepKnock(preso, 0.016);
+    assert.ok(preso.x < 1, `o corpo não atravessa a parede (${preso.x})`);
+    assert.ok(preso.x > 0.5, `mas recua até encostar nela (${preso.x})`);
+});
+
+test('o braço tem a sua cadência: um swing, um golpe', () => {
+    assert.ok(ATTACK_COOLDOWN >= 0.35 && ATTACK_COOLDOWN <= 0.7, `cadência de braço (${ATTACK_COOLDOWN})`);
+    assert.ok(attackReady(-Infinity, 10), 'no primeiro golpe, pronto');
+    assert.ok(!attackReady(10, 10 + ATTACK_COOLDOWN * 0.5), 'no meio do swing, não');
+    assert.ok(attackReady(10, 10 + ATTACK_COOLDOWN), 'passado o tempo, sim');
+    // A cadência é do jogador, não do bicho: trocar de alvo não fura a espera.
+    assert.ok(!attackReady(10, 10 + 0.05), 'outro bicho na frente não acelera o braço');
+});
+
+test('o golpe amassa o corpo, deita as orelhas e sacode a cabeça', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const sheep = spawnSheep(system, clock);
+    const player = { pos: { x: 0, z: 0 } };
+    const baseOrelhas = sheep.ears.map(orelha => orelha.userData.baseZ);
+
+    assert.ok(bater(system, clock, sheep));
+    system.update(0.016, player, true, { day: 1 });
+
+    // Corpo: encolhe na altura e alarga nos lados.
+    assert.ok(sheep.group.scale.y < 1 - HURT_SQUASH * 0.5, `amassa na altura (${sheep.group.scale.y})`);
+    assert.ok(sheep.group.scale.x > 1 + HURT_SPREAD * 0.5, `alarga nos lados (${sheep.group.scale.x})`);
+
+    // As duas orelhas deitam de vez no impacto.
+    sheep.ears.forEach((orelha, i) => {
+        const lado = orelha.userData.side ?? (i === 0 ? 1 : -1);
+        const desvio = (orelha.rotation.z - baseOrelhas[i]) * -lado;
+        assert.ok(desvio > HURT_EAR_FLAT * 0.5, `a orelha deitou (${desvio})`);
+    });
+
+    // E a cabeça dá um tranco para cima. Comparado com o mesmo instante um
+    // pouco depois (a fuga é a mesma), sobra só o tranco.
+    const comTranco = sheep.head.rotation.x;
+    clock.t += SHEEP_HURT_FLASH + 0.01;
+    system.update(0.016, player, true, { day: 1 });
+    const semTranco = sheep.head.rotation.x;
+    assert.ok(comTranco - semTranco > HURT_HEAD_KICK * 0.4,
+        `a cabeça subiu no golpe (${comTranco} vs ${semTranco})`);
+
+    assert.ok(Math.abs(sheep.group.scale.y - 1) < 1e-9, 'o corpo volta ao tamanho de sempre');
+    assert.ok(Math.abs(sheep.group.scale.x - 1) < 1e-9, 'e à largura de sempre');
 });
