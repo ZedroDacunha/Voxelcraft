@@ -990,3 +990,20 @@ bruto** e de **Carvão**.
 - [ ] O relevo: beirada clara em cima/à esquerda, escura embaixo/à direita.
 - [ ] Fora da lasca o ícone é **transparente** (aparece o fundo da casa).
 - [ ] Carvão, cobre, ferro e ouro brutos continuam como estavam.
+
+## 52. O item de lingote de cobre
+
+Abra o inventário com **Lingote de cobre** (`/give copper_ingot`) e ponha ao lado
+de **Cobre bruto** e de **Carvão**.
+
+- [ ] O lingote aparece como a **barra clássica**, tombada na diagonal: face de
+      cima clara, corpo em sombra embaixo e à direita, contorno escuro, pontas
+      afinando (uma em cima à direita, outra embaixo à esquerda).
+- [ ] A cor é de **cobre fundido**: mais vermelha e mais clara que o minério bruto.
+- [ ] Tem **reflexo** (1 px quase branco) na face de cima.
+- [ ] Fora da barra o ícone é **transparente** (aparece o fundo da casa).
+- [ ] Ao lado do **cobre bruto** não se confunde: o bruto são grumos soltos; o
+      lingote é uma peça só.
+- [ ] O **lingote de ferro** e o **lingote de ouro** continuam no retângulo
+      genérico, iguais a antes (só o de cobre foi redesenhado).
+- [ ] Carvão, cobre, ferro, ouro e diamante (itens) continuam como estavam.

@@ -296,6 +296,62 @@ export function gemItemMaskFor(material) {
     return ARTES_ITEM_GEMA[material]?.mascara ?? null;
 }
 
+/**
+ * A **forma do lingote** — a mesma para todos os metais: 16×16 px, cada
+ * caractere é um pixel e o dígito é o tom (`0` = contorno/sombra … `4` = reflexo).
+ *
+ * É o desenho clássico do lingote dos jogos de bloco, transcrito pixel a pixel:
+ * a barra **tombada na diagonal**, com a face de cima na luz (a mancha clara), o
+ * corpo em sombra embaixo e à direita, o contorno escuro fechando a silhueta, e
+ * a quina de baixo à esquerda terminando em ponta. É assim que a barra lê como
+ * barra em 16 px, e não como um tijolo chapado.
+ */
+const LINGOTE_GRADE = Object.freeze([
+    '................',
+    '................',
+    '..........00....',
+    '.......000221...',
+    '....0002333321..',
+    '.00023333333321.',
+    '0433333333334431',
+    '0243333334443120',
+    '0224334443111120',
+    '0222443111112220',
+    '012231111122100.',
+    '.012311111000...',
+    '..01210000......',
+    '...0000.........',
+    '................',
+    '................',
+]);
+
+/**
+ * As paletas dos lingotes, na ordem dos tons `0…4` do `LINGOTE_GRADE`.
+ *
+ * O cobre é **mais vermelho e mais claro** que o minério bruto: metal fundido,
+ * polido. O tom `2` fica propositalmente perto do `1` — é o “grão” do sombreado
+ * original, que no cobre funcionaria como textura de ferrugem se abrisse demais.
+ */
+const LINGOTE_PALETAS = Object.freeze({
+    copper: Object.freeze([
+        [62, 30, 22],
+        [128, 62, 40],
+        [146, 72, 46],
+        [246, 182, 132],
+        [255, 236, 206],
+    ]),
+});
+
+/** Os lingotes com arte desenhada (o de cobre, por enquanto). */
+const ARTES_ITEM_LINGOTE = Object.freeze(Object.fromEntries(
+    Object.entries(LINGOTE_PALETAS).map(([material, paleta]) => [material, Object.freeze({ paleta, grade: LINGOTE_GRADE })]),
+));
+
+/** A forma do lingote (para o teste conferir), ou `null` se o metal ainda é genérico. */
+export function ingotItemGradeFor(material) {
+    return ARTES_ITEM_LINGOTE[material]?.grade ?? null;
+}
+
 export function createMineralSpritePixels(kind, material) {
     if (!['ingot', 'gem', 'raw', 'coal'].includes(kind)) return null;
 
@@ -305,6 +361,12 @@ export function createMineralSpritePixels(kind, material) {
     };
 
     if (kind === 'ingot') {
+        // Metal com arte desenhada (o cobre): a forma clássica do lingote, com o
+        // tom de cada pixel escrito no desenho — em vez do retângulo automático.
+        const arte = ARTES_ITEM_LINGOTE[material];
+        if (arte) {
+            return arte.grade.map((linha) => Array.from(linha, (c) => (c === '.' ? null : arte.paleta[Number(c)])));
+        }
         const palettes = ITEM_PALETTES.ingot;
         const colors = palettes[material] || palettes.iron;
         for (let y = 4; y <= 11; y++) {
