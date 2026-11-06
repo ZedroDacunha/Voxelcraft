@@ -41,6 +41,12 @@ import {
     SHEEP_HERD_SPREAD_MIN,
     SHEEP_HERD_SPREAD_MAX,
     SHEEP_FOLLOW_GAP,
+    SHEEP_SLOT_MIN,
+    SHEEP_SLOT_MAX,
+    SHEEP_PACE_SPREAD,
+    walkSpeedFor,
+    herdSlotFor,
+    herdSlotSpot,
     SHEEP_ALERT_RADIUS,
     SHEEP_ALERT_SPEED,
     SHEEP_ALERT_TIME,
@@ -1273,9 +1279,11 @@ test('a seguidora vai atrás da líder quando fica para trás', () => {
 
     system.update(0.016, idlePlayer({ x: lider.x + 20, z: lider.z + 20 }), true, { day: 1 });
 
-    // A líder se mexe no mesmo quadro, então o alvo é o ponto dela de agora.
+    // A líder se mexe no mesmo quadro: o alvo é o **lugar** da seguidora em
+    // volta dela (perto, mas não em cima do corpo dela).
     const dalider = Math.hypot(seguidora.targetX - lider.x, seguidora.targetZ - lider.z);
-    assert.ok(dalider < 0.05, `o alvo da seguidora é a líder (ficou a ${dalider})`);
+    assert.ok(dalider >= SHEEP_SLOT_MIN - 0.02 && dalider <= SHEEP_SLOT_MAX + 0.02,
+        `o alvo é o lugar dela no bando (ficou a ${dalider})`);
 });
 
 test('a seguidora pastoreia em volta da líder, não de si mesma', () => {
@@ -1856,14 +1864,14 @@ test('saindo do pasto, ela arranca devagar em vez de sair a toda', () => {
     system.update(0.05, longe, true, { day: 1 });
 
     assert.ok(sheep.speed > 0, 'já está andando');
-    assert.ok(sheep.speed < SHEEP_WANDER_SPEED,
-        `mas ainda arrancando (${sheep.speed} < ${SHEEP_WANDER_SPEED})`);
+    assert.ok(sheep.speed < sheep.walkSpeed,
+        `mas ainda arrancando (${sheep.speed} < ${sheep.walkSpeed})`);
     const andou = Math.hypot(sheep.x - x0, sheep.z - z0);
-    assert.ok(andou < SHEEP_WANDER_SPEED * 0.05, `e o passo é curto (${andou})`);
+    assert.ok(andou < sheep.walkSpeed * 0.05, `e o passo é curto (${andou})`);
 
-    // Meio segundo depois: velocidade de cruzeiro.
+    // Meio segundo depois: velocidade de cruzeiro **dela**.
     for (let i = 0; i < 10; i++) { clock.t += 0.05; system.update(0.05, longe, true, { day: 1 }); }
-    assert.ok(Math.abs(sheep.speed - SHEEP_WANDER_SPEED) < 1e-9, `chegou no cruzeiro (${sheep.speed})`);
+    assert.ok(Math.abs(sheep.speed - sheep.walkSpeed) < 1e-9, `chegou no cruzeiro (${sheep.speed})`);
 });
 
 test('a vida parada: respira, balança a cauda, treme a orelha e espia', () => {
@@ -1969,4 +1977,114 @@ test('parada, ela respira e mexe a cauda sem tirar as patas do chão', () => {
     // Em 6 s ela espia para os lados em algum momento (a cabeça sai do zero).
     assert.ok(olharMax - olharMin > 0.05 || Math.abs(olharMax) + Math.abs(olharMin) > 0.05,
         `e espia em volta (${olharMin} a ${olharMax})`);
+});
+
+test('cada ovelha anda no seu ritmo, dentro de ±12% do passo do pasto', () => {
+    const velocidades = [];
+    for (let id = 1; id <= 40; id++) velocidades.push(walkSpeedFor(id));
+    for (const velocidade of velocidades) {
+        assert.ok(velocidade >= SHEEP_WANDER_SPEED * (1 - SHEEP_PACE_SPREAD) - 1e-12,
+            `não anda rápido demais (${velocidade})`);
+        assert.ok(velocidade <= SHEEP_WANDER_SPEED * (1 + SHEEP_PACE_SPREAD) + 1e-12,
+            `nem devagar demais (${velocidade})`);
+    }
+    // Cada id cai num ritmo diferente — é o que tira o bando do pelotão.
+    assert.equal(new Set(velocidades.map(v => v.toFixed(6))).size, velocidades.length);
+    assert.ok(Math.max(...velocidades) - Math.min(...velocidades) > 0.08, 'a diferença dá para ver');
+    assert.ok(Math.abs(walkSpeedFor(7, { spread: 0 }) - SHEEP_WANDER_SPEED) < 1e-12,
+        'sem espalhamento, é o passo do pasto');
+    assert.equal(walkSpeedFor(7, { base: 0 }), 0);
+});
+
+test('cada seguidora tem o seu lugar em volta da líder', () => {
+    const lugares = [1, 2, 3, 4, 5].map(id => herdSlotFor(id));
+    for (const lugar of lugares) {
+        assert.ok(lugar.radius >= SHEEP_SLOT_MIN - 1e-12 && lugar.radius <= SHEEP_SLOT_MAX + 1e-12,
+            `o raio fica entre ${SHEEP_SLOT_MIN} e ${SHEEP_SLOT_MAX} (${lugar.radius})`);
+        assert.ok(lugar.angle >= 0 && lugar.angle <= Math.PI * 2 + 1e-12);
+    }
+    assert.equal(new Set(lugares.map(l => l.angle.toFixed(4))).size, lugares.length,
+        'cada uma num ângulo diferente');
+
+    // O ponto do lugar fica exatamente o raio dela longe da líder.
+    const ponto = herdSlotSpot(10, -4, 3);
+    const distancia = Math.hypot(ponto.x - 10, ponto.z + 4);
+    assert.ok(Math.abs(distancia - herdSlotFor(3).radius) < 1e-12);
+});
+
+test('o bando não anda em pelotão nem vira um monte atrás da líder', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const longe = idlePlayer({ x: 400, z: 400 });
+    const ovelhas = spawnOne(system, clock, longe) && system.entities;
+    const bando = ovelhas.filter(sheep => sheep.herd === ovelhas[0].herd);
+    const lider = bando.find(sheep => sheep.leader) ?? bando[0];
+    const seguidoras = bando.filter(sheep => sheep !== lider);
+
+    // Cada uma no seu ritmo, já no nascimento.
+    const ritmos = new Set(bando.map(sheep => sheep.walkSpeed.toFixed(6)));
+    assert.equal(ritmos.size, bando.length, 'todas com velocidades diferentes');
+    for (const sheep of bando) {
+        assert.ok(Math.abs(sheep.walkSpeed - SHEEP_WANDER_SPEED) <= SHEEP_WANDER_SPEED * SHEEP_PACE_SPREAD + 1e-12);
+    }
+
+    // A líder "andou" para longe: as seguidoras vão atrás, cada uma no seu lugar.
+    const centro = seguidoras[0] ?? lider;
+    lider.x = centro.x + SHEEP_FOLLOW_GAP + 1;
+    lider.z = centro.z;
+    lider.targetX = lider.x; lider.targetZ = lider.z;
+    lider.turnAt = clock.t + 1000;
+    lider.speed = 0;
+    lider.grazeT = null;
+    for (const sheep of seguidoras) sheep.turnAt = clock.t;
+
+    for (let i = 0; i < 400; i++) {           // 20 s: tempo de caminhar até lá
+        clock.t += 0.05;
+        // Ninguém pasta nem troca de alvo sozinha: o teste mede o reencontro.
+        lider.grazeT = null; lider.grazeAt = clock.t + 100;
+        for (const sheep of seguidoras) { sheep.grazeT = null; sheep.grazeAt = clock.t + 100; }
+        system.update(0.05, longe, true, { day: 1 });
+    }
+
+    for (const sheep of seguidoras) {
+        const dalider = Math.hypot(sheep.x - lider.x, sheep.z - lider.z);
+        assert.ok(dalider <= SHEEP_SLOT_MAX + 1, `chegou perto da líder (${dalider})`);
+        assert.ok(dalider > 0.5, `sem subir no lombo dela (${dalider})`);
+    }
+    // E cada uma no seu canto: ninguém em cima de ninguém.
+    for (let i = 0; i < seguidoras.length; i++) {
+        for (let j = i + 1; j < seguidoras.length; j++) {
+            const d = Math.hypot(seguidoras[i].x - seguidoras[j].x, seguidoras[i].z - seguidoras[j].z);
+            assert.ok(d > 0.6, `seguidoras ${i} e ${j} longe uma da outra (${d})`);
+        }
+    }
+});
+
+test('na fuga cada uma mantém o seu ritmo', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const longe = idlePlayer({ x: 400, z: 400 });
+    const ovelhas = spawnOne(system, clock, longe) && system.entities;
+    const bando = ovelhas.filter(sheep => sheep.herd === ovelhas[0].herd).slice(0, 2);
+    if (bando.length < 2) return;
+
+    for (const sheep of bando) {
+        sheep.x = 0; sheep.z = (sheep.id % 2) * 3;   // lado a lado, sem se atrapalhar
+        sheep.heading = 0;                            // já olhando para +z
+        sheep.grazeT = null;
+        sheep.grazeAt = clock.t + 1000;
+        sheep.fleeFrom = { x: 0, z: sheep.z - 2 };
+        sheep.fleeUntil = clock.t + 100;
+    }
+
+    // Jogador por perto (senão elas saem de cena por distância) e parado.
+    const perto = idlePlayer({ x: 0, z: -12 });
+    for (let i = 0; i < 60; i++) { clock.t += 0.05; system.update(0.05, perto, true, { day: 1 }); }
+
+    const esperado = bando.map(sheep => SHEEP_FLEE_SPEED * (sheep.walkSpeed / SHEEP_WANDER_SPEED));
+    for (let i = 0; i < bando.length; i++) {
+        assert.ok(Math.abs(bando[i].speed - esperado[i]) < 1e-6,
+            `a fuga dela é ${esperado[i]}, e a velocidade é ${bando[i].speed}`);
+    }
+    assert.ok(Math.abs(bando[0].speed - bando[1].speed) > 1e-9, 'e não correm no mesmo ritmo');
 });

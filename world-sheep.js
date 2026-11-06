@@ -53,6 +53,17 @@ export const SHEEP_DESPAWN_DISTANCE = 44;
 export const SHEEP_MIN_GAP = 6;
 /** Distância do líder a partir da qual a seguidora vai atrás (blocos). */
 export const SHEEP_FOLLOW_GAP = 7;
+/**
+ * Cada ovelha anda no **seu** ritmo: ±12% em volta do passo do pasto
+ * (0,48 a 0,62 bloco/s). É o que impede o bando de andar como um pelotão.
+ */
+export const SHEEP_PACE_SPREAD = 0.12;
+/**
+ * O lugar de cada seguidora em volta da líder (blocos). Sem um lugar próprio,
+ * todas miravam o **ponto exato** da líder e acabavam umas dentro das outras.
+ */
+export const SHEEP_SLOT_MIN = 1.3;
+export const SHEEP_SLOT_MAX = 2.8;
 
 // ---------------------------------------------------------------- o susto
 //
@@ -548,6 +559,41 @@ export function herdSpotFor({ x, z, seed = 0, attempt = 0, member = 1, hash2: ha
     const radius = SHEEP_HERD_SPREAD_MIN
         + hash(seed, attempt * 17 + member, 191) * (SHEEP_HERD_SPREAD_MAX - SHEEP_HERD_SPREAD_MIN);
     return { x: x + Math.cos(angle) * radius, z: z + Math.sin(angle) * radius };
+}
+
+/**
+ * A velocidade de passeio **desta** ovelha (blocos/s).
+ *
+ * Sai de `SHEEP_WANDER_SPEED` com ±`SHEEP_PACE_SPREAD`, sorteado uma vez pelo
+ * `id`: no bando cada uma anda no seu ritmo, e a que ficou para trás alcança as
+ * outras em vez de andar colada.
+ */
+export function walkSpeedFor(id, { base = SHEEP_WANDER_SPEED, spread = SHEEP_PACE_SPREAD } = {}) {
+    const sorteio = defaultHash2(Number(id) || 0, 5, 929);
+    return Math.max(0, Number(base) || 0) * (1 + (sorteio * 2 - 1) * Math.max(0, Number(spread) || 0));
+}
+
+/**
+ * O lugar dela no bando: um ângulo e um raio próprios em volta da líder.
+ *
+ * Fixo por ovelha (sorteado do `id`), então o bando se abre num círculo em vez
+ * de formar fila atrás da líder.
+ */
+export function herdSlotFor(id) {
+    const seed = Number(id) || 0;
+    return {
+        angle: defaultHash2(seed, 3, 937) * Math.PI * 2,
+        radius: SHEEP_SLOT_MIN + defaultHash2(seed, 9, 941) * (SHEEP_SLOT_MAX - SHEEP_SLOT_MIN),
+    };
+}
+
+/** O ponto do lugar dela, relativo ao lugar onde a líder está. */
+export function herdSlotSpot(x, z, id) {
+    const lugar = herdSlotFor(id);
+    return {
+        x: (Number(x) || 0) + Math.cos(lugar.angle) * lugar.radius,
+        z: (Number(z) || 0) + Math.sin(lugar.angle) * lugar.radius,
+    };
 }
 
 /**
@@ -1064,8 +1110,11 @@ export function createSheepSystemClass({
             const model = this.createModel(coat.key, { woolMaterial: this.woolMaterialFor(coat.key) });
             model.group.position.set(spot.x, y, spot.z);
             this.world.scene.add(model.group);
+            const id = this.nextId++;
             this.entities.push({
-                id: this.nextId++,
+                id,
+                // O ritmo dela: cada uma anda um pouco mais devagar ou mais rápido.
+                walkSpeed: walkSpeedFor(id),
                 x: spot.x, y, z: spot.z,
                 visualY: y,
                 targetX: spot.x, targetZ: spot.z,
@@ -1153,9 +1202,11 @@ export function createSheepSystemClass({
             if (leader) {
                 const distanceToLeader = Math.hypot(leader.x - entity.x, leader.z - entity.z);
                 if (distanceToLeader > SHEEP_FOLLOW_GAP) {
-                    // Ficou para trás: vai direto para o lado dela e revê logo.
-                    entity.targetX = leader.x;
-                    entity.targetZ = leader.z;
+                    // Ficou para trás: vai para o **seu** lugar em volta da líder
+                    // (não para o ponto exato dela, senão o bando vira um monte).
+                    const lugar = herdSlotSpot(leader.x, leader.z, entity.id);
+                    entity.targetX = lugar.x;
+                    entity.targetZ = lugar.z;
                     entity.turnAt = at + 1.2;
                     return;
                 }
@@ -1379,7 +1430,9 @@ export function createSheepSystemClass({
                     // parede), a fuga acaba ali.
                     rumoX = e.fleeFrom ? e.x - e.fleeFrom.x : 1;
                     rumoZ = e.fleeFrom ? e.z - e.fleeFrom.z : 0;
-                    pressa = SHEEP_FLEE_SPEED;
+                    // A fuga guarda o ritmo dela: quem anda mais devagar também
+                    // corre um pouco menos (ninguém vira pelotão).
+                    pressa = SHEEP_FLEE_SPEED * ((e.walkSpeed ?? SHEEP_WANDER_SPEED) / SHEEP_WANDER_SPEED);
                 } else if (encarando) {
                     // Susto de chegada: para de andar e vira para quem chegou —
                     // mas **devagar** (o corpo leva o seu tempo; a cabeça é que
@@ -1394,7 +1447,8 @@ export function createSheepSystemClass({
                     if (at >= e.turnAt) this.pickTarget(e, at);
                     const dx = e.targetX - e.x, dz = e.targetZ - e.z;
                     if (Math.hypot(dx, dz) > SHEEP_ARRIVE) {
-                        rumoX = dx; rumoZ = dz; pressa = SHEEP_WANDER_SPEED;
+                        rumoX = dx; rumoZ = dz;
+                    pressa = e.walkSpeed ?? SHEEP_WANDER_SPEED;
                     }
                 }
 
