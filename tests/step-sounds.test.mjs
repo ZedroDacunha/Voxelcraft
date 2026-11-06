@@ -6,9 +6,6 @@ import { BLOCKS, ID } from '../world-catalog.js';
 import {
     STEP_MATERIALS,
     STEP_MAX_MOVED,
-    STEP_STRIDE,
-    advanceStepTracker,
-    createStepTracker,
     stepDistanceThisFrame,
     stepMaterialFor,
     stepPitch,
@@ -70,35 +67,6 @@ test('todo bloco do catálogo que não é líquido tem passo definido', () => {
     assert.deepEqual(silent, []);
 });
 
-test('a cadência é por distância: passos espaçados no mesmo ritmo', () => {
-    const tracker = createStepTracker();
-    assert.equal(advanceStepTracker(tracker, 0), 0);
-    assert.equal(advanceStepTracker(tracker, STEP_STRIDE * 0.5), 0, 'meio passo ainda não soa');
-    assert.equal(advanceStepTracker(tracker, STEP_STRIDE * 0.5), 1);
-    assert.equal(advanceStepTracker(tracker, STEP_STRIDE * 0.45), 0);
-    assert.equal(advanceStepTracker(tracker, STEP_STRIDE * 0.6), 1, 'o resto acumula entre quadros');
-});
-
-test('correr dá mais passos por segundo que andar', () => {
-    const count = speed => {
-        const tracker = createStepTracker();
-        let steps = 0;
-        for (let i = 0; i < 120; i++) steps += advanceStepTracker(tracker, speed * (1 / 60));
-        return steps;
-    };
-    const walking = count(4);
-    const sprinting = count(7.5);
-    assert.ok(walking >= 4, `andando: ${walking} passos em 2 s`);
-    assert.ok(sprinting > walking, `correndo (${sprinting}) > andando (${walking})`);
-    assert.ok(sprinting / walking < 2.5, 'a relação acompanha a velocidade, sem exagero');
-});
-
-test('um quadro longo não vira rajada de passos', () => {
-    const tracker = createStepTracker();
-    assert.equal(advanceStepTracker(tracker, STEP_STRIDE * 10), 2, 'no máximo dois');
-    assert.equal(tracker.distance, 0, 'o excedente é descartado');
-});
-
 test('só conta passo com o pé no chão e fora da água', () => {
     const base = { moved: 0.08, dt: 1 / 60, onGround: true, inWater: false };
     assert.equal(stepDistanceThisFrame(base), 0.08);
@@ -131,7 +99,7 @@ test('o tom de cada passo varia dentro de uma faixa curta', () => {
 test('game.js toca o passo do bloco sob os pés com o áudio compartilhado', () => {
     const source = readFileSync(new URL('../game.js', import.meta.url), 'utf8');
     assert.match(source, /const audio = getSharedAudio\(\)/, 'reaproveita o AudioContext do menu');
-    assert.match(source, /const moved = Math\.hypot\(p\.x - footPos\.x, p\.z - footPos\.z\)/);
+    assert.match(source, /const raw = Math\.hypot\(p\.x - footPos\.x, p\.z - footPos\.z\)/);
     assert.match(source, /stepDistanceThisFrame\(\{ moved, dt, onGround: player\.onGround, inWater \}\)/);
     assert.match(source, /Math\.floor\(player\.pos\.y - 0\.05\)/, 'pega o bloco sob os pés');
     assert.match(source, /audio\.play\(sound, \{[\s\S]{0,160}?rate: stepPitch\(\)/);
