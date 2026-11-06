@@ -975,3 +975,18 @@ Abra o inventário com **Ouro bruto** (`/give raw_gold`) e ponha ao lado de
 - [ ] Fora das pepitas o ícone é **transparente** (aparece o fundo da casa).
 - [ ] Nenhum item de minério ficou com o desenho genérico de três bolhas.
 - [ ] Cobre e ferro brutos continuam como estavam (nada mudou neles).
+
+## 51. O item de diamante
+
+Abra o inventário com **Diamante** (`/give diamond`) e ponha ao lado de **Ouro
+bruto** e de **Carvão**.
+
+- [ ] O diamante aparece como **uma lasca grande na diagonal**, e não mais como o
+      losango redondo do sprite automático.
+- [ ] Tem **um pixel de brilho** (branco-gelo) na face da pedra — nenhum outro
+      item do jogo tem esse branco.
+- [ ] A cor é **ciano-gelo**: é o único item frio da barra; ao lado do ouro e do
+      carvão, salta aos olhos.
+- [ ] O relevo: beirada clara em cima/à esquerda, escura embaixo/à direita.
+- [ ] Fora da lasca o ícone é **transparente** (aparece o fundo da casa).
+- [ ] Carvão, cobre, ferro e ouro brutos continuam como estavam.

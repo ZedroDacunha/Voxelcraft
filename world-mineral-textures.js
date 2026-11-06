@@ -200,11 +200,57 @@ const OURO_BRUTO_ITEM = Object.freeze({
     ]),
 });
 
-/** Relevo de item: beirada de cima/esquerda clara, de baixo/direita escura. */
+/**
+ * Diamante em **arte de item** (16×16 px: cada célula da máscara é um pixel).
+ *
+ * Opção **C · lasca**, a escolhida no comparador. O diamante não é minério bruto:
+ * é **gema**, e a arte é de cristal — uma lasca grande atravessada na diagonal,
+ * a mesma ideia dos estilhaços do veio no bloco. A estrela (`*`) é o único pixel
+ * de brilho do jogo: nenhum outro item tem esse branco, o que faz o diamante
+ * piscar na barra sem precisar de cor mais clara que o ciano.
+ */
+const DIAMANTE_ITEM = Object.freeze({
+    paleta: Object.freeze({
+        escuro: [24, 88, 112],
+        corpo: [48, 152, 176],
+        meio: [80, 196, 216],
+        claro: [136, 232, 240],
+        brilho: [216, 253, 255],
+    }),
+    mascara: Object.freeze([
+        '................',
+        '................',
+        '..........###...',
+        '.........#####..',
+        '........######..',
+        '.......######...',
+        '......#####.....',
+        '.....####*......',
+        '....#####.......',
+        '....####........',
+        '...####.........',
+        '...###..........',
+        '..###...........',
+        '..##............',
+        '................',
+        '................',
+    ]),
+});
+
+/**
+ * Relevo de item: beirada de cima/esquerda clara, de baixo/direita escura.
+ *
+ * `*` na máscara é **brilho** — um pixel de luz, usado nas gemas (o diamante tem
+ * um branco a mais na paleta). Para o relevo dos vizinhos ele conta como sólido,
+ * senão a beirada em volta da estrelinha acenderia à toa.
+ */
 function pintarItem(mascara, paleta, grao) {
-    const dentro = (x, y) => (mascara[y]?.[x] ?? '.') === '#';
+    const celula = (x, y) => mascara[y]?.[x] ?? '.';
+    const dentro = (x, y) => { const c = celula(x, y); return c === '#' || c === '*'; };
     return (x, y) => {
-        if (!dentro(x, y)) return null;
+        const marca = celula(x, y);
+        if (marca === '.') return null;
+        if (marca === '*') return paleta.brilho ?? paleta.claro;
         const cima = dentro(x, y - 1), esq = dentro(x - 1, y);
         const baixo = dentro(x, y + 1), dir = dentro(x + 1, y);
         if (!cima || !esq) return paleta.claro;
@@ -242,6 +288,14 @@ export function rawItemMaskFor(material) {
     return ARTES_ITEM_BRUTO[material]?.mascara ?? null;
 }
 
+/** As gemas com arte de item desenhada à mão (o diamante, por enquanto). */
+const ARTES_ITEM_GEMA = Object.freeze({ diamond: DIAMANTE_ITEM });
+
+/** A máscara da arte de item de uma gema (para o teste conferir), ou `null`. */
+export function gemItemMaskFor(material) {
+    return ARTES_ITEM_GEMA[material]?.mascara ?? null;
+}
+
 export function createMineralSpritePixels(kind, material) {
     if (!['ingot', 'gem', 'raw', 'coal'].includes(kind)) return null;
 
@@ -264,6 +318,13 @@ export function createMineralSpritePixels(kind, material) {
     }
 
     if (kind === 'gem') {
+        // Gema com arte desenhada à mão (o diamante): máscara + relevo, com o
+        // brilho do `*` — em vez do losango automático.
+        const arte = ARTES_ITEM_GEMA[material];
+        if (arte) {
+            const pintar = pintarItem(arte.mascara, arte.paleta, false);
+            return Array.from({ length: 16 }, (_, y) => Array.from({ length: 16 }, (_, x) => pintar(x, y)));
+        }
         for (let y = 4; y <= 11; y++) {
             const inset = y <= 7 ? y - 4 : 11 - y;
             for (let x = 4 + inset; x <= 11 - inset; x++) {
