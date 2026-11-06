@@ -561,6 +561,8 @@ O chat é a única porta para comandos no jogo (não há console no navegador).
 | Ovelhas nascendo sozinhas ou espalhadas pelo pasto | Elas nascem em **bando** (2 a 4, mesmo `herd`, em volta da líder); bandos diferentes ficam a 6 blocos. `tests/sheep.test.mjs` reprova bando de um só |
 | Ovelha correndo atrás do jogador ou fugindo sem motivo | Só o **golpe** faz correr; chegando perto correndo ela apenas para e encara por 1,8 s. Agachado não assusta |
 | Clicar num bicho e não acontecer nada | O golpe exige a cruz **em cima do corpo** (abertura de ~31°) e até 3,5 blocos; o corpo tem altura própria (`bodyOffset`: Mofim 0,45; ovelha 0,6) e o bloco na mira ganha 0,75 de folga. `tests/mob-hit.test.mjs` cobre a mira e a folga |
+| Braço balançando fora do ritmo dos passos | O braço, o som e a câmera leem a mesma fase (`world-gait.js`): o passo soa no ponto baixo do balanço. `tests/gait.test.mjs` reprova quem voltar a usar um cronômetro à parte |
+| Balanço da visão exagerado ou tremendo | São 5 cm para baixo, 3 cm de lado e 0,32° de rolagem, com a amplitude entrando e saindo em ~0,5 s; no ar e parado o balanço é zero (`tests/gait.test.mjs`) |
 | Ovelha parada no mesmo lugar para sempre | `pickTarget()` é chamado quando vence o `turnAt` (o bug antigo era ele nunca ser chamado): `tests/sheep.test.mjs` cobre a seguidora indo atrás da líder |
 | Ovelha sem casco, sem brilho no olho ou com a lã lisa demais | O modelo é montado em `createModel` com `SHEEP_TUFTS`, casco e brilho: `tests/sheep.test.mjs` conta os tufos, os cascos, os brilhos e confere que o casco toca o chão |
 | Ovelha mexendo a cabeça sem parar, ou abaixando sem comer nada | Só pasta de vez em quando e só come grama: `tests/sheep.test.mjs` confere o pasto (para, baixa, come a célula da frente) e o crescimento em 5–10 min |
@@ -577,7 +579,7 @@ O chat é a única porta para comandos no jogo (não há console no navegador).
 
 ## O que **não** precisa ser testado à mão
 
-Já coberto por `npm test` (914 testes):
+Já coberto por `npm test` (922 testes):
 
 - manifest e ícones — tamanho, opacidade, círculo seguro do maskable, favicon
   chapado (`tests/icons.test.mjs`);
@@ -657,3 +659,21 @@ Já coberto por `npm test` (914 testes):
 - [ ] `/give carne` dá a carne (o `/help` lista com o nome do jogo).
 - [ ] Só a ovelha que levou o golpe pisca: as companheiras do bando continuam
       apagadas.
+
+## 30. Passada e balanço da visão
+
+- [ ] Andando, o **som do passo** sai no mesmo instante em que a visão **desce**
+      e o **braço** chega ao ponto baixo — nada de mão fora do ritmo do barulho.
+- [ ] A visão faz um **sobe-e-desce discreto** (uns 5 cm) e um **vai e vem
+      lateral** curto (uns 3 cm), com o horizonte jogando ~0,3° para cada lado.
+      Nada de enjoo.
+- [ ] **Correndo**, o balanço fica um pouco maior; **agachado**, menor; **nadando**,
+      menor ainda (e sem som de passo, só o da água).
+- [ ] **Parado** o balanço some suave, em meio segundo, e não corta de um quadro
+      para o outro. **Pulando**, não há balanço de caminhada.
+- [ ] O vai e vem é **para os lados de quem anda**: olhando para o norte ou
+      virando a câmera, o corpo continua balançando nas laterais.
+- [ ] A **mira acompanha** o balanço (a cruz se desloca com a câmera), como no
+      Minecraft.
+- [ ] Empurrando uma parede o som de passo **não** dispara (não se anda), e um
+      respawn/teleporte não vira rajada de passos.

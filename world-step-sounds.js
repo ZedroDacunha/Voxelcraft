@@ -1,8 +1,10 @@
-// Passos: qual som toca e de quanto em quanto tempo.
+// Passos: qual som toca e em que situação.
 //
 // A cadência é por **distância**, não por tempo: andar devagar dá passos
 // espaçados, correr dá o dobro de passos por segundo (mesma passada, mais
-// metros). Assim o som acompanha o corpo em vez de brigar com a animação.
+// metros). Quem conta os passos é `world-gait.js` — a mesma fase que balança o
+// braço e a visão —, e este módulo guarda o que é do som: qual material soa,
+// quanto se anda entre um passo e outro e qual variação de tom usar.
 import { BLOCK_MATERIALS, blockMaterialFor, materialSoundName } from './world-block-materials.js';
 
 export const STEP_MATERIALS = BLOCK_MATERIALS;
@@ -21,26 +23,6 @@ export function stepMaterialFor(blockType) {
 
 export function stepSoundFor(blockType) {
     return materialSoundName(blockType, 'step');
-}
-
-export function createStepTracker() {
-    return { distance: 0 };
-}
-
-// Acumula os metros andados no quadro e devolve quantos passos tocam agora.
-// Um quadro muito longo não deve virar rajada de passos: no máximo dois.
-export function advanceStepTracker(tracker, distance, { stride = STEP_STRIDE } = {}) {
-    if (!(distance > 0)) return 0;
-    tracker.distance += distance;
-    let steps = 0;
-    while (tracker.distance >= stride && steps < 2) {
-        tracker.distance -= stride;
-        steps++;
-    }
-    // se ainda sobrou distância (queda de FPS), descarta o excedente: o passo
-    // seguinte não pode sair atrasado depois de um congelamento
-    if (tracker.distance >= stride) tracker.distance = 0;
-    return steps;
 }
 
 // Acima disso o deslocamento do quadro é teleporte (respawn, carregamento),

@@ -52,7 +52,8 @@ import { createChatCompleter, visibleSuggestions } from './world-chat-completion
 import { DUST_COLOR, dustScaleFor } from './world-creature-dust.js';
 import { configureWindSway, updateWindSway, windDirectionFor, windStep, windTargetFor } from './world-wind.js';
 import { advanceHandAnimation, countStrikes, createHandAnimation, handSwingAmount, startPunch } from './world-hand-animation.js';
-import { advanceStepTracker, createStepTracker, stepDistanceThisFrame, stepPitch, stepSoundFor } from './world-step-sounds.js';
+import { STEP_MAX_MOVED, stepDistanceThisFrame, stepPitch, stepSoundFor } from './world-step-sounds.js';
+import { advanceGait, createGait, gaitPose } from './world-gait.js';
 import { materialSoundName } from './world-block-materials.js';
 import { createWaterAudioState, waterSoundFor } from './world-water-sounds.js';
 import {
@@ -2061,12 +2062,17 @@ function updateHand(dt) {
     const ea = handAnim.eat;
     const wob = Math.sin(performance.now() / 1000 * 22) * 0.015 * ea;
 
+    // O braço lê a **mesma fase** do som e da câmera: no passo ele desce junto
+    // com o corpo e vai e vem de lado no mesmo compasso. Antes era um cronômetro
+    // à parte, que podia sair fora de fase do barulho dos pés.
+    const gaitNow = gaitPose(gait);
+    const ba = gaitNow.amplitude;
     handPivot.position.set(
-        HAND_BASE.x + Math.cos(bobTimer) * 0.012 - 0.22 * ea,
-        HAND_BASE.y + Math.sin(bobTimer * 2) * 0.010 - dip - 0.05 * swing + 0.20 * ea + wob,
+        HAND_BASE.x + gaitNow.handX * 0.012 * ba - 0.22 * ea,
+        HAND_BASE.y + gaitNow.handY * 0.010 * ba - dip - 0.05 * swing + 0.20 * ea + wob,
         HAND_BASE.z - 0.12 * swing + 0.08 * ea);
     handPivot.rotation.set(
-        0.35 - 0.9 * swing + 0.35 * ea, 0.25 - 0.3 * ea, 0);
+        0.35 - 0.9 * swing + 0.35 * ea + gaitNow.handX * 0.02 * ba, 0.25 - 0.3 * ea, 0);
     handPivot.scale.setScalar(1);
 }
 
@@ -3248,8 +3254,9 @@ const player = {
 };
 const spawnPoint = new THREE.Vector3();
 
-let bobTimer = 0;
-const stepTracker = createStepTracker();
+// A passada: uma fase só para o som do passo, o braço e o balanço da visão.
+const gait = createGait();
+const cameraRight = new THREE.Vector3();
 // Janela do pulo tardio (coyote time): ver player-jump.js.
 const jumpState = createJumpState();
 const waterAudio = createWaterAudioState();
@@ -3896,19 +3903,31 @@ function updatePhysics(dt) {
     // (no chão), fechada (pulou / nadando) ou escorrida (no ar).
     updateJumpWindow(jumpState, { dt, onGround: player.onGround, jumped: jumpedNow, inWater });
 
+    // A passada anda primeiro: o balanço deste quadro é o mesmo que decide se o
+    // passo soa agora.
+    const passos = updateGait(dt, inWater);
+
     const targetEye = isCrouching ? EYE_CROUCH : EYE_STAND;
     player.eye += (targetEye - player.eye) * Math.min(1, 15 * dt);
+    const pose = gaitPose(gait);
     camera.position.set(p.x, p.y + player.eye, p.z);
+    if (pose.amplitude > 0) {
+        // O vai e vem é para os **lados da câmera**, não para os lados do mundo:
+        // olhando para o norte, o corpo continua balançando nas laterais de quem
+        // anda.
+        cameraRight.set(1, 0, 0).applyQuaternion(camera.quaternion);
+        camera.position.addScaledVector(cameraRight, pose.sway);
+        camera.position.y += pose.bobY;
+    }
+    // A rolagem do balanço é do olhar: reaplica o quatérnio com ela.
+    applyLook();
 
     const hzSpeed = Math.hypot(player.vel.x, player.vel.z);
     if ((player.onGround || inWater) && hzSpeed > 0.1 && sprintNow && !isCrouching) {
         addExhaustion(hzSpeed * dt * 0.1);
     }
 
-    if ((player.onGround || inWater) && hzSpeed > 2.0) bobTimer += dt * (hzSpeed * (inWater ? 0.8 : 1.2));
-    else bobTimer += (0 - bobTimer) * Math.min(1, 5 * dt);
-
-    playFootsteps(dt, inWater);
+    playFootsteps(passos);
 }
 
 // Batida de cada golpe enquanto o bloco não cai. A cadência vem da fase do
@@ -3922,18 +3941,40 @@ function playMiningHits(strikes) {
     for (let i = 0; i < strikes; i++) audio.play(sound, { rate: stepPitch() });
 }
 
-// Passos: o som vem do bloco sob os pés e a cadência do deslocamento real.
+// Onde os pés estão agora, para medir quanto se andou no quadro.
 const footPos = { x: null, z: null };
-function playFootsteps(dt, inWater) {
+
+// Avança a passada (fase, amplitude e passos) a partir do deslocamento real e
+// devolve quantos passos **soam** neste quadro. O balanço da visão vale também
+// nadando; o som do passo não — a água tem som próprio.
+function updateGait(dt, inWater) {
     const p = player.pos;
-    if (footPos.x === null) { footPos.x = p.x; footPos.z = p.z; return; }
+    if (footPos.x === null) {
+        footPos.x = p.x;
+        footPos.z = p.z;
+        return 0;
+    }
     // Distância percorrida neste quadro (não a velocidade: empurrar uma parede
     // mantém a velocidade alta com o corpo parado).
-    const moved = Math.hypot(p.x - footPos.x, p.z - footPos.z);
+    const raw = Math.hypot(p.x - footPos.x, p.z - footPos.z);
     footPos.x = p.x;
     footPos.z = p.z;
-    const steps = advanceStepTracker(stepTracker,
-        stepDistanceThisFrame({ moved, dt, onGround: player.onGround, inWater }));
+    // Respawn e carregamento são teleporte, não caminhada.
+    const moved = raw <= STEP_MAX_MOVED ? raw : 0;
+    const passos = advanceGait(gait, {
+        distance: moved,
+        dt,
+        onGround: player.onGround,
+        inWater,
+        sprinting: isSprinting,
+        crouching: isCrouching,
+    });
+    const pisa = stepDistanceThisFrame({ moved, dt, onGround: player.onGround, inWater });
+    return pisa > 0 ? passos : 0;
+}
+
+// Passos: o som vem do bloco sob os pés; a cadência já veio da passada.
+function playFootsteps(steps) {
     if (!steps) return;
     const type = world.getBlock(
         Math.floor(player.pos.x), Math.floor(player.pos.y - 0.05), Math.floor(player.pos.z));
@@ -4004,7 +4045,10 @@ const loadGame = createWorldSaveLoader({
 // 11. INICIALIZAÇÃO
 // =====================================================================
 function applyLook() {
-    lookEuler.set(look.pitch, look.yaw, 0, 'YXZ');
+    // A microinclinação da passada entra junto do olhar: no passo o horizonte
+    // joga ~0,3° para um lado e para o outro. Como é rolagem em torno do eixo
+    // da frente, o ponto para onde se aponta continua o mesmo.
+    lookEuler.set(look.pitch, look.yaw, gaitPose(gait).roll, 'YXZ');
     camera.quaternion.setFromEuler(lookEuler);
 }
 
