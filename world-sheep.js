@@ -114,6 +114,32 @@ export const SHEEP_DAY_THRESHOLD = 0.45;
 /** Passada das patas: velocidade do ciclo e amplitude (radianos). */
 export const SHEEP_STRIDE_SPEED = 5.4;
 export const SHEEP_LEG_SWING = 0.5;
+
+// ---------------------------------------------------------------- o andar
+//
+// Andar era o ponto mais duro da ovelha: o rumo do corpo era **reatribuído** a
+// cada quadro (`heading = atan2(...)`), então trocar de alvo a fazia girar 180°
+// num quadro só; a velocidade ia de 0 a 0,55 no mesmo quadro; e a passada das
+// patas andava por **tempo**, não por distância — na fuga, 2,8× mais rápida, os
+// pés escorregavam na grama. As três contas moram aqui, puras e testáveis.
+
+/** Quanto o corpo gira por segundo ao mudar de rumo (rad/s). */
+export const SHEEP_TURN_RATE = 3.4;
+/**
+ * Acima deste desvio do alvo ela **para e gira** antes de andar (rad ≈ 52°):
+ * quadrúpede não anda de lado nem de costas.
+ */
+export const SHEEP_TURN_DEADZONE = 0.9;
+/** Arranque e freio (blocos/s²). O freio é maior: ela para mais rápido do que sai. */
+export const SHEEP_ACCEL = 2.4;
+export const SHEEP_BRAKE = 3.6;
+/**
+ * Radianos de passada por bloco andado. Sai da conta antiga
+ * (`SHEEP_STRIDE_SPEED` a `SHEEP_WANDER_SPEED`), então **andando** o passo
+ * ficou exatamente como estava — o que muda é que agora ele acompanha a
+ * distância em qualquer velocidade.
+ */
+export const SHEEP_STRIDE_PER_BLOCK = SHEEP_STRIDE_SPEED / SHEEP_WANDER_SPEED;
 /** Duração do arco ao subir/decer degrau (segundos e blocos). */
 export const SHEEP_HOP_TIME = 0.24;
 export const SHEEP_GLIDE_TIME = 0.3;
@@ -382,6 +408,56 @@ export function wanderTargetFor({
 export function legPose(stride) {
     const swing = Math.sin(stride) * SHEEP_LEG_SWING;
     return [swing, -swing, -swing, swing];
+}
+
+/**
+ * O passo para o alvo: vira o corpo sem estalo e só anda de frente.
+ *
+ * Devolve o rumo novo, a distância a andar neste quadro (0 quando está só
+ * girando) e se ainda está girando. O rumo gira no máximo `turnRate * dt` por
+ * quadro — é a diferença entre uma ovelha e uma peça de tabuleiro.
+ */
+export function walkStep(heading, dirX, dirZ, speed, dt, {
+    turnRate = SHEEP_TURN_RATE, deadzone = SHEEP_TURN_DEADZONE,
+} = {}) {
+    const atual = Number(heading) || 0;
+    const dx = Number(dirX) || 0;
+    const dz = Number(dirZ) || 0;
+    const comprimento = Math.hypot(dx, dz);
+    const passo = Math.max(0, Number(speed) || 0) * Math.max(0, Number(dt) || 0);
+    if (!(comprimento > 1e-6)) return { heading: atual, distance: 0, turning: false };
+    const alvo = Math.atan2(dx, dz);
+    const rumo = turnTowardAngle(atual, alvo, Math.max(0, turnRate) * Math.max(0, Number(dt) || 0));
+    const desvio = Math.abs(wrapAngle(alvo - rumo));
+    return {
+        heading: rumo,
+        // Alvo muito para o lado: gira no lugar e anda depois.
+        distance: desvio > deadzone ? 0 : passo,
+        turning: desvio > 1e-3,
+    };
+}
+
+/**
+ * A velocidade andando até a desejada, sem pulo: acelera a `accel` e freia a
+ * `brake` (blocos/s²). Devolve a velocidade do quadro.
+ */
+export function approachSpeed(current, target, dt, {
+    accel = SHEEP_ACCEL, brake = SHEEP_BRAKE,
+} = {}) {
+    const atual = Math.max(0, Number(current) || 0);
+    const querida = Math.max(0, Number(target) || 0);
+    const passo = Math.max(0, dt) * (querida > atual ? Math.max(0, accel) : Math.max(0, brake));
+    if (Math.abs(querida - atual) <= passo) return querida;
+    return atual + Math.sign(querida - atual) * passo;
+}
+
+/**
+ * A fase da passada anda pela **distância**: dois passos por bloco rendem a
+ * mesma cadência a 0,55 ou a 1,55 bloco/s — o pé nunca escorrega.
+ */
+export function strideAdvance(phase, distance) {
+    const andado = Math.max(0, Number(distance) || 0);
+    return (Number(phase) || 0) + andado * SHEEP_STRIDE_PER_BLOCK;
 }
 
 /** Quantas ovelhas nascem juntas, a partir de um sorteio de 0 a 1. */
@@ -931,6 +1007,8 @@ export function createSheepSystemClass({
                 fleeUntil: 0,
                 fleeFrom: null,
                 lastHitAt: -Infinity,
+                // Velocidade atual (blocos/s): sobe e desce por rampa.
+                speed: 0,
                 // Olhar: cada uma repara no jogador por conta própria — atenção
                 // sorteada (0..1), relógio do alerta e o quanto a cabeça já
                 // virou (`lookYaw`) e inclinou (`lookTilt`).
@@ -1008,10 +1086,6 @@ export function createSheepSystemClass({
             entity.turnAt = at + target.duration;
         }
 
-        /**
-         * Susto de chegada: para, ergue a cabeça e encara quem chegou — e o
-         * bando faz o mesmo (contágio). Devolve `true` se foi um susto novo.
-         */
         /**
          * Susto de chegada: para, ergue a cabeça e encara quem chegou.
          *
@@ -1214,14 +1288,15 @@ export function createSheepSystemClass({
                 // 0 = cabeça no pasto, 1 = cabeça erguida olhando: a passagem é
                 // suave, então ela "levanta a cabeça" em vez de dar um pulo.
                 e.lookAmount += ((encarando ? 1 : 0) - e.lookAmount) * Math.min(1, SHEEP_LOOK_SMOOTH * dt);
-                let andou = false;
+                // Para onde ela quer ir e com que pressa. O rumo em si é o
+                // `walkStep` que decide — o corpo não gira num estalo.
+                let rumoX = 0, rumoZ = 0, pressa = 0;
                 if (fugindo) {
-                    // Golpe: corre para longe de quem bateu, com a passada
-                    // acelerada. Encurralada (água, parede), a fuga acaba ali.
-                    const dxf = e.fleeFrom ? e.x - e.fleeFrom.x : 1;
-                    const dzf = e.fleeFrom ? e.z - e.fleeFrom.z : 0;
-                    andou = this.stepToward(e, dxf, dzf, SHEEP_FLEE_SPEED, dt);
-                    if (!andou) e.fleeUntil = 0;
+                    // Golpe: corre para longe de quem bateu. Encurralada (água,
+                    // parede), a fuga acaba ali.
+                    rumoX = e.fleeFrom ? e.x - e.fleeFrom.x : 1;
+                    rumoZ = e.fleeFrom ? e.z - e.fleeFrom.z : 0;
+                    pressa = SHEEP_FLEE_SPEED;
                 } else if (encarando) {
                     // Susto de chegada: para de andar e vira para quem chegou —
                     // mas **devagar** (o corpo leva o seu tempo; a cabeça é que
@@ -1235,12 +1310,29 @@ export function createSheepSystemClass({
                     // lado da líder, se ficou para trás).
                     if (at >= e.turnAt) this.pickTarget(e, at);
                     const dx = e.targetX - e.x, dz = e.targetZ - e.z;
-                    const distanceToTarget = Math.hypot(dx, dz);
-                    if (distanceToTarget > SHEEP_ARRIVE) {
-                        andou = this.stepToward(e, dx, dz, SHEEP_WANDER_SPEED, dt);
-                        // Barrada (água, encosta, buraco): sorteia outro alvo em
-                        // vez de empurrar a mesma parede até o tempo acabar.
-                        if (!andou) e.turnAt = at;
+                    if (Math.hypot(dx, dz) > SHEEP_ARRIVE) {
+                        rumoX = dx; rumoZ = dz; pressa = SHEEP_WANDER_SPEED;
+                    }
+                }
+
+                // Arranque e freio em rampa, e o passo é dado **no rumo do
+                // corpo**: alvo muito para o lado, ela gira parada e anda depois.
+                e.speed = approachSpeed(e.speed, pressa, dt);
+                let andou = 0;
+                if (e.speed > 1e-4) {
+                    // Sem alvo (freando), o passo termina no rumo em que ela está.
+                    const dx = rumoX || Math.sin(e.heading);
+                    const dz = rumoZ || Math.cos(e.heading);
+                    const passo = walkStep(e.heading, dx, dz, e.speed, dt);
+                    e.heading = passo.heading;
+                    if (passo.distance > 0) {
+                        andou = this.stepHeading(e, passo.distance);
+                        // Barrada (água, encosta, buraco): a fuga acaba ali e o
+                        // pasto sorteia outro alvo, em vez de empurrar a parede.
+                        if (!andou) {
+                            if (fugindo) e.fleeUntil = 0;
+                            else e.turnAt = at;
+                        }
                     }
                 }
 
@@ -1254,7 +1346,9 @@ export function createSheepSystemClass({
 
                 // Passada: a fase só anda quando ela anda, e a amplitude entra e
                 // sai suave para a pata não congelar no meio do passo.
-                if (andou) e.stride += dt * SHEEP_STRIDE_SPEED * (fugindo ? 1.7 : 1);
+                // A passada anda pela distância andada — correr não faz o pé
+                // escorregar, faz a perna passar mais rápido.
+                e.stride = strideAdvance(e.stride, andou);
                 const alvoAmplitude = andou ? 1 : 0;
                 e.walking += (alvoAmplitude - e.walking) * Math.min(1, 8 * dt);
                 const pose = legPose(e.stride);

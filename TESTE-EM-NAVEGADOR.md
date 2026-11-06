@@ -709,3 +709,17 @@ Já coberto por `npm test` (922 testes):
       sem vão nenhum — e a gola **não** desce junto: fica no ombro.
 - [ ] Olhando de lado, o pescoço acompanha a cabeça e continua encaixado.
 - [ ] Tosquiada, a ovelha continua com o pescoço ligado ao corpo.
+
+## 33. O andar da ovelha
+
+- [ ] Olhando uma ovelha de perto: quando ela escolhe outro trecho de pasto, o
+      corpo **gira** até lá — nada de dar meia-volta num quadro.
+- [ ] Alvo atrás dela: ela **para e gira** no lugar antes de sair andando; nunca
+      desliza de lado nem de costas.
+- [ ] Alvo de lado: ela sai **curvando**, com o corpo apontando para onde vai.
+- [ ] Partindo do pasto, a velocidade **entra aos poucos** (~0,2 s) e, ao parar,
+      freia em vez de congelar.
+- [ ] Batendo nela: na fuga as patas passam **bem mais rápido** e casam com o
+      chão — nenhum pé escorregando na grama.
+- [ ] Empurrando contra uma parede/água, as patas **param** (não fica marchando
+      no lugar) e ela sorteia outro alvo.

@@ -82,6 +82,14 @@ import {
     SHEEP_TUFTS,
     SHEEP_TURN_MIN,
     SHEEP_WANDER_SPEED,
+    SHEEP_ACCEL,
+    SHEEP_BRAKE,
+    SHEEP_STRIDE_PER_BLOCK,
+    SHEEP_TURN_RATE,
+    SHEEP_TURN_DEADZONE,
+    approachSpeed,
+    strideAdvance,
+    walkStep,
     coatFor,
     createSheepSystemClass,
     grazeCellFor,
@@ -1706,4 +1714,150 @@ test('em pé o pescoço some na gola; pastando ele sai por baixo dela', () => {
     // E continua ligado na cabeça, com a gola parada no ombro.
     assert.ok(Math.abs(topoDoPescoco() - (sheep.head.position.y + SHEEP_NECK_HEAD_Y)) < 0.02);
     assert.ok(Math.abs(gola[0].position.y - SHEEP_RUFF_PARTS[0].y) < 1e-12, 'a gola não segue a cabeça');
+});
+
+test('o passo vira o corpo aos poucos e nunca anda de lado', () => {
+    // Alvo nas costas: em um quadro ela gira no máximo `turnRate * dt` e, como
+    // está muito fora do rumo, **não anda** — gira parada.
+    const deCostas = walkStep(0, 0, -1, SHEEP_WANDER_SPEED, 0.05);
+    assert.ok(Math.abs(wrapAngle(deCostas.heading)) <= SHEEP_TURN_RATE * 0.05 + 1e-9,
+        `girou no máximo o passo do quadro (${deCostas.heading})`);
+    assert.ok(Math.abs(Math.abs(wrapAngle(deCostas.heading)) - Math.PI) > 2.5, 'ainda longe de virar');
+    assert.equal(deCostas.distance, 0, 'não anda de costas');
+    assert.ok(deCostas.turning, 'e está girando');
+
+    // Alvo pequeno de lado (dentro da zona morta): já anda, virando.
+    const deLado = walkStep(0, Math.sin(SHEEP_TURN_DEADZONE * 0.5), Math.cos(SHEEP_TURN_DEADZONE * 0.5),
+        SHEEP_WANDER_SPEED, 0.05);
+    assert.ok(deLado.distance > 0, 'desvio pequeno não impede o passo');
+    assert.ok(Math.abs(wrapAngle(deLado.heading)) > 1e-6, 'mas o corpo ainda está virando');
+
+    // Alinhada: anda exatamente velocidade × tempo, e o rumo não muda.
+    const reto = walkStep(0.4, Math.sin(0.4), Math.cos(0.4), 0.6, 0.1);
+    assert.ok(Math.abs(reto.heading - 0.4) < 1e-12);
+    assert.ok(Math.abs(reto.distance - 0.06) < 1e-12);
+    assert.ok(!reto.turning);
+
+    // Parada (velocidade 0): não anda, mas continua virando para o alvo.
+    const parada = walkStep(0, 1, 0, 0, 0.1);
+    assert.equal(parada.distance, 0);
+    assert.ok(parada.heading > 0, 'o rumo segue o alvo mesmo sem andar');
+});
+
+test('a velocidade entra e sai por rampa, sem pulo', () => {
+    // Do zero: no primeiro quadro ela ainda está arrancando.
+    const primeiro = approachSpeed(0, SHEEP_WANDER_SPEED, 0.05);
+    assert.ok(primeiro > 0 && primeiro < SHEEP_WANDER_SPEED, `arranca devagar (${primeiro})`);
+    assert.ok(Math.abs(primeiro - SHEEP_ACCEL * 0.05) < 1e-12, 'acelera a SHEEP_ACCEL');
+
+    // Em meio segundo chega na velocidade de cruzeiro (e não passa dela).
+    let v = 0;
+    for (let i = 0; i < 20; i++) v = approachSpeed(v, SHEEP_WANDER_SPEED, 0.05);
+    assert.ok(Math.abs(v - SHEEP_WANDER_SPEED) < 1e-12, `chega no cruzeiro (${v})`);
+    assert.equal(approachSpeed(SHEEP_WANDER_SPEED, 0, 0.05), SHEEP_WANDER_SPEED - SHEEP_BRAKE * 0.05);
+
+    // O freio é mais curto que o arranque: parar é mais rápido que sair.
+    assert.ok(SHEEP_BRAKE > SHEEP_ACCEL);
+
+    // Nunca negativo: velocidade negativa conta como parada.
+    assert.equal(approachSpeed(0, 0, 1), 0);
+    assert.equal(approachSpeed(-3, 1, 0.5), 1);
+});
+
+test('a passada anda pela distância, não pelo tempo', () => {
+    const meiaVolta = strideAdvance(0, 1);
+    assert.ok(Math.abs(meiaVolta - SHEEP_STRIDE_PER_BLOCK) < 1e-12);
+    assert.ok(Math.abs(strideAdvance(0, 2) - 2 * SHEEP_STRIDE_PER_BLOCK) < 1e-12);
+    assert.ok(Math.abs(strideAdvance(1.5, 0) - 1.5) < 1e-12, 'parada, a fase não anda');
+    assert.ok(Math.abs(strideAdvance(0, -1)) < 1e-12, 'distância negativa não volta a fase');
+});
+
+test('andando, o corpo não vira num quadro só', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const longe = idlePlayer({ x: 400, z: 400 });
+    const sheep = spawnOne(system, clock, longe);
+
+    // Alvo atrás dela: o rumo tem de chegar aos poucos.
+    sheep.heading = 0;
+    sheep.speed = 0;
+    sheep.targetX = sheep.x;
+    sheep.targetZ = sheep.z - 5;
+    sheep.turnAt = clock.t + 100;
+
+    clock.t += 0.05;
+    system.update(0.05, longe, true, { day: 1 });
+    const depoisDeUmQuadro = Math.abs(wrapAngle(sheep.heading));
+    assert.ok(depoisDeUmQuadro <= SHEEP_TURN_RATE * 0.05 + 1e-6,
+        `virou no máximo o passo do quadro (${depoisDeUmQuadro} rad)`);
+    assert.ok(depoisDeUmQuadro < Math.PI / 2, 'nada de 180° num quadro');
+
+    // Um segundo e meio depois ela terminou de virar e já anda para lá.
+    const antesZ = sheep.z;
+    for (let i = 0; i < 30; i++) { clock.t += 0.05; system.update(0.05, longe, true, { day: 1 }); }
+    assert.ok(Math.abs(wrapAngle(sheep.heading - Math.PI)) < 0.25, `acabou encarando o alvo (${sheep.heading})`);
+    assert.ok(sheep.z < antesZ - 0.05, `e andou para trás dela (${antesZ - sheep.z})`);
+});
+
+test('correndo, a perna acompanha o chão: a fase casa com a distância', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const longe = idlePlayer({ x: 400, z: 400 });
+    const sheep = spawnOne(system, clock, longe);
+
+    // Susto de golpe: ela corre para longe de quem bateu.
+    sheep.heading = 0;
+    sheep.turnAt = clock.t + 100;
+    sheep.alertUntil = 0;
+    sheep.alertAt = 0;
+    sheep.fleeFrom = { x: sheep.x, z: sheep.z + 2 };
+    sheep.fleeUntil = clock.t + 5;
+
+    const faseInicial = sheep.stride;
+    let andado = 0;
+    let x = sheep.x, z = sheep.z;
+    for (let i = 0; i < 60; i++) {
+        clock.t += 0.05;
+        system.update(0.05, longe, true, { day: 1 });
+        andado += Math.hypot(sheep.x - x, sheep.z - z);
+        x = sheep.x; z = sheep.z;
+    }
+    const totalFase = sheep.stride - faseInicial;
+
+    assert.ok(andado > 3, `ela correu (${andado} blocos)`);
+    // A fase é a distância vezes a cadência — em qualquer velocidade.
+    assert.ok(Math.abs(totalFase - andado * SHEEP_STRIDE_PER_BLOCK) < 1e-6,
+        `fase ${totalFase} para ${andado} blocos`);
+    // E o ritmo na fuga é bem maior do que no passo: os pés não escorregam.
+    assert.ok(SHEEP_STRIDE_PER_BLOCK * SHEEP_FLEE_SPEED > SHEEP_STRIDE_PER_BLOCK * SHEEP_WANDER_SPEED * 2);
+});
+
+test('saindo do pasto, ela arranca devagar em vez de sair a toda', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const longe = idlePlayer({ x: 400, z: 400 });
+    const sheep = spawnOne(system, clock, longe);
+
+    // Parada, com um alvo à frente — e sem pastar no meio do caminho.
+    sheep.grazeT = null;
+    sheep.grazeAt = clock.t + 100;
+    sheep.speed = 0;
+    sheep.heading = 0;
+    sheep.targetX = sheep.x;
+    sheep.targetZ = sheep.z + 4;
+    sheep.turnAt = clock.t + 100;
+
+    const x0 = sheep.x, z0 = sheep.z;
+    clock.t += 0.05;
+    system.update(0.05, longe, true, { day: 1 });
+
+    assert.ok(sheep.speed > 0, 'já está andando');
+    assert.ok(sheep.speed < SHEEP_WANDER_SPEED,
+        `mas ainda arrancando (${sheep.speed} < ${SHEEP_WANDER_SPEED})`);
+    const andou = Math.hypot(sheep.x - x0, sheep.z - z0);
+    assert.ok(andou < SHEEP_WANDER_SPEED * 0.05, `e o passo é curto (${andou})`);
+
+    // Meio segundo depois: velocidade de cruzeiro.
+    for (let i = 0; i < 10; i++) { clock.t += 0.05; system.update(0.05, longe, true, { day: 1 }); }
+    assert.ok(Math.abs(sheep.speed - SHEEP_WANDER_SPEED) < 1e-9, `chegou no cruzeiro (${sheep.speed})`);
 });
