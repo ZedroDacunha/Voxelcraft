@@ -51,6 +51,25 @@ import {
     SHEEP_SCARE_SPREAD,
     herdSizeFor,
     herdSpotFor,
+    SHEEP_BODY_TURN_SPEED,
+    SHEEP_LOOK_MAX_YAW,
+    SHEEP_LOOK_TILT,
+    SHEEP_NECK_ANCHOR_Y,
+    SHEEP_NECK_ANCHOR_Z,
+    SHEEP_NECK_HEAD_Y,
+    SHEEP_NECK_HEAD_Z,
+    SHEEP_NECK_Z,
+    SHEEP_NOTICE_CHANCE,
+    SHEEP_NOTICE_DELAY_MAX,
+    SHEEP_NOTICE_DELAY_MIN,
+    SHEEP_NOTICE_RADIUS,
+    SHEEP_VIEW_MIN_DOT,
+    angleTo,
+    neckPoseFor,
+    noticeDelayFor,
+    sheepNotices,
+    turnTowardAngle,
+    wrapAngle,
     SHEEP_MIN_GAP,
     SHEEP_ROAM_MAX,
     SHEEP_ROAM_MIN,
@@ -364,25 +383,52 @@ test('jogador correndo perto: ela para, ergue a cabeça e encara (sem fugir)', (
     sheep.turnAt = clock.t + 100;
     sheep.targetX = sheep.x + 1.5;
     sheep.targetZ = sheep.z;
+    // Atenção zero = ela **percebe** (a percepção é sorteada; aqui é o teste).
+    sheep.attention = 0;
 
     // Jogador correndo em cima dela, de pé: é o susto de chegada.
     const correndo = { pos: { x: sheep.x + 0.4, z: sheep.z }, vel: { x: 6, z: 0 }, crouching: false };
+    // Ela começa virada meio radiano fora do jogador: dá para ver o corpo
+    // girando devagar e a cabeça chegando antes.
+    const rumo = Math.atan2(correndo.pos.x - sheep.x, correndo.pos.z - sheep.z);
+    sheep.heading = rumo + 0.5;
+
     const startX = sheep.x, startZ = sheep.z;
     const cabecaAntes = sheep.head.position.y;
-    for (let i = 0; i < 20; i++) { clock.t += 0.05; system.update(0.05, correndo, true, { day: 1 }); }
+    let maiorPulo = 0;
+    let anterior = sheep.heading;
+    let meioX = 0, meioZ = 0;
+    for (let i = 0; i < 20; i++) {
+        clock.t += 0.05;
+        system.update(0.05, correndo, true, { day: 1 });
+        // Só vale o giro do **encarar**: andando, a ovelha vira para o alvo do
+        // passo (comportamento antigo, não é o que este teste mede).
+        if (clock.t >= sheep.alertAt) {
+            maiorPulo = Math.max(maiorPulo, Math.abs(wrapAngle(sheep.heading - anterior)));
+        }
+        anterior = sheep.heading;
+        // Depois da reação (0,5 s no pior caso) ela já parou de andar.
+        if (i === 11) { meioX = sheep.x; meioZ = sheep.z; }
+    }
 
     assert.ok(sheep.alertUntil > clock.t, 'ela está assustada (alerta ligado)');
+    assert.ok(sheep.alertAt > 0, 'e a reação tem hora para começar');
     assert.equal(sheep.fleeUntil, 0, 'susto de chegada não é fuga: ela não corre');
-    const andou = Math.hypot(sheep.x - startX, sheep.z - startZ);
-    assert.ok(andou < 0.05, `ficou parada (andou ${andou})`);
+    // Ela continua andando só até **reagir** (a reação é uma animação, não um
+    // interruptor); depois disso fica parada de verdade.
+    const parou = Math.hypot(sheep.x - meioX, sheep.z - meioZ);
+    assert.ok(parou < 0.05, `depois da reação ficou parada (andou ${parou})`);
+    assert.ok(Math.hypot(sheep.x - startX, sheep.z - startZ) < 0.4, 'e o passo até reagir é curto');
     // A cabeça sobe: o focinho sai do chão e a cara aponta para quem chegou.
-    // A cabeça ergue exatamente o que a constante manda (fora o resto do
-    // repouso e um resto de passada).
-    assert.ok(Math.abs(SHEEP_HEAD_REST - SHEEP_ALERT_HEAD_LIFT - sheep.head.rotation.x) <= 0.1,
+    assert.ok(Math.abs(SHEEP_HEAD_REST - SHEEP_ALERT_HEAD_LIFT - sheep.head.rotation.x) <= 0.12,
         `cabeça erguida (${sheep.head.rotation.x}, esperado ~${SHEEP_HEAD_REST - SHEEP_ALERT_HEAD_LIFT})`);
     assert.ok(sheep.head.position.y >= cabecaAntes - 1e-9, 'o pescoço não desce no susto');
-    const rumo = Math.atan2(correndo.pos.x - sheep.x, correndo.pos.z - sheep.z);
-    assert.ok(Math.abs(sheep.heading - rumo) < 1e-6, 'ela vira a cara para o jogador');
+    // O corpo girou devagar (nunca de um quadro para o outro) e chegou perto.
+    assert.ok(maiorPulo <= SHEEP_BODY_TURN_SPEED * 0.05 + 1e-9,
+        `o corpo nunca dá um pulo de ${maiorPulo} rad num quadro`);
+    assert.ok(Math.abs(wrapAngle(sheep.heading - rumo)) < 0.25, `o corpo encarou (${sheep.heading} vs ${rumo})`);
+    // E a cabeça inclinou de curiosidade.
+    assert.ok(Math.abs(sheep.head.rotation.z) > 0.05, `a cabeça inclinou (${sheep.head.rotation.z})`);
 });
 
 test('perto, mas agachado (ou devagar), ela não se assusta', () => {
@@ -734,7 +780,12 @@ test('terminada a pastagem, a cabeça volta a subir e ela volta a andar', () => 
         system.update(0.05, player, true, { day: 1 });
     }
     assert.equal(sheep.grazeT, null, 'a pastagem termina');
-    assert.equal(sheep.head.position.y, SHEEP_NECK_Y, 'a cabeça volta ao lugar');
+    // A subida é suavizada, então ela chega a poucos centímetros do repouso no
+    // mesmo quadro em que a pastagem acaba (e termina de subir logo depois).
+    assert.ok(Math.abs(sheep.head.position.y - SHEEP_NECK_Y) < 0.05,
+        `a cabeça volta ao lugar (${sheep.head.position.y} vs ${SHEEP_NECK_Y})`);
+    for (let i = 0; i < 10; i++) { clock.t += 0.05; system.update(0.05, player, true, { day: 1 }); }
+    assert.ok(Math.abs(sheep.head.position.y - SHEEP_NECK_Y) < 1e-3, 'e assenta no repouso (menos de 1 mm)');
     assert.ok(Math.abs(sheep.head.rotation.x - SHEEP_HEAD_REST) < 0.1, 'e volta a inclinação de repouso');
     assert.ok(sheep.grazeAt > clock.t, 'e fica um tempo sem pastar de novo');
 });
@@ -1244,28 +1295,37 @@ test('sumindo a líder, a próxima do bando assume', () => {
     assert.ok(seguidora.leader, 'ela virou a líder');
 });
 
-test('o susto se espalha pelo bando, mas não para o bando do lado', () => {
+test('o susto alcança as vizinhas que percebem, mas não o bando do lado', () => {
     const clock = { t: 0 };
     const system = makeSystem(makeWorld(), clock);
     const ovelhas = spawnOne(system, clock, idlePlayer({ x: 0, z: 0 })) && system.entities;
     const [primeira, segunda] = ovelhas;
     if (!segunda) return;
-    // `entities` é a mesma lista: guarda o bando antes de entrar a estranha.
+    // `entities` é a mesma lista: guarda o bando antes de entrar as estranhas.
     const bando = [...ovelhas];
 
-    // Um estranho de outro bando, colado na primeira.
-    const estranha = { ...segunda, id: 9999, herd: 424242, leader: true, alertUntil: 0, fleeUntil: 0 };
-    estranha.x = primeira.x + 0.5;
-    estranha.z = primeira.z;
-    system.entities.push(estranha);
+    // Duas estranhas coladas na primeira: uma de outro bando e uma distraída do
+    // **mesmo** bando (atenção alta = não sente a vizinha).
+    const outraBando = { ...segunda, id: 9999, herd: 424242, leader: true, alertUntil: 0, fleeUntil: 0 };
+    outraBando.x = primeira.x + 0.5;
+    outraBando.z = primeira.z;
+    const distraida = { ...segunda, id: 9998, herd: primeira.herd, leader: false, alertUntil: 0, fleeUntil: 0, attention: 0.95 };
+    distraida.x = primeira.x - 0.5;
+    distraida.z = primeira.z;
+    system.entities.push(outraBando, distraida);
+
+    // As companheiras "sentem" a vizinha (atenção baixa).
+    for (const outra of bando.slice(1)) outra.attention = 0;
 
     system.alert(primeira, clock.t, { x: primeira.x + 1, z: primeira.z });
 
     assert.ok(primeira.alertUntil > clock.t, 'a assustada está alerta');
     for (const outra of bando.slice(1)) {
-        assert.ok(outra.alertUntil > clock.t, 'a companheira do bando encara junto');
+        assert.ok(outra.alertUntil > clock.t, 'a companheira que sente a vizinha encara junto');
+        assert.ok(outra.alertAt > clock.t, 'mas entra no susto **depois**, com atraso');
     }
-    assert.equal(estranha.alertUntil, 0, 'o bando do lado não é contaminado');
+    assert.equal(distraida.alertUntil, 0, 'a distraída não entra no susto alheio');
+    assert.equal(outraBando.alertUntil, 0, 'o bando do lado não é contaminado');
     assert.ok(SHEEP_SCARE_SPREAD >= SHEEP_HERD_SPREAD_MAX, 'o contágio alcança o bando inteiro');
     assert.ok(SHEEP_ALERT_TIME > 0, 'o susto dura um tempo');
 });
@@ -1307,4 +1367,279 @@ test('game.js dá velocidade e agachamento à ovelha e liga o golpe nela', () =>
     assert.match(source, /const golpe = sheepSystem\.hitAt\(camera\.position, creatureAim, aim\)/,
         'o golpe do jogador assusta a ovelha');
     assert.match(source, /audio\.play\('sheep-bleat-near', \{ gainScale:[^}]*\}\)/, 'e ela bale assustada');
+});
+
+// ------------------------------------------------ o pescoço e o olhar (P7)
+
+test('o pescoço liga o corpo à cabeça: em pé é curto, pastando estica', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const sheep = spawnOne(system, clock, idlePlayer({ x: 0, z: 0 }));
+
+    const pescoco = sheep.group.children.find(child => child.name === 'neck');
+    assert.ok(pescoco, 'o modelo tem uma peça de pescoço');
+
+    const emPe = neckPoseFor(SHEEP_NECK_Y, SHEEP_NECK_Z);
+    const pastando = neckPoseFor(headPoseFor(1).y, headPoseFor(1).z);
+    assert.ok(pastando.length > emPe.length + 0.2,
+        `pastando o pescoço estica (${emPe.length} → ${pastando.length})`);
+
+    // As pontas do pescoço: uma dentro do corpo, outra no pivô da cabeça.
+    for (const [pose, rotulo] of [[emPe, 'em pé'], [pastando, 'pastando']]) {
+        const meia = pose.length / 2;
+        const ponta = (sinal) => ({
+            y: pose.y + sinal * meia * Math.cos(pose.rotationX),
+            z: pose.z + sinal * meia * Math.sin(pose.rotationX),
+        });
+        const baixo = ponta(-1), alto = ponta(1);
+        assert.ok(Math.abs(baixo.y - SHEEP_NECK_ANCHOR_Y) < 1e-9 && Math.abs(baixo.z - SHEEP_NECK_ANCHOR_Z) < 1e-9,
+            `${rotulo}: o pé do pescoço fica no ombro`);
+        // O ombro está dentro do corpo? (corpo: centro y 0,62 e meio 0,23; z ±0,39)
+        assert.ok(SHEEP_NECK_ANCHOR_Y < 0.85 && SHEEP_NECK_ANCHOR_Y > 0.39, 'o ombro fica dentro da lã');
+        assert.ok(Math.abs(SHEEP_NECK_ANCHOR_Z) < 0.39, 'e na frente do corpo, não na lateral');
+    }
+});
+
+test('pastando, o pescoço acompanha a cabeça e não sobra vão', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const sheep = spawnOne(system, clock, idlePlayer({ x: 0, z: 0 }));
+    const pose = headPoseFor(1);
+    sheep.head.rotation.x = pose.rotationX;
+    sheep.head.position.y = pose.y;
+    sheep.head.position.z = pose.z;
+    sheep.group.position.set(0, 0, 0);
+    sheep.group.rotation.y = 0;
+    sheep.group.updateMatrixWorld(true);
+
+    const pescoco = sheep.group.children.find(child => child.name === 'neck');
+    // O jogo posiciona o pescoço com `neckPoseFor` todo quadro; o teste faz o
+    // mesmo e confere o encaixe.
+    const ajuste = neckPoseFor(sheep.head.position.y, sheep.head.position.z);
+    pescoco.position.y = ajuste.y;
+    pescoco.position.z = ajuste.z;
+    pescoco.rotation.x = ajuste.rotationX;
+    pescoco.scale.y = ajuste.length;
+    // A ponta de cima do pescoço tem de estar na cabeça (é o encaixe).
+    const comprimento = pescoco.scale.y;
+    const alto = new THREE.Vector3(0, comprimento / 2, 0)
+        .applyEuler(pescoco.rotation).add(pescoco.position);
+    assert.ok(Math.abs(alto.y - (sheep.head.position.y + SHEEP_NECK_HEAD_Y)) < 1e-6,
+        `topo do pescoço na altura do encaixe (${alto.y} vs ${sheep.head.position.y + SHEEP_NECK_HEAD_Y})`);
+    assert.ok(Math.abs(alto.z - (sheep.head.position.z + SHEEP_NECK_HEAD_Z)) < 1e-6);
+
+    // E a cabeça desceu de verdade (o motivo de precisar do pescoço).
+    assert.ok(sheep.head.position.y < SHEEP_NECK_Y - 0.3, 'a cabeça desce para pastar');
+});
+
+test('cada ovelha repara por conta própria: visão, raio e atenção', () => {
+    // Valores escritos à mão (e não a constante de novo).
+    const perto = { distance: 3, viewDot: 1 };
+    assert.equal(sheepNotices({ ...perto, attention: 0 }), true);
+    assert.equal(sheepNotices({ ...perto, attention: 0.3 }), true);
+    assert.equal(sheepNotices({ ...perto, attention: 0.9 }), false, 'distraída não repara');
+    assert.equal(sheepNotices({ distance: SHEEP_NOTICE_RADIUS + 1, viewDot: 1, attention: 0 }), false, 'longe demais');
+    assert.equal(sheepNotices({ distance: 3, viewDot: SHEEP_VIEW_MIN_DOT - 0.01, attention: 0 }), false,
+        'de costas não vê');
+    assert.equal(sheepNotices({ distance: 3, viewDot: SHEEP_VIEW_MIN_DOT, attention: 0 }), true,
+        'na borda do campo de visão ainda vê');
+    assert.equal(SHEEP_NOTICE_RADIUS > SHEEP_ALERT_RADIUS, true, 'ela repara antes de se assustar');
+    assert.ok(SHEEP_NOTICE_CHANCE > 0 && SHEEP_NOTICE_CHANCE < 1, 'nem todas reparam');
+});
+
+test('a reação tem atraso sorteado, dentro da faixa', () => {
+    for (let id = 0; id < 30; id++) {
+        const atraso = noticeDelayFor(id, 12.3);
+        assert.ok(atraso >= SHEEP_NOTICE_DELAY_MIN && atraso <= SHEEP_NOTICE_DELAY_MAX,
+            `atraso ${atraso} fora da faixa`);
+    }
+    assert.ok(SHEEP_NOTICE_DELAY_MAX > SHEEP_NOTICE_DELAY_MIN, 'a faixa tem largura');
+    assert.equal(noticeDelayFor(5, 12.3), noticeDelayFor(5, 12.3), 'a mesma ovelha, o mesmo instante, o mesmo atraso');
+});
+
+test('pastando de costas, o jogador passa correndo e ela nem levanta a cabeça', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const sheep = spawnOne(system, clock, idlePlayer({ x: 0, z: 0 }));
+    sheep.attention = 0;
+    // De costas para o jogador (que está em +x).
+    sheep.heading = -Math.PI / 2;
+    sheep.turnAt = clock.t + 100;
+    sheep.targetX = sheep.x; sheep.targetZ = sheep.z;
+
+    const correndo = { pos: { x: sheep.x + 0.4, z: sheep.z }, vel: { x: 6, z: 0 }, crouching: false };
+    for (let i = 0; i < 20; i++) { clock.t += 0.05; system.update(0.05, correndo, true, { day: 1 }); }
+
+    assert.equal(sheep.alertUntil, 0, 'não viu: não se assusta');
+    assert.ok(Math.abs(sheep.lookYaw) < 1e-9, 'e a cabeça não vira');
+});
+
+test('duas ovelhas do mesmo bando reagem diferente ao mesmo jogador', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const ovelhas = spawnOne(system, clock, idlePlayer({ x: 0, z: 0 })) && system.entities;
+    const [atenta, distraida] = ovelhas;
+    if (!distraida) return;
+
+    atenta.attention = 0;
+    distraida.attention = 0.95;
+    for (const ovelha of [atenta, distraida]) {
+        // As duas de cara para o jogador, e paradas.
+        ovelha.heading = Math.atan2(1, 0);
+        ovelha.turnAt = clock.t + 100;
+        ovelha.targetX = ovelha.x; ovelha.targetZ = ovelha.z;
+        ovelha.x = atenta.x + (ovelha === distraida ? 0.6 : 0);
+        ovelha.z = atenta.z;
+    }
+
+    const correndo = { pos: { x: atenta.x + 0.4, z: atenta.z }, vel: { x: 6, z: 0 }, crouching: false };
+    for (let i = 0; i < 20; i++) { clock.t += 0.05; system.update(0.05, correndo, true, { day: 1 }); }
+
+    assert.ok(atenta.alertUntil > clock.t, 'a atenta encara o jogador');
+    assert.equal(distraida.alertUntil, 0, 'a distraída continua no pasto');
+});
+
+test('o olhar entra suave: a cabeça vira aos poucos e volta ao repouso', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const sheep = spawnOne(system, clock, idlePlayer({ x: 0, z: 0 }));
+    sheep.attention = 0;
+    sheep.x = 0; sheep.z = 0;
+    sheep.heading = 0;            // olhando para +z
+    sheep.turnAt = clock.t + 100;
+    sheep.targetX = 0; sheep.targetZ = 0;
+
+    // Jogador ao lado (0,6; 0,2): a cabeça tem de virar quase 90°.
+    const correndo = { pos: { x: 0.6, z: 0.2 }, vel: { x: 6, z: 0 }, crouching: false };
+    system.update(0.05, correndo, true, { day: 1 });
+    system.alert(sheep, clock.t, correndo.pos, { delay: 0 });
+
+    let maiorSalto = 0;
+    let anterior = sheep.lookYaw;
+    let primeiro = null;
+    let pico = 0;
+    for (let i = 0; i < 40; i++) {
+        clock.t += 0.05;
+        system.update(0.05, correndo, true, { day: 1 });
+        maiorSalto = Math.max(maiorSalto, Math.abs(sheep.lookYaw - anterior));
+        anterior = sheep.lookYaw;
+        if (primeiro === null && sheep.lookYaw !== 0) primeiro = Math.abs(sheep.lookYaw);
+        pico = Math.max(pico, Math.abs(sheep.lookYaw));
+    }
+
+    // Num quadro (0,05 s aqui) ela dá no máximo metade do caminho — é o que faz
+    // a virada parecer animação em vez de teleporte.
+    assert.ok(primeiro !== null && primeiro < SHEEP_LOOK_MAX_YAW * 0.5,
+        `no primeiro quadro a cabeça só começa (${primeiro})`);
+    assert.ok(maiorSalto < SHEEP_LOOK_MAX_YAW * 0.5, `nenhum quadro vira de uma vez (${maiorSalto} rad)`);
+    assert.ok(pico > 0.4, `a cabeça chegou a virar (${pico} rad)`);
+    assert.ok(pico <= SHEEP_LOOK_MAX_YAW + 1e-9, 'sem passar do limite do pescoço');
+    assert.ok(SHEEP_LOOK_TILT > 0, 'e inclina de lado');
+    // A cabeça chega primeiro; o corpo acompanha e a cabeça volta a alinhar com
+    // ele (é o que se vê: ela vira a cara, depois o corpo inteiro).
+    const rumoJogador = angleTo(sheep.x, sheep.z, correndo.pos.x, correndo.pos.z);
+    assert.ok(Math.abs(wrapAngle(sheep.heading - rumoJogador)) < 0.2, 'o corpo acabou encarando o jogador');
+    assert.ok(Math.abs(sheep.lookYaw) < Math.abs(pico), 'e a cabeça voltou a alinhar com o corpo');
+
+    // Passado o susto, cabeça e corpo voltam ao repouso.
+    clock.t += SHEEP_ALERT_TIME + 1;
+    const longe = idlePlayer({ x: sheep.x + 25, z: sheep.z + 25 });
+    for (let i = 0; i < 30; i++) { clock.t += 0.05; system.update(0.05, longe, true, { day: 1 }); }
+    assert.ok(Math.abs(sheep.lookYaw) < 0.02, 'a cabeça volta a olhar para a frente');
+    assert.ok(sheep.lookAmount < 0.02, 'e o susto saiu de cena');
+});
+
+test('wrapAngle, angleTo e turnTowardAngle fazem a conta do rumo', () => {
+    assert.ok(Math.abs(Math.abs(wrapAngle(Math.PI * 3)) - Math.PI) < 1e-9, '3π cai na emenda');
+    assert.ok(Math.abs(Math.abs(wrapAngle(-Math.PI * 3)) - Math.PI) < 1e-9, 'e -3π também');
+    assert.ok(Math.abs(wrapAngle(0.3) - 0.3) < 1e-12, 'ângulo pequeno passa igual');
+    assert.ok(Math.abs(wrapAngle(-0.3) + 0.3) < 1e-12);
+
+    assert.ok(Math.abs(angleTo(0, 0, 0, 1)) < 1e-12, 'para +z é 0');
+    assert.ok(Math.abs(angleTo(0, 0, 1, 0) - Math.PI / 2) < 1e-12, 'para +x é π/2');
+
+    // Gira na direção certa, pelo passo permitido, atravessando a emenda.
+    const quase = turnTowardAngle(Math.PI - 0.1, -Math.PI + 0.1, 0.05);
+    assert.ok(quase > Math.PI - 0.06 || quase < -Math.PI + 0.06, `atravessou a emenda (${quase})`);
+    assert.ok(Math.abs(wrapAngle(turnTowardAngle(0, 0.01, 1))) < 0.02, 'chega no alvo sem passar');
+});
+
+test('o contágio dá um passo só: quem sente a vizinha não passa adiante', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const bicho = (id, x, attention) => ({
+        id, herd: 1, x, z: 0, attention,
+        alertUntil: 0, alertAt: 0, grazeT: 0, alertFrom: null,
+    });
+    const susto = bicho(1, 0, 0);      // viu o jogador
+    const vizinha = bicho(2, 5, 0);    // sente a vizinha (dentro do raio do susto)
+    const longe = bicho(3, 10.5, 0);   // só alcançaria se o contágio passasse adiante
+    system.entities.push(susto, vizinha, longe);
+
+    system.alert(susto, 10, { x: 0, z: 3 });
+
+    assert.equal(susto.alertAt, 10, 'quem viu reage na hora');
+    assert.ok(vizinha.alertAt > 10, 'a vizinha reage, mas depois');
+    assert.ok(vizinha.alertAt - 10 >= SHEEP_NOTICE_DELAY_MIN * 0 - 1 + 0.18 - 1e-9,
+        'com o atraso do contágio');
+    assert.ok(vizinha.alertAt - 10 <= 0.45 + 1e-9, 'sem demorar demais');
+    assert.equal(longe.alertAt, 0, 'e o susto não sai em cadeia pelo bando');
+});
+
+test('no modelo, o pescoço estica no pasto e encolhe em pé', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    // Jogador longe: ninguém assusta, ela pode pastar à vontade.
+    const longe = idlePlayer({ x: 400, z: 400 });
+    const sheep = spawnOne(system, clock, longe);
+    assert.ok(sheep.neck, 'a ovelha tem a peça do pescoço');
+
+    const comprimento = () => sheep.neck.scale.y;
+    const topo = () => sheep.neck.position.y + Math.cos(sheep.neck.rotation.x) * comprimento() / 2;
+
+    // Em pé: o pescoço é um toco escondido na lã.
+    sheep.grazeT = null;
+    system.update(0.001, longe, true, { day: 1 });
+    const emPe = comprimento();
+    assert.ok(emPe < 0.15, `em pé é curto (${emPe})`);
+
+    // Pastando no ponto mais fundo: estica até a cabeça, sem vão.
+    sheep.grazeFor = 4;
+    sheep.grazeT = 2;                 // meio do pasto: focinho no chão
+    system.update(0.001, longe, true, { day: 1 });
+    const pastando = comprimento();
+    assert.ok(pastando > emPe * 3, `pastando estica (${pastando} vs ${emPe})`);
+    assert.ok(Math.abs(topo() - (sheep.head.position.y + SHEEP_NECK_HEAD_Y)) < 0.02,
+        'e a ponta de cima continua na cabeça');
+
+    // Com a cabeça no chão, o pescoço vai junto: o vão é zero.
+    const vao = Math.hypot(
+        sheep.neck.position.y + Math.cos(sheep.neck.rotation.x) * comprimento() / 2
+            - (sheep.head.position.y + SHEEP_NECK_HEAD_Y),
+        sheep.neck.position.z + Math.sin(sheep.neck.rotation.x) * comprimento() / 2
+            - (sheep.head.position.z + SHEEP_NECK_HEAD_Z),
+    );
+    assert.ok(vao < 0.02, `sem vão entre pescoço e cabeça (${vao})`);
+});
+
+test('levantar a cabeça do pasto é animação, não pulo', () => {
+    const clock = { t: 0 };
+    const system = makeSystem(makeWorld(), clock);
+    const longe = idlePlayer({ x: 400, z: 400 });
+    const sheep = spawnOne(system, clock, longe);
+
+    sheep.grazeFor = 4;
+    sheep.grazeT = 2;                 // meio do pasto: focinho no chão
+    system.update(0.001, longe, true, { day: 1 });
+    const noChao = sheep.head.position.y;
+
+    system.alert(sheep, clock.t, { x: sheep.x, z: sheep.z + 1 }, { delay: 0 });
+    clock.t += 0.05;
+    system.update(0.05, longe, true, { day: 1 });
+    const meio = sheep.head.position.y;
+    const repouso = SHEEP_NECK_Y;
+
+    assert.ok(sheep.lookAmount > 0 && sheep.lookAmount < 1, `o susto entra aos poucos (${sheep.lookAmount})`);
+    assert.ok(meio > noChao + 0.01, 'a cabeça já subiu um pouco');
+    assert.ok(meio < repouso - 0.01, 'mas ainda não deu o pulo até em cima');
 });

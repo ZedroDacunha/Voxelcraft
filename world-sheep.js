@@ -150,6 +150,61 @@ export const SHEEP_HEAD_REST = 0.1;
 export const SHEEP_HEAD_DROP = 0.36;
 export const SHEEP_HEAD_TILT = 1.0;
 
+// ---------------------------------------------------------------- o pescoço
+
+/**
+ * O pescoço: a caixa que liga o corpo à cabeça.
+ *
+ * Sem ela, a cabeça descia 0,36 bloco para pastar e **flutuava solta** no ar —
+ * o bicho parecia desmontar. O pescoço nasce no ombro, encontra a cabeça e
+ * estica o quanto for preciso, então o vão é sempre zero.
+ */
+export const SHEEP_NECK_WIDTH = 0.2;
+export const SHEEP_NECK_DEPTH = 0.22;
+/** Onde o pescoço nasce (dentro do corpo, na frente de cima). */
+export const SHEEP_NECK_ANCHOR_Y = 0.72;
+export const SHEEP_NECK_ANCHOR_Z = 0.3;
+/** Onde ele encontra a cabeça (relativo ao pivô dela). */
+export const SHEEP_NECK_HEAD_Y = 0.06;
+export const SHEEP_NECK_HEAD_Z = -0.02;
+
+// ---------------------------------------------------------------- o olhar
+
+/** Até onde a ovelha repara no jogador (blocos) — mais longe que o susto. */
+export const SHEEP_NOTICE_RADIUS = 7;
+/**
+ * Campo de visão: cosseno do meio ângulo. -0,34 ≈ 140° de abertura — ela vê o
+ * que está à frente e dos lados, não o que está atrás.
+ */
+export const SHEEP_VIEW_MIN_DOT = -0.34;
+/** Nem toda ovelha repara no jogador: com atenção abaixo disso, ela percebe. */
+export const SHEEP_NOTICE_CHANCE = 0.6;
+/** A reação não é instantânea: a cabeça vira depois de um instante. */
+export const SHEEP_NOTICE_DELAY_MIN = 0.12;
+export const SHEEP_NOTICE_DELAY_MAX = 0.5;
+/** O vizinho assustado puxa o outro, mas com atraso. */
+export const SHEEP_CONTAGION_DELAY_MIN = 0.18;
+export const SHEEP_CONTAGION_DELAY_MAX = 0.45;
+/**
+ * Quem entra no susto alheio: atenção abaixo disso. É mais frouxo que
+ * `SHEEP_NOTICE_CHANCE` de propósito (o bicho sente a vizinha correndo mesmo
+ * sem ter visto o jogador), mas não pega o bando inteiro.
+ */
+export const SHEEP_CONTAGION_CHANCE = 0.8;
+/** Giro do corpo ao encarar (rad/s) e suavização do olhar (1/s). */
+export const SHEEP_BODY_TURN_SPEED = 1.8;
+export const SHEEP_LOOK_SMOOTH = 9;
+/** Além deste ângulo a cabeça não vira mais sozinha: o corpo acompanha. */
+export const SHEEP_LOOK_MAX_YAW = 1.1;
+/** Curiosidade: a cabeça inclina de lado enquanto olha. */
+export const SHEEP_LOOK_TILT = 0.22;
+/**
+ * Quão rápido a cabeça **sai** do pasto (1/s). Descer acompanha o envelope do
+ * pasto na hora — o que precisa de animação é a subida, quando algo a
+ * interrompe no meio da mordida.
+ */
+export const SHEEP_PASTO_SMOOTH = 7;
+
 /** A grama comida volta a crescer entre cinco e dez minutos (segundos). */
 export const SHEEP_REGROW_MIN = 300;
 export const SHEEP_REGROW_MAX = 600;
@@ -371,6 +426,84 @@ export function headPoseFor(envelope) {
 }
 
 /**
+ * Onde o pescoço fica, dado o pivô da cabeça.
+ *
+ * Devolve o centro (y, z), o comprimento e a inclinação em X — o jogo escala a
+ * caixa em Y e gira em X com isso. É a peça que impede a cabeça de desgrudar do
+ * corpo quando ela pasta.
+ */
+export function neckPoseFor(headY, headZ) {
+    const y0 = SHEEP_NECK_ANCHOR_Y;
+    const z0 = SHEEP_NECK_ANCHOR_Z;
+    const y1 = (Number(headY) || 0) + SHEEP_NECK_HEAD_Y;
+    const z1 = (Number(headZ) || 0) + SHEEP_NECK_HEAD_Z;
+    const dy = y1 - y0;
+    const dz = z1 - z0;
+    return {
+        y: (y0 + y1) / 2,
+        z: (z0 + z1) / 2,
+        length: Math.max(0.02, Math.hypot(dy, dz)),
+        // O cubo é vertical: girar em X leva o +Y para a direção do pescoço.
+        rotationX: Math.atan2(dz, dy),
+    };
+}
+
+/** Ângulo no intervalo de -π a π (para comparar rumos sem dar a volta). */
+export function wrapAngle(angle) {
+    const a = Number(angle) || 0;
+    const volta = Math.PI * 2;
+    return ((a + Math.PI) % volta + volta) % volta - Math.PI;
+}
+
+/** Rumo de `de` para `para`, no mesmo sistema do `heading` (0 = +z). */
+export function angleTo(fromX, fromZ, toX, toZ) {
+    return Math.atan2((Number(toX) || 0) - (Number(fromX) || 0), (Number(toZ) || 0) - (Number(fromZ) || 0));
+}
+
+/**
+ * Gira `current` na direção de `target` sem passar do alvo e sem dar um pulo:
+ * no máximo `maxStep` radianos por chamada.
+ */
+export function turnTowardAngle(current, target, maxStep) {
+    const delta = wrapAngle((Number(target) || 0) - (Number(current) || 0));
+    const step = Math.max(0, Number(maxStep) || 0);
+    if (Math.abs(delta) <= step) return wrapAngle(Number(target) || 0);
+    return wrapAngle((Number(current) || 0) + Math.sign(delta) * step);
+}
+
+/**
+ * Ela repara no jogador? Três condições, todas de uma vez:
+ *
+ * - **raio**: longe demais, não vê;
+ * - **campo de visão**: `viewDot` é o cosseno do ângulo entre a cara dela e a
+ *   direção do jogador — pastando de costas, não vê;
+ * - **atenção**: cada ovelha tem a sua (`attention`, 0..1). Acima de
+ *   `SHEEP_NOTICE_CHANCE` ela está distraída e continua no pasto. É o que faz
+ *   o bando **não** reagir em uníssono.
+ */
+export function sheepNotices({
+    distance,
+    viewDot = 1,
+    attention = 0,
+    radius = SHEEP_NOTICE_RADIUS,
+    minDot = SHEEP_VIEW_MIN_DOT,
+    chance = SHEEP_NOTICE_CHANCE,
+} = {}) {
+    const d = Number(distance);
+    if (!(d <= radius)) return false;
+    if (!(Number(viewDot) >= minDot)) return false;
+    return Number(attention) < chance;
+}
+
+/** Quanto tempo a reação demora (sorteado por ovelha e por instante). */
+export function noticeDelayFor(id, at, {
+    min = SHEEP_NOTICE_DELAY_MIN, max = SHEEP_NOTICE_DELAY_MAX,
+} = {}) {
+    const roll = defaultHash2(Number(id) || 0, Math.round(Number(at) || 0), 631);
+    return min + roll * (max - min);
+}
+
+/**
  * Vale um balido agora? Devolve o motivo — `'near'` (o jogador chegou perto) ou
  * `'call'` (chamado de passeio) — ou `null` para ficar quieta.
  *
@@ -533,6 +666,16 @@ export function createSheepSystemClass({
             // A cabeça é um **grupo** com o pivô no pescoço, e não peças soltas:
             // é o que permite baixar o focinho até o chão para pastar sem a cara
             // se desmontar. As posições aqui dentro são relativas ao pescoço.
+            // Pescoço: uma caixa de 1 bloco de altura, escalada e girada a cada
+            // quadro por `neckPoseFor`. Em pé ela fica quase toda dentro da lã;
+            // pastando, estica e aparece — é o que segura a cabeça no corpo.
+            const inicio = neckPoseFor(SHEEP_NECK_Y, SHEEP_NECK_Z);
+            const neck = this.addPart(group, wool, 0, inicio.y, inicio.z,
+                SHEEP_NECK_WIDTH, 1, SHEEP_NECK_DEPTH);
+            neck.name = 'neck';
+            neck.rotation.x = inicio.rotationX;
+            neck.scale.y = inicio.length;
+
             const head = new THREE.Group();
             head.name = 'head';
             head.position.set(0, SHEEP_NECK_Y, SHEEP_NECK_Z);
@@ -583,7 +726,7 @@ export function createSheepSystemClass({
                 ? part(0, 0.74, -0.48, 0.12, 0.14, 0.1, wool, 'tail')
                 : part(0, 0.78, -0.5, 0.14, 0.16, 0.12, wool, 'tail');
 
-            return { group, head, tufts, eyes, glints, ears, legs, tail, coat: coatKey, sheared, woolMaterial: wool };
+            return { group, head, neck, tufts, eyes, glints, ears, legs, tail, coat: coatKey, sheared, woolMaterial: wool };
         }
 
         // ------------------------------------------------------------ pastar
@@ -764,6 +907,18 @@ export function createSheepSystemClass({
                 fleeUntil: 0,
                 fleeFrom: null,
                 lastHitAt: -Infinity,
+                // Olhar: cada uma repara no jogador por conta própria — atenção
+                // sorteada (0..1), relógio do alerta e o quanto a cabeça já
+                // virou (`lookYaw`) e inclinou (`lookTilt`).
+                attention: hash2(seed, attempt + member * 17, 613),
+                alertAt: 0,
+                lookYaw: 0,
+                lookTilt: 0,
+                lookAmount: 0,
+                // Quanto do pasto ainda está de pé na cabeça (0 = em pé, 1 =
+                // focinho no chão). Só a **subida** é suavizada: a descida segue
+                // o envelope do pasto, que já tem a sua rampa.
+                pastoAmount: 0,
                 // Vida: quatro golpes. `hurtUntil` é o clarão que o golpe acende
                 // no corpo (mesma ideia do Mofim) e `bodyOffset` é a altura que
                 // a mira tem de acertar.
@@ -833,19 +988,36 @@ export function createSheepSystemClass({
          * Susto de chegada: para, ergue a cabeça e encara quem chegou — e o
          * bando faz o mesmo (contágio). Devolve `true` se foi um susto novo.
          */
-        alert(entity, at, from) {
-            if (at < entity.alertUntil) return false;
-            entity.alertUntil = at + SHEEP_ALERT_TIME;
+        /**
+         * Susto de chegada: para, ergue a cabeça e encara quem chegou.
+         *
+         * `delay` é a **reação**: a ovelha não vira no mesmo quadro do susto
+         * (quem percebeu leva de 0,12 a 0,5 s; quem só sentiu a vizinha, um
+         * pouco mais). `spread` deixa o contágio dar **um** passo: a vizinha
+         * que entra no susto não sai contaminando as outras, senão o bando
+         * inteiro acabava encarando de qualquer jeito.
+         */
+        alert(entity, at, from, { delay = 0, spread = true } = {}) {
+            const start = at + Math.max(0, Number(delay) || 0);
+            if (start < entity.alertUntil) return false;
+            entity.alertAt = start;
+            entity.alertUntil = start + SHEEP_ALERT_TIME;
             entity.alertFrom = from ? { x: from.x, z: from.z } : null;
-            // Pastando? a cabeça sobe na hora.
-            entity.grazeT = null;
+            // Pastando? a cabeça sobe na hora em que ela reage.
+            if (start <= at) entity.grazeT = null;
+            if (!spread) return true;
+
             for (const other of this.entities) {
                 if (other === entity || other.herd !== entity.herd) continue;
                 if (Math.hypot(other.x - entity.x, other.z - entity.z) > SHEEP_SCARE_SPREAD) continue;
                 if (at < other.alertUntil) continue;
-                other.alertUntil = at + SHEEP_ALERT_TIME;
-                other.alertFrom = entity.alertFrom;
-                other.grazeT = null;
+                // Só entra quem sente a vizinha: atenção abaixo do limite do
+                // contágio. As distraídas continuam pastando.
+                if (!(other.attention < SHEEP_CONTAGION_CHANCE)) continue;
+                const atraso = SHEEP_CONTAGION_DELAY_MIN
+                    + hash2(other.id, Math.round(at) + entity.id, 743)
+                        * (SHEEP_CONTAGION_DELAY_MAX - SHEEP_CONTAGION_DELAY_MIN);
+                this.alert(other, at, entity.alertFrom, { delay: atraso, spread: false });
             }
             return true;
         }
@@ -859,6 +1031,7 @@ export function createSheepSystemClass({
             entity.fleeUntil = at + SHEEP_FLEE_TIME;
             entity.fleeFrom = from ? { x: from.x, z: from.z } : { x: entity.x - 1, z: entity.z };
             entity.alertUntil = 0;
+            entity.alertAt = 0;
             entity.grazeT = null;
             const dx = entity.x - entity.fleeFrom.x;
             const dz = entity.z - entity.fleeFrom.z;
@@ -954,7 +1127,19 @@ export function createSheepSystemClass({
                     crouching,
                     scareRadius: SHEEP_ALERT_RADIUS,
                     scareSpeed: SHEEP_ALERT_SPEED,
-                })) this.alert(e, at, playerPos);
+                })) {
+                    // Mas só reage quem **percebe**: raio, campo de visão e a
+                    // atenção dela. Pastando de costas (ou distraída), continua
+                    // no pasto mesmo com o jogador passando correndo.
+                    const distancia = distanceToPlayer || 1;
+                    const viewDot = (
+                        Math.sin(e.heading) * (playerPos.x - e.x)
+                        + Math.cos(e.heading) * (playerPos.z - e.z)
+                    ) / distancia;
+                    if (sheepNotices({ distance: distanceToPlayer, viewDot, attention: e.attention })) {
+                        this.alert(e, at, playerPos, { delay: noticeDelayFor(e.id, at) });
+                    }
+                }
 
                 // Balido: chamado de vez em quando e um "cheguei perto" quando o
                 // jogador entra no raio dela.
@@ -997,10 +1182,14 @@ export function createSheepSystemClass({
                         + hash2(e.id, Math.round(at), 811) * (SHEEP_GRAZE_TIME_MAX - SHEEP_GRAZE_TIME_MIN);
                     e.bit = false;
                 }
-                const pastando = e.grazeT !== null && at >= e.alertUntil && at >= e.fleeUntil;
-
                 const fugindo = at < e.fleeUntil;
-                const encarando = !fugindo && at < e.alertUntil;
+                // Encarar só vale a partir da **reação** (`alertAt`): o susto é
+                // marcado antes, mas a ovelha leva um instante para reagir.
+                const encarando = !fugindo && at >= e.alertAt && at < e.alertUntil;
+                const pastando = e.grazeT !== null && !encarando && !fugindo;
+                // 0 = cabeça no pasto, 1 = cabeça erguida olhando: a passagem é
+                // suave, então ela "levanta a cabeça" em vez de dar um pulo.
+                e.lookAmount += ((encarando ? 1 : 0) - e.lookAmount) * Math.min(1, SHEEP_LOOK_SMOOTH * dt);
                 let andou = false;
                 if (fugindo) {
                     // Golpe: corre para longe de quem bateu, com a passada
@@ -1010,10 +1199,12 @@ export function createSheepSystemClass({
                     andou = this.stepToward(e, dxf, dzf, SHEEP_FLEE_SPEED, dt);
                     if (!andou) e.fleeUntil = 0;
                 } else if (encarando) {
-                    // Susto de chegada: para de andar e vira a cara para quem
-                    // chegou. Sem passo — é o "parar e encarar".
+                    // Susto de chegada: para de andar e vira para quem chegou —
+                    // mas **devagar** (o corpo leva o seu tempo; a cabeça é que
+                    // chega primeiro).
                     if (e.alertFrom) {
-                        e.heading = Math.atan2(e.alertFrom.x - e.x, e.alertFrom.z - e.z);
+                        const querRumo = angleTo(e.x, e.z, e.alertFrom.x, e.alertFrom.z);
+                        e.heading = turnTowardAngle(e.heading, querRumo, SHEEP_BODY_TURN_SPEED * dt);
                     }
                 } else if (!pastando) {
                     // Hora de sortear outro trecho de pasto (ou de voltar para o
@@ -1046,10 +1237,27 @@ export function createSheepSystemClass({
                 for (let leg = 0; leg < e.legs.length; leg++) {
                     e.legs[leg].rotation.x = pose[leg] * e.walking;
                 }
+                // Olhar: a cabeça vira primeiro e o corpo acompanha devagar. A
+                // inclinação de curiosidade entra junto e tudo volta suave
+                // quando o susto passa.
+                const querOlhar = encarando && e.alertFrom
+                    ? Math.max(-SHEEP_LOOK_MAX_YAW, Math.min(SHEEP_LOOK_MAX_YAW,
+                        wrapAngle(angleTo(e.x, e.z, e.alertFrom.x, e.alertFrom.z) - e.heading)))
+                    : 0;
+                const suave = Math.min(1, SHEEP_LOOK_SMOOTH * dt);
+                e.lookYaw += (querOlhar - e.lookYaw) * suave;
+                e.lookTilt += ((encarando ? SHEEP_LOOK_TILT : 0) - e.lookTilt) * suave;
+
                 // Cabeça: balanço curto junto com a passada e, no pasto, o
                 // focinho descendo até o chão com uma mastigadinha no meio.
                 if (e.head) {
-                    const envelope = pastando ? grazeEnvelope(e.grazeT / e.grazeFor) : 0;
+                    // O pasto desce na hora (o envelope já é a rampa), mas sobe
+                    // suave: se o susto interrompe a mordida, a cabeça se ergue
+                    // em vez de teleportar. `lookAmount` completa o movimento.
+                    const pasto = pastando ? grazeEnvelope(e.grazeT / e.grazeFor) : 0;
+                    if (pasto >= e.pastoAmount) e.pastoAmount = pasto;
+                    else e.pastoAmount += (pasto - e.pastoAmount) * Math.min(1, SHEEP_PASTO_SMOOTH * dt);
+                    const envelope = e.pastoAmount * (1 - e.lookAmount);
                     const pose = headPoseFor(envelope);
                     const mascando = Math.sin((pastando ? e.grazeT / e.grazeFor : 0) * Math.PI * 6) * 0.05;
                     e.head.rotation.x = pose.rotationX
@@ -1058,10 +1266,23 @@ export function createSheepSystemClass({
                         // No susto a cabeça sobe (focinho para cima, olhando
                         // quem chegou) e na fuga ela desce um pouco, como quem
                         // corre de cabeça baixa.
-                        - SHEEP_ALERT_HEAD_LIFT * (encarando ? 1 : 0)
+                        - SHEEP_ALERT_HEAD_LIFT * e.lookAmount
                         + 0.18 * (fugindo ? 1 : 0);
+                    // A cabeça olha: vira no rumo do jogador e inclina de lado.
+                    e.head.rotation.y = e.lookYaw;
+                    e.head.rotation.z = e.lookTilt;
                     e.head.position.y = pose.y;
                     e.head.position.z = pose.z;
+
+                    // Pescoço: estica o necessário para ligar o corpo à cabeça.
+                    // É o que impede a cabeça de desgrudar quando ela pasta.
+                    if (e.neck) {
+                        const pescoco = neckPoseFor(e.head.position.y, e.head.position.z);
+                        e.neck.position.y = pescoco.y;
+                        e.neck.position.z = pescoco.z;
+                        e.neck.rotation.x = pescoco.rotationX;
+                        e.neck.scale.y = pescoco.length;
+                    }
                 }
 
                 // Clarão do golpe: a lã dela acende por um instante. Como o
