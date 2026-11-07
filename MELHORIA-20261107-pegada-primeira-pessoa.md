@@ -1,8 +1,9 @@
 # Ferramenta na mão — primeira pessoa
 
 Picareta, machado, pá e tesoura recebem uma pose de primeira pessoa que gira em
-torno da empunhadura. A cabeça aponta para cima e à direita, e o cabo encontra
-aproximadamente a ponta da mão. A referência enviada pelo jogador orientou a
+torno da empunhadura. A cabeça aponta para cima na tela, e o cabo encontra
+aproximadamente a ponta da mão. Após o print mostrando a picareta deitada, a rotação foi corrigida considerando
+o braço e a projeção da câmera. A referência enviada pelo jogador orientou a
 pose; a arte continua sendo a própria do Voxelcraft e a adaptação precisa de
 validação visual, não é uma promessa de identidade exata.
 
