@@ -62,10 +62,12 @@ grade está errada — e o teste pega.
    vizinhos — hoje **≤ +170**, contra +194 do cítrico.
 4. **Cabo comum.** `a`…`d` são os mesmos nas três ferramentas: as peças parecem
    saídas da mesma oficina.
-5. **Cabo de madeira = as tábuas do jogo.** `a`…`d` saem do tile `PLANKS`
-   (`[123,91,51]` no veio, `[151,116,67]` na sombra, `[202,166,106]` no claro,
-   `[86,62,34]` no contorno). A ferramenta na mão precisa parecer feita do mesmo
-   material do chão. O teste da picareta trava esses quatro tons.
+5. **Cabo de madeira = as tábuas do jogo.** `CABO_PALETA` é literalmente o tile
+   `PLANKS`: `[123,91,51]` no veio (`b`), `[151,116,67]` na sombra (`c`),
+   `[202,166,106]` no claro (`d`) e `[86,62,34]` na sombra do cabo (`a`). A
+   ferramenta na mão precisa parecer feita do mesmo material do chão — e, nas
+   ferramentas de madeira, cabeça e cabo são quase a mesma peça.
+   Um teste trava os quatro tons.
 6. **Faixa de couro costurada — só na pá.** `g`/`s` na metade de baixo do cabo
    (onde a mão pega): uma faixa logo abaixo do encaixe e outra no punho. A
    **picareta** e o **machado** voltaram à base fiel **sem couro**: a faixa era a

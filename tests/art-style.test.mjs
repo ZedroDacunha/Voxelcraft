@@ -85,7 +85,7 @@ test('o acento da casa aparece nas três e é o mesmo amarelo-cítrico', () => {
 test('as cores da família são exatamente estas', () => {
     // Se alguém mexer nas constantes, o teste avisa: são a identidade das peças.
     assert.deepEqual(Object.fromEntries(Object.entries(CABO_PALETA).map(([k, v]) => [k, hex(v)])),
-        { a: '3a2a12', b: '6b4c1e', c: '9a7130', d: 'c39148' }, 'tons do cabo');
+        { a: '563e22', b: '7b5b33', c: '977443', d: 'caa66a' }, 'tons do cabo');
     assert.deepEqual(Object.fromEntries(Object.entries(PUNHO_PALETA).map(([k, v]) => [k, hex(v)])),
         { g: '4a3524', s: 'be9660' }, 'couro e costura');
     assert.equal(hex(ACENTO), 'ead69e', 'acento');
@@ -158,6 +158,17 @@ test('a picareta de madeira usa as cores da tábua do jogo', () => {
     assert.ok(perto(wood['4'], tabua.claro), 'tom 4 é o claro da tábua');
     assert.ok(lum(wood['3']) > lum(tabua.sombra) && lum(wood['3']) < lum(tabua.claro), 'tom 3 fica entre sombra e claro');
     assert.ok(lum(wood.O) < lum(tabua.veio), 'o contorno é mais escuro que o veio');
+});
+
+test('o cabo é feito das tábuas do jogo', () => {
+    // Decisão de 07/11/2026: o cabo deixa de ter madeira própria e passa a usar
+    // os tons do tile PLANKS — a ferramenta na mão é do mesmo material do chão.
+    const veio = [123, 91, 51], sombra = [151, 116, 67], claro = [202, 166, 106];
+    assert.deepEqual([...CABO_PALETA.b], veio, 'tom b é o veio da tábua');
+    assert.deepEqual([...CABO_PALETA.c], sombra, 'tom c é a sombra da tábua');
+    assert.deepEqual([...CABO_PALETA.d], claro, 'tom d é o claro da tábua');
+    assert.ok(lum(CABO_PALETA.a) < lum(veio), 'o tom a é a sombra do cabo, abaixo do veio');
+    assert.ok(CABO_PALETA.a[0] + CABO_PALETA.a[1] + CABO_PALETA.a[2] > 120, 'e o cabo não tem preto puro');
 });
 
 test('as três ferramentas são desenhos diferentes entre si', () => {

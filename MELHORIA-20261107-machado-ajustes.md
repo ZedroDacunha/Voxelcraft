@@ -80,6 +80,5 @@ O comparador com as cinco está fora do repo, em
 
 - **Pá** — ainda é o desenho livre do #122, com couro. É a próxima rodada.
 - **Tesoura** — segue com o desenho antigo.
-- **Cabo**: hoje as três usam `CABO_PALETA` (`#3a2a12 … #c39148`), que é mais
-  escuro que as tábuas do jogo. Ficou em aberto se o cabo deve adotar de vez os
-  tons da tábua — mudaria as três de uma vez.
+- **Cabo**: resolvido logo depois — as três passaram a usar os tons da tábua
+  ([`MELHORIA-20261107-cabo-de-tabua.md`](MELHORIA-20261107-cabo-de-tabua.md)).

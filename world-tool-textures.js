@@ -97,12 +97,19 @@ export const PA_GRADE = Object.freeze([
     '................',
 ]);
 
-/** O cabo de madeira — o mesmo nas três ferramentas. */
+/**
+ * O cabo de madeira — o mesmo nas três ferramentas.
+ *
+ * Os quatro tons são **os da tábua do jogo** (`TILE.PLANKS`, em
+ * `world-textures.js`): o cabo é feito do mesmo material do chão. Decisão de
+ * 07/11/2026 — até então o cabo era mais escuro e mais saturado que a tábua, e a
+ * ferramenta na mão não combinava com o chão de madeira.
+ */
 export const CABO_PALETA = Object.freeze({
-    a: Object.freeze([58, 42, 18]),
-    b: Object.freeze([107, 76, 30]),
-    c: Object.freeze([154, 113, 48]),
-    d: Object.freeze([195, 145, 72]),
+    a: Object.freeze([86, 62, 34]),
+    b: Object.freeze([123, 91, 51]),
+    c: Object.freeze([151, 116, 67]),
+    d: Object.freeze([202, 166, 106]),
 });
 
 /** As faixas de couro: `g` o couro, `s` a costura clara. */

@@ -1169,3 +1169,18 @@ inventário e na mão.
 - [ ] Picareta e machado, lado a lado, **parecem da mesma oficina**.
 - [ ] Na mão e na barra o ícone é o mesmo.
 - [ ] A **pá** continua como ficou no #122, com a faixa de couro — é a próxima.
+
+## 61. O cabo é das tábuas
+
+O cabo das três ferramentas passou a usar os tons do tile de tábuas
+([`MELHORIA-20261107-cabo-de-tabua.md`](MELHORIA-20261107-cabo-de-tabua.md)).
+
+- [ ] Coloque uma **picareta de ferro**, um **machado de ouro** e uma **pá de
+      diamante** na barra e olhe na mão: o cabo é o mesmo nas três.
+- [ ] Encoste qualquer uma num **bloco de tábuas**: o cabo e a tábua são da mesma
+      família de cor — nada de cabo laranja-escuro.
+- [ ] Nas ferramentas **de madeira** (picareta, machado, pá), cabeça e cabo
+      parecem a mesma peça de tábua — é de propósito.
+- [ ] O cabo continua com **quatro tons**: dá para ver o topo claro e o lado de
+      baixo escuro; não virou um traço chapado.
+- [ ] Na **pá** o couro continua em cima do cabo novo, e ainda se distingue dele.
