@@ -253,8 +253,122 @@ branca, e o travesseiro volta a existir.
 - **O save** não mudou de formato: o ID do bloco já diz a cor. A cama antiga (ID
   117) é a branca — save velho abre com a cama na cor nova.
 
-## O que fica para a próxima parte
+---
 
-- **A cama 3D equipada na mão**, em primeira pessoa (parte 4).
-- Fora do escopo: as 16 tinturas (o jogo não tem corantes) e a cama cair quando
-  o chão é cavado.
+# Parte 4 — a cama na mão
+
+A cama aparecia na mão como **ícone extrudado**: a figura chata que as
+ferramentas usam, com um dedo de profundidade. Dá para reconhecer a cama, mas ela
+não é 3D — e o ícone é uma *pintura* do modelo, não o modelo.
+
+Agora a mão recebe a peça de verdade: pernas, travessa, colchão, aba e
+travesseiro, na cor da lã que o jogador está segurando.
+
+## Como a peça é montada
+
+`world-bed-hand.js` transforma `bedModelBoxes(cor)` em **arrays puros** —
+posição, normal, UV e índice —, sem THREE. O `game.js` só embrulha isso num
+`BufferGeometry` e usa o material do mundo (o mesmo mapa do atlas, o mesmo que o
+bloco na mão já usava). Três consequências boas:
+
+- **A cor vem do tile**, não de um material novo: o colchão preto é preto porque
+  amostra o tile do colchão preto — o mesmo do bloco no mundo;
+- **As faces enterradas continuam fora** (`enterrarFaces`): a face que mora
+  dentro de outra caixa não é desenhada, exatamente como no mesher;
+- **Dá para testar sem navegador**: `tests/bed-hand.test.mjs` cobra a contagem de
+  faces, a UV de cada face, o centro do modelo e a escala.
+
+## Centrar é o que faz girar certo
+
+O modelo tem duas células de comprimento, então o meio está em `z = 1`, não em
+`z = 0,5`. Centrar no meio (`0,5, 0,5, 1`) é o que faz a peça girar em volta de
+si mesma na mão — com a origem numa quina, ela orbitaria o próprio canto a cada
+giro do braço.
+
+## O ajuste da mão
+
+`HELD_BED` guarda escala e giro: `0,26` de escala (a cama é móvel, não
+ferramenta — fica do tamanho de um bloco grande na mão), giro de `0,30` em X
+(mostra o topo do colchão), `0,55` em Y (a peça atravessa a tela na diagonal) e
+`0,20` em Z (descola da horizontal, para não ler como um cartão). O travesseiro
+fica do lado de perto, que é o que identifica a cama de relance.
+
+## A tabela de faces saiu do `game.js`
+
+O mesher, as nuvens e agora a cama na mão desenham a mesma caixa, e todos
+precisavam dos mesmos seis cantos com as mesmas UVs. A tabela morava no
+`game.js` e quem desenhasse uma caixa fora dele copiava os cantos à mão — cópia
+que envelhece calada. Ela virou `world-faces.js`, um módulo puro.
+
+## O escopo que ficou de fora
+
+- **As 16 tinturas**: o jogo não tem corantes, então são três cores (a lã da
+  ovelha), não dezesseis.
+- **A cama cair quando o chão é cavado**: hoje ela fica no ar, como a porta.
+
+# Correção — a face do travesseiro que o mesher comia
+
+Depois da parte 4 o jogador voltou com o mesmo print: de frente para o pé da
+cama, com a câmera quase na altura do colchão, havia uma **faixa escura embaixo
+do travesseiro**. Não era a mão nem o modelo: era o mesher do mundo.
+
+## O que estava acontecendo
+
+O mesher descarta a face de um bloco quando o vizinho "tapa" aquele lado. Para
+cama e porta a regra era grosseira:
+
+```js
+// antes
+if (currentRender === 'bed') return neighborRender === 'bed';
+```
+
+Ou seja: se a cela vizinha naquela direção é a outra metade da cama, **todas** as
+faces daquele lado somem. Vale para o cubo, não vale para a cama — ela é feita
+de caixas que param no meio da célula:
+
+```
+travesseiro .... 8,5 → 12  (o corpo para em 14,5/16 no comprimento)
+colchão ........ 4 → 8     (é o único que vai até a borda)
+```
+
+A face do travesseiro virada para o meio da cama está em `z = 8,5/16`, muito
+longe do plano da emenda (`z = 0` da célula da cabeceira). Ela é visível — e era
+justamente ela que sumia. O material do mundo é `DoubleSide`, então o buraco não
+aparecia como céu: aparecia como a **face de dentro**, escura. Daí a faixa preta
+sob o travesseiro.
+
+Com a câmera quase rente ao colchão o defeito ficava óbvio: era a única coisa
+que se via do travesseiro de frente.
+
+## A correção
+
+A regra passou a olhar **onde a face está**, não só quem é o vizinho:
+
+```js
+// depois
+if (currentRender === 'door' || currentRender === 'bed') {
+    return neighborRender === currentRender && faceNaBordaDaCelula(shape, dir);
+}
+```
+
+`faceNaBordaDaCelula(shape, dir)` (em `world-faces.js`) responde "esta face
+encosta em 0 ou em 1 na direção dela?". Só a face que está no **plano da
+emenda** é descartada — que era o motivo original da regra (dois planos iguais
+brigando pelo mesmo pixel, o pisca-pisca ao girar a câmera). A tolerância de
+0,01 existe por causa da folga de 0,06/16 que a cama aplica nas faces de fora.
+
+O `solid` do mesher ganhou o parâmetro da forma, e o mesher passa a caixa que
+está desenhando. Efeito colateral bom: as **pernas** da cabeceira também
+perdiam a face virada para o meio da cama (4,5/16 para dentro) — voltaram, e as
+da porta também, pela mesma regra.
+
+## Como isso foi encontrado
+
+Um renderizador de mesa (`preview/cama-mundo-mesher.mjs`, fora do repositório)
+monta a cama **pelo caminho do mesher**: duas células, `bedShapes` por metade e a
+regra de recusa. Rodando com `REGRA=antiga` a faixa preta aparece; com
+`REGRA=nova` ela some, e 6 faces (12 triângulos) voltam a ser desenhadas.
+
+`tests/shape-culling.test.mjs` guarda a regra: a face do travesseiro virada para
+o meio da cama tem de estar entre as desenhadas, a face do colchão na emenda não
+pode voltar, e o `game.js` tem de continuar chamando a regra nova.
