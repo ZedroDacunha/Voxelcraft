@@ -207,10 +207,54 @@ bloco ainda está lá. Cama quebrada não puxa ninguém.
   um item não faz nada. Morrer dormindo (um bicho pode chegar) corta a dormida
   antes da tela de morte — nunca se morre com a tela preta.
 
+---
+
+# Parte 3 — três camas, uma por cor de lã
+
+A cama da parte 1 era **vermelha**, a cor das imagens de referência. Só que o
+jogo não tem lã vermelha: a receita sempre foi 3 lãs **brancas** + 3 tábuas, e o
+colchão vermelho saía de uma lã que não era vermelha. A parte 3 conserta isso
+com o que o jogo já tem — a ovelha dá **lã branca, cinza e preta**, e cada uma
+agora faz a cama da sua cor.
+
+| cama | receita | colchão |
+| --- | --- | --- |
+| **Cama** (a de sempre) | 3 lãs brancas + 3 tábuas | creme `209,204,192` |
+| **Cama cinza** | 3 lãs cinzas + 3 tábuas | cinza `150,150,145` |
+| **Cama preta** | 3 lãs pretas + 3 tábuas | preta `58,58,62` |
+
+O **travesseiro é branco nas três** e a madeira é a mesma peça: o que muda é só
+o colchão. Misturar lãs não vira cama nenhuma — não há corante no jogo, e a
+receita não empresta cor.
+
+## Uma decisão de arte: a branca não é branco puro
+
+Com branco puro o colchão e o travesseiro ficavam **exatamente** da mesma cor e
+o travesseiro desaparecia dentro da cama. O colchão da branca é um creme de
+`209,204,192` — 25 níveis mais escuro que o travesseiro. Continua lendo como cama
+branca, e o travesseiro volta a existir.
+
+## Como está montado
+
+- `world-catalog.js` › **`BED_VARIANTS`** é a tabela única: para cada cor, a lã da
+  receita, o item, os dois blocos (cabeceira e pés) e os tiles do colchão. Os
+  seis blocos e as três receitas nascem dessa tabela num laço — acrescentar uma
+  quarta cor é acrescentar **uma linha**.
+- Cada bloco carrega `bed: { part, color }`. É daí que saem as perguntas do resto
+  do jogo: `bedPart(tipo)` e `bedColor(tipo)` (antes eram uma cadeia de `if`s
+  sobre IDs fixos).
+- O **mesher** desenha `bedShapes(bedPart(t), facing, bedColor(t))`; o **ícone da
+  barra** é `spritePixels('bed', cor)`, que monta o mesmo modelo naquela cor.
+- **Colocar** pega a cor do item: `placeBed(..., footType)` acha a cabeceira do
+  mesmo par, então uma cama preta nunca vira branca ao ser posta no chão.
+- **Quebrar** devolve o item da cor do bloco (`BLOCKS[tipo].drop`), e o som
+  continua sendo de lã nas três (`world-block-materials.js` deriva a lista dos
+  `BED_VARIANTS`).
+- **O save** não mudou de formato: o ID do bloco já diz a cor. A cama antiga (ID
+  117) é a branca — save velho abre com a cama na cor nova.
+
 ## O que fica para a próxima parte
 
-- **Três camas, uma por cor de lã** (branca, cinza, preta): a geometria é a
-  mesma, muda a tabela de tile por cor.
-- **A cama 3D equipada na mão**, em primeira pessoa.
+- **A cama 3D equipada na mão**, em primeira pessoa (parte 4).
 - Fora do escopo: as 16 tinturas (o jogo não tem corantes) e a cama cair quando
   o chão é cavado.

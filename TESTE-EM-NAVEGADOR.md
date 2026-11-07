@@ -1357,3 +1357,23 @@ A parte 2 da cama. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
 - [ ] Morrer dormindo (um Mofim atacando) não deixa a tela preta: a tela de
       morte aparece normalmente.
 - [ ] Dormir duas vezes seguidas funciona (não fica preso na primeira).
+
+## 70. As três camas (uma por cor de lã)
+
+Parte 3 da cama. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
+
+- [ ] Na bancada, **3 lãs brancas + 3 tábuas** → **Cama** (a de sempre).
+- [ ] **3 lãs cinzas + 3 tábuas** → **Cama cinza**; **3 lãs pretas + 3 tábuas** →
+      **Cama preta**.
+- [ ] Misturar (2 cinzas + 1 branca) **não** vira cama nenhuma.
+- [ ] Colocando a cinza, o colchão é cinza; a preta, preta; a branca, creme. O
+      **travesseiro é branco nas três** e a madeira é a mesma.
+- [ ] Na barra, cada uma tem o seu ícone: a cama aparece em 3/4 com a cor certa.
+- [ ] Quebrar qualquer uma devolve **a mesma cor** (não vira branca).
+- [ ] Dormir e renascer funcionam igual nas três (a cama preta também é o seu
+      ponto de renascimento).
+- [ ] Salve e recarregue: as camas voltam com a cor certa (é a cor do bloco, não
+      um filtro).
+- [ ] `/give cama`, `/give cama cinza` e `/give cama preta` funcionam.
+- [ ] A cama **vermelha** não existe mais — save antigo com cama vira a branca
+      (mesmo item, mesmo ID).

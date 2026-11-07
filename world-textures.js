@@ -1,7 +1,7 @@
 import { hash2, mulberry32 } from './world-math.js';
 import { ATLAS_COLUMNS, ATLAS_ROWS, BLOCKS, ITEMS, TILE, TILE_PX, atlasTileRect } from './world-catalog.js';
 import { createBlockIconPixels, createModelIconPixels } from './world-block-icons.js';
-import { bedModelBoxes } from './world-bed.js';
+import { BED_COLORS, bedModelBoxes } from './world-bed.js';
 import { MEAT_SPRITE_CORES } from './world-meats.js';
 import { createCoalItemSpritePixels, createMineralOrePixel, createMineralSpritePixels, isMineralOreTile } from './world-mineral-textures.js';
 import {
@@ -67,6 +67,16 @@ function cobblePixel(x, y, variant) {
  * para RGBA, e a folha só pinta o que ela devolve.
  */
 export function createTilePixelSource() {
+    // Colchão por cor de lã. A branca é um creme, não branco puro: com o branco
+    // cheio o travesseiro (que é branco em todas) desaparecia dentro dela. As
+    // outras duas são exatamente as cores do bloco de lã da mesma cor, para a
+    // cama e a lã lerem como o mesmo material.
+    const BED_QUILT_TINTS = {
+        [TILE.BED_TOP]: [209, 204, 192], [TILE.BED_SIDE]: [209, 204, 192],
+        [TILE.BED_TOP_GRAY]: [150, 150, 145], [TILE.BED_SIDE_GRAY]: [150, 150, 145],
+        [TILE.BED_TOP_BLACK]: [58, 58, 62], [TILE.BED_SIDE_BLACK]: [58, 58, 62],
+    };
+    const BED_PILLOW_TINT = [238, 236, 230];
     const grassEdges = [0, 1].map(variant => Array.from({ length: TILE_PX }, (_, x) =>
         4 + Math.floor(hash2(x, variant, 2024) * 4)));
     const grassRoots = [0, 1].map(variant => Array.from({ length: TILE_PX }, (_, x) => {
@@ -378,19 +388,24 @@ export function createTilePixelSource() {
                 else if ((x + y) % 8 === 4) shade += 0.04;
                 return base.map(channel => Math.max(0, Math.min(255, Math.round(channel * shade))));
             }
-            // Cama: colchão vermelho e travesseiro branco. Os tons vêm das
-            // imagens de referência (o vermelho do topo ~156,44,36, a lateral
-            // mais escura), mas o desenho é nosso: trama curta de lã, um vinco
-            // de 2 px e o "rolo" da borda. A lateral repete o claro do topo nas
-            // primeiras linhas e escurece no encontro com a madeira — é isso que
-            // dá a impressão de colchão alto, e não de caixa vermelha.
+            // Cama: colchão na cor da lã e travesseiro branco. O desenho é
+            // nosso: trama curta de lã, um vinco de 2 px e o "rolo" da borda. A
+            // lateral repete o claro do topo nas primeiras linhas e escurece no
+            // encontro com a madeira — é isso que dá a impressão de colchão
+            // alto, e não de caixa chapada. Só a cor muda entre as três camas:
+            // o mesmo desenho, três tintas.
             case TILE.BED_TOP:
             case TILE.BED_SIDE:
+            case TILE.BED_TOP_GRAY:
+            case TILE.BED_SIDE_GRAY:
+            case TILE.BED_TOP_BLACK:
+            case TILE.BED_SIDE_BLACK:
             case TILE.BED_PILLOW_TOP:
             case TILE.BED_PILLOW_SIDE: {
                 const pillow = tile === TILE.BED_PILLOW_TOP || tile === TILE.BED_PILLOW_SIDE;
-                const side = tile === TILE.BED_SIDE || tile === TILE.BED_PILLOW_SIDE;
-                const base = pillow ? [238, 236, 230] : [164, 46, 38];
+                const side = tile === TILE.BED_SIDE || tile === TILE.BED_SIDE_GRAY
+                    || tile === TILE.BED_SIDE_BLACK || tile === TILE.BED_PILLOW_SIDE;
+                const base = pillow ? BED_PILLOW_TINT : BED_QUILT_TINTS[tile];
                 // Mancha macia (veludo) + pelo curto. A mancha manda no volume,
                 // mas precisa ser **interpolada**: em blocos de 6 px o topo do
                 // colchão lia como um xadrez; suave, lê como tecido.
@@ -639,7 +654,10 @@ export function createTextureTools(THREE) {
         // Desenhar uma segunda arte só para a barra é o caminho curto para o
         // ícone e o bloco divergirem.
         if (kind === 'bed') {
-            return (spriteCache[key] = createModelIconPixels(bedModelBoxes(), pixelDoTile(), {
+            // `mat` é a cor da cama: o ícone é o modelo daquela cor, com o mesmo
+            // enquadramento nas três (a silhueta não dança de uma para outra).
+            const cor = BED_COLORS.includes(mat) ? mat : 'white';
+            return (spriteCache[key] = createModelIconPixels(bedModelBoxes(cor), pixelDoTile(), {
                 size: TILE_PX, yaw: 36, pitch: 30, scale: 14.8, center: [0.5, 0.38, 1],
             }));
         }

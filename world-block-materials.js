@@ -1,7 +1,7 @@
 // Família de material de cada bloco, usada por todos os sons que dependem do
 // que está sendo pisado, quebrado ou colocado. Um bloco novo aqui rende som de
 // passo, de quebra e de colocação de uma vez.
-import { ID } from './world-catalog.js';
+import { BED_VARIANTS, ID } from './world-catalog.js';
 
 export const BLOCK_MATERIALS = Object.freeze(['grass', 'dirt', 'stone', 'wood', 'sand', 'wool']);
 
@@ -22,7 +22,7 @@ assign('sand', [ID.SAND]);
 // Lã é macia em tudo: passo abafado, quebra muda, colocação fofa.
 // A cama é quase toda colchão: passo e quebra saem macios, como na lã.
 assign('wool', [ID.WOOL_BLOCK_WHITE, ID.WOOL_BLOCK_GRAY, ID.WOOL_BLOCK_BLACK,
-    ID.BED_HEAD, ID.BED_FOOT]);
+    ...BED_VARIANTS.flatMap(bed => [bed.head, bed.foot])]);
 
 // Material do bloco, ou null quando ele não produz som de material (ar, tocha,
 // água — que tem som próprio de fluxo/natação).

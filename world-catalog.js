@@ -13,7 +13,11 @@ export const TILE = { GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, STONE: 3, WOOD: 4, C
                FURNACE_FRONT_ON: 29, FURNACE_SIDE: 30, CHEST_FRONT_OPEN: 31,
                WOOD_DOOR_UPPER: 32, WOOD_DOOR_LOWER: 33, MOFIM_LANTERN: 34,
                WOOL_WHITE: 35, WOOL_GRAY: 36, WOOL_BLACK: 37,
-               BED_TOP: 38, BED_SIDE: 39, BED_PILLOW_TOP: 40, BED_PILLOW_SIDE: 41 };
+               BED_TOP: 38, BED_SIDE: 39, BED_PILLOW_TOP: 40, BED_PILLOW_SIDE: 41,
+               // Colchão por cor de lã: a branca usa os tiles sem sufixo (é a
+               // cama "de sempre"), e cinza e preta ganham os seus. O
+               // travesseiro é branco em todas e por isso tem tile só.
+               BED_TOP_GRAY: 42, BED_SIDE_GRAY: 43, BED_TOP_BLACK: 44, BED_SIDE_BLACK: 45 };
 export const TILE_PX = 32;
 
 const allFaces = (t) => ({ top: t, side: t, bottom: t });
@@ -46,11 +50,35 @@ export const ID = { GRASS: 1, STONE: 2, LOG: 3, DIRT: 4, COBBLE: 5, PLANKS: 6, L
              SHEARS: 99,
              // A cama é **um item e dois blocos**: quebrar qualquer metade
              // devolve uma cama só, e o item entra no mundo pela metade dos pés.
+             // Uma cama por cor de lã: um item (a peça da barra) e dois blocos
+             // (as metades). A branca fica com os IDs de sempre — é a cama que
+             // os saves antigos já têm.
              BED: 117, BED_HEAD: 118, BED_FOOT: 119,
+             BED_GRAY: 120, BED_HEAD_GRAY: 121, BED_FOOT_GRAY: 122,
+             BED_BLACK: 123, BED_HEAD_BLACK: 124, BED_FOOT_BLACK: 125,
              // As carnes moram em `world-meats.js`: 100–116, oito bichos ×
              // duas entradas (crua e assada). Mob novo que solta carne entra
              // lá, não aqui.
              ...MEAT_IDS };
+
+/**
+ * As três camas, uma por cor de lã.
+ *
+ * A cor não é enfeite: ela escolhe o **colchão** (tiles próprios, um par claro e
+ * um escuro para a aba), o **item** e os **blocos** das duas metades. Quem lê a
+ * tabela é o resto do jogo — a receita (`RECIPES`), o mesher (que pergunta ao
+ * bloco qual é o seu `bed.color`) e o ícone da barra.
+ *
+ * O travesseiro não está aqui de propósito: ele é branco nas três.
+ */
+export const BED_VARIANTS = Object.freeze([
+    { color: 'white', label: 'branca', wool: ID.WOOL_WHITE, item: ID.BED,
+      head: ID.BED_HEAD, foot: ID.BED_FOOT, top: TILE.BED_TOP, side: TILE.BED_SIDE },
+    { color: 'gray', label: 'cinza', wool: ID.WOOL_GRAY, item: ID.BED_GRAY,
+      head: ID.BED_HEAD_GRAY, foot: ID.BED_FOOT_GRAY, top: TILE.BED_TOP_GRAY, side: TILE.BED_SIDE_GRAY },
+    { color: 'black', label: 'preta', wool: ID.WOOL_BLACK, item: ID.BED_BLACK,
+      head: ID.BED_HEAD_BLACK, foot: ID.BED_FOOT_BLACK, top: TILE.BED_TOP_BLACK, side: TILE.BED_SIDE_BLACK },
+].map(bed => Object.freeze({ ...bed, name: bed.color === 'white' ? 'Cama' : `Cama ${bed.label}` })));
 
 export const BLOCKS = {
     [ID.GRASS]: { name: 'Grama',      hardness: 0.6, drop: ID.DIRT,   tool: 'shovel', tiles: { top: TILE.GRASS_TOP, side: TILE.GRASS_SIDE, bottom: TILE.DIRT } },
@@ -102,19 +130,6 @@ export const BLOCKS = {
     [ID.WOOL_BLOCK_WHITE]: { name: 'Bloco de lã branca', hardness: 0.6, drop: ID.WOOL_BLOCK_WHITE, tool: null, tiles: allFaces(TILE.WOOL_WHITE) },
     [ID.WOOL_BLOCK_GRAY]: { name: 'Bloco de lã cinza', hardness: 0.6, drop: ID.WOOL_BLOCK_GRAY, tool: null, tiles: allFaces(TILE.WOOL_GRAY) },
     [ID.WOOL_BLOCK_BLACK]: { name: 'Bloco de lã preta', hardness: 0.6, drop: ID.WOOL_BLOCK_BLACK, tool: null, tiles: allFaces(TILE.WOOL_BLACK) },
-    // Cama: dois voxels com geometria própria (`world-bed.js`). Ela é `solid`
-    // porque o jogador sobe nela — a colisão que vale é a caixa de 9/16 tratada
-    // na física — e não é opaca, porque móvel não faz sombra de parede.
-    [ID.BED_FOOT]: {
-        name: 'Cama', hardness: 0.8, drop: ID.BED, tool: null, collectible: false,
-        render: 'bed', solid: true, opaque: false, bed: { part: 'foot' },
-        tiles: { top: TILE.BED_TOP, side: TILE.BED_SIDE, bottom: TILE.WOOD_END },
-    },
-    [ID.BED_HEAD]: {
-        name: 'Cama', hardness: 0.8, drop: ID.BED, tool: null, collectible: false,
-        render: 'bed', solid: true, opaque: false, bed: { part: 'head' },
-        tiles: { top: TILE.BED_TOP, side: TILE.BED_SIDE, bottom: TILE.WOOD_END },
-    },
     [ID.WATER]: { name: 'Água',      hardness: 100, drop: null, tool: null, render: 'liquid', solid: false, collectible: false, tiles: allFaces(TILE.WATER) }, // Água só existe no mundo
 };
 
@@ -132,6 +147,21 @@ BLOCKS[ID.WATER_FALL] = {
     render: 'liquid', solid: false, collectible: false, flowing: true, falling: true,
     flowLevel: 8, waterLevel: 1, tiles: allFaces(TILE.WATER),
 };
+
+// Cama: dois voxels com geometria própria (`world-bed.js`). Ela é `solid`
+// porque o jogador sobe nela — a colisão que vale é a caixa de 9/16 tratada na
+// física — e não é opaca, porque móvel não faz sombra de parede. Uma entrada por
+// cor × metade; `bed.part` e `bed.color` dizem ao mesher o que desenhar.
+for (const bed of BED_VARIANTS) {
+    const tiles = { top: bed.top, side: bed.side, bottom: TILE.WOOD_END };
+    for (const part of ['foot', 'head']) {
+        BLOCKS[bed[part]] = {
+            name: bed.name, hardness: 0.8, drop: bed.item, tool: null, collectible: false,
+            render: 'bed', solid: true, opaque: false,
+            bed: { part, color: bed.color }, tiles,
+        };
+    }
+}
 
 for (const block of Object.values(BLOCKS)) {
     block.render ??= 'opaque';
@@ -202,12 +232,15 @@ for (const [key, label, color] of [['WHITE', 'branca', 'white'], ['GRAY', 'cinza
 // das ferramentas por material (base + índice) e enfiar mais um tipo ali
 // renumeraria picareta, machado e pá de todos os materiais — e os saves com
 // isso. Ela é item próprio, com `tool.type` para o jogo reconhecer.
-// A cama é uma peça só na barra: o ícone sai do modelo (world-textures.js ›
-// `spritePixels('bed')`) e o bloco que ela vira é a metade dos pés.
-ITEMS[ID.BED] = {
-    name: 'Cama', maxStack: 1, block: ID.BED_FOOT,
-    sprite: { kind: 'bed', mat: 'red' }, iconTile: nextTile++,
-};
+// As camas são uma peça só na barra: o ícone sai do modelo
+// (world-textures.js › `spritePixels('bed', cor)`) e o bloco que ela vira é a
+// metade dos pés daquela cor. Cama não stacka — é móvel, não recurso.
+for (const bed of BED_VARIANTS) {
+    ITEMS[bed.item] = {
+        name: bed.name, maxStack: 1, block: bed.foot,
+        sprite: { kind: 'bed', mat: bed.color }, iconTile: nextTile++,
+    };
+}
 
 ITEMS[ID.SHEARS] = {
     name: 'Tesoura', maxStack: 1, maxDurability: 238,
@@ -370,8 +403,11 @@ defRecipe([[ID.WOOL_WHITE, ID.WOOL_WHITE], [ID.WOOL_WHITE, ID.WOOL_WHITE]], ID.W
 defRecipe([[ID.WOOL_GRAY, ID.WOOL_GRAY], [ID.WOOL_GRAY, ID.WOOL_GRAY]], ID.WOOL_BLOCK_GRAY);
 defRecipe([[ID.WOOL_BLACK, ID.WOOL_BLACK], [ID.WOOL_BLACK, ID.WOOL_BLACK]], ID.WOOL_BLOCK_BLACK);
 // Cama: três fardos de lã em cima, três tábuas embaixo — a mesma silhueta da
-// receita clássica, que se reconhece sem tutorial. Sai uma cama por vez.
-defRecipe([[ID.WOOL_WHITE, ID.WOOL_WHITE, ID.WOOL_WHITE], [ID.PLANKS, ID.PLANKS, ID.PLANKS]], ID.BED);
+// receita clássica, que se reconhece sem tutorial. Sai uma cama por vez e a lã
+// manda na cor: branca, cinza e preta não se misturam (o jogo não tem corante).
+for (const bed of BED_VARIANTS) {
+    defRecipe([[bed.wool, bed.wool, bed.wool], [ID.PLANKS, ID.PLANKS, ID.PLANKS]], bed.item);
+}
 
 function shapesEqual(a, b) {
     if (a.length !== b.length || a[0].length !== b[0].length) return false;

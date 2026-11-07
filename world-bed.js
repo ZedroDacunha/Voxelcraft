@@ -1,5 +1,8 @@
 // A cama: um bloco de **dois voxels** (cabeceira + pés) desenhado com caixas.
 //
+// São três camas — uma por cor de lã (branca, cinza e preta) — e o modelo é o
+// mesmo nas três: muda só a tile do colchão. O travesseiro é branco em todas.
+//
 // O mesher só sabia desenhar duas formas não cúbicas — a tocha (uma caixa) e a
 // porta (uma caixa fina) — e cada uma usava **uma** tile por tipo de face. A
 // cama precisa de mais: pernas e moldura de madeira, colchão vermelho e
@@ -10,7 +13,7 @@
 // As medidas estão em dezesseis-avos de bloco, como o desenho original: 0 é o
 // chão e 16 é o topo do voxel. O eixo do comprimento é o **Z local**, com a
 // cabeceira para o +Z; `facing` gira esse eixo para as quatro direções.
-import { ID, TILE } from './world-catalog.js';
+import { BED_VARIANTS, BLOCKS, TILE } from './world-catalog.js';
 
 /** Um dezesseis-avos de bloco — a unidade em que o modelo é escrito. */
 const U = 1 / 16;
@@ -29,7 +32,20 @@ export const BED_HEIGHTS = Object.freeze({
 // madeira escura do tronco: é o que separa a cama do chão sem virar um móvel
 // pesado.
 const WOOD_TILES = Object.freeze({ top: TILE.PLANKS, side: TILE.PLANKS, bottom: TILE.PLANKS });
-const MATTRESS_TILES = Object.freeze({ top: TILE.BED_TOP, side: TILE.BED_SIDE, bottom: TILE.WOOD_END });
+// O colchão de cada cor: o par de tiles (topo e lateral) e a madeira embaixo.
+// A tabela vem do catálogo (`BED_VARIANTS`), que é quem manda nas cores — aqui
+// só se escolhe o jogo de tiles de quem está sendo desenhado.
+const QUILT_TILES = Object.freeze(Object.fromEntries(BED_VARIANTS.map(bed => [bed.color, Object.freeze({
+    top: bed.top, side: bed.side, bottom: TILE.WOOD_END,
+})])));
+
+/** As cores de cama que existem, na ordem do catálogo. */
+export const BED_COLORS = Object.freeze(Object.keys(QUILT_TILES));
+
+/** O colchão da cor pedida; cor desconhecida cai na branca. */
+function quiltTiles(color) {
+    return QUILT_TILES[color] ?? QUILT_TILES.white;
+}
 const PILLOW_TILES = Object.freeze({
     top: TILE.BED_PILLOW_TOP, side: TILE.BED_PILLOW_SIDE, bottom: TILE.BED_PILLOW_SIDE,
 });
@@ -93,8 +109,9 @@ function comFolga(box, extremidade) {
  * travesseiro .... 8,5 → 12  (corpo até 11 e tampa 1/16 menor até 12)
  * ```
  */
-function canonicalBoxes(part) {
+function canonicalBoxes(part, color = 'white') {
     const head = part === 'head';
+    const MATTRESS_TILES = quiltTiles(color);
     const extremidade = head ? 'max' : 'min';   // o fim de fora desta metade
     // Pernas e travessa ficam 1/16 para dentro, e as pernas mais 1/2 ainda: é o
     // que as afasta do plano da travessa (duas faces no mesmo plano piscam).
@@ -175,8 +192,8 @@ function rotate(x, z, facing) {
  * Cada caixa carrega as tiles de topo, lateral e fundo — mais de um material por
  * peça, que é a diferença em relação à tocha e à porta.
  */
-export function bedShapes(part, facing = 'south') {
-    return canonicalBoxes(part).map(({ min, max, tiles }) => {
+export function bedShapes(part, facing = 'south', color = 'white') {
+    return canonicalBoxes(part, color).map(({ min, max, tiles }) => {
         const [ax, az] = rotate(min[0], min[2], facing);
         const [bx, bz] = rotate(max[0], max[2], facing);
         return {
@@ -187,20 +204,36 @@ export function bedShapes(part, facing = 'south') {
     });
 }
 
-/** `'head'`, `'foot'` ou `null` para o tipo de bloco. */
+/**
+ * `'head'`, `'foot'` ou `null` para o tipo de bloco.
+ *
+ * A resposta vem do próprio catálogo (`BLOCKS[tipo].bed`), que é onde as três
+ * cores foram declaradas: acrescentar uma quarta cama é acrescentar uma linha em
+ * `BED_VARIANTS`, sem tocar aqui.
+ */
 export function bedPart(type) {
-    if (type === ID.BED_HEAD) return 'head';
-    if (type === ID.BED_FOOT) return 'foot';
-    return null;
+    return BLOCKS[type]?.bed?.part ?? null;
 }
 
-export function bedTypeForPart(part) {
-    return part === 'head' ? ID.BED_HEAD : ID.BED_FOOT;
+/** `'white'`, `'gray'`, `'black'` — ou `null` se o bloco não é cama. */
+export function bedColor(type) {
+    return BLOCKS[type]?.bed?.color ?? null;
 }
 
-/** O bloco é uma cama (qualquer das duas metades)? */
+/** O bloco é uma cama (qualquer metade, qualquer cor)? */
 export function isBedBlock(type) {
     return bedPart(type) !== null;
+}
+
+/** A metade dos pés? É ela que o item coloca primeiro e que guarda o save. */
+export function isBedFoot(type) {
+    return bedPart(type) === 'foot';
+}
+
+/** O par de um tipo: dado os pés (ou a cabeceira), devolve o outro. */
+export function bedTypeForPart(part, color = 'white') {
+    const bed = BED_VARIANTS.find(variante => variante.color === color) ?? BED_VARIANTS[0];
+    return part === 'head' ? bed.head : bed.foot;
 }
 
 /**
@@ -238,10 +271,10 @@ export function bedCollisionBox() {
  * do inventário e a página de comparação desenham. As caixas voltam no espaço
  * canônico (comprimento em Z, de 0 a 2).
  */
-export function bedModelBoxes() {
+export function bedModelBoxes(color = 'white') {
     return [
-        ...canonicalBoxes('foot'),
-        ...canonicalBoxes('head').map(({ min, max, tiles }) => ({
+        ...canonicalBoxes('foot', color),
+        ...canonicalBoxes('head', color).map(({ min, max, tiles }) => ({
             min: [min[0], min[1], min[2] + 1],
             max: [max[0], max[1], max[2] + 1],
             tiles,
