@@ -12,7 +12,7 @@ test('a ferramenta gira ao redor do cabo e aponta para cima', () => {
     const grip = mesh.localToWorld(new THREE.Vector3(-FIRST_TOOL_POSE.grip[0], -FIRST_TOOL_POSE.grip[1], 0));
     assert.ok(grip.distanceTo(anchor.getWorldPosition(new THREE.Vector3())) < 1e-9);
     const tip = mesh.localToWorld(new THREE.Vector3(.15, .15, 0));
-    assert.ok(tip.y > grip.y && tip.x > grip.x, 'cabeça fica acima e à direita da empunhadura');
+    assert.ok(tip.y > grip.y, 'cabeça fica acima da empunhadura');
     assert.ok(Math.abs(FIRST_TOOL_POSE.position[2] + .6) < .02, 'cabo no fim da mão');
     mesh.geometry.dispose(); mesh.material.dispose();
 });
@@ -35,4 +35,21 @@ test('a pose se aplica só às ferramentas e mantém a animação do braço', ()
     assert.match(source, /if \(HELD_TOOL_KINDS\.has\(item\.sprite\.kind\)\) heldMesh\.position\.set\(\.\.\.FIRST_TOOL_POSE\.grip\)/);
     assert.match(source, /if \(HELD_TOOL_KINDS\.has\(heldToolKind\)\) \{\s*applyFirstPersonToolPose\(heldAnchor\)/);
     assert.match(source, /advanceHandAnimation\(handAnim, dt/);
+});
+
+
+test('projetada pela câmera do jogo, a ferramenta sobe mais do que avança para o lado', () => {
+    const camera = new THREE.PerspectiveCamera(70, 4 / 3, 0.01, 5);
+    camera.updateProjectionMatrix();
+    const arm = new THREE.Group();
+    arm.position.set(0.42, -0.50, -0.25);
+    arm.rotation.set(0.35, 0.25, 0);
+    const anchor = new THREE.Group();
+    arm.add(anchor);
+    applyFirstPersonToolPose(anchor);
+    const grip = anchor.localToWorld(new THREE.Vector3(0, 0, 0)).project(camera);
+    const tip = anchor.localToWorld(new THREE.Vector3(0.35, 0.35, 0)).project(camera);
+    assert.ok(tip.y > grip.y, 'cabeça aparece acima do cabo na tela');
+    assert.ok(tip.y - grip.y > 2 * Math.abs(tip.x - grip.x), 'cabo é predominantemente vertical na tela');
+    assert.ok(tip.x < 1 && tip.y < 1, 'a cabeça fica dentro do quadro 4:3');
 });

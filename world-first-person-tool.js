@@ -1,11 +1,12 @@
 /** Pose da ferramenta em primeira pessoa, no espaço do braço.
  * A origem fica no cabo: o sprite diagonal é girado e inclinado para que a
  * ferramenta saia da mão em direção ao alto, sem ocupar o centro da tela.
+ * A inclinação inclui o efeito da rotação do braço e da projeção da câmera.
  * Os valores são adaptação visual, não uma reprodução exata da câmera alheia.
  */
 export const FIRST_TOOL_POSE = Object.freeze({
     position: Object.freeze([0, 0.02, -0.59]),
-    rotation: Object.freeze([10 * Math.PI / 180, -20 * Math.PI / 180, -25 * Math.PI / 180]),
+    rotation: Object.freeze([10 * Math.PI / 180, -20 * Math.PI / 180, 50 * Math.PI / 180]),
     scale: 0.85,
     grip: Object.freeze([0.187, 0.204, 0]),
 });
