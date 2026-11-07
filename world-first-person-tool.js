@@ -6,7 +6,7 @@
  */
 export const FIRST_TOOL_POSE = Object.freeze({
     position: Object.freeze([0, 0.02, -0.59]),
-    rotation: Object.freeze([10 * Math.PI / 180, -35 * Math.PI / 180, 50 * Math.PI / 180]),
+    rotation: Object.freeze([10 * Math.PI / 180, -65 * Math.PI / 180, 50 * Math.PI / 180]),
     scale: 0.85,
     grip: Object.freeze([0.187, 0.204, 0]),
 });

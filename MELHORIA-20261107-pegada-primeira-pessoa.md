@@ -27,3 +27,9 @@ Após o novo print, o eixo Y foi virado 15° a mais (de −20° para −35°),
 reduzindo o quanto a face da ferramenta aponta para a câmera. Posição do cabo,
 escala e inclinação vertical permanecem iguais. A comparação na tela e o
 contato com o bloco ainda precisam da avaliação visual do jogador.
+
+## Segunda tentativa: mais giro
+
+Como o ajuste anterior ficou quase imperceptível para o jogador, o eixo Y foi
+virado mais 30°, de −35° para −65°. A empunhadura, a escala e a inclinação
+vertical continuam iguais. A aparência ainda precisa de confirmação no jogo.
