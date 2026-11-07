@@ -65,6 +65,7 @@ import { createChatCompleter, visibleSuggestions } from './world-chat-completion
 import { DUST_COLOR, dustScaleFor } from './world-creature-dust.js';
 import { configureWindSway, updateWindSway, windDirectionFor, windStep, windTargetFor } from './world-wind.js';
 import { advanceHandAnimation, countStrikes, createHandAnimation, handSwingAmount, startPunch } from './world-hand-animation.js';
+import { FIRST_TOOL_POSE, applyFirstPersonToolPose } from './world-first-person-tool.js';
 import { STEP_MAX_MOVED, stepDistanceThisFrame, stepPitch, stepSoundFor } from './world-step-sounds.js';
 import { advanceGait, createGait, gaitPose } from './world-gait.js';
 import { materialSoundName } from './world-block-materials.js';
@@ -199,12 +200,6 @@ const HAND_BASE = { x: 0.42, y: -0.50, z: -0.25 };
 const HELD_TOOL_ROT = [0.3, -0.55, 0.0];
 const HELD_BLOCK_ROT = [0.25, 0.7, 0.0];
 const HELD_BLOCK_POS = [0.03, 0.07, -0.04];
-const HELD = {
-    // Local to handPivot: origin remains at the existing grip location.
-    position: { x: 0, y: 0, z: -0.50 },
-    rotation: { x: 10, y: -30, z: 90 },
-    scale: 0.85,
-};
 const HELD_TOOL_KINDS = new Set(['pickaxe', 'axe', 'shovel', 'shears']);
 
 // =====================================================================
@@ -2162,12 +2157,7 @@ function refreshHeldItem() {
     }
     if (itemRenderMode(item) === 'sprite') {
         if (HELD_TOOL_KINDS.has(item.sprite.kind)) {
-            heldAnchor.position.set(HELD.position.x, HELD.position.y, HELD.position.z);
-            heldAnchor.rotation.set(
-                THREE.MathUtils.degToRad(HELD.rotation.x),
-                THREE.MathUtils.degToRad(HELD.rotation.y),
-                THREE.MathUtils.degToRad(HELD.rotation.z));
-            heldAnchor.scale.setScalar(HELD.scale);
+            applyFirstPersonToolPose(heldAnchor);
         }
         const px = 0.034;
         const key = 'spr' + id;
@@ -2181,8 +2171,11 @@ function refreshHeldItem() {
         }
         heldMesh = new THREE.Mesh(heldGeoCache[key], spriteMaterial);
         const hasHandle = !!item.tool || item.sprite.kind === 'stick';
-        heldMesh.position.set(hasHandle ? 3.5 * px : 0, hasHandle ? 4.5 * px : 0, 0);
-        if (!HELD_TOOL_KINDS.has(item.sprite.kind)) heldAnchor.rotation.set(...HELD_TOOL_ROT);
+        if (HELD_TOOL_KINDS.has(item.sprite.kind)) heldMesh.position.set(...FIRST_TOOL_POSE.grip);
+        else {
+            heldMesh.position.set(hasHandle ? 3.5 * px : 0, hasHandle ? 4.5 * px : 0, 0);
+            heldAnchor.rotation.set(...HELD_TOOL_ROT);
+        }
     } else {
         const key = 'blk' + id;
         const block = BLOCKS[item.block];
@@ -2220,12 +2213,7 @@ function updateHand(dt) {
     const { swing, dip } = handSwingAmount(handAnim);
     const heldToolKind = ITEMS[heldId]?.sprite?.kind;
     if (HELD_TOOL_KINDS.has(heldToolKind)) {
-        heldAnchor.position.set(HELD.position.x, HELD.position.y, HELD.position.z);
-        heldAnchor.rotation.set(
-            THREE.MathUtils.degToRad(HELD.rotation.x),
-            THREE.MathUtils.degToRad(HELD.rotation.y),
-            THREE.MathUtils.degToRad(HELD.rotation.z));
-        heldAnchor.scale.setScalar(HELD.scale);
+        applyFirstPersonToolPose(heldAnchor);
     }
 
     handAnim.eat += ((eat.active ? 1 : 0) - handAnim.eat) * Math.min(1, 10 * dt);
