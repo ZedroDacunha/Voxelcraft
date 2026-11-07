@@ -53,6 +53,9 @@ export function createWorldSaveCodec({ version = WORLD_SAVE_VERSION } = {}) {
                 cook: furnace.cook,
             }]),
             edits,
+            // Célula da cama em que o jogador dormiu por último (o ponto de
+            // renascimento). Sem cama, o campo vai nulo.
+            bedSpawn: state.bedSpawn ?? null,
         };
     }
 
@@ -103,6 +106,16 @@ export function createWorldSaveCodec({ version = WORLD_SAVE_VERSION } = {}) {
             });
         }
         return drops;
+    }
+
+    // A célula da cama é só um endereço: inteiro, dentro do mundo. Se a cama
+    // não estiver mais lá, quem carrega descarta (o jogo confere o bloco).
+    function parseBedSpawn(value) {
+        if (!value || typeof value !== 'object') return null;
+        const { x, y, z } = value;
+        if (![x, y, z].every(Number.isInteger)) return null;
+        if (y < 0 || y >= WORLD_HEIGHT) return null;
+        return { x, y, z };
     }
 
     function validate(data, expectedSeed) {
@@ -168,6 +181,7 @@ export function createWorldSaveCodec({ version = WORLD_SAVE_VERSION } = {}) {
                 drops: parseDrops(data.drops),
                 chests: parseChests(data.chests),
                 worldTime: Number.isFinite(data.worldTime) ? ((data.worldTime % 1) + 1) % 1 : START_TIME,
+                bedSpawn: parseBedSpawn(data.bedSpawn),
             };
         } catch {
             return null;

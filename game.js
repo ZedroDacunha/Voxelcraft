@@ -44,6 +44,7 @@ import { FurnaceSmokeSystem } from './world-furnace-effects.js';
 import { canHarvest, damageTool as damageToolStack, getBreakTime } from './world-tool-rules.js';
 import { boxOverlapsXZ, woodDoorCollision, woodDoorPart, woodDoorShape, woodDoorType } from './world-door.js';
 import { bedCells, bedOtherCell, bedPart, bedShapes, isBedBlock } from './world-bed.js';
+import { DAWN_TIME, bedRespawnPoint, canSleepAt, sleepPhaseAt } from './world-sleep.js';
 import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld } from './player-physics.js';
 import { canJumpFrom, createJumpState, updateJumpWindow } from './player-jump.js';
 import { ATTACK_COOLDOWN, attackReady, createCreatureSystemClass } from './world-creature.js';
@@ -1841,6 +1842,13 @@ function breakBlock(x, y, z) {
     if (bedHalf && isBedBlock(world.getBlock(bedHalf.x, bedHalf.y, bedHalf.z))) {
         world.setBlock(bedHalf.x, bedHalf.y, bedHalf.z, 0);
     }
+    // Se a cama quebrada era o ponto de renascimento, o jogador volta a nascer
+    // no ponto de partida do mundo (e é avisado).
+    if (bedSpawnStanding() && (x === bedSpawn.x && y === bedSpawn.y && z === bedSpawn.z
+        || (bedHalf && bedHalf.x === bedSpawn.x && bedHalf.y === bedSpawn.y && bedHalf.z === bedSpawn.z))) {
+        clearBedSpawn();
+        showToast('Seu ponto de renascimento voltou ao início do mundo');
+    }
     // A célula fica vazia; a água em volta escorre para dentro como fluxo
     // (nunca como fonte). Ver `world-water.js` › `onBlockBroken()`.
     world.water.onBlockBroken(world, x, y, z);
@@ -3322,6 +3330,8 @@ const LOOK_SPEED = 0.002;
 // jogo rodando), então fica numa variável, não numa constante.
 let LOOK_SENSITIVITY = GAME_SETTINGS.sensitivity;
 const MAX_PITCH = Math.PI / 2 - 0.02;
+// Deitado na cama o olhar sobe para o céu: é o ângulo da cabeça no travesseiro.
+const LIE_PITCH = 1.15;
 
 let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
 let jumpHeld = false, swimStrokeLocked = false, isSprinting = false, wantToCrouch = false, isCrouching = false;
@@ -3642,6 +3652,8 @@ function die(source = 'generic') {
     touchActive = false;
     resetInputFlags();
     cancelEating();
+    // Morrer dormindo (um bicho pode chegar) não pode deixar a tela preta.
+    stopSleep();
     const dx = Math.floor(player.pos.x), dy = Math.floor(player.pos.y), dz = Math.floor(player.pos.z);
     const origin = new THREE.Vector3(player.pos.x, player.pos.y + 0.8, player.pos.z);
     let lost = 0;
@@ -3656,11 +3668,13 @@ function die(source = 'generic') {
 
     resetStats();
     invuln = 2;
-    player.pos.copy(spawnPoint);
+    // Cama do último sonho (se ela ainda está de pé) ou o ponto de partida.
+    const spawnAt = respawnOrigin();
+    player.pos.copy(spawnAt);
     world.water.updateSubmersion(world, player);
     player.vel.set(0, 0, 0);
     player.fallDistance = 0;
-    world.update(spawnPoint.x, spawnPoint.z);
+    world.update(spawnAt.x, spawnAt.z);
     camera.position.set(player.pos.x, player.pos.y + player.eye, player.pos.z);
     updateHotbarUI();
     updateSurvivalUI();
@@ -3672,7 +3686,7 @@ function die(source = 'generic') {
     const btn = document.getElementById('btn-respawn');
     btn.disabled = true;
     btn.textContent = 'Preparando...';
-    waitForWorldRegion(spawnPoint.x, spawnPoint.z, { driveUpdates: false })
+    waitForWorldRegion(spawnAt.x, spawnAt.z, { driveUpdates: false })
         .then(() => new Promise(resolve => setTimeout(resolve, 1200)))
         .then(() => {
             if (dead) {
@@ -4088,6 +4102,7 @@ function buildSave() {
         drops: itemEntities,
         chests,
         furnaces,
+        bedSpawn: bedSpawn.valid ? { x: bedSpawn.x, y: bedSpawn.y, z: bedSpawn.z } : null,
     });
 }
 
@@ -4122,6 +4137,163 @@ const loadGame = createWorldSaveLoader({
     confirmReset: message => window.confirm(message),
     onError: error => console.warn('Reset de save bloqueado para proteger o mundo:', error),
 });
+
+// =====================================================================
+// 10C. A CAMA: DORMIR E RENASCER NELA
+// =====================================================================
+// Dormir é uma sequência curta e mandona: o jogador deita (a câmera desce até o
+// travesseiro e olha para cima), a tela escurece, a noite passa de uma vez e ele
+// acorda **em pé em cima da cama**, que passa a ser o ponto de renascimento.
+// `world-sleep.js` guarda a conta (quem pode dormir, quanto tempo cada fase
+// dura, onde o corpo aparece); aqui é só a ligação com o jogo.
+const sleepEl = document.getElementById('sleep');
+const sleep = {
+    active: false, t: 0, changed: false, bed: null,
+    start: new THREE.Vector3(), lying: new THREE.Vector3(), lookBefore: { yaw: 0, pitch: 0 },
+};
+// A célula da cama onde o jogador dormiu: é para lá que ele volta ao morrer.
+const bedSpawn = { x: 0, y: 0, z: 0, valid: false };
+
+function setBedSpawn(cell) {
+    bedSpawn.x = cell.x; bedSpawn.y = cell.y; bedSpawn.z = cell.z;
+    bedSpawn.valid = true;
+}
+
+function clearBedSpawn() {
+    bedSpawn.valid = false;
+}
+
+/** A cama ainda está lá? Cama quebrada não pode continuar puxando o jogador. */
+function bedSpawnStanding() {
+    return bedSpawn.valid && isBedBlock(world.getBlock(bedSpawn.x, bedSpawn.y, bedSpawn.z));
+}
+
+/**
+ * Onde o corpo aparece ao renascer: em cima do colchão, se a cama do último
+ * sonho ainda existir; senão, o ponto de partida do mundo.
+ */
+function respawnOrigin() {
+    if (bedSpawnStanding()) {
+        const p = bedRespawnPoint(bedSpawn);
+        if (p) return new THREE.Vector3(p.x, p.y, p.z);
+    }
+    return spawnPoint;
+}
+
+function trySleep(hit) {
+    if (!hit || !isBedBlock(hit.type) || sleep.active || dead) return false;
+    // O céu é quem diz a hora: `worldSky.day` já é a luz do dia usada por tudo
+    // (bichos, som ambiente). Dormir só vale com a noite fechada.
+    if (!canSleepAt(1 - worldSky.day)) {
+        showToast('Só dá para dormir à noite');
+        return true;
+    }
+    const facing = world.getBlockFacing(hit.x, hit.y, hit.z);
+    const part = bedPart(hit.type);
+    // A cabeceira é onde fica o travesseiro: é ali que a cabeça do jogador
+    // deita. A célula guardada como ponto de renascimento é sempre a dos pés,
+    // para a cama não mudar de lugar se ele dormir pela outra metade.
+    const head = part === 'head' ? { x: hit.x, z: hit.z } : bedOtherCell(hit.x, hit.z, part, facing);
+    const foot = part === 'foot' ? { x: hit.x, z: hit.z } : bedOtherCell(hit.x, hit.z, part, facing);
+    sleep.active = true;
+    sleep.t = 0;
+    sleep.changed = false;
+    sleep.bed = { x: foot.x, y: hit.y, z: foot.z, facing };
+    sleep.start.copy(camera.position);
+    sleep.lookBefore = { yaw: look.yaw, pitch: look.pitch };
+    sleep.lying.set(head.x + 0.5, hit.y + 0.62, head.z + 0.5);
+    if (inventoryOpen) closeInventory(false);
+    cancelEating();
+    resetInputFlags();
+    audio.play('place-wool', { gainScale: 0.5, rate: 0.9 });
+    haptic('place');
+    return true;
+}
+
+/**
+ * A noite passa no instante em que a tela fica preta: o relógio pula para o
+ * amanhecer e o corpo é levado para cima da cama, com a cama registrada como
+ * ponto de renascimento.
+ */
+function wakeUpAtDawn() {
+    worldClock.time = DAWN_TIME;
+    updateSky();
+    const bed = sleep.bed;
+    if (bed) {
+        setBedSpawn(bed);
+        const p = bedRespawnPoint(bed);
+        if (p) {
+            player.pos.set(p.x, p.y, p.z);
+            player.vel.set(0, 0, 0);
+            player.fallDistance = 0;
+            player.onGround = true;
+            world.water.updateSubmersion(world, player);
+            world.update(p.x, p.z);
+            camera.position.set(p.x, p.y + player.eye, p.z);
+        }
+    }
+    resetInputFlags();
+}
+
+/**
+ * Corta a dormida sem cerimônia (morte ou saída do mundo): a tela volta, a
+ * câmera volta para o olho do jogador e nada é salvo.
+ */
+function stopSleep() {
+    if (!sleep.active) return;
+    sleep.active = false;
+    sleep.changed = false;
+    if (sleepEl) {
+        sleepEl.style.opacity = '0';
+        sleepEl.classList.remove('dark');
+    }
+    look.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, sleep.lookBefore.pitch));
+    applyLook();
+}
+
+function finishSleep() {
+    sleep.active = false;
+    sleep.changed = false;
+    if (sleepEl) {
+        sleepEl.style.opacity = '0';
+        sleepEl.classList.remove('dark');
+    }
+    // O olhar volta para onde o jogador estava olhando antes de deitar.
+    look.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, sleep.lookBefore.pitch));
+    applyLook();
+    saveGame(true);
+    showToast('Bom dia! A cama agora é o seu ponto de renascimento');
+}
+
+/** Um quadro da dormida: tela, câmera e a virada da noite. */
+function updateSleep(dt) {
+    sleep.t += dt;
+    const st = sleepPhaseAt(sleep.t);
+    if (sleepEl) {
+        sleepEl.style.opacity = st.fade.toFixed(3);
+        sleepEl.classList.toggle('dark', st.phase === 'sleep' && st.fade > 0.9);
+    }
+    if (st.changed && !sleep.changed) {
+        sleep.changed = true;
+        wakeUpAtDawn();
+    }
+    if (st.phase === 'lie') {
+        // Deita: a câmera desce até o travesseiro enquanto a tela fecha.
+        camera.position.lerpVectors(sleep.start, sleep.lying, st.fade);
+        look.pitch = sleep.lookBefore.pitch + (LIE_PITCH - sleep.lookBefore.pitch) * st.fade;
+        applyLook();
+    } else if (st.phase === 'sleep') {
+        camera.position.copy(sleep.lying);
+        look.pitch = LIE_PITCH;
+        applyLook();
+    } else if (st.phase === 'wake') {
+        // Já em pé na cama: o olhar sobe do travesseiro de volta ao normal.
+        camera.position.set(player.pos.x, player.pos.y + player.eye, player.pos.z);
+        look.pitch = LIE_PITCH + (sleep.lookBefore.pitch - LIE_PITCH) * (1 - st.fade);
+        applyLook();
+    }
+    if (st.done) finishSleep();
+}
 
 // =====================================================================
 // 11. INICIALIZAÇÃO
@@ -4352,6 +4524,13 @@ async function init() {
     }
     const sp = findSpawn(world.generator, TERRAIN_CONFIG);
     spawnPoint.set(sp.x, sp.y, sp.z);
+    // A cama do save só continua valendo se ainda estiver de pé no mundo — o
+    // jogador pode tê-la quebrado (ou o mundo pode ter mudado).
+    if (save?.bedSpawn && isBedBlock(world.getBlock(save.bedSpawn.x, save.bedSpawn.y, save.bedSpawn.z))) {
+        setBedSpawn(save.bedSpawn);
+    } else {
+        clearBedSpawn();
+    }
     const savedPositionIsInWorld = save && save.player.y >= 0 && save.player.y < WORLD_HEIGHT + 4;
     const recoveredSavedPosition = !!save && !savedPositionIsInWorld;
     if (recoveredSavedPosition) console.warn('Posição do jogador fora do mundo; mantendo o restante do save e recuperando no ponto inicial.');
@@ -4549,16 +4728,20 @@ async function init() {
     // Ação do "usar": o botão direito do mouse e o botão Usar do toque precisam
     // fazer exatamente a mesma coisa — estação, porta, comida ou colocar bloco.
     function useHeldItem({ sneaking = false } = {}) {
+        // Dormindo, a mão não usa nada: o clique na cama já virou a dormida.
+        if (sleep.active) return;
         updateTarget();
 
         const held = inventory.slots[selectedSlot];
         const station = currentHit && BLOCKS[currentHit.type].station;
         const door = Boolean(currentHit && woodDoorPart(currentHit.type));
+        const bed = Boolean(currentHit && isBedBlock(currentHit.type));
         const food = Boolean(held && ITEMS[held.id].food);
-        const intent = rightClickIntent({ sneaking, station, door, food });
+        const intent = rightClickIntent({ sneaking, station, door, bed, food });
 
         if (intent === 'station') { openStation(station, currentHit); return; }
         if (intent === 'door') { toggleWoodDoor(currentHit); return; }
+        if (intent === 'bed') { trySleep(currentHit); return; }
         // Comer funciona mirando para qualquer lugar (inclusive um bloco).
         if (intent === 'eat') {
             if (hunger < MAX_HUNGER) { eat.active = true; eat.progress = 0; eat.slot = selectedSlot; eat.id = held.id; }
@@ -4891,7 +5074,9 @@ function animate() {
     // porque o mouse está solto e as teclas vão para a linha de digitação.
     const worldRunning = playing() || chat.open;
     if (worldRunning) {
-        updatePhysics(dt);
+        // Dormindo, o corpo fica parado: quem manda na câmera é `updateSleep`,
+        // e o jogador não anda, não cava e não come.
+        if (!sleep.active) updatePhysics(dt);
         // O Mofim é bicho de noite: o céu diz a hora (1 = noite fechada) e ele
         // aparece ao anoitecer / vai embora ao amanhecer.
         creatureSystem.update(dt, { pos: player.pos, vel: player.vel, crouching: isCrouching }, true,
@@ -4905,8 +5090,10 @@ function animate() {
         updateItemEntities(dt);
         breakParticles.update(dt);
     }
+    // A dormida anda mesmo com o jogador parado: ela é quem mexe na câmera.
+    if (sleep.active) updateSleep(dt);
     // Mirar, cavar e comer são do mouse: com o chat aberto não há mouse no jogo.
-    if (playing()) {
+    if (playing() && !sleep.active) {
         updateTarget();
         if (!strikeCreature()) updateMining(dt);
         updateEating(dt);
@@ -4957,7 +5144,7 @@ function animate() {
     renderer.clearDepth();
     // Pausado, a mão sai do quadro: o fundo do menu é o mundo, sem um braço
     // atravessado na frente.
-    if (!pauseMenuShown) renderer.render(handScene, handCamera);
+    if (!pauseMenuShown && !sleep.active) renderer.render(handScene, handCamera);
 
     const cpu = performance.now() - now;
     perf.sum += cpu; perf.frames++; perf.t += rawDt;

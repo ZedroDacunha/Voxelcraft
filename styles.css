@@ -182,6 +182,16 @@
     #death p { margin: 0 0 20px; max-width: 460px; font: 14px/1.5 monospace; }
     #hurt { position: absolute; inset: 0; pointer-events: none; z-index: 4; opacity: 0; background: radial-gradient(ellipse at center, rgba(200,0,0,0) 45%, rgba(200,0,0,0.65) 100%); }
 
+    /* --- dormir -------------------------------------------------------------
+       Véu preto da cama: cobre o mundo (mas não os avisos, que ficam acima),
+       sem bloquear clique nenhum. O Zzz acompanha o escuro para a passagem da
+       noite ficar legível. */
+    #sleep { position: absolute; inset: 0; pointer-events: none; z-index: 5; opacity: 0;
+        background: #000; display: flex; align-items: center; justify-content: center; }
+    #sleep .sleep-zzz { font: bold 30px/1 monospace; letter-spacing: 6px; color: #fff;
+        text-shadow: 3px 3px 0 #222; opacity: 0; transition: opacity 220ms ease-out; }
+    #sleep.dark .sleep-zzz { opacity: .75; }
+
     /* --- chat ---------------------------------------------------------------
        No canto de baixo, em cima da hotbar, como no Minecraft: o log fica
        sempre ali (as linhas apagam sozinhas) e a linha de digitação só aparece

@@ -138,9 +138,79 @@ está atrás, nunca um buraco preto.
   as duas metades) — tudo uma peça só.
 - Som de lã no passo, na quebra e na colocação.
 
+---
+
+# Parte 2 — dormir e renascer nela
+
+A cama da parte 1 era um móvel: dava para subir nela e nada mais. A parte 2 é o
+que ela faz — **deitar de noite, a noite passar e o jogador acordar em pé em cima
+do colchão**, com a cama passando a ser o ponto de renascimento.
+
+As contas ficaram em `world-sleep.js`, um módulo puro (sem THREE, sem DOM), pelo
+mesmo motivo da geometria: dá para testar a hora, o tempo e o lugar do corpo sem
+abrir navegador. O `game.js` só liga os fios — câmera, tela preta, relógio,
+save.
+
+## A hora de dormir
+
+`noite = 1 - worldSky.day` é a conta que o resto do jogo já usava para dizer que
+anoiteceu (o Mofim aparece com `dia < 0,35`). A cama usa o **mesmo ponto**:
+`canSleepAt(noite)` exige `noite >= 0,65`. Com o sol ainda no horizonte o céu
+está claro demais: o aviso é *"Só dá para dormir à noite"*, na mesma `showToast`
+das outras recusas.
+
+## A dormida em três tempos
+
+`sleepPhaseAt(segundos)` devolve a fase, o quanto a tela está preta e se a noite
+já virou:
+
+| fase    | duração | o que acontece                                              |
+| ------- | ------- | ----------------------------------------------------------- |
+| `lie`   | 1,1 s   | a câmera desce do olho até o travesseiro, a tela escurece    |
+| `sleep` | 0,85 s  | tela preta; **aqui** o relógio pula para o amanhecer         |
+| `wake`  | 0,9 s   | a tela clareia com o jogador já em pé na cama                |
+
+A virada (`changed`) acontece no **começo do preto**, não no fim: assim o corpo
+aparece em pé na cama enquanto nada se vê, e o clarear já mostra a manhã. O
+teste `a noite passa no começo do escuro, não no fim` protege essa ordem, e
+`a dormida nunca anda para trás` garante que nenhum quadro pule de fase.
+
+## Onde o corpo aparece
+
+`bedRespawnPoint(célula)` = **centro da célula + 9/16 de altura** — a mesma
+altura da colisão da cama. O jogador acorda *apoiado* no colchão: nem dentro
+dele, nem flutuando.
+
+A célula guardada é sempre a dos **pés**, mesmo que ele clique na cabeceira:
+dormir pelas duas metades tem de registrar a mesma cama. E o ponto de
+renascimento é checado **toda vez**: `bedSpawnStanding()` pergunta ao mundo se o
+bloco ainda está lá. Cama quebrada não puxa ninguém.
+
+## O que muda no jogo
+
+- **Clique direito na cama** = dormir. A cama entra na fila de intenções do
+  `world-interaction-rules.js` entre a porta e a comida (`station > door > bed >
+  eat > place`): mirando na cama, o clique é para deitar, não para mastigar o
+  que está na mão. Agachado, o clique continua sendo do item na mão.
+- **Morrer** leva o corpo para `respawnOrigin()`: a cama do último sonho, se ela
+  ainda existe, ou o ponto de partida do mundo.
+- **Quebrar a cama** que era o ponto de renascimento devolve o ponto ao início
+  do mundo e avisa (*"Seu ponto de renascimento voltou ao início do mundo"*).
+- **O save** guarda a célula (`bedSpawn`), e o `world-save-codec.js` a valida
+  como endereço (inteiro, dentro do mundo); lixo no arquivo vira `null` sem
+  derrubar o save.
+- **A tela preta** é o `#sleep` no `index.html`/`styles.css`: cobre o mundo, não
+  bloqueia clique e fica **abaixo** do aviso (`z-index: 5`, o `toast` é 6). O
+  `Zzz…` só aparece com a tela já fechada.
+- **Dormindo, o corpo para**: a física não roda (quem manda na câmera é a
+  dormida), a mineração e o comer param, a mão em primeira pessoa some, e usar
+  um item não faz nada. Morrer dormindo (um bicho pode chegar) corta a dormida
+  antes da tela de morte — nunca se morre com a tela preta.
+
 ## O que fica para a próxima parte
 
-Dormir (pular a noite) e o ponto de renascimento não entraram aqui: são regras,
-não geometria, e merecem o seu próprio PR. A cor também: hoje a cama é a vermelha
-da referência, feita com lã branca. Tingir (uma cama por cor de lã) é a extensão
-natural, e a tabela de tile por cor já cabe no mesmo desenho.
+- **Três camas, uma por cor de lã** (branca, cinza, preta): a geometria é a
+  mesma, muda a tabela de tile por cor.
+- **A cama 3D equipada na mão**, em primeira pessoa.
+- Fora do escopo: as 16 tinturas (o jogo não tem corantes) e a cama cair quando
+  o chão é cavado.
