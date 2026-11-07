@@ -37,7 +37,9 @@ Duas decisões de silhueta, tiradas das imagens de referência:
   tábua que dá volume à cama; com o colchão recuado ela virava uma caixa em cima
   de uma tábua.
 - **o travesseiro é chanfrado em duas caixas.** Uma caixa só lia como um segundo
-  colchãozinho branco.
+  colchãozinho branco. Ele ocupa 13/16 de largura por 6/16 de comprimento — o
+  usuário pediu duas vezes para aumentar, e o tamanho atual é o que lê como
+  travesseiro de perto, sem encostar na beirada da aba.
 
 A metade dos pés não tem travesseiro; a da cabeceira tem. As duas se encontram
 **sem degrau** na emenda (o colchão do pé vai até 16, o da cabeceira começa em
@@ -121,6 +123,12 @@ A correção tem três partes:
 O teste `nenhuma caixa tem face no mesmo plano de outra` cobra isso de qualquer
 mudança futura, com uma única exceção: o plano da **emenda** entre as metades,
 onde as faces são descartadas pelo mesher (é o que mantém a cama contínua).
+
+De quebra, as faces que o encaixe deixou **dentro** de outra caixa saem do
+desenho (`enterrarFaces`): o mesher agora pula uma face declarada como `null`.
+Uma face vista por dentro é preta — era ela que aparecia quando a ordem de
+desenho escorregava. Sem ela no modelo, o pior que pode acontecer é ver o que
+está atrás, nunca um buraco preto.
 
 ## O que o jogador vê
 

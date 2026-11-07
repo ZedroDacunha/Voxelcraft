@@ -72,12 +72,17 @@ test('nenhuma caixa escapa do voxel, em nenhuma direção', () => {
                     assert.ok(max[a] >= 0 && max[a] <= 1, `${part}/${facing}: max ${a} fora de 0..1`);
                     assert.ok(max[a] > min[a], `${part}/${facing}: caixa achatada no eixo ${a}`);
                 }
-                // Toda caixa precisa de arte nos três tipos de face que o
-                // mesher desenha — sem isso o buraco aparece na malha.
+                // Toda caixa precisa de arte na **lateral** — é a face que o
+                // jogador sempre pode ver. Topo e fundo podem vir `null`: são as
+                // faces que ficaram enterradas dentro de outra caixa (o mesher
+                // pula) e não podem reaparecer como arte vazia.
                 for (const face of ['top', 'side', 'bottom']) {
-                    assert.equal(typeof tiles[face], 'number', `${part}/${facing}: caixa sem tile de ${face}`);
-                    assert.ok(Object.values(TILE).includes(tiles[face]), `tile ${tiles[face]} não existe`);
+                    const tile = tiles[face];
+                    if (tile === null) continue;
+                    assert.equal(typeof tile, 'number', `${part}/${facing}: caixa sem tile de ${face}`);
+                    assert.ok(Object.values(TILE).includes(tile), `tile ${tile} não existe`);
                 }
+                assert.equal(typeof tiles.side, 'number', `${part}/${facing}: caixa sem lateral`);
             }
         }
     }
@@ -136,6 +141,35 @@ test('nenhuma caixa tem face no mesmo plano de outra (o pisca-pisca)', () => {
             }
         }
     }
+});
+
+test('as faces enterradas saem do desenho (nada de buraco preto)', () => {
+    // Uma face que mora dentro de outra caixa nunca é vista — e uma face vista
+    // por dentro é preta. Se ela ficar no modelo, vira "buraco" na tela quando
+    // alguma coisa dá errado com a ordem de desenho.
+    for (const facing of FACINGS) {
+        const cabeca = bedShapes('head', facing);
+        const travesseiro = cabeca.find(c => c.tiles.top === TILE.BED_PILLOW_TOP && c.max[1] > BED_HEIGHTS.quilt / 16 + 0.05);
+        assert.ok(travesseiro, 'travesseiro sem topo visível');
+        // O corpo do travesseiro cobre a tela de cima, então o fundo dele (que
+        // está dentro da aba do colchão) não precisa existir.
+        const corpo = cabeca.find(c => c.tiles.top === TILE.BED_PILLOW_TOP && c.tiles.bottom === null);
+        assert.ok(corpo, 'o fundo enterrado do travesseiro continua no desenho');
+        // A lateral do colchão, ao contrário, nunca pode sumir.
+        for (const caixa of bedShapes('foot', facing)) {
+            assert.equal(typeof caixa.tiles.side, 'number');
+        }
+    }
+});
+
+test('o travesseiro é maior que meia largura do colchão', () => {
+    // Tamanho pedido pelo usuário: 13/16 de largura por 6/16 de comprimento.
+    const caixas = bedShapes('head', 'south');
+    const corpo = caixas.find(c => c.tiles.top === TILE.BED_PILLOW_TOP && c.tiles.bottom === null);
+    const largura = (corpo.max[0] - corpo.min[0]) * 16;
+    const comprimento = (corpo.max[2] - corpo.min[2]) * 16;
+    assert.ok(Math.abs(largura - 13) < 0.01, `largura ${largura}`);
+    assert.ok(Math.abs(comprimento - 6) < 0.01, `comprimento ${comprimento}`);
 });
 
 test('o travesseiro só existe na cabeceira', () => {

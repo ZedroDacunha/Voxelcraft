@@ -1014,6 +1014,10 @@ class World {
                             faceTile = TILE.CHEST_FRONT_OPEN;
                         }
                         const tile = shape ? shape.tiles[f.kind] : variantTile(faceTile, wx, y, wz);
+                        // Peça de forma própria pode declarar uma face como
+                        // enterrada (`null`): ela existe dentro de outra caixa do
+                        // mesmo modelo e nunca é vista.
+                        if (tile == null) continue;
                         atlasUVInto(tile, ATLAS_UV_PAD_PX, tileUV);
                         const ndx = vertexCount;
                         positions = growTypedArray(positions, (vertexCount + 4) * 3);

@@ -194,7 +194,7 @@ export function createModelIconPixels(boxes, pixel, {
             tu = sinal > 0 ? lx : 1 - lx; tv = ly;
             luz = sinal > 0 ? LUZ_DE_FACE.zMais : LUZ_DE_FACE.zMenos;
         }
-        if (tile === undefined) continue;
+        if (tile == null) continue;
         const tx = Math.max(0, Math.min(TILE_PX - 1, Math.floor(tu * TILE_PX)));
         const ty = Math.max(0, Math.min(TILE_PX - 1, Math.floor((1 - tv) * TILE_PX)));
         const cor = pixel(tile, tx, ty);

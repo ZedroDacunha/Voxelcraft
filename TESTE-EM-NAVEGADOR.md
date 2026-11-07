@@ -1323,3 +1323,8 @@ A cama é o primeiro bloco do jogo que não é cubo nem painel: são duas metade
 - [ ] O item na barra mostra a caminha em 3/4, vermelha com o travesseiro branco.
 - [ ] Salve, saia e volte: a cama continua virada para o mesmo lado.
 - [ ] Passo, quebra e colocação soam macios (lã), não como pedra.
+- [ ] **Gire a câmera em volta da cama** (de perto e de longe): nada pisca e o
+      travesseiro não tem buraco preto — as faces internas não brigam mais pelo
+      mesmo pixel.
+- [ ] O **travesseiro** é branco, chanfrado e grande (quase do tamanho da
+      largura do colchão), sem encostar na beirada.

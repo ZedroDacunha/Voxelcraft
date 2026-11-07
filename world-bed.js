@@ -119,11 +119,36 @@ function canonicalBoxes(part) {
         ...(head ? [
             // O travesseiro para 1/2 antes da beirada da aba: encostado nela as
             // duas faces caíam no mesmo plano (o mesmo pisca-pisca das pilhas).
-            box(2, H2.quilt - ENCAIXE, 9, 14, H2.pillow - 1, 14.5, PILLOW_TILES),
-            box(3, H2.pillow - 1 - ENCAIXE, 9.5, 13, H2.pillow, 13.5, PILLOW_TILES),
+            box(1.5, H2.quilt - ENCAIXE, 8.5, 14.5, H2.pillow - 1, 14.5, PILLOW_TILES),
+            box(2.5, H2.pillow - 1 - ENCAIXE, 9, 13.5, H2.pillow, 14, PILLOW_TILES),
         ] : []),
     ];
-    return caixas.map(caixa => comFolga(caixa, extremidade));
+    return enterrarFaces(caixas.map(caixa => comFolga(caixa, extremidade)));
+}
+
+/**
+ * Tira as faces que ficaram **dentro** de outra caixa.
+ *
+ * O encaixe das peças deixa a face de baixo de uma dentro da peça de baixo (é o
+ * que evita o pisca-pisca). Essas faces nunca aparecem — mas continuam sendo
+ * desenhadas, e uma face vista por dentro é preta. Tirando-as, o que sobra é só
+ * o que o jogador pode ver: menos triângulo e nenhuma chance de "buraco preto"
+ * no travesseiro.
+ *
+ * Só topo e fundo: as quatro laterais compartilham a mesma tile.
+ */
+function enterrarFaces(caixas) {
+    for (const caixa of caixas) {
+        for (const kind of ['top', 'bottom']) {
+            const plano = kind === 'top' ? caixa.max[1] : caixa.min[1];
+            const dentro = caixas.some(outra => outra !== caixa
+                && outra.min[1] < plano - 1e-6 && outra.max[1] > plano + 1e-6
+                && outra.min[0] <= caixa.min[0] + 1e-6 && outra.max[0] >= caixa.max[0] - 1e-6
+                && outra.min[2] <= caixa.min[2] + 1e-6 && outra.max[2] >= caixa.max[2] - 1e-6);
+            if (dentro) caixa.tiles = { ...caixa.tiles, [kind]: null };
+        }
+    }
+    return caixas;
 }
 
 const FACING_VECTORS = Object.freeze({
