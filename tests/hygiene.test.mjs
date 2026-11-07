@@ -92,6 +92,8 @@ test('nenhum `debugger` esquecido', () => {
 test('todo módulo é importado por alguém (sem arquivo morto)', () => {
     const entry = new Set(['service-worker.js']); // registrado, não importado
     const html = read('index.html');
+    // Protótipos autônomos também são pontos de entrada reais.
+    const previews = [read('tools/personagem-modelo.html')];
     const report = [];
 
     for (const file of SHIPPED) {
@@ -100,7 +102,8 @@ test('todo módulo é importado por alguém (sem arquivo morto)', () => {
         const referenced = SOURCES.some(source => source !== file
             && new RegExp(`['"]\\./${name.replace('.', '\\.')}['"]`).test(read(source)));
         const loadedByHtml = html.includes(`src="${name}"`) || html.includes(`src="${name}?v=`);
-        if (!referenced && !loadedByHtml) report.push(name);
+        const loadedByPreview = previews.some(preview => preview.includes(`'../${name}'`));
+        if (!referenced && !loadedByHtml && !loadedByPreview) report.push(name);
     }
     assert.deepEqual(report, [], `módulos que ninguém carrega:\n${report.join('\n')}`);
 });

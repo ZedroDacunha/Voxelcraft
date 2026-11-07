@@ -191,7 +191,7 @@ test('pausado, o HUD sai da frente e a mão não aparece no borrão', () => {
     assert.match(styles, /body\.is-paused #crosshair/);
     assert.match(gameSource, /document\.body\.classList\.toggle\('is-paused', pauseMenuShown\)/);
     // Com o menu aberto a mão some; dormindo, ela também (a tela está preta).
-    assert.match(gameSource, /if \(!pauseMenuShown && !sleep\.active\) renderer\.render\(handScene, handCamera\)/,
+    assert.match(gameSource, /if \(!pauseMenuShown && !sleep\.active && !thirdViewActive\) renderer\.render\(handScene, handCamera\)/,
         'a mão em primeira pessoa não pode aparecer no fundo do menu');
     assert.match(gameSource, /pauseMenuShown = shouldShowPauseMenu\(state\)/);
 });
