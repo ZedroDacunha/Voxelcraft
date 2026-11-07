@@ -133,7 +133,9 @@ export function createWorldSaveCodec({ version = WORLD_SAVE_VERSION } = {}) {
                 const cx = floorDiv(x, CHUNK_SIZE), cz = floorDiv(z, CHUNK_SIZE);
                 const localIndex = idx(x - cx * CHUNK_SIZE, y, z - cz * CHUNK_SIZE);
                 const type = edits.get(chunkKey(cx, cz))?.get(localIndex);
-                return BLOCKS[type]?.tiles.front !== undefined;
+                // A cama guarda a direção sem ter face frontal: sem esta
+                // exceção ela voltava do save sempre virada para o sul.
+                return BLOCKS[type]?.tiles.front !== undefined || BLOCKS[type]?.render === 'bed';
             });
 
             const furnaces = new Map();

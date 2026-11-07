@@ -20,7 +20,9 @@ assign('wood', [ID.LOG, ID.PLANKS, ID.CRAFTING_TABLE, ID.CHEST,
     ID.WOOD_DOOR_BOTTOM_OPEN, ID.WOOD_DOOR_TOP_OPEN]);
 assign('sand', [ID.SAND]);
 // Lã é macia em tudo: passo abafado, quebra muda, colocação fofa.
-assign('wool', [ID.WOOL_BLOCK_WHITE, ID.WOOL_BLOCK_GRAY, ID.WOOL_BLOCK_BLACK]);
+// A cama é quase toda colchão: passo e quebra saem macios, como na lã.
+assign('wool', [ID.WOOL_BLOCK_WHITE, ID.WOOL_BLOCK_GRAY, ID.WOOL_BLOCK_BLACK,
+    ID.BED_HEAD, ID.BED_FOOT]);
 
 // Material do bloco, ou null quando ele não produz som de material (ar, tocha,
 // água — que tem som próprio de fluxo/natação).

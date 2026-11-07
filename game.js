@@ -43,6 +43,7 @@ import { configureTorchFlicker, configureTorchFlameAnimation, updateWorldLightin
 import { FurnaceSmokeSystem } from './world-furnace-effects.js';
 import { canHarvest, damageTool as damageToolStack, getBreakTime } from './world-tool-rules.js';
 import { boxOverlapsXZ, woodDoorCollision, woodDoorPart, woodDoorShape, woodDoorType } from './world-door.js';
+import { bedCells, bedOtherCell, bedPart, bedShapes, isBedBlock } from './world-bed.js';
 import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld } from './player-physics.js';
 import { canJumpFrom, createJumpState, updateJumpWindow } from './player-jump.js';
 import { ATTACK_COOLDOWN, attackReady, createCreatureSystemClass } from './world-creature.js';
@@ -645,7 +646,10 @@ class World {
         const oldType = chunk.data[i];
         if (oldType === ID.SAND && type !== ID.SAND) this.cancelFallingSand(x, y, z);
         chunk.data[i] = type;
-        if (BLOCKS[type]?.tiles.front !== undefined) {
+        // Blocos com frente **e** a cama guardam a direção: a cama não tem face
+        // frontal, mas gira inteira — sem isto as duas metades voltavam para o
+        // sul (e o travesseiro ia parar no lado errado).
+        if (BLOCKS[type]?.tiles.front !== undefined || BLOCKS[type]?.render === 'bed') {
             const nextFacing = isHorizontalFacing(facing) ? facing : this.blockFacings.get(x, y, z);
             this.blockFacings.set(x, y, z, nextFacing);
         } else this.blockFacings.delete(x, y, z);
@@ -885,6 +889,9 @@ class World {
             // Portas desenham todas as faces (formato fino); só a face entre as
             // duas metades é omitida para não haver z-fighting.
             if (currentRender === 'door') return neighborRender === 'door';
+            // Cama: a única face que não precisa existir é a da emenda entre as
+            // duas metades — o resto é forma fina e aparece sempre.
+            if (currentRender === 'bed') return neighborRender === 'bed';
             if (currentRender === 'liquid') {
                 if (nType === 0) return false;
                 if (neighborRender !== 'liquid') return true;
@@ -905,7 +912,7 @@ class World {
         const ambientOcclusionWeight = type => {
             if (type === 0 || BLOCKS[type]?.render === 'liquid' || BLOCKS[type]?.render === 'torch') return 0;
             const render = BLOCKS[type]?.render;
-            return render === 'cutout' || render === 'door' ? 0.35 : 1;
+            return render === 'cutout' || render === 'door' || render === 'bed' ? 0.35 : 1;
         };
         const ambientOcclusionAt = (lx, y, lz, face, corner, includeAO = true) => {
             let axisA, axisB;
@@ -973,9 +980,17 @@ class World {
                     const aboveType = y + 1 < WORLD_HEIGHT ? data[lx + lz * CS + (y + 1) * CS2] : 0;
                     const blockTop = renderMode === 'liquid' ? WaterSystem.surfaceHeightFor(t, aboveType) : 1;
                     const wx = chunk.cx * CS + lx, wz = chunk.cz * CS + lz;
-                    const facing = tiles.front !== undefined ? this.getBlockFacing(wx, y, wz) : DEFAULT_BLOCK_FACING;
+                    // A cama desenha forma própria em qualquer direção, então
+                    // ela lê `facing` mesmo sem ter face frontal.
+                    const facing = tiles.front !== undefined || renderMode === 'bed'
+                        ? this.getBlockFacing(wx, y, wz) : DEFAULT_BLOCK_FACING;
                     const doorShape = renderMode === 'door' ? doorPartShape(t, facing) : null;
-                    const shapeCount = renderMode === 'torch' ? TORCH_PARTS.length : 1;
+                    // Uma cama é feita de várias caixas (pernas, travessa, colchão,
+                    // aba e travesseiro) — o mesmo laço que já servia à tocha.
+                    const shapes = renderMode === 'bed' ? bedShapes(bedPart(t), facing)
+                        : renderMode === 'torch' ? TORCH_PARTS
+                        : renderMode === 'door' ? [doorShape] : [null];
+                    const shapeCount = shapes.length;
                     const orientation = block.orientation || [0, 0];
                     if (renderMode === 'torch') {
                         const lean = block.orientation ? (0.82 * 0.35 - 0.38) : 0;
@@ -983,7 +998,7 @@ class World {
                         torchFlameCenters.push([lx + 0.5 + orientation[0] * lean, y, lz + 0.5 + orientation[1] * lean, phase]);
                     }
                     for (let shapeIndex = 0; shapeIndex < shapeCount; shapeIndex++) {
-                        const shape = renderMode === 'torch' ? TORCH_PARTS[shapeIndex] : doorShape;
+                        const shape = shapes[shapeIndex];
                         for (const f of FACES) {
                         const neighborX = lx + f.dir[0], neighborY = y + f.dir[1], neighborZ = lz + f.dir[2];
                         const neighborType = blockAt(neighborX, neighborY, neighborZ);
@@ -1008,7 +1023,7 @@ class World {
                         torchInfluence = growTypedArray(torchInfluence, vertexCount + 4);
                         furnaceFlame = growTypedArray(furnaceFlame, vertexCount + 4);
                         let target, targetOffset;
-                        if (renderMode === 'cutout' || renderMode === 'torch' || renderMode === 'door') {
+                        if (renderMode === 'cutout' || renderMode === 'torch' || renderMode === 'door' || renderMode === 'bed') {
                             cutoutIndices = growTypedArray(cutoutIndices, cutoutIndexCount + 6);
                             target = cutoutIndices; targetOffset = cutoutIndexCount; cutoutIndexCount += 6;
                         } else if (renderMode === 'liquid') {
@@ -1454,6 +1469,15 @@ function otherDoorHalf(x, y, z, type) {
     return { x, y: y + (part.half === 'bottom' ? 1 : -1), z, part };
 }
 
+// A outra metade da cama. Quebrar qualquer uma das duas derruba o par e
+// devolve **uma** cama — o mesmo contrato da porta.
+function otherBedHalf(x, y, z, type) {
+    const part = bedPart(type);
+    if (!part) return null;
+    const { x: ox, z: oz } = bedOtherCell(x, z, part, world.getBlockFacing(x, y, z));
+    return { x: ox, y, z: oz, part };
+}
+
 // O painel colide nos dois estados; se o jogador estiver onde o painel vai
 // ficar, a porta não muda de estado para não prender ninguém dentro dela.
 function doorWouldHitPlayer(x, y, z, type) {
@@ -1504,6 +1528,35 @@ function placeWoodDoor(px, py, pz, facing) {
         return false;
     }
     return true;
+}
+
+// A cama: duas células lado a lado, cada uma com a sua metade e a mesma
+// direção. A célula clicada recebe os pés; a cabeceira vai para o lado oposto ao
+// jogador. Se lá estiver ocupado, a cama vira (a cabeceira passa para o lado do
+// jogador), como no jogo original — e se nenhum dos dois lados couber, não
+// coloca nada.
+function bedCellFree(x, y, z) {
+    if (y < 0 || y >= WORLD_HEIGHT) return false;
+    const type = world.getBlock(x, y, z);
+    if (type !== 0 && BLOCKS[type]?.solid !== false) return false;
+    const support = world.getBlock(x, y - 1, z);
+    return BLOCKS[support]?.solid ?? false;
+}
+
+function placeBed(px, py, pz, facing) {
+    const oposta = { north: 'south', south: 'north', east: 'west', west: 'east' }[facing] ?? 'north';
+    for (const dir of [facing, oposta]) {
+        const { head } = bedCells(px, pz, dir);
+        if (!bedCellFree(px, py, pz) || !bedCellFree(head.x, py, head.z)) continue;
+        if (intersectsPlayer(px, py, pz) || intersectsPlayer(head.x, py, head.z)) return false;
+        if (!world.setBlock(px, py, pz, ID.BED_FOOT, dir)) return false;
+        if (!world.setBlock(head.x, py, head.z, ID.BED_HEAD, dir)) {
+            world.setBlock(px, py, pz, 0);
+            return false;
+        }
+        return true;
+    }
+    return false;
 }
 
 function waterImmersionAt(world, x, y, z, halfHeight) {
@@ -1777,6 +1830,12 @@ function breakBlock(x, y, z) {
     const doorHalf = otherDoorHalf(x, y, z, type);
     if (doorHalf && woodDoorPart(world.getBlock(doorHalf.x, doorHalf.y, doorHalf.z))) {
         world.setBlock(doorHalf.x, doorHalf.y, doorHalf.z, 0);
+    }
+    // Cama: quebrar uma metade leva a outra junto (e cai uma cama só, porque o
+    // `drop` das duas metades é o item da cama).
+    const bedHalf = otherBedHalf(x, y, z, type);
+    if (bedHalf && isBedBlock(world.getBlock(bedHalf.x, bedHalf.y, bedHalf.z))) {
+        world.setBlock(bedHalf.x, bedHalf.y, bedHalf.z, 0);
     }
     // A célula fica vazia; a água em volta escorre para dentro como fluxo
     // (nunca como fonte). Ver `world-water.js` › `onBlockBroken()`.
@@ -4524,12 +4583,18 @@ async function init() {
         if (blockAtTarget !== 0 && !WaterSystem.isBlock(blockAtTarget) && BLOCKS[blockAtTarget]?.solid !== false) return;
 
         if (intersectsPlayer(px, py, pz)) return;
-        const facing = BLOCKS[placedType]?.tiles.front !== undefined
-            ? facingTowardPlayer(px + 0.5, pz + 0.5, player.pos.x, player.pos.z)
-            : null;
+        // A cama tem frente própria mesmo sem face frontal: a cabeceira foge do
+        // jogador, então a direção é a do jogador **para** o bloco.
+        const facing = placedType === ID.BED_FOOT
+            ? facingTowardPlayer(player.pos.x, player.pos.z, px + 0.5, pz + 0.5)
+            : BLOCKS[placedType]?.tiles.front !== undefined
+                ? facingTowardPlayer(px + 0.5, pz + 0.5, player.pos.x, player.pos.z)
+                : null;
         const placed = placedType === ID.WOOD_DOOR_BOTTOM
             ? placeWoodDoor(px, py, pz, facing)
-            : world.setBlock(px, py, pz, placedType, facing);
+            : placedType === ID.BED_FOOT
+                ? placeBed(px, py, pz, facing)
+                : world.setBlock(px, py, pz, placedType, facing);
         if (placed) {
             inventory.removeOne(selectedSlot);
             updateHotbarUI();
@@ -4539,6 +4604,8 @@ async function init() {
             haptic('place');
         } else if (placedType === ID.WOOD_DOOR_BOTTOM) {
             showToast('A porta precisa de apoio sólido e de dois blocos livres');
+        } else if (placedType === ID.BED_FOOT) {
+            showToast('A cama precisa de dois blocos livres e de apoio embaixo');
         }
     }
 

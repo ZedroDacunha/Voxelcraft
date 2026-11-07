@@ -12,7 +12,8 @@ export const TILE = { GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, STONE: 3, WOOD: 4, C
                SAND: 24, WATER: 25, TORCH_FLAME: 26, COPPER_ORE: 27, CHEST_FRONT: 28,
                FURNACE_FRONT_ON: 29, FURNACE_SIDE: 30, CHEST_FRONT_OPEN: 31,
                WOOD_DOOR_UPPER: 32, WOOD_DOOR_LOWER: 33, MOFIM_LANTERN: 34,
-               WOOL_WHITE: 35, WOOL_GRAY: 36, WOOL_BLACK: 37 };
+               WOOL_WHITE: 35, WOOL_GRAY: 36, WOOL_BLACK: 37,
+               BED_TOP: 38, BED_SIDE: 39, BED_PILLOW_TOP: 40, BED_PILLOW_SIDE: 41 };
 export const TILE_PX = 32;
 
 const allFaces = (t) => ({ top: t, side: t, bottom: t });
@@ -43,6 +44,9 @@ export const ID = { GRASS: 1, STONE: 2, LOG: 3, DIRT: 4, COBBLE: 5, PLANKS: 6, L
              WOOL_BLOCK_WHITE: 93, WOOL_BLOCK_GRAY: 94, WOOL_BLOCK_BLACK: 95,
              WOOL_WHITE: 96, WOOL_GRAY: 97, WOOL_BLACK: 98,
              SHEARS: 99,
+             // A cama é **um item e dois blocos**: quebrar qualquer metade
+             // devolve uma cama só, e o item entra no mundo pela metade dos pés.
+             BED: 117, BED_HEAD: 118, BED_FOOT: 119,
              // As carnes moram em `world-meats.js`: 100–116, oito bichos ×
              // duas entradas (crua e assada). Mob novo que solta carne entra
              // lá, não aqui.
@@ -98,6 +102,19 @@ export const BLOCKS = {
     [ID.WOOL_BLOCK_WHITE]: { name: 'Bloco de lã branca', hardness: 0.6, drop: ID.WOOL_BLOCK_WHITE, tool: null, tiles: allFaces(TILE.WOOL_WHITE) },
     [ID.WOOL_BLOCK_GRAY]: { name: 'Bloco de lã cinza', hardness: 0.6, drop: ID.WOOL_BLOCK_GRAY, tool: null, tiles: allFaces(TILE.WOOL_GRAY) },
     [ID.WOOL_BLOCK_BLACK]: { name: 'Bloco de lã preta', hardness: 0.6, drop: ID.WOOL_BLOCK_BLACK, tool: null, tiles: allFaces(TILE.WOOL_BLACK) },
+    // Cama: dois voxels com geometria própria (`world-bed.js`). Ela é `solid`
+    // porque o jogador sobe nela — a colisão que vale é a caixa de 9/16 tratada
+    // na física — e não é opaca, porque móvel não faz sombra de parede.
+    [ID.BED_FOOT]: {
+        name: 'Cama', hardness: 0.8, drop: ID.BED, tool: null, collectible: false,
+        render: 'bed', solid: true, opaque: false, bed: { part: 'foot' },
+        tiles: { top: TILE.BED_TOP, side: TILE.BED_SIDE, bottom: TILE.WOOD_END },
+    },
+    [ID.BED_HEAD]: {
+        name: 'Cama', hardness: 0.8, drop: ID.BED, tool: null, collectible: false,
+        render: 'bed', solid: true, opaque: false, bed: { part: 'head' },
+        tiles: { top: TILE.BED_TOP, side: TILE.BED_SIDE, bottom: TILE.WOOD_END },
+    },
     [ID.WATER]: { name: 'Água',      hardness: 100, drop: null, tool: null, render: 'liquid', solid: false, collectible: false, tiles: allFaces(TILE.WATER) }, // Água só existe no mundo
 };
 
@@ -185,6 +202,13 @@ for (const [key, label, color] of [['WHITE', 'branca', 'white'], ['GRAY', 'cinza
 // das ferramentas por material (base + índice) e enfiar mais um tipo ali
 // renumeraria picareta, machado e pá de todos os materiais — e os saves com
 // isso. Ela é item próprio, com `tool.type` para o jogo reconhecer.
+// A cama é uma peça só na barra: o ícone sai do modelo (world-textures.js ›
+// `spritePixels('bed')`) e o bloco que ela vira é a metade dos pés.
+ITEMS[ID.BED] = {
+    name: 'Cama', maxStack: 1, block: ID.BED_FOOT,
+    sprite: { kind: 'bed', mat: 'red' }, iconTile: nextTile++,
+};
+
 ITEMS[ID.SHEARS] = {
     name: 'Tesoura', maxStack: 1, maxDurability: 238,
     tool: { type: 'shears', tier: 1, speed: 1 },
@@ -345,6 +369,9 @@ defRecipe([[ID.IRON_INGOT, null], [null, ID.IRON_INGOT]], ID.SHEARS);
 defRecipe([[ID.WOOL_WHITE, ID.WOOL_WHITE], [ID.WOOL_WHITE, ID.WOOL_WHITE]], ID.WOOL_BLOCK_WHITE);
 defRecipe([[ID.WOOL_GRAY, ID.WOOL_GRAY], [ID.WOOL_GRAY, ID.WOOL_GRAY]], ID.WOOL_BLOCK_GRAY);
 defRecipe([[ID.WOOL_BLACK, ID.WOOL_BLACK], [ID.WOOL_BLACK, ID.WOOL_BLACK]], ID.WOOL_BLOCK_BLACK);
+// Cama: três fardos de lã em cima, três tábuas embaixo — a mesma silhueta da
+// receita clássica, que se reconhece sem tutorial. Sai uma cama por vez.
+defRecipe([[ID.WOOL_WHITE, ID.WOOL_WHITE, ID.WOOL_WHITE], [ID.PLANKS, ID.PLANKS, ID.PLANKS]], ID.BED);
 
 function shapesEqual(a, b) {
     if (a.length !== b.length || a[0].length !== b[0].length) return false;

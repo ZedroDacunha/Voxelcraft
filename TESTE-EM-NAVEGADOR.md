@@ -1299,3 +1299,27 @@ o próximo bicho pronto.
 - [ ] Colocar a **assada** no forno não acende nem gasta combustível.
 - [ ] `/give assada` e `/give cooked_mutton` dão o mesmo item.
 - [ ] Mate uma ovelha: ela continua soltando **carne crua** (1–2), não assada.
+
+## 68. A cama (dois voxels, forma própria)
+
+A cama é o primeiro bloco do jogo que não é cubo nem painel: são duas metades
+(cabeceira e pés) com pernas, travessa, colchão e travesseiro. Ver
+[`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
+
+- [ ] `/give cama` (ou 3 lãs brancas + 3 tábuas na bancada) e coloque no chão.
+- [ ] Ao colocar, a **cabeceira fica do lado oposto ao seu** — o travesseiro
+      branco aponta para longe de você.
+- [ ] Gire o jogador e coloque outra: as quatro direções funcionam, e o
+      travesseiro acompanha.
+- [ ] Encostando de lado, **não dá para atravessar** a cama.
+- [ ] Pulando em cima, dá para **ficar de pé** no colchão (9/16) sem afundar e
+      sem flutuar.
+- [ ] O colchão vermelho **sobra** por cima da madeira, e a tábua aparece embaixo
+      com as quatro pernas.
+- [ ] O topo do colchão tem o chanfro de 1 px na beirada (não é um cubo liso).
+- [ ] O travesseiro é branco, chanfrado, e só existe na cabeceira.
+- [ ] Quebrar **qualquer** uma das duas metades derruba a outra e solta **uma**
+      cama (não sobra metade fantasma no mundo).
+- [ ] O item na barra mostra a caminha em 3/4, vermelha com o travesseiro branco.
+- [ ] Salve, saia e volte: a cama continua virada para o mesmo lado.
+- [ ] Passo, quebra e colocação soam macios (lã), não como pedra.
