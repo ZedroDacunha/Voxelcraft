@@ -1328,3 +1328,32 @@ A cama é o primeiro bloco do jogo que não é cubo nem painel: são duas metade
       mesmo pixel.
 - [ ] O **travesseiro** é branco, chanfrado e grande (quase do tamanho da
       largura do colchão), sem encostar na beirada.
+
+## 69. Dormir na cama e renascer nela
+
+A parte 2 da cama. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
+
+- [ ] De **dia**, com a cama na mira, clique direito: aparece o aviso *"Só dá
+      para dormir à noite"* e **nada acontece** (o jogador não deita).
+- [ ] Espere anoitecer (ou `/time set night`) e clique na cama: a câmera
+      **desce até o travesseiro** e a tela fecha no preto.
+- [ ] No preto aparece o `Zzz…`; depois a tela clareia e o jogador está **de pé
+      em cima do colchão**, não dentro dele nem flutuando.
+- [ ] Ao acordar, o céu está no **amanhecer** (06:00 no relógio do jogo) e o
+      aviso *"Bom dia! A cama agora é o seu ponto de renascimento"* aparece.
+- [ ] O olhar volta para o mesmo ângulo de antes de deitar (mesma direção, mesma
+      inclinação).
+- [ ] Dê `/kill` (ou morra): o jogador renasce **em cima da cama**, não no ponto
+      de partida do mundo.
+- [ ] Quebre a cama e morra de novo: renasce no ponto de partida e o aviso
+      *"Seu ponto de renascimento voltou ao início do mundo"* aparece quando a
+      cama quebra.
+- [ ] Recarregue a página depois de dormir: a cama continua sendo o
+      renascimento (o save guarda a célula).
+- [ ] Cama quebrada **fora** do jogo (save antigo, mundo editado): o jogador
+      renasce no ponto de partida em vez de cair no vazio.
+- [ ] Durante a dormida, nada se mexe: não anda, não cava, não come, não coloca
+      bloco e a mão em primeira pessoa some.
+- [ ] Morrer dormindo (um Mofim atacando) não deixa a tela preta: a tela de
+      morte aparece normalmente.
+- [ ] Dormir duas vezes seguidas funciona (não fica preso na primeira).

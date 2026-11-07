@@ -23,6 +23,7 @@ function makeState() {
         drops: [],
         chests: new Map(),
         furnaces: new Map(),
+        bedSpawn: null,
     };
 }
 
@@ -50,4 +51,33 @@ test('save válido nunca aceita itens inexistentes', () => {
     state.inventory[0] = { id: 250, count: 1 };
     const loaded = codec.validate(codec.build(state), 7);
     assert.equal(loaded.inventory[0], null);
+});
+
+test('a cama do último sonho vai e volta no save', () => {
+    const codec = createWorldSaveCodec({ version: WORLD_SAVE_VERSION });
+    const state = makeState();
+    // A célula dos pés da cama onde o jogador dormiu (ponto de renascimento).
+    state.bedSpawn = { x: -3, y: 33, z: 8 };
+    const built = codec.build(state);
+    assert.deepEqual(built.bedSpawn, { x: -3, y: 33, z: 8 });
+    assert.deepEqual(codec.validate(built, 7).bedSpawn, { x: -3, y: 33, z: 8 });
+});
+
+test('save sem cama (ou com cama estragada) não guarda renascimento', () => {
+    const codec = createWorldSaveCodec({ version: WORLD_SAVE_VERSION });
+    // Sem cama: o campo vai nulo e volta nulo.
+    assert.equal(codec.build(makeState()).bedSpawn, null);
+    assert.equal(codec.validate(codec.build(makeState()), 7).bedSpawn, null);
+    // Cama estragada no arquivo é descartada sem derrubar o save inteiro.
+    const estragada = (bedSpawn) => {
+        const state = makeState();
+        state.bedSpawn = bedSpawn;
+        return codec.validate(codec.build(state), 7);
+    };
+    for (const ruim of [{ x: 1.5, y: 20, z: 3 }, { x: 1, y: -2, z: 3 }, { x: 1, y: 9999, z: 3 },
+        { x: 1, y: 20 }, 'cama', 42, [1, 20, 3]]) {
+        const carregado = estragada(ruim);
+        assert.ok(carregado, `save derrubado por ${JSON.stringify(ruim)}`);
+        assert.equal(carregado.bedSpawn, null, `cama inválida aceita: ${JSON.stringify(ruim)}`);
+    }
 });
