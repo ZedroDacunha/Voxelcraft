@@ -124,3 +124,87 @@ export function createBlockIconPixels(tiles, pixel) {
 
     return px;
 }
+
+/**
+ * Ícone de um bloco **com forma própria**, desenhado a partir das caixas do
+ * modelo — é o caso da cama, que não é cubo e por isso não cabe na projeção de
+ * uma face só.
+ *
+ * A conta é um lançamento de raio por pixel, em projeção ortográfica: para cada
+ * pixel do ícone, o raio desce na direção da câmera e a primeira caixa que ele
+ * encontra diz a cor. Como são poucas caixas (a cama tem onze), o custo é
+ * irrelevante — e o ícone fica sempre igual ao modelo do mundo, sem uma segunda
+ * arte para manter em dia.
+ */
+const LUZ_DE_FACE = Object.freeze({
+    topo: 1, xMais: 0.78, xMenos: 0.66, zMais: 0.86, zMenos: 0.58, fundo: 0.45,
+});
+
+export function createModelIconPixels(boxes, pixel, {
+    size = BLOCK_ICON_PX, yaw = 40, pitch = 28, scale = null, center = [0.5, 0.4, 1],
+} = {}) {
+    const N = size;
+    const s = scale ?? N / 2.25;
+    const px = Array.from({ length: N }, () => Array(N).fill(null));
+    const azim = (yaw * Math.PI) / 180, elev = (pitch * Math.PI) / 180;
+    const f = normalizar([
+        -Math.cos(elev) * Math.sin(azim), -Math.sin(elev), -Math.cos(elev) * Math.cos(azim),
+    ]);
+    const direita = normalizar([-f[2], 0, f[0]]);
+    const cima = [
+        direita[1] * f[2] - direita[2] * f[1],
+        direita[2] * f[0] - direita[0] * f[2],
+        direita[0] * f[1] - direita[1] * f[0],
+    ];
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+        const u = (x + 0.5 - N / 2) / s;
+        const v = (N / 2 - (y + 0.5)) / s;
+        const origem = [0, 1, 2].map(a => center[a] + direita[a] * u + cima[a] * v - f[a] * 8);
+        let perto = Infinity, achado = null;
+        for (const box of boxes) {
+            let t0 = -Infinity, t1 = Infinity, eixo = 0, sinal = -1;
+            for (let a = 0; a < 3; a++) {
+                const inv = 1 / f[a];
+                let ta = (box.min[a] - origem[a]) * inv;
+                let tb = (box.max[a] - origem[a]) * inv;
+                let sinalEixo = -1;
+                if (ta > tb) { const t = ta; ta = tb; tb = t; sinalEixo = 1; }
+                if (ta > t0) { t0 = ta; eixo = a; sinal = sinalEixo; }
+                if (tb < t1) t1 = tb;
+            }
+            if (t0 <= t1 && t0 > 0 && t0 < perto) { perto = t0; achado = { box, eixo, sinal }; }
+        }
+        if (!achado) continue;
+        const { box, eixo, sinal } = achado;
+        const p = [0, 1, 2].map(a => origem[a] + f[a] * perto);
+        const lx = (p[0] - box.min[0]) / (box.max[0] - box.min[0]);
+        const ly = (p[1] - box.min[1]) / (box.max[1] - box.min[1]);
+        const lz = (p[2] - box.min[2]) / (box.max[2] - box.min[2]);
+        let tile, tu, tv, luz;
+        if (eixo === 1) {
+            tile = sinal > 0 ? box.tiles.top : (box.tiles.bottom ?? box.tiles.side);
+            tu = 1 - lx; tv = 1 - lz;
+            luz = sinal > 0 ? LUZ_DE_FACE.topo : LUZ_DE_FACE.fundo;
+        } else if (eixo === 0) {
+            tile = box.tiles.front ?? box.tiles.side;
+            tu = sinal > 0 ? 1 - lz : lz; tv = ly;
+            luz = sinal > 0 ? LUZ_DE_FACE.xMais : LUZ_DE_FACE.xMenos;
+        } else {
+            tile = box.tiles.front ?? box.tiles.side;
+            tu = sinal > 0 ? lx : 1 - lx; tv = ly;
+            luz = sinal > 0 ? LUZ_DE_FACE.zMais : LUZ_DE_FACE.zMenos;
+        }
+        if (tile == null) continue;
+        const tx = Math.max(0, Math.min(TILE_PX - 1, Math.floor(tu * TILE_PX)));
+        const ty = Math.max(0, Math.min(TILE_PX - 1, Math.floor((1 - tv) * TILE_PX)));
+        const cor = pixel(tile, tx, ty);
+        if (!cor || cor[3] === 0) continue;
+        px[y][x] = escurecer(cor, luz).map(v => Math.round(v));
+    }
+    return px;
+}
+
+function normalizar(v) {
+    const l = Math.hypot(v[0], v[1], v[2]) || 1;
+    return [v[0] / l, v[1] / l, v[2] / l];
+}

@@ -8,6 +8,7 @@
 // pode ser testada sem navegador.
 
 import { boxOverlapsXZ, woodDoorPart } from './world-door.js';
+import { bedCollisionBox, bedPart } from './world-bed.js';
 
 /** Raio horizontal do corpo do jogador (o voxel tem lado 1). */
 export const PLAYER_RADIUS = 0.3;
@@ -53,6 +54,17 @@ export function collidesInWorld(world, x, y, z, height, radius = PLAYER_RADIUS) 
                 if (woodDoorPart(type)) {
                     const box = world.doorCollisionBox(bx, by, bz, type);
                     if (box && boxOverlapsXZ(box, pMinX, pMaxX, pMinZ, pMaxZ)) return true;
+                    continue;
+                }
+                // A cama ocupa o voxel inteiro no plano, mas só 9/16 na altura:
+                // dá para subir nela e não dá para atravessá-la de pé no chão.
+                if (bedPart(type)) {
+                    const box = bedCollisionBox();
+                    const overlaps = boxOverlapsXZ({
+                        minX: bx + box.minX, maxX: bx + box.maxX,
+                        minZ: bz + box.minZ, maxZ: bz + box.maxZ,
+                    }, pMinX, pMaxX, pMinZ, pMaxZ);
+                    if (overlaps && y < by + box.maxY - e && y + height > by + e) return true;
                     continue;
                 }
                 if (!world.isSolidForPhysics(bx, by, bz, type)) continue;

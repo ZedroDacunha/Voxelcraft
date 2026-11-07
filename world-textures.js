@@ -1,6 +1,7 @@
 import { hash2, mulberry32 } from './world-math.js';
 import { ATLAS_COLUMNS, ATLAS_ROWS, BLOCKS, ITEMS, TILE, TILE_PX, atlasTileRect } from './world-catalog.js';
-import { createBlockIconPixels } from './world-block-icons.js';
+import { createBlockIconPixels, createModelIconPixels } from './world-block-icons.js';
+import { bedModelBoxes } from './world-bed.js';
 import { MEAT_SPRITE_CORES } from './world-meats.js';
 import { createCoalItemSpritePixels, createMineralOrePixel, createMineralSpritePixels, isMineralOreTile } from './world-mineral-textures.js';
 import {
@@ -377,6 +378,51 @@ export function createTilePixelSource() {
                 else if ((x + y) % 8 === 4) shade += 0.04;
                 return base.map(channel => Math.max(0, Math.min(255, Math.round(channel * shade))));
             }
+            // Cama: colchão vermelho e travesseiro branco. Os tons vêm das
+            // imagens de referência (o vermelho do topo ~156,44,36, a lateral
+            // mais escura), mas o desenho é nosso: trama curta de lã, um vinco
+            // de 2 px e o "rolo" da borda. A lateral repete o claro do topo nas
+            // primeiras linhas e escurece no encontro com a madeira — é isso que
+            // dá a impressão de colchão alto, e não de caixa vermelha.
+            case TILE.BED_TOP:
+            case TILE.BED_SIDE:
+            case TILE.BED_PILLOW_TOP:
+            case TILE.BED_PILLOW_SIDE: {
+                const pillow = tile === TILE.BED_PILLOW_TOP || tile === TILE.BED_PILLOW_SIDE;
+                const side = tile === TILE.BED_SIDE || tile === TILE.BED_PILLOW_SIDE;
+                const base = pillow ? [238, 236, 230] : [164, 46, 38];
+                // Mancha macia (veludo) + pelo curto. A mancha manda no volume,
+                // mas precisa ser **interpolada**: em blocos de 6 px o topo do
+                // colchão lia como um xadrez; suave, lê como tecido.
+                const suave = (passo, seed) => {
+                    const gx = x / passo, gy = y / passo;
+                    const x0 = Math.floor(gx), y0 = Math.floor(gy);
+                    const fx = gx - x0, fy = gy - y0;
+                    const s = t => t * t * (3 - 2 * t);
+                    const wx = s(fx), wy = s(fy);
+                    return (hash2(x0, y0, seed) * (1 - wx) + hash2(x0 + 1, y0, seed) * wx) * (1 - wy)
+                        + (hash2(x0, y0 + 1, seed) * (1 - wx) + hash2(x0 + 1, y0 + 1, seed) * wx) * wy;
+                };
+                const mancha = suave(9, 3313) * 0.6 + suave(4, 9173) * 0.4;
+                const tuft = hash2(Math.floor(x / 2), Math.floor(y / 2), 5501);
+                const fuzz = hash2(x, y, 4507);
+                let shade = 1 + (mancha - 0.5) * 0.075 + (tuft - 0.5) * 0.025;
+                if (fuzz > 0.94) shade += 0.04;
+                else if (fuzz < 0.06) shade -= 0.04;
+                if (side) {
+                    // A lateral do colchão: clara no alto (a aba vira), escura
+                    // embaixo, onde a sombra da própria beirada cai.
+                    shade *= pillow ? 0.88 : 0.9;
+                    if (y < 3) shade *= 1.12;
+                    else if (y > TILE_PX - 6) shade *= 0.82;
+                    else if (y > TILE_PX - 10) shade *= 0.93;
+                } else if (pillow) {
+                    // Borda de 2 px mais escura: é o contorno do travesseiro.
+                    const border = x < 2 || x > TILE_PX - 3 || y < 2 || y > TILE_PX - 3;
+                    if (border) shade *= 0.93;
+                }
+                return base.map(channel => Math.max(0, Math.min(255, Math.round(channel * shade))));
+            }
             case TILE.SAND: {
                 const c = 215 + j(12);
                 return [c, c - 20, c - 70];
@@ -588,6 +634,14 @@ export function createTextureTools(THREE) {
             const bloco = BLOCKS[Number(mat)];
             if (!bloco) return null;
             return (spriteCache[key] = createBlockIconPixels(bloco.tiles, pixelDoTile()));
+        }
+        // Cama: o ícone sai do próprio modelo (world-bed.js), como o do bloco.
+        // Desenhar uma segunda arte só para a barra é o caminho curto para o
+        // ícone e o bloco divergirem.
+        if (kind === 'bed') {
+            return (spriteCache[key] = createModelIconPixels(bedModelBoxes(), pixelDoTile(), {
+                size: TILE_PX, yaw: 36, pitch: 30, scale: 14.8, center: [0.5, 0.38, 1],
+            }));
         }
         const mineralSprite = createMineralSpritePixels(kind, mat);
         if (mineralSprite) return (spriteCache[key] = mineralSprite);
