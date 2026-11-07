@@ -15,7 +15,6 @@ import {
     PICARETA_PALETAS,
     MACHADO_PALETAS,
     PA_PALETAS,
-    ACENTO,
     pickaxeGradeFor,
     pickaxePaletteFor,
     createPickaxeSpritePixels,
@@ -29,7 +28,7 @@ import {
 import { silhueta, cheios, pecaUnica, simbolosDe, lum, hex } from './tool-art.mjs';
 
 const MATERIAIS = ['wood', 'stone', 'copper', 'iron', 'gold', 'diamond'];
-const SIMBOLOS = ['.', 'O', '1', '2', '3', '4', '5', 'a', 'b', 'c', 'd', 'g', 's'];
+const SIMBOLOS = ['.', 'O', '1', '2', '3', '4', 'a', 'b', 'c', 'd', 'g', 's'];
 
 const FERRAMENTAS = [
     {
@@ -99,7 +98,7 @@ test('a arte é 1 px por célula, com fundo transparente', () => {
     }
 });
 
-test('cada símbolo tem o seu tom, e o acento é sempre o da casa', () => {
+test('cada símbolo tem o seu tom', () => {
     for (const f of FERRAMENTAS) {
         for (const mat of MATERIAIS) {
             const px = f.criar(mat);
@@ -107,10 +106,6 @@ test('cada símbolo tem o seu tom, e o acento é sempre o da casa', () => {
             for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
                 const s = f.grade[y][x];
                 if (s === '.') continue;
-                if (s === '5') {
-                    assert.deepEqual(px[y][x], [...ACENTO], `${f.nome}/${mat}: (${x},${y}) é acento`);
-                    continue;
-                }
                 if ('1234'.includes(s)) {
                     assert.deepEqual(px[y][x], [...paleta[s]], `${f.nome}/${mat}: (${x},${y}) tom "${s}"`);
                 }
@@ -187,20 +182,16 @@ test('material fora da arte devolve null, para quem chama cair no desenho antigo
     }
 });
 
-test('picareta e machado são base fiel com ajustes: sem couro, com o acento no topo', () => {
+test('as ferramentas são base fiel com ajustes: sem couro e sem acento', () => {
     // As duas ficaram na versão "cor + forma": cabo liso, sem faixa de couro.
-    const SEM_COURO = ['1', '2', '3', '4', '5', 'O', 'a', 'b', 'c', 'd'];
+    const SEM_COURO = ['1', '2', '3', '4', 'O', 'a', 'b', 'c', 'd'];
     assert.deepEqual(simbolosDe(PICARETA_GRADE), SEM_COURO, 'picareta sem couro');
     assert.deepEqual(simbolosDe(MACHADO_GRADE), SEM_COURO, 'machado sem couro');
     // A pá ainda tem a faixa do #122: a rodada dela não chegou.
     assert.ok(simbolosDe(PA_GRADE).includes('g'), 'pá ainda tem couro');
     assert.ok(simbolosDe(PA_GRADE).includes('s'), 'pá ainda tem costura');
-    // O acento é um só, no topo da cabeça, e sempre no tom mais claro de lá.
-    const acentos = (grade) => {
-        const p = [];
-        for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (grade[y][x] === '5') p.push([x, y]);
-        return p;
-    };
-    assert.deepEqual(acentos(PICARETA_GRADE), [[6, 3]], 'picareta: acento em (6,3)');
-    assert.deepEqual(acentos(MACHADO_GRADE), [[8, 2]], 'machado: acento em (8,2)');
+    // O acento saiu de todas: o símbolo `5` nem existe mais no alfabeto.
+    for (const g of [PICARETA_GRADE, MACHADO_GRADE, PA_GRADE]) {
+        assert.ok(!g.join('').includes('5'), 'nenhuma ferramenta tem acento');
+    }
 });

@@ -329,8 +329,7 @@ Se esquecer, o teste `cache-versioning` e o `npm run check` reprovam.
 ## Arte
 
 A arte do jogo é **nossa**: ícones desenhados aqui, em 16×16, com paleta própria,
-contorno tingido, um acento amarelo-palha e o cabo de madeira das tábuas do
-jogo. **Picareta** e **machado** partem da leitura clássica com pequenos ajustes
+contorno tingido e o cabo de madeira das tábuas do jogo. **Picareta** e **machado** partem da leitura clássica com pequenos ajustes
 — cor nossa, forma reconhecível —, sem faixa de couro; a **pá** ainda é desenho
 autoral com as faixas costuradas, até chegar a rodada dela. As regras estão em
 [`GUIA-DE-ARTE.md`](GUIA-DE-ARTE.md), e os testes de `tests/art-style.test.mjs`

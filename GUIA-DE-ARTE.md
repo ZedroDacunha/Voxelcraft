@@ -31,7 +31,6 @@ ferramentas, itens, minérios, blocos do inventário.
 | `.` | vazio (transparente) |
 | `O` | contorno, **tingido** com a sombra do material |
 | `1`…`4` | corpo, do escuro ao claro |
-| `5` | **acento** — o amarelo-palha da casa |
 | `a`…`d` | cabo de madeira, do escuro ao claro |
 | `g` | couro da empunhadura |
 | `s` | costura do couro |
@@ -54,12 +53,11 @@ grade está errada — e o teste pega.
 2. **Contorno tingido.** O `O` nunca é preto puro e muda com o material: pedra
    puxa azul, ouro puxa verde-escuro, diamante puxa ciano-escuro. É sempre a cor
    mais escura da paleta.
-3. **Quatro tons + um acento.** `1`…`4` do escuro ao claro, com o `2` no meio; o
-   `5` é detalhe — **no máximo 2 pixels**, sempre o mesmo amarelo-palha
-   (`#ead69e`), em qualquer material. É a assinatura mais reconhecível.
-   Ele é **claro, não aceso**: foi cítrico (`#fdf0a8`) até 07/11/2026, quando
-   virava um ponto de luz nas pontas. A régua é o salto de luminância contra os
-   vizinhos — hoje **≤ +170**, contra +194 do cítrico.
+3. **Quatro tons, e só.** `1`…`4` do escuro ao claro, com o `2` no meio. Nada de
+   cor fora da rampa do material: o **acento** amarelo que existia até 07/11/2026
+   saiu de todas as ferramentas — era um ponto de luz nas pontas e chamava mais
+   atenção do que a própria peça. A identidade agora é a **cor do material** e a
+   forma, não um pixel assinatura.
 4. **Cabo comum.** `a`…`d` são os mesmos nas três ferramentas: as peças parecem
    saídas da mesma oficina.
 5. **Cabo de madeira = as tábuas do jogo.** `CABO_PALETA` é literalmente o tile
@@ -104,7 +102,7 @@ A luz vem de cima e da esquerda. Na prática:
 - aresta de cima e lado esquerdo com os tons claros (`3`, `4`);
 - corpo com `2`;
 - aresta de baixo e lado direito com `1`;
-- o `5` no ponto mais alto da peça.
+- nada de pixel destacado: quem marca o topo é o `4`.
 
 ## 6. Ordem de trabalho
 

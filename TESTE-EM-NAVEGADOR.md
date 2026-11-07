@@ -1119,8 +1119,8 @@ de ouro`, `… pá de diamante`) e olhe na barra, no inventário e **na mão**.
       logo abaixo do encaixe e outra no punho.
 - [ ] O **contorno é tingido**: pedra puxa azul, ouro puxa verde-escuro, diamante
       puxa ciano-escuro. Nada de preto puro.
-- [ ] Há **um ponto de acento amarelo-palha** em cada ferramenta, no alto —
-      claro, mas sem acender como um LED.
+- [ ] ~~Há um ponto de acento amarelo-palha em cada ferramenta~~ — o acento saiu
+      de todas em 07/11/2026 (ver §62).
 - [ ] Os seis materiais se distinguem na hora, e o cobre (nosso) não parece o ouro.
 - [ ] As três **não lembram** os ícones clássicos lado a lado: silhueta diferente.
 - [ ] Na mão e na barra o ícone é o mesmo.
@@ -1136,7 +1136,7 @@ ferro`, `… de ouro`, `… de diamante`) e olhe na barra, no inventário e na m
 - [ ] A picareta **parece a picareta do jogo** — cabo na mesma diagonal, cabeça
       em barra com as duas pontas. É de propósito.
 - [ ] Mesmo assim ela **não é igual**: a cabeça é dois pixels mais larga à direita
-      e tem um pixel amarelo-palha no alto.
+      e o topo é só o tom mais claro do material.
 - [ ] **Não tem faixa de couro** no cabo. A pá continua com a dela.
 - [ ] O cabo é **da cor da tábua**: encoste o ícone num bloco de tábuas e a
       madeira combina.
@@ -1160,7 +1160,7 @@ inventário e na mão.
 - [ ] O machado **parece o machado do jogo**: topo reto, gume alto à esquerda e
       barba curta, cabo descendo na diagonal — não é mais uma lâmina em "D".
 - [ ] Mesmo assim ele **não é igual**: a cabeça é 1 px mais larga no topo e a
-      barba 1 px mais à direita, e há um pixel amarelo-palha no canto do topo.
+      barba 1 px mais à direita.
 - [ ] **Não tem faixa de couro** no cabo, igual à picareta.
 - [ ] O cabo é o **mesmo das outras duas**, e o cabo de madeira do machado de
       madeira combina com o das ferramentas de metal.

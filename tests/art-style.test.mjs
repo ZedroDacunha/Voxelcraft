@@ -17,7 +17,6 @@ import {
     PA_PALETAS,
     CABO_PALETA,
     PUNHO_PALETA,
-    ACENTO,
     createPickaxeSpritePixels,
     createAxeSpritePixels,
     createShovelSpritePixels,
@@ -67,19 +66,18 @@ test('a pá ainda tem faixa de couro costurada, e a costura é sempre a mesma co
     }
 });
 
-test('o acento da casa aparece nas três e é o mesmo amarelo-cítrico', () => {
+test('as ferramentas não têm acento', () => {
+    // O pixel de acento (amarelo-cítrico, depois palha) saiu de todas em
+    // 07/11/2026: a leitura ficou mais limpa sem ele.
     for (const f of TRES) {
+        assert.ok(!f.grade.join('').includes('5'), `${f.nome}: sem acento`);
         const px = f.criar('stone');
-        let acentos = 0;
         for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-            if (f.grade[y][x] !== '5') continue;
-            acentos++;
-            assert.deepEqual(px[y][x], [...ACENTO], `${f.nome}: acento em (${x},${y})`);
+            if (!px[y][x]) continue;
+            assert.notDeepEqual(px[y][x], [234, 214, 158], `${f.nome}: (${x},${y}) não é o amarelo-palha`);
+            assert.notDeepEqual(px[y][x], [253, 240, 168], `${f.nome}: (${x},${y}) não é o cítrico`);
         }
-        assert.ok(acentos >= 1, `${f.nome}: tem acento`);
-        assert.ok(acentos <= 2, `${f.nome}: acento é detalhe, não mancha (${acentos} px)`);
     }
-    assert.deepEqual([...ACENTO], [234, 214, 158], 'o amarelo-palha da casa');
 });
 
 test('as cores da família são exatamente estas', () => {
@@ -88,7 +86,6 @@ test('as cores da família são exatamente estas', () => {
         { a: '563e22', b: '7b5b33', c: '977443', d: 'caa66a' }, 'tons do cabo');
     assert.deepEqual(Object.fromEntries(Object.entries(PUNHO_PALETA).map(([k, v]) => [k, hex(v)])),
         { g: '4a3524', s: 'be9660' }, 'couro e costura');
-    assert.equal(hex(ACENTO), 'ead69e', 'acento');
 });
 
 test('o contorno é tingido — nunca preto puro, e muda com o material', () => {

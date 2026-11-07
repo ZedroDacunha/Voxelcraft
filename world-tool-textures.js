@@ -5,32 +5,28 @@
 //
 // A arte segue o `GUIA-DE-ARTE.md`, com duas famílias de desenho:
 //
-// - **picareta** — base fiel (a do #119) com **pequenos ajustes**: mesmo desenho
-//   clássico, 2 px de forma e paleta própria. Foi a decisão do usuário em
-//   07/11/2026: continuar com a leitura clássica e mudar só o suficiente para a
-//   peça ser nossa;
-// - **machado** e **pá** — desenho autoral de forma livre.
+// - **picareta**, **machado** e **pá** — **base fiel** do sprite clássico com
+//   **pequenos ajustes**: mesmo desenho, 2 px de forma e paleta própria. Foi a
+//   decisão do usuário em 07/11/2026: continuar com a leitura clássica e mudar só
+//   o suficiente para a peça ser nossa.
 //
 // As regras valem para as três: **contorno tingido** (`O`, nunca preto puro),
-// **quatro tons** (`1`…`4`, do escuro ao claro), **um acento** (`5`, o
-// amarelo-cítrico da casa) e o **cabo de madeira** (`a`…`d`) comum. O machado e
-// a pá ainda levam **faixas de couro** (`g`/`s`).
+// **quatro tons** (`1`…`4`, do escuro ao claro) e o **cabo de madeira** (`a`…`d`)
+// das tábuas do jogo. Nenhuma ferramenta tem acento.
 //
 // Um desenho por ferramenta, para todos os materiais: o que muda é a paleta.
 
 /**
- * A **picareta** — 16×16. `O` contorno · `1`…`4` cabeça · `5` acento ·
- * `a`…`d` cabo.
+ * A **picareta** — 16×16. `O` contorno · `1`…`4` cabeça · `a`…`d` cabo.
  *
  * É a base fiel do #119 com **dois ajustes de forma**: o topo da cabeça cresce
  * 1 px para a direita (a barra fica com 6 px) e a ponta esquerda ganha 1 px.
- * O acento (`5`) fica no tom mais claro do topo da cabeça.
  */
 export const PICARETA_GRADE = Object.freeze([
     '................',
     '................',
     '......111111....',
-    '....11532231bc..',
+    '....11432231bc..',
     '......1OOO22da..',
     '..........b32O..',
     '.........bca23O.',
@@ -56,7 +52,7 @@ export const PICARETA_GRADE = Object.freeze([
 export const MACHADO_GRADE = Object.freeze([
     '................',
     '.........111....',
-    '........5441....',
+    '........1441....',
     '.......14341....',
     '......14333bc...',
     '......O44323a...',
@@ -81,8 +77,8 @@ export const MACHADO_GRADE = Object.freeze([
 export const PA_GRADE = Object.freeze([
     '................',
     '.....O4431O.....',
-    '....O5443221O...',
-    '....O5432211O...',
+    '....O4443221O...',
+    '....O4432211O...',
     '....O4322211O...',
     '.....O3221O.....',
     '......O21O......',
@@ -117,14 +113,6 @@ export const PUNHO_PALETA = Object.freeze({
     g: Object.freeze([74, 53, 36]),
     s: Object.freeze([190, 150, 96]),
 });
-
-/**
- * O acento: a assinatura da casa, em **amarelo-palha**. Era um cítrico
- * `#fdf0a8`, quase branco, e virava um ponto aceso nas pontas das ferramentas —
- * pedido de 07/11/2026: mais suave. Desceu 24 pontos de luminância e perdeu
- * saturação, mas continua sendo o único tom quente-claro da família.
- */
-export const ACENTO = Object.freeze([234, 214, 158]);
 
 /**
  * Paleta de cada material: contorno `O` + quatro tons `1`…`4` (escuro → claro).
@@ -192,7 +180,7 @@ export const PA_PALETAS = PICARETA_PALETAS;
 function paletaCompleta(paletas, material) {
     const cores = paletas[material];
     if (!cores) return null;
-    return { ...CABO_PALETA, ...PUNHO_PALETA, ...cores, 5: ACENTO };
+    return { ...CABO_PALETA, ...PUNHO_PALETA, ...cores };
 }
 
 /** Pinta uma grade com a paleta; `.` vira transparente. */
