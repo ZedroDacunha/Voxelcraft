@@ -33,11 +33,14 @@ export function createPlayerModel(THREE, colors = {}) {
         return mesh;
     };
     const head = part('head', 0, 24, 0);
-    box(head, 'face', 'skin', [8, 8, 8], [0, 4, 0]);
-    box(head, 'hair-top', 'hair', [8.05, 1.4, 8.05], [0, 7.3, 0]);
-    box(head, 'hair-back', 'hair', [8.05, 5.8, 0.45], [0, 4.1, -3.85]);
-    box(head, 'hair-left', 'hair', [0.3, 3.5, 7.4], [-3.9, 5.75, 0]);
-    box(head, 'hair-right', 'hair', [0.3, 3.5, 7.4], [3.9, 5.75, 0]);
+    // O topo da pele termina abaixo do cabelo: duas faces no mesmo plano
+    // piscavam conforme a câmera se movia (z-fighting). As mechas laterais e
+    // de trás terminam na base do topo, sem ocupar o mesmo volume entre si.
+    box(head, 'face', 'skin', [8, 7.9, 8], [0, 3.95, 0]);
+    box(head, 'hair-top', 'hair', [8.16, 1.4, 8.16], [0, 7.3, 0]);
+    box(head, 'hair-back', 'hair', [8, 5.4, 0.08], [0, 3.9, -4.04]);
+    box(head, 'hair-left', 'hair', [0.08, 2.6, 8], [-4.04, 5.3, 0]);
+    box(head, 'hair-right', 'hair', [0.08, 2.6, 8], [4.04, 5.3, 0]);
     for (const x of [-2, 2]) {
         box(head, 'eye-white', 'eyeWhite', [1.5, 1, 0.08], [x, 4.15, 4.03]);
         box(head, 'pupil', 'eyes', [0.7, 0.9, 0.09], [x, 4.15, 4.08]);
