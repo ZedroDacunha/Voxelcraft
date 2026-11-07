@@ -298,7 +298,10 @@ export const SHEEP_REGROW_LIMIT = 128;
 
 /** Quantos fardos de lã saem de uma tosquia. */
 export const SHEEP_WOOL_MIN = 1;
-export const SHEEP_WOOL_MAX = 3;
+export const SHEEP_WOOL_MAX = 4;
+/** Quantos fardos saem ao morrer com velo. */
+export const SHEEP_DEATH_WOOL_MIN = 2;
+export const SHEEP_DEATH_WOOL_MAX = 4;
 /** Depois de tosquiada, a lã volta entre cinco e oito minutos. */
 export const SHEEP_WOOL_REGROW_MIN = 300;
 export const SHEEP_WOOL_REGROW_MAX = 480;
@@ -755,8 +758,7 @@ export function bleatFor({
 }
 
 /**
- * Quantos fardos saem de uma tosquia, a partir de um sorteio de 0 a 1: um, dois
- * ou três, em partes iguais.
+ * Quantos fardos saem de uma tosquia, de um a quatro em partes iguais.
  */
 export function woolCountFor(roll) {
     const r = Math.min(0.999999, Math.max(0, Number(roll) || 0));
@@ -771,7 +773,8 @@ export function woolCountFor(roll) {
  * não rende lã nenhuma. É a regra combinada com o jogador.
  */
 export function sheepDropsFor({ coat = 'white', sheared = false, woolRoll = 0, meatRoll = 0 } = {}) {
-    const wool = sheared ? 0 : woolCountFor(woolRoll);
+    const rWool = Math.min(0.999999, Math.max(0, Number(woolRoll) || 0));
+    const wool = sheared ? 0 : SHEEP_DEATH_WOOL_MIN + Math.floor(rWool * (SHEEP_DEATH_WOOL_MAX - SHEEP_DEATH_WOOL_MIN + 1));
     const r = Math.min(0.999999, Math.max(0, Number(meatRoll) || 0));
     const mutton = SHEEP_MUTTON_MIN + Math.floor(r * (SHEEP_MUTTON_MAX - SHEEP_MUTTON_MIN + 1));
     return { coat, wool, mutton };

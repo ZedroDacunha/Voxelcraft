@@ -489,7 +489,7 @@ vez de aparecer parada ao lado — então o teste é esperar e procurar.
 - [ ] A terra comida **volta a ser grama em 5 a 10 minutos** (deixe a tela
       aberta e volte). Se você puser outro bloco no lugar, o seu bloco fica.
 - [ ] Com a **tesoura** na mão, clicar na ovelha a deixa **tosquiada** (lã baixa
-      e lisa, sem topete) e solta de um a três fardos da cor dela — o resto está
+      e lisa, sem topete) e solta de um a quatro fardos da cor dela — o resto está
       na seção 26.
 - [ ] Tosquiada, ela **continua pastando**, e cada pastagem adianta a volta da lã.
 - [ ] Chegar correndo, de perto, agachado ou não, **não espanta** a ovelha: é
@@ -595,7 +595,7 @@ Já coberto por `npm test` (922 testes):
 - [ ] Na bancada, **duas barras de ferro na diagonal** fazem uma **tesoura**
       (uma barra sozinha não faz nada).
 - [ ] Com a tesoura na mão, clicar numa ovelha a **tosquia**: ela fica com a lã
-      baixa e lisa, sem os tufos e sem o topete, e cai no chão de **1 a 3 fardos
+      baixa e lisa, sem os tufos e sem o topete, e cai no chão de **1 a 4 fardos
       de lã da cor dela** (branca, cinza ou preta).
 - [ ] Clicar de novo na mesma ovelha **não tosquia** (ela está sem lã) e o clique
       não quebra o chão atrás dela.
@@ -649,7 +649,7 @@ Já coberto por `npm test` (922 testes):
       corre para longe com o bando.
 - [ ] A ovelha cai no **quarto** golpe (esperando ~0,35 s entre um e outro); o
       Mofim continua caindo no **terceiro**.
-- [ ] Morta, a ovelha solta no chão de **1 a 3 fardos de lã da cor dela** — mas
+- [ ] Morta, a ovelha solta no chão de **2 a 4 fardos de lã da cor dela** — mas
       só se ainda tiver velo; tosquiada, não solta lã.
 - [ ] A **carne de ovelha** cai sempre (1 a 2), com ou sem lã, e é comestível:
       segurando na mão e usando, a barra de fome sobe (3 de fome, menos que a
@@ -1306,7 +1306,7 @@ A cama é o primeiro bloco do jogo que não é cubo nem painel: são duas metade
 (cabeceira e pés) com pernas, travessa, colchão e travesseiro. Ver
 [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
 
-- [ ] `/give cama` (ou 3 lãs brancas + 3 tábuas na bancada) e coloque no chão.
+- [ ] `/give cama` (ou 3 blocos de lã branca + 3 tábuas na bancada) e coloque no chão.
 - [ ] Ao colocar, a **cabeceira fica do lado oposto ao seu** — o travesseiro
       branco aponta para longe de você.
 - [ ] Gire o jogador e coloque outra: as quatro direções funcionam, e o
@@ -1362,10 +1362,12 @@ A parte 2 da cama. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
 
 Parte 3 da cama. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
 
-- [ ] Na bancada, **3 lãs brancas + 3 tábuas** → **Cama** (a de sempre).
-- [ ] **3 lãs cinzas + 3 tábuas** → **Cama cinza**; **3 lãs pretas + 3 tábuas** →
-      **Cama preta**.
-- [ ] Misturar (2 cinzas + 1 branca) **não** vira cama nenhuma.
+- [ ] Na bancada, **3 blocos de lã branca + 3 tábuas** → **Cama** (a de sempre).
+      Se a versão que você está jogando ainda pede fardo solto, é cache: a
+      receita passou a pedir **bloco** na parte 6 (§74).
+- [ ] **3 blocos de lã cinza + 3 tábuas** → **Cama cinza**; **3 blocos de lã
+      preta + 3 tábuas** → **Cama preta**.
+- [ ] Misturar (2 blocos cinza + 1 branco) **não** vira cama nenhuma.
 - [ ] Colocando a cinza, o colchão é cinza; a preta, preta; a branca, creme. O
       **travesseiro é branco nas três** e a madeira é a mesma.
 - [ ] Na barra, cada uma tem o seu ícone: a cama aparece em 3/4 com a cor certa.
@@ -1434,3 +1436,14 @@ Parte 5 da cama. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
       buraco e a cama desaba do mesmo jeito — o gancho é a remoção do bloco, não
       a picareta.
 - [ ] Tente colocar uma cama no ar (numa beirada, sem bloco embaixo): não cola.
+
+## 74. A cama se costura com bloco de lã
+
+Parte 6 da cama. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
+
+- [ ] Na bancada, **4 fardos de lã branca** (2×2) → **1 bloco de lã branca**.
+- [ ] Na bancada, **3 blocos de lã branca em cima + 3 tábuas embaixo** → **Cama**.
+- [ ] **3 fardos de lã soltos + 3 tábuas** → **nada** (o fardo não costura cama).
+- [ ] O mesmo com cinza e preta: 4 fardos → bloco, 3 blocos → cama da cor.
+- [ ] A receita no livro da bancada mostra o **bloco de lã** no ícone dos
+      ingredientes de cima, e não o fardo.
