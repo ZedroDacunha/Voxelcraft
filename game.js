@@ -54,6 +54,7 @@ import { DAWN_TIME, bedRespawnPoint, canSleepAt, sleepPhaseAt } from './world-sl
 import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld } from './player-physics.js';
 import { canJumpFrom, createJumpState, updateJumpWindow } from './player-jump.js';
 import { createPlayerModel } from './player-model.js';
+import { createPlayerHeldItem } from './player-held-item.js';
 import { THIRD_PERSON_BODY_MIN_DISTANCE, THIRD_PERSON_DISTANCE, cameraOffsetSign, nextCameraView, thirdPersonDistance, thirdPersonLimbSwing } from './player-third-person.js';
 import { ATTACK_COOLDOWN, attackReady, createCreatureSystemClass } from './world-creature.js';
 import { creatureInReach } from './world-mob-hit.js';
@@ -2207,6 +2208,9 @@ function refreshHeldItem() {
 
 function updateHand(dt) {
     refreshHeldItem();
+    const item = ITEMS[heldId];
+    playerHeldItem.update(heldId, heldMesh, heldFlameMesh,
+        Boolean(item && item.sprite?.kind !== 'bed' && itemRenderMode(item) === 'sprite'));
     updateHeldTorchLight();
     const miningNow = Boolean(leftHeld && currentHit && currentHit.y !== 0);
     const phaseBefore = handAnim.phase;
@@ -3149,7 +3153,7 @@ function updateWaterfall(dt) {
 // =====================================================================
 // 6. ESTADO GERAL
 // =====================================================================
-let camera, thirdCamera, playerModel, scene, renderer, controls, world, creatureSystem, sheepSystem, tallGrassMaterial, tallGrassMaterials = [];
+let camera, thirdCamera, playerModel, playerHeldItem, scene, renderer, controls, world, creatureSystem, sheepSystem, tallGrassMaterial, tallGrassMaterials = [];
 let cameraView = 'first';
 const thirdDirection = new THREE.Vector3();
 const frontCameraTurn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
@@ -4589,6 +4593,7 @@ async function init() {
     scene.add(camera);
     thirdCamera = new THREE.PerspectiveCamera(GAME_SETTINGS.fov, camera.aspect, 0.05, 300);
     playerModel = createPlayerModel(THREE);
+    playerHeldItem = createPlayerHeldItem(THREE, playerModel.rightArm);
     playerModel.root.visible = false;
     scene.add(playerModel.root);
 
