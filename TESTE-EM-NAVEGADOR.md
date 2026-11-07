@@ -1260,3 +1260,22 @@ A picareta deixou de ser "base fiel + 2 px" e ganhou a passada autoral
       desenho é o mesmo, só muda a cor.
 - [ ] Lado a lado com o machado, a pá e a tesoura, ela é da **mesma oficina**.
 - [ ] Minerar continua funcionando igual.
+
+## 66. O machado ganha barba e fio reto
+
+Terceira ferramenta da passada autoral, e a mais difícil: a cabeça do machado é
+uma mancha só. O que mudou está em
+[`MELHORIA-20261107-machado-autoral.md`](MELHORIA-20261107-machado-autoral.md).
+
+- [ ] Faça um **machado** e olhe no inventário, na barra e na mão.
+- [ ] A **borda de corte** é vertical e clara — o fio corre reto, sem degrau.
+- [ ] O **contra-fio** (a parte de trás da cabeça) é curto: não tem mais o rabo
+      que ia para a direita.
+- [ ] A **barba** desce na direção do cabo: a lâmina "morde" para baixo, em vez
+      de terminar reta.
+- [ ] O **topo** da cabeça não tem degrau.
+- [ ] Continua **uma peça só** e continua lido como machado — não virou enxada
+      nem martelo, e a cabeça não está descolada do cabo (o erro do #120).
+- [ ] Em todos os materiais o desenho é o mesmo, só muda a cor.
+- [ ] Lado a lado com a picareta, a pá e a tesoura, é da **mesma oficina**.
+- [ ] Cortar madeira continua funcionando igual.

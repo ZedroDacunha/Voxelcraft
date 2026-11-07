@@ -41,15 +41,16 @@ grade está errada — e o teste pega.
 1. **Silhueta reconhecível — e não copiada.** O teste compara o perfil linha a
    linha com as silhuetas de referência. A conta é **por ferramenta**:
    - **picareta**: silhueta própria, **66 px** (ver §8);
-   - **machado**: 2 linhas diferentes, **62 px**; **pá**: 2 linhas, **55 px**;
+   - **machado**: silhueta própria, **64 px** (ver §9);
+   - **pá**: 2 linhas diferentes, **55 px**;
    - **tesoura**: silhueta própria, **79 px** (ver §7).
 
    O clássico é **referência de leitura, não molde**: a peça tem que ser
    reconhecida de longe como picareta, machado, pá ou tesoura — e não como a
-   arte do jogo. No machado e na pá os 2 px são sempre um no topo da peça e outro
-   na ponta, e nenhuma linha pode ser cópia exata de ponta a ponta. Na **tesoura**
-   (§7) e na **picareta** (§8) a diferença já é de estrutura: 2 px não afastava o
-   suficiente, e o usuário pediu explicitamente que a forma se afastasse
+   arte do jogo. Na **pá** os 2 px são sempre um no topo da peça e outro na ponta,
+   e nenhuma linha pode ser cópia exata de ponta a ponta. Na **tesoura** (§7), na
+   **picareta** (§8) e no **machado** (§9) a diferença já é de estrutura: 2 px não
+   afastava o suficiente, e o usuário pediu explicitamente que a forma se afastasse
    "suavemente" do original.
 2. **Contorno tingido.** O `O` nunca é preto puro e muda com o material: pedra
    puxa azul, ouro puxa verde-escuro, diamante puxa ciano-escuro. É sempre a cor
@@ -157,17 +158,35 @@ Resultado: **66 px**, uma peça só, perfil
 `[0,0,6,11,3,4,6,6,6,6,6,4,3,3,2,0]` — 3 linhas fora da silhueta clássica. O
 desenho continua lido como picareta de longe, mas não é mais a figura do jogo.
 
-## 9. O que ainda é herdado
+## 9. O machado
+
+O machado é a ferramenta mais difícil de afastar sem perder a leitura: a cabeça é
+uma **mancha só**, e qualquer corte grande vira outra ferramenta (o "D" descolado
+do cabo foi reprovado no #120). O que dá para mexer é a **borda** e o **contra-fio**:
+
+1. **contra-fio curto** — a pontinha de trás da cabeça (`(13,6)` e `(13,7)`) sai:
+   sobra a lâmina e um toco de encaixe, sem o rabo do clássico;
+2. **fio reto** — `(6,3)` entra e `(7,3)` vira `4`: a borda de corte fica
+   **vertical em três fileiras**, com o tom claro correndo pelo fio, em vez de
+   degrau;
+3. **topo sem degrau** — `(11,1)` sai;
+4. **barba** — `(6,6)` vira `4` e `(5,6)`, `(6,7)` e `(5,7)` viram `O`: a lâmina
+   **desce na direção do cabo**, como machado de barba.
+
+Resultado: **64 px**, uma peça só, perfil
+`[0,2,4,6,7,7,8,7,6,3,3,3,3,3,2,0]` — 4 linhas fora da silhueta clássica.
+
+## 10. O que ainda é herdado
 
 Blocos, minérios, lingotes e itens de minério já foram desenhados aqui (com
 paletas escolhidas a dedo, nas rodadas de #104 a #118). Nenhuma ferramenta está
 fora da régua desde 07/11/2026.
 
-Das quatro ferramentas, a **tesoura** (§7) e a **picareta** (§8) já passaram pela
-passada autoral. O machado e a pá continuam na base fiel com poucos pixels de
-diferença — a próxima rodada é decidir se elas recebem o mesmo tratamento.
+Das quatro ferramentas, **tesoura** (§7), **picareta** (§8) e **machado** (§9) já
+passaram pela passada autoral. Só a **pá** continua na base fiel com 2 px de
+diferença — é a última da fila.
 
-## 10. Aviso de boa-fé
+## 11. Aviso de boa-fé
 
 O Voxelcraft é um jogo próprio, inspirado no gênero voxel — **não é um produto
 oficial** e não tem vínculo com a Mojang ou a Microsoft. Ver o aviso no

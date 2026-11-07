@@ -1,5 +1,10 @@
 # MELHORIA: o machado volta à base fiel, com ajustes pequenos e nossos
 
+> **Revisado em 07/11/2026:** a base fiel com 2 px foi considerada perto demais
+> da arte do jogo. A silhueta autoral está em
+> [`MELHORIA-20261107-machado-autoral.md`](MELHORIA-20261107-machado-autoral.md);
+> o perfil e a contagem de pixels desta página são os **antigos**.
+
 - **Data:** 07/11/2026
 - **Status:** implementado
 - **Arquivos principais:** `world-tool-textures.js`, `tests/tool-art.test.mjs`, `tests/art-style.test.mjs`, `GUIA-DE-ARTE.md`

@@ -48,8 +48,8 @@ const FERRAMENTAS = [
         gradeFor: axeGradeFor,
         paletteFor: axePaletteFor,
         criar: createAxeSpritePixels,
-        silhuetaEsperada: [0, 3, 4, 5, 7, 7, 7, 6, 6, 3, 3, 3, 3, 3, 2, 0],
-        totalEsperado: 62,
+        silhuetaEsperada: [0, 2, 4, 6, 7, 7, 8, 7, 6, 3, 3, 3, 3, 3, 2, 0],
+        totalEsperado: 64,
     },
     {
         nome: 'pá',
