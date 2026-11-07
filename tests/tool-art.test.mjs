@@ -49,8 +49,8 @@ const FERRAMENTAS = [
         gradeFor: axeGradeFor,
         paletteFor: axePaletteFor,
         criar: createAxeSpritePixels,
-        silhuetaEsperada: [0, 8, 10, 10, 8, 6, 4, 3, 3, 3, 3, 3, 3, 0, 0, 0],
-        totalEsperado: 64,
+        silhuetaEsperada: [0, 3, 4, 5, 7, 7, 7, 6, 6, 3, 3, 3, 3, 3, 2, 0],
+        totalEsperado: 62,
     },
     {
         nome: 'pá',
@@ -187,13 +187,20 @@ test('material fora da arte devolve null, para quem chama cair no desenho antigo
     }
 });
 
-test('a picareta é a base fiel com ajustes: sem couro, com o acento no topo', () => {
-    // A picareta ficou na versão "cor + forma": cabo liso, sem faixa de couro.
-    assert.deepEqual(simbolosDe(PICARETA_GRADE), ['1', '2', '3', '4', '5', 'O', 'a', 'b', 'c', 'd']);
-    assert.ok(simbolosDe(MACHADO_GRADE).includes('s'), 'machado ainda tem costura');
+test('picareta e machado são base fiel com ajustes: sem couro, com o acento no topo', () => {
+    // As duas ficaram na versão "cor + forma": cabo liso, sem faixa de couro.
+    const SEM_COURO = ['1', '2', '3', '4', '5', 'O', 'a', 'b', 'c', 'd'];
+    assert.deepEqual(simbolosDe(PICARETA_GRADE), SEM_COURO, 'picareta sem couro');
+    assert.deepEqual(simbolosDe(MACHADO_GRADE), SEM_COURO, 'machado sem couro');
+    // A pá ainda tem a faixa do #122: a rodada dela não chegou.
     assert.ok(simbolosDe(PA_GRADE).includes('g'), 'pá ainda tem couro');
-    // O acento é um só, no tom mais claro do topo da cabeça.
-    const acentos = [];
-    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (PICARETA_GRADE[y][x] === '5') acentos.push([x, y]);
-    assert.deepEqual(acentos, [[6, 3]], 'acento em (6,3)');
+    assert.ok(simbolosDe(PA_GRADE).includes('s'), 'pá ainda tem costura');
+    // O acento é um só, no topo da cabeça, e sempre no tom mais claro de lá.
+    const acentos = (grade) => {
+        const p = [];
+        for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (grade[y][x] === '5') p.push([x, y]);
+        return p;
+    };
+    assert.deepEqual(acentos(PICARETA_GRADE), [[6, 3]], 'picareta: acento em (6,3)');
+    assert.deepEqual(acentos(MACHADO_GRADE), [[8, 2]], 'machado: acento em (8,2)');
 });

@@ -1,8 +1,8 @@
 // As REGRAS DA FAMÍLIA das ferramentas — o que faz a arte ser nossa.
 //
-// Ficam aqui os testes que valem para as três juntas: o cabo comum, as faixas de
-// o acento da casa, o contorno tingido e o quanto cada silhueta se afasta da
-// clássica (a picareta de propósito, bem pouco). As regras por ferramenta estão em
+// Ficam aqui os testes que valem para as três juntas: o cabo comum, o couro da
+// pá, o acento da casa, o contorno tingido e o quanto cada silhueta se afasta da
+// clássica (picareta e machado de propósito, bem pouco). As regras por ferramenta estão em
 // `tool-art.test.mjs`.
 
 import test from 'node:test';
@@ -44,10 +44,12 @@ test('o cabo de madeira é o mesmo nas três ferramentas', () => {
     }
 });
 
-test('machado e pá têm faixa de couro costurada, e a costura é sempre a mesma cor', () => {
-    // A picareta ficou sem couro: a decisão foi "cor + forma".
+test('a pá ainda tem faixa de couro costurada, e a costura é sempre a mesma cor', () => {
+    // Picareta e machado voltaram à base fiel sem couro ("cor + forma"); a pá é a
+    // última com a faixa do #122, até chegar a rodada dela.
     assert.ok(!simbolosDe(PICARETA_GRADE).includes('g'), 'a picareta não tem faixa de couro');
-    for (const f of TRES.filter((t) => t.nome !== 'picareta')) {
+    assert.ok(!simbolosDe(MACHADO_GRADE).includes('g'), 'o machado não tem faixa de couro');
+    for (const f of TRES.filter((t) => t.nome === 'pá')) {
         assert.ok(simbolosDe(f.grade).includes('g'), `${f.nome}: tem couro`);
         assert.ok(simbolosDe(f.grade).includes('s'), `${f.nome}: tem costura`);
         const px = f.criar('iron');
@@ -105,9 +107,9 @@ test('o contorno é tingido — nunca preto puro, e muda com o material', () => 
 });
 
 test('cada silhueta se afasta da clássica na medida combinada', () => {
-    // A picareta é a base fiel com **2 px** de forma (decisão de 07/11/2026);
-    // machado e pá são desenho livre e se afastam bastante.
-    const esperado = { picareta: { linhas: 2, px: 70 }, machado: { min: 8 }, 'pá': { min: 8 } };
+    // Picareta e machado são a base fiel com **2 px** de forma (decisão de
+    // 07/11/2026); a pá é desenho livre e se afasta bastante.
+    const esperado = { picareta: { linhas: 2, px: 70 }, machado: { linhas: 2, px: 62 }, 'pá': { min: 8 } };
     for (const f of TRES) {
         const nossa = silhueta(f.grade);
         assert.notDeepEqual(nossa, f.classica, `${f.nome}: o perfil não pode ser igual ao clássico`);

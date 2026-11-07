@@ -10,10 +10,12 @@ ferramentas, itens, minérios, blocos do inventário.
 >
 > **Revisão de 07/11/2026 — base fiel com ajustes.** Depois de ver as três
 > ferramentas prontas, a direção mudou: a **pirâmide de intensidade** caiu para
-> *"parecida com a do jogo, com ajustes pequenos e nossos"*. A picareta voltou à
-> **base fiel** do sprite clássico e recebeu só alguns pixels de forma, paleta
-> suave e veios de metal. O machado e a pá continuam sendo desenhos autorais
-> ([`MELHORIA-20261107-picareta-ajustes.md`](MELHORIA-20261107-picareta-ajustes.md)).
+> *"parecida com a do jogo, com ajustes pequenos e nossos"*. A **picareta** e o
+> **machado** voltaram à **base fiel** do sprite clássico e receberam só alguns
+> pixels de forma, paleta suave e veios de metal
+> ([`MELHORIA-20261107-picareta-ajustes.md`](MELHORIA-20261107-picareta-ajustes.md),
+> [`MELHORIA-20261107-machado-ajustes.md`](MELHORIA-20261107-machado-ajustes.md)).
+> A **pá** ainda é o desenho autoral do #122 — é a próxima.
 > Regra prática: **a forma pode ser próxima; a cor e o detalhe são nossos.**
 
 ## 1. A grade
@@ -41,10 +43,11 @@ grade está errada — e o teste pega.
 
 1. **Silhueta reconhecível — e não copiada.** O teste compara o perfil linha a
    linha com as silhuetas de referência. A conta é **por ferramenta**:
-   - picareta (base fiel): **2 linhas** diferentes e **70 px** cheios — a forma é
-     quase a clássica de propósito, quem carrega a identidade é a cor;
-   - machado e pá (autorais): **pelo menos 8 linhas** diferentes e a contagem de
-     pixels fora da faixa clássica.
+   - picareta e machado (base fiel): **2 linhas** diferentes — **70** e **62 px**
+     cheios —, porque a forma é quase a clássica de propósito e quem carrega a
+     identidade é a cor;
+   - pá (autoral, por enquanto): **pelo menos 8 linhas** diferentes e a contagem
+     de pixels fora da faixa clássica.
 
    Nenhuma linha pode ser cópia exata de ponta a ponta: mesmo na base fiel, cada
    ferramenta tem um pixel de assinatura.
@@ -63,10 +66,11 @@ grade está errada — e o teste pega.
    (`[123,91,51]` no veio, `[151,116,67]` na sombra, `[202,166,106]` no claro,
    `[86,62,34]` no contorno). A ferramenta na mão precisa parecer feita do mesmo
    material do chão. O teste da picareta trava esses quatro tons.
-6. **Faixa de couro costurada — só no machado e na pá.** `g`/`s` na metade de
-   baixo do cabo (onde a mão pega): uma faixa logo abaixo do encaixe e outra no
-   punho. A **picareta não tem couro**: ela é a base fiel, e o couro era a
-   assinatura que mais pesava na leitura.
+6. **Faixa de couro costurada — só na pá.** `g`/`s` na metade de baixo do cabo
+   (onde a mão pega): uma faixa logo abaixo do encaixe e outra no punho. A
+   **picareta** e o **machado** voltaram à base fiel **sem couro**: a faixa era a
+   assinatura que mais pesava na leitura. Quando a pá voltar à base fiel, deve
+   seguir o mesmo caminho.
 
 ## 4. Materiais
 

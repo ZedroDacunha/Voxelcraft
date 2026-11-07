@@ -99,8 +99,9 @@ brilho — e é por isso que ele foi para o amarelo quente em vez de só escurec
 - **"a picareta de madeira usa as cores da tábua do jogo"** — os quatro tons da
   madeira têm que ser exatamente os quatro da tábua.
 - **"cada silhueta se afasta da clássica na medida combinada"** — picareta com
-  **2** linhas diferentes e 70 px; machado e pá com **≥ 8**. A régua antiga (8
-  para todos) não valia mais para uma base fiel.
+  **2** linhas diferentes e 70 px na picareta (e **62 px** no machado, depois da
+  rodada dele); a pá, ainda autoral, com **≥ 8**. A régua antiga (8 para todos)
+  não valia mais para uma base fiel.
 - **"nos metais o desvio de cor é o mais visível"** — mede contra a paleta
   clássica, e o eixo muda por material:
 

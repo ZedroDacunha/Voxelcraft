@@ -1137,7 +1137,7 @@ ferro`, `… de ouro`, `… de diamante`) e olhe na barra, no inventário e na m
       em barra com as duas pontas. É de propósito.
 - [ ] Mesmo assim ela **não é igual**: a cabeça é dois pixels mais larga à direita
       e tem um pixel amarelo-palha no alto.
-- [ ] **Não tem faixa de couro** no cabo. O machado e a pá continuam com a deles.
+- [ ] **Não tem faixa de couro** no cabo. A pá continua com a dela.
 - [ ] O cabo é **da cor da tábua**: encoste o ícone num bloco de tábuas e a
       madeira combina.
 - [ ] A cor é **mais suave** que a da rodada anterior: sem estouro de contraste,
@@ -1149,3 +1149,23 @@ ferro`, `… de ouro`, `… de diamante`) e olhe na barra, no inventário e na m
 - [ ] Na mão e na barra o ícone é o mesmo.
 - [ ] O **machado** (#120) e a **pá** (#121) continuam exatamente como ficaram.
 - [ ] A **tesoura** segue com o desenho antigo — é a próxima.
+
+## 60. O machado volta à base fiel
+
+O machado foi refeito **em cima do desenho clássico**, com a mesma receita da
+picareta ([`MELHORIA-20261107-machado-ajustes.md`](MELHORIA-20261107-machado-ajustes.md)).
+Pegue os seis (`/give machado de madeira` … `… de diamante`) e olhe na barra, no
+inventário e na mão.
+
+- [ ] O machado **parece o machado do jogo**: topo reto, gume alto à esquerda e
+      barba curta, cabo descendo na diagonal — não é mais uma lâmina em "D".
+- [ ] Mesmo assim ele **não é igual**: a cabeça é 1 px mais larga no topo e a
+      barba 1 px mais à direita, e há um pixel amarelo-palha no canto do topo.
+- [ ] **Não tem faixa de couro** no cabo, igual à picareta.
+- [ ] O cabo é o **mesmo das outras duas**, e o cabo de madeira do machado de
+      madeira combina com o das ferramentas de metal.
+- [ ] A cor é a **mesma paleta** da família: ferro azulado, ouro quente, diamante
+      azulado, cobre alaranjado — e o cobre não confunde com o ouro.
+- [ ] Picareta e machado, lado a lado, **parecem da mesma oficina**.
+- [ ] Na mão e na barra o ícone é o mesmo.
+- [ ] A **pá** continua como ficou no #122, com a faixa de couro — é a próxima.

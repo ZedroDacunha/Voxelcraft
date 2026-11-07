@@ -46,27 +46,29 @@ export const PICARETA_GRADE = Object.freeze([
 ]);
 
 /**
- * O **machado** — 16×16, mesmo alfabeto da picareta.
+ * O **machado** — 16×16, mesmo alfabeto.
  *
- * Lâmina de topo reto, gume alto e convexo à esquerda, afinando para o olho à
- * direita; barba curta embaixo. O cabo sai do olho e desce.
+ * Também é a **base fiel** do sprite clássico, com **2 pixels** de forma nossa
+ * (a receita da picareta): o topo da cabeça fica 1 px mais largo e a barba
+ * ganha 1 px à direita. O acento (`5`) fica no canto iluminado do topo, em
+ * `(8,2)`, e o cabo é liso — **sem couro**, como a picareta.
  */
 export const MACHADO_GRADE = Object.freeze([
     '................',
-    '..O443322O......',
-    '.O54433221O.....',
-    '.O54432211O.....',
-    '..O443221O......',
-    '...O3321O.......',
-    '....O21O........',
-    '.......bda......',
+    '.........111....',
+    '........5441....',
+    '.......14341....',
+    '......14333bc...',
+    '......O44323a...',
+    '.......OOb323O..',
+    '........bca33O..',
+    '.......bda.OOO..',
     '......bca.......',
-    '.....bda........',
-    '....bca.........',
-    '....gsg.........',
-    '...ggg..........',
-    '................',
-    '................',
+    '.....bca........',
+    '....bda.........',
+    '...bca..........',
+    '..bda...........',
+    '..aa............',
     '................',
 ]);
 

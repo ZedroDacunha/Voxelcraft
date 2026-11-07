@@ -330,9 +330,9 @@ Se esquecer, o teste `cache-versioning` e o `npm run check` reprovam.
 
 A arte do jogo é **nossa**: ícones desenhados aqui, em 16×16, com paleta própria,
 contorno tingido, um acento amarelo-palha e o cabo de madeira das tábuas do
-jogo. A **picareta** parte da leitura clássica com pequenos ajustes — cor nossa,
-forma reconhecível —, enquanto **machado e pá** são desenho autoral, e só eles
-levam as faixas de couro costuradas. As regras estão em
+jogo. **Picareta** e **machado** partem da leitura clássica com pequenos ajustes
+— cor nossa, forma reconhecível —, sem faixa de couro; a **pá** ainda é desenho
+autoral com as faixas costuradas, até chegar a rodada dela. As regras estão em
 [`GUIA-DE-ARTE.md`](GUIA-DE-ARTE.md), e os testes de `tests/art-style.test.mjs`
 cobram cada uma delas — inclusive **nenhuma silhueta igual à do sprite clássico**.
 
