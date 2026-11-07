@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 
 import { ID, ITEMS, BLOCKS, RECIPES, TILE, ATLAS_COLUMNS, ATLAS_ROWS } from '../world-catalog.js';
 import {
-    BED_COLLISION_HEIGHT, BED_HEIGHTS, bedCells, bedCollisionBox, bedModelBoxes,
+    BED_COLLISION_HEIGHT, BED_HEIGHTS, bedCells, bedCollisionBox, bedFacingVector, bedModelBoxes,
     bedOtherCell, bedPart, bedShapes, bedTypeForPart, isBedBlock,
 } from '../world-bed.js';
 import { collidesInWorld, hasGroundSupport } from '../player-physics.js';
@@ -92,6 +92,50 @@ test('as duas metades se encontram sem degrau', () => {
     const colchaoCabeca = cabeca.find(c => c.max[1] === BED_HEIGHTS.mattress / 16 && c.min[1] === BED_HEIGHTS.frame / 16);
     assert.equal(colchaoPe.max[2], 1);
     assert.equal(colchaoCabeca.min[2], 0);
+});
+
+test('nenhuma caixa tem face no mesmo plano de outra (o pisca-pisca)', () => {
+    // O passe de recorte desenha os dois lados da face (`DoubleSide`), então
+    // duas faces coplanares que se cruzam brigam pelo mesmo pixel — foi assim
+    // que a cama piscava ao girar a câmera. As peças se **embutem** (ENCAIXE)
+    // em vez de encostar; este teste cobra isso de qualquer mudança futura.
+    const EPS = 1e-6;
+    const cruza = (aMin, aMax, bMin, bMax) => Math.min(aMax, bMax) - Math.max(aMin, bMin) > EPS;
+    // A exceção é o plano da **emenda** entre as duas metades: as faces que dão
+    // para a outra metade são descartadas pelo mesher (`solid()`), então elas
+    // podem coincidir à vontade — é justamente o que mantém a cama contínua.
+    // Onde a emenda cai no espaço local: ela fica do lado da outra metade — o
+    // pé aponta para a cabeceira e a cabeceira para o pé.
+    const emendaDe = (facing, part) => {
+        const [dx, dz] = bedFacingVector(facing);
+        const sinal = part === 'foot' ? 1 : -1;
+        const eixo = dx !== 0 ? 0 : 2;
+        return { eixo, valor: (eixo === 0 ? dx : dz) * sinal > 0 ? 1 : 0 };
+    };
+    for (const part of ['foot', 'head']) {
+        for (const facing of FACINGS) {
+            const emenda = emendaDe(facing, part);
+            const caixas = bedShapes(part, facing);
+            for (let i = 0; i < caixas.length; i++) {
+                for (let j = i + 1; j < caixas.length; j++) {
+                    const A = caixas[i], B = caixas[j];
+                    for (let a = 0; a < 3; a++) {
+                        const planos = [A.min[a], A.max[a]].some(va => [B.min[a], B.max[a]].some(vb => Math.abs(va - vb) < EPS));
+                        if (!planos) continue;
+                        const noPlanoDaEmenda = a === emenda.eixo
+                            && [A.min[a], A.max[a], B.min[a], B.max[a]].some(v => Math.abs(v - emenda.valor) < EPS);
+                        if (noPlanoDaEmenda) continue;
+                        const outros = [0, 1, 2].filter(e => e !== a);
+                        const [p, q] = outros;
+                        if (cruza(A.min[p], A.max[p], B.min[p], B.max[p])
+                            && cruza(A.min[q], A.max[q], B.min[q], B.max[q])) {
+                            assert.fail(`${part}/${facing}: caixas ${i} e ${j} têm face coplanar no eixo ${a}`);
+                        }
+                    }
+                }
+            }
+        }
+    }
 });
 
 test('o travesseiro só existe na cabeceira', () => {

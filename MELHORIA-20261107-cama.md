@@ -99,6 +99,29 @@ O ícone da barra **não** é uma segunda arte: `createModelIconPixels()`
 as caixas do próprio modelo. São 32×32, o tamanho da célula do atlas — o mesmo
 caminho do ícone 3D dos blocos. Se o modelo mudar, o ícone muda junto.
 
+### 8. O pisca-pisca ao girar a câmera
+
+A primeira versão das caixas era **empilhada no seco**: a travessa terminava
+exatamente onde o colchão começava, o colchão onde a aba começava, e assim por
+diante. Duas faces no mesmo plano brigam pelo mesmo pixel — e o passe de recorte
+desenha **os dois lados** da face (`DoubleSide`), então até as faces internas
+entravam na briga. Resultado: a cama piscava ao girar a câmera.
+
+A correção tem três partes:
+
+- **encaixe de 1/2 dezesseis-avos** (`ENCAIXE`): cada peça entra na de baixo, e a
+  face que sobra fica *dentro* da peça de cima em vez de no plano dela. A
+  silhueta não muda — só o que estava escondido;
+- **folga de 3 milésimos de bloco** (`FOLGA`) nas faces que encostam no mundo (o
+  pé no chão, a lateral do colchão no bloco vizinho): o vizinho desenha a face
+  dele no mesmo plano, porque a cama não é opaca;
+- **as pernas 1/2 para dentro** da travessa, pelo mesmo motivo, e o travesseiro
+  1/2 antes da beirada da aba.
+
+O teste `nenhuma caixa tem face no mesmo plano de outra` cobra isso de qualquer
+mudança futura, com uma única exceção: o plano da **emenda** entre as metades,
+onde as faces são descartadas pelo mesher (é o que mantém a cama contínua).
+
 ## O que o jogador vê
 
 - Receita: **3 fardos de lã branca em cima + 3 tábuas embaixo** → 1 cama (a
