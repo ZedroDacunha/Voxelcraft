@@ -253,8 +253,55 @@ branca, e o travesseiro volta a existir.
 - **O save** não mudou de formato: o ID do bloco já diz a cor. A cama antiga (ID
   117) é a branca — save velho abre com a cama na cor nova.
 
-## O que fica para a próxima parte
+---
 
-- **A cama 3D equipada na mão**, em primeira pessoa (parte 4).
-- Fora do escopo: as 16 tinturas (o jogo não tem corantes) e a cama cair quando
-  o chão é cavado.
+# Parte 4 — a cama na mão
+
+A cama aparecia na mão como **ícone extrudado**: a figura chata que as
+ferramentas usam, com um dedo de profundidade. Dá para reconhecer a cama, mas ela
+não é 3D — e o ícone é uma *pintura* do modelo, não o modelo.
+
+Agora a mão recebe a peça de verdade: pernas, travessa, colchão, aba e
+travesseiro, na cor da lã que o jogador está segurando.
+
+## Como a peça é montada
+
+`world-bed-hand.js` transforma `bedModelBoxes(cor)` em **arrays puros** —
+posição, normal, UV e índice —, sem THREE. O `game.js` só embrulha isso num
+`BufferGeometry` e usa o material do mundo (o mesmo mapa do atlas, o mesmo que o
+bloco na mão já usava). Três consequências boas:
+
+- **A cor vem do tile**, não de um material novo: o colchão preto é preto porque
+  amostra o tile do colchão preto — o mesmo do bloco no mundo;
+- **As faces enterradas continuam fora** (`enterrarFaces`): a face que mora
+  dentro de outra caixa não é desenhada, exatamente como no mesher;
+- **Dá para testar sem navegador**: `tests/bed-hand.test.mjs` cobra a contagem de
+  faces, a UV de cada face, o centro do modelo e a escala.
+
+## Centrar é o que faz girar certo
+
+O modelo tem duas células de comprimento, então o meio está em `z = 1`, não em
+`z = 0,5`. Centrar no meio (`0,5, 0,5, 1`) é o que faz a peça girar em volta de
+si mesma na mão — com a origem numa quina, ela orbitaria o próprio canto a cada
+giro do braço.
+
+## O ajuste da mão
+
+`HELD_BED` guarda escala e giro: `0,26` de escala (a cama é móvel, não
+ferramenta — fica do tamanho de um bloco grande na mão), giro de `0,30` em X
+(mostra o topo do colchão), `0,55` em Y (a peça atravessa a tela na diagonal) e
+`0,20` em Z (descola da horizontal, para não ler como um cartão). O travesseiro
+fica do lado de perto, que é o que identifica a cama de relance.
+
+## A tabela de faces saiu do `game.js`
+
+O mesher, as nuvens e agora a cama na mão desenham a mesma caixa, e todos
+precisavam dos mesmos seis cantos com as mesmas UVs. A tabela morava no
+`game.js` e quem desenhasse uma caixa fora dele copiava os cantos à mão — cópia
+que envelhece calada. Ela virou `world-faces.js`, um módulo puro.
+
+## O escopo que ficou de fora
+
+- **As 16 tinturas**: o jogo não tem corantes, então são três cores (a lã da
+  ovelha), não dezesseis.
+- **A cama cair quando o chão é cavado**: hoje ela fica no ar, como a porta.

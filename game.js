@@ -18,6 +18,8 @@ import { createPointerLockRequester } from './game-pointer-lock.js';
 import { createInventoryAssets } from './inventory-assets.js';
 import { createTextureTools } from './world-textures.js';
 import { itemRenderMode } from './world-block-icons.js';
+import { FACES } from './world-faces.js';
+import { HELD_BED, bedHandGeometry } from './world-bed-hand.js';
 import { createWorldSaveCodec, WORLD_SAVE_VERSION } from './world-save-codec.js';
 import { createWorldSaveLoader } from './world-save-loader.js';
 import { createWorldSaveManager } from './world-save-manager.js';
@@ -304,14 +306,8 @@ function doorPartShape(type, facing) {
         tiles: { top: TILE.WOOD_END, bottom: TILE.WOOD_END, side: faceTile, front: faceTile },
     };
 }
-const FACES = [
-    { kind: 'side',   dir: [-1, 0, 0], corners: [ { pos: [0,1,0], uv: [0,1] }, { pos: [0,0,0], uv: [0,0] }, { pos: [0,1,1], uv: [1,1] }, { pos: [0,0,1], uv: [1,0] } ] },
-    { kind: 'side',   dir: [ 1, 0, 0], corners: [ { pos: [1,1,1], uv: [0,1] }, { pos: [1,0,1], uv: [0,0] }, { pos: [1,1,0], uv: [1,1] }, { pos: [1,0,0], uv: [1,0] } ] },
-    { kind: 'bottom', dir: [ 0,-1, 0], corners: [ { pos: [1,0,1], uv: [1,0] }, { pos: [0,0,1], uv: [0,0] }, { pos: [1,0,0], uv: [1,1] }, { pos: [0,0,0], uv: [0,1] } ] },
-    { kind: 'top',    dir: [ 0, 1, 0], corners: [ { pos: [0,1,1], uv: [1,1] }, { pos: [1,1,1], uv: [0,1] }, { pos: [0,1,0], uv: [1,0] }, { pos: [1,1,0], uv: [0,0] } ] },
-    { kind: 'side',   dir: [ 0, 0,-1], corners: [ { pos: [1,0,0], uv: [0,0] }, { pos: [0,0,0], uv: [1,0] }, { pos: [1,1,0], uv: [0,1] }, { pos: [0,1,0], uv: [1,1] } ] },
-    { kind: 'side',   dir: [ 0, 0, 1], corners: [ { pos: [0,0,1], uv: [0,0] }, { pos: [1,0,1], uv: [1,0] }, { pos: [0,1,1], uv: [0,1] }, { pos: [1,1,1], uv: [1,1] } ] },
-];
+// As faces do cubo moram em `world-faces.js`: o mesher, as nuvens e a cama na
+// mão desenham a mesma caixa e precisam do mesmo canto no mesmo lugar.
 const worldClouds = createWorldClouds({ THREE, Noise2D, faces: FACES });
 const worldSky = createWorldSkySystem({
     THREE,
@@ -1598,6 +1594,20 @@ function buildCubeGeo(tiles, size, facing = DEFAULT_BLOCK_FACING) {
     return geo;
 }
 
+/**
+ * A cama na mão: o modelo de duas células, montado a partir dos arrays puros de
+ * `world-bed-hand.js` (é lá que mora a conta e o teste).
+ */
+function buildHeldBedGeo(color) {
+    const { positions, normals, uvs, indices } = bedHandGeometry(color);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geo.setIndex(indices);
+    return geo;
+}
+
 function buildSpriteGeo(pix, px, depth) {
     const pos = [], nor = [], col = [], ind = [];
     // O lado vem da própria arte: o ícone de bloco é 32×32 e os itens, 16×16.
@@ -2089,6 +2099,17 @@ function refreshHeldItem() {
     heldAnchor.scale.setScalar(1);
     if (!id) return;
     const item = ITEMS[id];
+    // A cama vem antes do teste de sprite: o ícone dela é 3D, e na mão ela
+    // precisa ser a **peça**, não a figura chata que as ferramentas usam.
+    if (item.sprite?.kind === 'bed') {
+        const key = 'bed:' + item.sprite.mat;
+        if (!heldGeoCache[key]) heldGeoCache[key] = buildHeldBedGeo(item.sprite.mat);
+        heldMesh = new THREE.Mesh(heldGeoCache[key], world.material);
+        heldMesh.position.set(...HELD_BED.position);
+        heldAnchor.rotation.set(...HELD_BED.rotation);
+        heldAnchor.add(heldMesh);
+        return;
+    }
     if (itemRenderMode(item) === 'sprite') {
         if (HELD_TOOL_KINDS.has(item.sprite.kind)) {
             heldAnchor.position.set(HELD.position.x, HELD.position.y, HELD.position.z);
