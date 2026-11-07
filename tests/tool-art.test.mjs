@@ -2,7 +2,7 @@
 //
 // Um teste por regra, valendo para as três ferramentas: grade, silhueta,
 // transparência, papéis dos símbolos, paletas, materiais, determinismo e o
-// `null` de segurança. As regras da família (cabo comum, couro, acento,
+// `null` de segurança. As regras da família (cabo comum, acento,
 // contorno tingido) ficam em `art-style.test.mjs`.
 
 import test from 'node:test';
@@ -15,7 +15,6 @@ import {
     PICARETA_PALETAS,
     MACHADO_PALETAS,
     PA_PALETAS,
-    ACENTO,
     pickaxeGradeFor,
     pickaxePaletteFor,
     createPickaxeSpritePixels,
@@ -29,7 +28,7 @@ import {
 import { silhueta, cheios, pecaUnica, simbolosDe, lum, hex } from './tool-art.mjs';
 
 const MATERIAIS = ['wood', 'stone', 'copper', 'iron', 'gold', 'diamond'];
-const SIMBOLOS = ['.', 'O', '1', '2', '3', '4', '5', 'a', 'b', 'c', 'd', 'g', 's'];
+const SIMBOLOS = ['.', 'O', '1', '2', '3', '4', 'a', 'b', 'c', 'd'];
 
 const FERRAMENTAS = [
     {
@@ -39,8 +38,8 @@ const FERRAMENTAS = [
         gradeFor: pickaxeGradeFor,
         paletteFor: pickaxePaletteFor,
         criar: createPickaxeSpritePixels,
-        silhuetaEsperada: [0, 0, 4, 9, 10, 3, 4, 3, 3, 3, 3, 3, 3, 3, 0, 0],
-        totalEsperado: 51,
+        silhuetaEsperada: [0, 0, 6, 11, 3, 4, 6, 6, 6, 6, 6, 4, 3, 3, 2, 0],
+        totalEsperado: 66,
     },
     {
         nome: 'machado',
@@ -49,7 +48,7 @@ const FERRAMENTAS = [
         gradeFor: axeGradeFor,
         paletteFor: axePaletteFor,
         criar: createAxeSpritePixels,
-        silhuetaEsperada: [0, 8, 10, 10, 8, 6, 4, 3, 3, 3, 3, 3, 3, 0, 0, 0],
+        silhuetaEsperada: [0, 2, 4, 6, 7, 7, 8, 7, 6, 3, 3, 3, 3, 3, 2, 0],
         totalEsperado: 64,
     },
     {
@@ -59,8 +58,8 @@ const FERRAMENTAS = [
         gradeFor: shovelGradeFor,
         paletteFor: shovelPaletteFor,
         criar: createShovelSpritePixels,
-        silhuetaEsperada: [0, 6, 9, 9, 9, 6, 4, 4, 4, 3, 3, 3, 3, 3, 3, 0],
-        totalEsperado: 69,
+        silhuetaEsperada: [0, 0, 4, 5, 6, 7, 5, 6, 4, 3, 3, 3, 4, 3, 2, 0],
+        totalEsperado: 55,
     },
 ];
 
@@ -99,7 +98,7 @@ test('a arte é 1 px por célula, com fundo transparente', () => {
     }
 });
 
-test('cada símbolo tem o seu tom, e o acento é sempre o da casa', () => {
+test('cada símbolo tem o seu tom', () => {
     for (const f of FERRAMENTAS) {
         for (const mat of MATERIAIS) {
             const px = f.criar(mat);
@@ -107,10 +106,6 @@ test('cada símbolo tem o seu tom, e o acento é sempre o da casa', () => {
             for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
                 const s = f.grade[y][x];
                 if (s === '.') continue;
-                if (s === '5') {
-                    assert.deepEqual(px[y][x], [...ACENTO], `${f.nome}/${mat}: (${x},${y}) é acento`);
-                    continue;
-                }
                 if ('1234'.includes(s)) {
                     assert.deepEqual(px[y][x], [...paleta[s]], `${f.nome}/${mat}: (${x},${y}) tom "${s}"`);
                 }
@@ -187,8 +182,14 @@ test('material fora da arte devolve null, para quem chama cair no desenho antigo
     }
 });
 
-test('a picareta não usa os símbolos do machado só porque são da mesma família', () => {
-    assert.deepEqual(simbolosDe(PICARETA_GRADE), ['1', '2', '3', '4', '5', 'O', 'a', 'b', 'c', 'd', 'g', 's']);
-    assert.ok(simbolosDe(MACHADO_GRADE).includes('s'), 'machado tem costura');
-    assert.ok(simbolosDe(PA_GRADE).includes('g'), 'pá tem couro');
+test('as ferramentas são base fiel com ajustes: sem couro e sem acento', () => {
+    // As duas ficaram na versão "cor + forma": cabo liso, sem faixa de couro.
+    const ALFABETO = ['1', '2', '3', '4', 'O', 'a', 'b', 'c', 'd'];
+    assert.deepEqual(simbolosDe(PICARETA_GRADE), ALFABETO, 'picareta sem couro');
+    assert.deepEqual(simbolosDe(MACHADO_GRADE), ALFABETO, 'machado sem couro');
+    assert.deepEqual(simbolosDe(PA_GRADE), ALFABETO, 'pá sem couro');
+    // O acento saiu de todas: o símbolo `5` nem existe mais no alfabeto.
+    for (const g of [PICARETA_GRADE, MACHADO_GRADE, PA_GRADE]) {
+        assert.ok(!g.join('').includes('5'), 'nenhuma ferramenta tem acento');
+    }
 });

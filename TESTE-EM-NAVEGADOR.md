@@ -1119,8 +1119,163 @@ de ouro`, `… pá de diamante`) e olhe na barra, no inventário e **na mão**.
       logo abaixo do encaixe e outra no punho.
 - [ ] O **contorno é tingido**: pedra puxa azul, ouro puxa verde-escuro, diamante
       puxa ciano-escuro. Nada de preto puro.
-- [ ] Há **um ponto de acento amarelo-cítrico** em cada ferramenta, no alto.
+- [ ] ~~Há um ponto de acento amarelo-palha em cada ferramenta~~ — o acento saiu
+      de todas em 07/11/2026 (ver §62).
 - [ ] Os seis materiais se distinguem na hora, e o cobre (nosso) não parece o ouro.
 - [ ] As três **não lembram** os ícones clássicos lado a lado: silhueta diferente.
 - [ ] Na mão e na barra o ícone é o mesmo.
 - [ ] A **tesoura** segue com o desenho antigo — é a próxima, e já nasce no guia.
+
+## 59. A picareta volta à base fiel
+
+A picareta foi refeita **em cima da versão fiel do #119**, com ajustes pequenos
+([`MELHORIA-20261107-picareta-ajustes.md`](MELHORIA-20261107-picareta-ajustes.md)).
+Pegue as seis (`/give picareta de madeira`, `… de pedra`, `… de cobre`, `… de
+ferro`, `… de ouro`, `… de diamante`) e olhe na barra, no inventário e na mão.
+
+- [ ] A picareta **parece a picareta do jogo** — cabo na mesma diagonal, cabeça
+      em barra com as duas pontas. É de propósito.
+- [ ] Mesmo assim ela **não é igual**: a cabeça é dois pixels mais larga à direita
+      e o topo é só o tom mais claro do material.
+- [ ] **Não tem faixa de couro** no cabo. A pá continua com a dela.
+- [ ] O cabo é **da cor da tábua**: encoste o ícone num bloco de tábuas e a
+      madeira combina.
+- [ ] A cor é **mais suave** que a da rodada anterior: sem estouro de contraste,
+      o metal ainda lê como metal.
+- [ ] O metal é o que mais se mexe: **ferro azulado**, **ouro quente**,
+      **diamante azul-esverdeado** — bem longe do clássico, e o cobre não confunde
+      com o ouro.
+- [ ] A pedra continua cinza-neutra, só que mais clara que o ferro.
+- [ ] Na mão e na barra o ícone é o mesmo.
+- [ ] O **machado** (#120) e a **pá** (#121) continuam exatamente como ficaram.
+- [ ] A **tesoura** segue com o desenho antigo — é a próxima.
+
+## 60. O machado volta à base fiel
+
+O machado foi refeito **em cima do desenho clássico**, com a mesma receita da
+picareta ([`MELHORIA-20261107-machado-ajustes.md`](MELHORIA-20261107-machado-ajustes.md)).
+Pegue os seis (`/give machado de madeira` … `… de diamante`) e olhe na barra, no
+inventário e na mão.
+
+- [ ] O machado **parece o machado do jogo**: topo reto, gume alto à esquerda e
+      barba curta, cabo descendo na diagonal — não é mais uma lâmina em "D".
+- [ ] Mesmo assim ele **não é igual**: a cabeça é 1 px mais larga no topo e a
+      barba 1 px mais à direita.
+- [ ] **Não tem faixa de couro** no cabo, igual à picareta.
+- [ ] O cabo é o **mesmo das outras duas**, e o cabo de madeira do machado de
+      madeira combina com o das ferramentas de metal.
+- [ ] A cor é a **mesma paleta** da família: ferro azulado, ouro quente, diamante
+      azulado, cobre alaranjado — e o cobre não confunde com o ouro.
+- [ ] Picareta e machado, lado a lado, **parecem da mesma oficina**.
+- [ ] Na mão e na barra o ícone é o mesmo.
+- [ ] A **pá** continua como ficou no #122 até a rodada dela (§62).
+
+## 61. O cabo é das tábuas
+
+O cabo das três ferramentas passou a usar os tons do tile de tábuas
+([`MELHORIA-20261107-cabo-de-tabua.md`](MELHORIA-20261107-cabo-de-tabua.md)).
+
+- [ ] Coloque uma **picareta de ferro**, um **machado de ouro** e uma **pá de
+      diamante** na barra e olhe na mão: o cabo é o mesmo nas três.
+- [ ] Encoste qualquer uma num **bloco de tábuas**: o cabo e a tábua são da mesma
+      família de cor — nada de cabo laranja-escuro.
+- [ ] Nas ferramentas **de madeira** (picareta, machado, pá), cabeça e cabo
+      parecem a mesma peça de tábua — é de propósito.
+- [ ] O cabo continua com **quatro tons**: dá para ver o topo claro e o lado de
+      baixo escuro; não virou um traço chapado.
+- [ ] A **pá** ainda tem a faixa de couro antiga — sai na rodada dela (§62).
+
+## 62. Sem acento, e a pá na base fiel
+
+Duas mudanças seguidas de 07/11/2026: o **acento** amarelo saiu de todas as
+ferramentas ([`MELHORIA-20261107-sem-acento.md`](MELHORIA-20261107-sem-acento.md))
+e a **pá** voltou à base fiel
+([`MELHORIA-20261107-pa-ajustes.md`](MELHORIA-20261107-pa-ajustes.md)).
+
+- [ ] Nenhuma ferramenta tem mais o **ponto amarelo** — nem no alto, nem na ponta.
+- [ ] Olhando as três de perto, não há **nenhum pixel fora da rampa do material**
+      (só `O` + quatro tons + cabo).
+- [ ] A **pá** agora parece a pá do jogo: concha em paralelogramo no canto de
+      cima, cabo na diagonal. Não é mais a concha redonda do #122.
+- [ ] A pá **não tem couro** no cabo — igual à picareta e ao machado.
+- [ ] As três, lado a lado, têm o **mesmo cabo** (tábua) e o mesmo tamanho de
+      gesto: 2 px de forma fora do clássico.
+- [ ] O topo da pá é 1 px mais largo e o canto de baixo da lâmina tem 1 px de
+      contorno — é o que faz a pá ser nossa sem deixar de ser pá.
+- [ ] Na mão e na barra o ícone é o mesmo, e a pá não se confunde com a picareta
+      nem com o machado.
+- [ ] A **tesoura** segue com o desenho antigo — é a última.
+
+## 63. A tesoura entra na régua
+
+A tesoura deixou de ser desenhada por código e passou a usar a arte da família
+([`MELHORIA-20261107-tesoura.md`](MELHORIA-20261107-tesoura.md)).
+
+- [ ] Faça uma **tesoura** (duas barras de ferro na diagonal) e olhe na barra,
+      no inventário e na mão.
+- [ ] Ela **parece a tesoura do jogo**: duas lâminas cruzadas em cima e o punho
+      curto embaixo — não é mais o "X" de ferro do desenho antigo.
+- [ ] As **lâminas são claras** e o **punho é de madeira**, da cor da tábua: dá
+      para ver que são duas partes.
+- [ ] A tesoura é **uma peça só** — não há pixel solto nas argolas do punho.
+- [ ] Nada de **acento amarelo** nem de **couro** na peça.
+- [ ] Lado a lado com a picareta, o machado e a pá, ela é da **mesma oficina**.
+- [ ] Na mão e na barra o ícone é o mesmo, e ela não se confunde com a pá.
+- [ ] Tosquiar a ovelha continua funcionando igual (§ da lã).
+
+## 64. A tesoura ganha silhueta própria
+
+O usuário avisou: a imagem de exemplo era a do **jogo original** — e a primeira
+tesoura da família era fiel demais. A passada autoral está em
+[`MELHORIA-20261107-tesoura-autoral.md`](MELHORIA-20261107-tesoura-autoral.md).
+
+- [ ] Faça uma **tesoura** e olhe na barra, no inventário e na mão.
+- [ ] A **ponta da lâmina** sobe mais que antes e afina — dá para ver o fio
+      terminando em bico no canto de cima.
+- [ ] O **cabo é fino** (2 px) e afina na direção das lâminas, em vez de manter a
+      mesma grossura até o topo.
+- [ ] O **vão entre as duas lâminas** é mais aberto: dá para contar as duas peças
+      mesmo a 16×16.
+- [ ] O punho **não escorre para dentro da lâmina**: a ponta da mandíbula é
+      contorno.
+- [ ] Ela continua **uma peça só** (nada de pixel solto) e continua lida como
+      tesoura — não virou alicate nem faca.
+- [ ] Lado a lado com a picareta, o machado e a pá, ela é da **mesma oficina**.
+- [ ] Tosquiar a ovelha continua funcionando igual.
+
+## 65. A picareta ganha cabeça própria
+
+A picareta deixou de ser "base fiel + 2 px" e ganhou a passada autoral
+([`MELHORIA-20261107-picareta-autoral.md`](MELHORIA-20261107-picareta-autoral.md)).
+
+- [ ] Faça uma **picareta** e olhe no inventário, na barra e na mão.
+- [ ] A **cabeça é mais fina** que a de antes: o fundo perdeu uma fileira e dá
+      para ver o fio.
+- [ ] A **ponta esquerda** termina em bico, não reta.
+- [ ] O **encaixe do cabo** na cabeça tem um degrau (colar), não uma emenda
+      derretida.
+- [ ] Ela continua **uma peça só** e continua lida como picareta — não virou
+      enxada nem martelo.
+- [ ] Em todos os materiais (madeira, pedra, cobre, ferro, ouro, diamante) o
+      desenho é o mesmo, só muda a cor.
+- [ ] Lado a lado com o machado, a pá e a tesoura, ela é da **mesma oficina**.
+- [ ] Minerar continua funcionando igual.
+
+## 66. O machado ganha barba e fio reto
+
+Terceira ferramenta da passada autoral, e a mais difícil: a cabeça do machado é
+uma mancha só. O que mudou está em
+[`MELHORIA-20261107-machado-autoral.md`](MELHORIA-20261107-machado-autoral.md).
+
+- [ ] Faça um **machado** e olhe no inventário, na barra e na mão.
+- [ ] A **borda de corte** é vertical e clara — o fio corre reto, sem degrau.
+- [ ] O **contra-fio** (a parte de trás da cabeça) é curto: não tem mais o rabo
+      que ia para a direita.
+- [ ] A **barba** desce na direção do cabo: a lâmina "morde" para baixo, em vez
+      de terminar reta.
+- [ ] O **topo** da cabeça não tem degrau.
+- [ ] Continua **uma peça só** e continua lido como machado — não virou enxada
+      nem martelo, e a cabeça não está descolada do cabo (o erro do #120).
+- [ ] Em todos os materiais o desenho é o mesmo, só muda a cor.
+- [ ] Lado a lado com a picareta, a pá e a tesoura, é da **mesma oficina**.
+- [ ] Cortar madeira continua funcionando igual.

@@ -5,6 +5,7 @@ import { createCoalItemSpritePixels, createMineralOrePixel, createMineralSpriteP
 import {
     createAxeSpritePixels,
     createPickaxeSpritePixels,
+    createShearsSpritePixels,
     createShovelSpritePixels,
 } from './world-tool-textures.js';
 
@@ -728,7 +729,11 @@ export function createTextureTools(THREE) {
         }
 
         if (kind === 'shears') {
-            // Tesoura de ferro: duas lâminas cruzadas em X e as argolas embaixo.
+            // Arte da casa (ver GUIA-DE-ARTE.md): base fiel do sprite clássico
+            // com 2 px nossos, lâminas de ferro e punho de tábua.
+            const arteDaTesoura = createShearsSpritePixels();
+            if (arteDaTesoura) return (spriteCache[key] = arteDaTesoura);
+            // Desenho antigo, para nada quebrar se a arte sumir.
             const hc = HEAD_COLORS[mat] ?? HEAD_COLORS.iron;
             const blade = (x, y) => put(x, y, hc.l);
             for (let i = 0; i < 7; i++) {
