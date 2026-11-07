@@ -1,7 +1,12 @@
 # MELHORIA: a tesoura entra na régua da família
 
+> **Revisado em 07/11/2026:** a base fiel com 2 px foi considerada perto
+> demais da arte do jogo. A silhueta autoral está em
+> [`MELHORIA-20261107-tesoura-autoral.md`](MELHORIA-20261107-tesoura-autoral.md);
+> o perfil e a contagem de pixels desta página são os **antigos**.
+
 - **Data:** 07/11/2026
-- **Status:** implementado
+- **Status:** substituído pela passada autoral
 - **Arquivos principais:** `world-tool-textures.js`, `world-textures.js`, `tests/shears-art.test.mjs`, `GUIA-DE-ARTE.md`
 
 ## O problema

@@ -1,9 +1,13 @@
 // A TESOURA — a última ferramenta a entrar na régua da família.
 //
 // Até aqui ela era desenhada por código em `world-textures.js` (um "X" de ferro
-// com argolas). Agora ela é **base fiel** do sprite clássico com 2 px nossos, as
-// lâminas na rampa do ferro e o punho na madeira da tábua — o mesmo cabo das
-// outras três ferramentas.
+// com argolas). Depois veio a base fiel do clássico com 2 px nossos — e o olho
+// ainda reconhecia a arte do jogo. Esta é a passada **autoral**: ponta mais alta
+// e afiada, cabo afinado, costura aberta entre as lâminas. As lâminas na rampa do
+// ferro, o punho na madeira da tábua — o mesmo cabo das outras três ferramentas.
+//
+// O que estes testes guardam é o desenho **nosso**: se alguém voltar a colar a
+// silhueta clássica, o perfil de linhas e a contagem de pixels brigam.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -61,7 +65,7 @@ test('a grade da tesoura é 16×16 e só usa o alfabeto da casa', () => {
 });
 
 test('a silhueta é a nossa e a tesoura é uma peça só', () => {
-    assert.deepEqual(perfil, [0, 0, 5, 6, 7, 8, 9, 8, 7, 7, 8, 6, 5, 3, 0, 0], 'perfil das linhas');
+    assert.deepEqual(perfil, [0, 4, 5, 6, 7, 8, 8, 7, 6, 6, 8, 6, 5, 3, 0, 0], 'perfil das linhas');
     assert.equal(total, 79, '79 px cheios');
     assert.equal(pecaUnica(), 79, 'tudo ligado numa peça só');
 });

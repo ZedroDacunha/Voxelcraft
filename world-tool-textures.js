@@ -170,21 +170,33 @@ export const PICARETA_PALETAS = Object.freeze({
  * lâminas são o metal (`O`, `2`…`4`) e o **punho é madeira** (`a`…`d`), a mesma
  * tábua do cabo das ferramentas.
  *
- * É a base fiel do sprite clássico com **2 pixels** de forma nossa, em `(3,12)` e
- * `(5,13)`: eles fecham as argolas do punho e fazem a tesoura ser **uma peça só**
- * (no original as pontas das argolas ficam soltas). Sem acento, sem couro.
+ * A primeira versão era o sprite clássico com 2 px trocados e o olho ainda
+ * reconhecia a arte do jogo — de perto demais para uma textura nossa. Esta é a
+ * passada **autoral**, sem virar outra ferramenta:
+ *
+ * 1. **ponta mais alta e afiada** — a lâmina sobe uma fileira e afina em
+ *    `(9,1)`…`(12,1)`, o que muda o desenho de cima para baixo;
+ * 2. **cabo afinado** — de 3 para 2 px a partir de `(6,7)`, afinando na direção
+ *    das lâminas;
+ * 3. **costura aberta** — o vão entre as duas lâminas ganha 1 px em `(8,6)`;
+ * 4. **ponta da mandíbula em contorno** — `(13,7)` deixa de ser madeira e vira
+ *    contorno: o punho não escorre para dentro da lâmina.
+ *
+ * Fecha em **79 px numa única peça**, sem acento e sem couro. A defesa contra
+ * arte de terceiros é esta: silhueta, proporção e paleta próprias — o clássico
+ * fica só como referência de leitura (é uma tesoura, não um martelo).
  */
 export const TESOURA_GRADE = Object.freeze([
     '................',
-    '................',
+    '.........b343...',
     '........b3443...',
     '.......b2443.3..',
     '......bc343.34..',
     '.....bd343.344..',
-    '....bda23.3443..',
-    '....bda..3432a..',
-    '...bda...23ba...',
-    '...bca..bbba....',
+    '....bda2..3443..',
+    '....bd...3432O..',
+    '...bd....23ba...',
+    '...bc...bbba....',
     '...33bbbcca.....',
     '..3..2ccaa......',
     '..2a.Oaa........',

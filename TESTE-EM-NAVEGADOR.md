@@ -1222,3 +1222,23 @@ A tesoura deixou de ser desenhada por código e passou a usar a arte da família
 - [ ] Lado a lado com a picareta, o machado e a pá, ela é da **mesma oficina**.
 - [ ] Na mão e na barra o ícone é o mesmo, e ela não se confunde com a pá.
 - [ ] Tosquiar a ovelha continua funcionando igual (§ da lã).
+
+## 64. A tesoura ganha silhueta própria
+
+O usuário avisou: a imagem de exemplo era a do **jogo original** — e a primeira
+tesoura da família era fiel demais. A passada autoral está em
+[`MELHORIA-20261107-tesoura-autoral.md`](MELHORIA-20261107-tesoura-autoral.md).
+
+- [ ] Faça uma **tesoura** e olhe na barra, no inventário e na mão.
+- [ ] A **ponta da lâmina** sobe mais que antes e afina — dá para ver o fio
+      terminando em bico no canto de cima.
+- [ ] O **cabo é fino** (2 px) e afina na direção das lâminas, em vez de manter a
+      mesma grossura até o topo.
+- [ ] O **vão entre as duas lâminas** é mais aberto: dá para contar as duas peças
+      mesmo a 16×16.
+- [ ] O punho **não escorre para dentro da lâmina**: a ponta da mandíbula é
+      contorno.
+- [ ] Ela continua **uma peça só** (nada de pixel solto) e continua lida como
+      tesoura — não virou alicate nem faca.
+- [ ] Lado a lado com a picareta, o machado e a pá, ela é da **mesma oficina**.
+- [ ] Tosquiar a ovelha continua funcionando igual.
