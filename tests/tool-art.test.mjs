@@ -38,8 +38,8 @@ const FERRAMENTAS = [
         gradeFor: pickaxeGradeFor,
         paletteFor: pickaxePaletteFor,
         criar: createPickaxeSpritePixels,
-        silhuetaEsperada: [0, 0, 6, 10, 8, 4, 6, 6, 6, 6, 6, 4, 3, 3, 2, 0],
-        totalEsperado: 70,
+        silhuetaEsperada: [0, 0, 6, 11, 3, 4, 6, 6, 6, 6, 6, 4, 3, 3, 2, 0],
+        totalEsperado: 66,
     },
     {
         nome: 'machado',

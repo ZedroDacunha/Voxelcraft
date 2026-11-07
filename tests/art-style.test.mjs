@@ -2,7 +2,8 @@
 //
 // Ficam aqui os testes que valem para as três juntas: o cabo comum, o couro da
 // pá, o acento da casa, o contorno tingido e o quanto cada silhueta se afasta da
-// clássica (picareta e machado de propósito, bem pouco). As regras por ferramenta estão em
+// clássica (machado e pá de propósito, bem pouco; a picareta e a tesoura já
+// receberam a passada autoral). As regras por ferramenta estão em
 // `tool-art.test.mjs`.
 
 import test from 'node:test';
@@ -87,8 +88,10 @@ test('o contorno é tingido — nunca preto puro, e muda com o material', () => 
 });
 
 test('cada silhueta se afasta da clássica na medida combinada', () => {
-    // As três são a base fiel com **2 px** de forma (decisão de 07/11/2026).
-    const esperado = { picareta: { linhas: 2, px: 70 }, machado: { linhas: 2, px: 62 }, 'pá': { linhas: 2, px: 55 } };
+    // A picareta já passou pela passada autoral (07/11/2026): a cabeça perdeu a
+    // fileira de fundo e a ponta esquerda virou bico. Machado e pá ainda são a
+    // base fiel com **2 px** de forma.
+    const esperado = { picareta: { linhas: 3, px: 66 }, machado: { linhas: 2, px: 62 }, 'pá': { linhas: 2, px: 55 } };
     for (const f of TRES) {
         const nossa = silhueta(f.grade);
         assert.notDeepEqual(nossa, f.classica, `${f.nome}: o perfil não pode ser igual ao clássico`);

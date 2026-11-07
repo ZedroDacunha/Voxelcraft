@@ -1242,3 +1242,21 @@ tesoura da família era fiel demais. A passada autoral está em
       tesoura — não virou alicate nem faca.
 - [ ] Lado a lado com a picareta, o machado e a pá, ela é da **mesma oficina**.
 - [ ] Tosquiar a ovelha continua funcionando igual.
+
+## 65. A picareta ganha cabeça própria
+
+A picareta deixou de ser "base fiel + 2 px" e ganhou a passada autoral
+([`MELHORIA-20261107-picareta-autoral.md`](MELHORIA-20261107-picareta-autoral.md)).
+
+- [ ] Faça uma **picareta** e olhe no inventário, na barra e na mão.
+- [ ] A **cabeça é mais fina** que a de antes: o fundo perdeu uma fileira e dá
+      para ver o fio.
+- [ ] A **ponta esquerda** termina em bico, não reta.
+- [ ] O **encaixe do cabo** na cabeça tem um degrau (colar), não uma emenda
+      derretida.
+- [ ] Ela continua **uma peça só** e continua lida como picareta — não virou
+      enxada nem martelo.
+- [ ] Em todos os materiais (madeira, pedra, cobre, ferro, ouro, diamante) o
+      desenho é o mesmo, só muda a cor.
+- [ ] Lado a lado com o machado, a pá e a tesoura, ela é da **mesma oficina**.
+- [ ] Minerar continua funcionando igual.
