@@ -304,7 +304,7 @@ que envelhece calada. Ela virou `world-faces.js`, um módulo puro.
 
 - **As 16 tinturas**: o jogo não tem corantes, então são três cores (a lã da
   ovelha), não dezesseis.
-- **A cama cair quando o chão é cavado**: hoje ela fica no ar, como a porta.
+- ~~**A cama cair quando o chão é cavado**~~: virou a parte 5, abaixo.
 
 # Correção — a face do travesseiro que o mesher comia
 
@@ -372,3 +372,78 @@ regra de recusa. Rodando com `REGRA=antiga` a faixa preta aparece; com
 `tests/shape-culling.test.mjs` guarda a regra: a face do travesseiro virada para
 o meio da cama tem de estar entre as desenhadas, a face do colchão na emenda não
 pode voltar, e o `game.js` tem de continuar chamando a regra nova.
+
+# Parte 5 — a cama precisa de chão (e leva o renascimento com ela)
+
+A última dívida do tema, e ela era de **mundo**, não de desenho. Dois defeitos
+que o jogador via juntos:
+
+1. **Cavava o chão embaixo da cama e ela ficava no ar** — dava até para dormir
+   flutuando, o que é pior que feio.
+2. **Quebrar a cama não esquecia o renascimento**, calado. O aviso "seu ponto de
+   renascimento voltou ao início do mundo" só aparecia quebrando a metade dos
+   pés.
+
+## Por que o renascimento escapava
+
+A célula salva é sempre a dos **pés** (`trySleep` guarda os pés de propósito, para
+a cama não mudar de lugar se o jogador dormir pela outra metade). E o
+`breakBlock` fazia, nesta ordem:
+
+```
+1. derruba a outra metade          ← se quebrou a cabeceira, são os pés
+2. pergunta "a cama ainda está de pé?"
+3. se sim, confere se era o renascimento e apaga
+```
+
+O passo 2 olhava o mundo **depois** de já ter mexido nele: a célula salva tinha
+virado ar no passo 1, então a resposta era "não" e o passo 3 nunca rodava. O
+ponto continuava no save, apontando para uma cama que não existia mais — o
+jogador só descobria ao morrer e nascer no início do mundo, sem entender.
+
+Agora a conferência vem **antes** da derrubada, e ela não olha o mundo: compara a
+célula salva com as duas células da cama que está sendo quebrada
+(`bedHoldsCell`). Quebrar qualquer metade apaga o renascimento, com aviso.
+
+## Por que a cama ficava no ar
+
+Nada no jogo perguntava "quem estava em cima disso?". A areia desce porque tem
+uma fila própria (`queueFallingSand`), mas ela só olha para areia. A cama ficava
+onde foi colocada, com o chão furado embaixo.
+
+A correção aproveita o ponto por onde **toda** remoção passa, o `setBlock` do
+`World`:
+
+```js
+// quando a célula vira ar (ou algo não sólido) e tem cama logo acima
+this.queueFallingSand(x, y + 1, z);                 // areia: cai
+const acima = this.getBlock(x, y + 1, z);
+if (isBedBlock(acima)) this.unsupportedBeds.push({ x, y: y + 1, z, type: acima });
+```
+
+A fila é drenada no laço do jogo, na camada que tem som, item e ponto de
+renascimento à mão. A cama **desaba**: some com as duas metades, cai **uma** cama
+no chão (o item das duas metades é o mesmo), sai o som de lã e as partículas — e,
+se era ela que guardava o renascimento, o ponto se perde com aviso.
+
+Como o gancho é o `setBlock`, o desabamento vale para **qualquer** caminho que
+tire o chão: a picareta do jogador, areia caindo e até água correndo para dentro
+do buraco — não só para a quebra na mão.
+
+## A regra do apoio, num lugar só
+
+`supportsBed(tipoDeBaixo)` (em `world-bed.js`) é a mesma resposta para três
+perguntas:
+
+| pergunta | quem faz |
+| --- | --- |
+| "posso colocar a cama aqui?" | `bedCellFree`, na colocação |
+| "esta cama ainda tem chão?" | `setBlock`, que enfileira |
+| "esta cama salva ainda está de pé?" | `bedSpawnStanding`, no carregamento |
+
+Chão é bloco sólido: ar, água e tocha não seguram cama; cama em cima de cama
+segura (é sólida).
+
+## O que fica de fora, ainda
+
+- **As 16 tinturas** seguem fora: o jogo não tem corantes.

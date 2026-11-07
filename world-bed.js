@@ -225,6 +225,19 @@ export function isBedBlock(type) {
     return bedPart(type) !== null;
 }
 
+/**
+ * O bloco abaixo segura uma cama?
+ *
+ * É a regra do **apoio**, e ela vale em três lugares: na colocação (não dá para
+ * colocar cama no ar), no desabamento (tirar o chão derruba a cama) e na hora de
+ * decidir se uma cama salva ainda está de pé. Chão é bloco sólido — água, tocha
+ * e ar não seguram nada.
+ */
+export function supportsBed(belowType) {
+    if (!belowType) return false;
+    return BLOCKS[belowType]?.solid !== false;
+}
+
 /** A metade dos pés? É ela que o item coloca primeiro e que guarda o save. */
 export function isBedFoot(type) {
     return bedPart(type) === 'foot';
@@ -245,6 +258,29 @@ export function bedOtherCell(x, z, part, facing) {
     const [dx, dz] = bedFacingVector(facing);
     const sign = part === 'head' ? -1 : 1;
     return { x: x + dx * sign, z: z + dz * sign };
+}
+
+/**
+ * As células das duas metades, partindo de **qualquer** uma delas.
+ *
+ * `bedCells` só sabe partir dos pés — é o que a colocação precisa. Aqui a
+ * pergunta é outra: "de que cama esta célula faz parte?". É o que a quebra e o
+ * ponto de renascimento precisam, porque o jogador pode quebrar a cabeceira e a
+ * célula salva é sempre a dos pés.
+ */
+export function bedCellsFrom(x, z, part, facing) {
+    const outra = bedOtherCell(x, z, part, facing);
+    const esta = { x, z };
+    return part === 'head' ? { foot: outra, head: esta } : { foot: esta, head: outra };
+}
+
+/**
+ * A célula salva é uma destas? O renascimento pertence à cama **inteira**: some
+ * o pé, some a cabeceira, o ponto se perde do mesmo jeito.
+ */
+export function bedHoldsCell(cells, cell) {
+    if (!cell) return false;
+    return cells.some(outra => outra.x === cell.x && outra.y === cell.y && outra.z === cell.z);
 }
 
 /** As duas células da cama, com o pé em `(x, z)` e a cabeceira na direção dele. */
