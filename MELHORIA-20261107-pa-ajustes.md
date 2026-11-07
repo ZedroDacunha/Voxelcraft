@@ -1,5 +1,10 @@
 # MELHORIA: a pá volta à base fiel — a família fecha
 
+> **Revisado em 07/11/2026 (fim do dia):** a pá foi a última a passar pelo
+> comparador da passada autoral. Quatro silhuetas novas foram desenhadas e a
+> decisão do usuário foi **manter esta arte** — nada mudou aqui. O registro
+> está no §10 do [`GUIA-DE-ARTE.md`](GUIA-DE-ARTE.md).
+
 - **Data:** 07/11/2026
 - **Status:** implementado
 - **Arquivos principais:** `world-tool-textures.js`, `tests/tool-art.test.mjs`, `tests/art-style.test.mjs`, `GUIA-DE-ARTE.md`

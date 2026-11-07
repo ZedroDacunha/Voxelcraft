@@ -183,8 +183,17 @@ paletas escolhidas a dedo, nas rodadas de #104 a #118). Nenhuma ferramenta está
 fora da régua desde 07/11/2026.
 
 Das quatro ferramentas, **tesoura** (§7), **picareta** (§8) e **machado** (§9) já
-passaram pela passada autoral. Só a **pá** continua na base fiel com 2 px de
-diferença — é a última da fila.
+passaram pela passada autoral.
+
+A **pá** foi a última da fila e a decisão de 07/11/2026 foi **ficar como está**:
+ela continua na base fiel com 2 px. Foram desenhadas quatro alternativas de
+silhueta (lâmina comprida, lâmina larga, larga com colar) e nenhuma convenceu —
+quanto mais larga a lâmina, mais a peça se aproxima de "espelho/placa", que é o
+mesmo problema que reprovou a "pá em cogumelo" no #121. A pá de hoje lê como pá
+de longe e não se confunde com o machado: fica.
+
+Registro do comparador: `preview/comparador-pa-autoral.html` (fora do repo, como
+os outros).
 
 ## 11. Aviso de boa-fé
 
