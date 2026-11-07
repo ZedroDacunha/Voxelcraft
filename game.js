@@ -2210,7 +2210,8 @@ function updateHand(dt) {
     refreshHeldItem();
     const item = ITEMS[heldId];
     playerHeldItem.update(heldId, heldMesh, heldFlameMesh,
-        Boolean(item && item.sprite?.kind !== 'bed' && itemRenderMode(item) === 'sprite'));
+        Boolean(item && item.sprite?.kind !== 'bed' && itemRenderMode(item) === 'sprite'),
+        Boolean(item && HELD_TOOL_KINDS.has(item.sprite?.kind)));
     updateHeldTorchLight();
     const miningNow = Boolean(leftHeld && currentHit && currentHit.y !== 0);
     const phaseBefore = handAnim.phase;
