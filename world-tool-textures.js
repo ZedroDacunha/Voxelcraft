@@ -12,7 +12,7 @@
 //
 // As regras valem para as três: **contorno tingido** (`O`, nunca preto puro),
 // **quatro tons** (`1`…`4`, do escuro ao claro) e o **cabo de madeira** (`a`…`d`)
-// das tábuas do jogo. Nenhuma ferramenta tem acento.
+// das tábuas do jogo. Nenhuma ferramenta tem acento nem faixa de couro.
 //
 // Um desenho por ferramenta, para todos os materiais: o que muda é a paleta.
 
@@ -71,25 +71,26 @@ export const MACHADO_GRADE = Object.freeze([
 /**
  * A **pá** — 16×16, mesmo alfabeto.
  *
- * Concha de topo largo e cantos arredondados (o dobro da largura do cabo), com
- * pescoço comprido até a virola. O cabo desce na diagonal com as faixas.
+ * Também é a **base fiel** do sprite clássico, com **2 pixels** de forma nossa:
+ * o topo da lâmina fica 1 px mais largo (à esquerda) e o canto de baixo da
+ * lâmina ganha 1 px de contorno. Cabo liso, sem couro — como as outras duas.
  */
 export const PA_GRADE = Object.freeze([
     '................',
-    '.....O4431O.....',
-    '....O4443221O...',
-    '....O4432211O...',
-    '....O4322211O...',
-    '.....O3221O.....',
-    '......O21O......',
-    '......O21O......',
-    '......O21O......',
-    '......bda.......',
-    '.....bca........',
-    '....bda.........',
-    '...bca..........',
-    '...gsg..........',
-    '..ggg...........',
+    '................',
+    '..........111O..',
+    '..........1442O.',
+    '.........14324O.',
+    '........143234O.',
+    '.........b234O..',
+    '........bda4OO..',
+    '.......bda.O....',
+    '......bca.......',
+    '.....bda........',
+    '....bca.........',
+    '..bbda..........',
+    '..bda...........',
+    '...aa...........',
     '................',
 ]);
 
@@ -106,12 +107,6 @@ export const CABO_PALETA = Object.freeze({
     b: Object.freeze([123, 91, 51]),
     c: Object.freeze([151, 116, 67]),
     d: Object.freeze([202, 166, 106]),
-});
-
-/** As faixas de couro: `g` o couro, `s` a costura clara. */
-export const PUNHO_PALETA = Object.freeze({
-    g: Object.freeze([74, 53, 36]),
-    s: Object.freeze([190, 150, 96]),
 });
 
 /**
@@ -180,7 +175,7 @@ export const PA_PALETAS = PICARETA_PALETAS;
 function paletaCompleta(paletas, material) {
     const cores = paletas[material];
     if (!cores) return null;
-    return { ...CABO_PALETA, ...PUNHO_PALETA, ...cores };
+    return { ...CABO_PALETA, ...cores };
 }
 
 /** Pinta uma grade com a paleta; `.` vira transparente. */

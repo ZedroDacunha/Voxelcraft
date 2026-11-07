@@ -16,7 +16,6 @@ import {
     MACHADO_PALETAS,
     PA_PALETAS,
     CABO_PALETA,
-    PUNHO_PALETA,
     createPickaxeSpritePixels,
     createAxeSpritePixels,
     createShovelSpritePixels,
@@ -43,26 +42,12 @@ test('o cabo de madeira é o mesmo nas três ferramentas', () => {
     }
 });
 
-test('a pá ainda tem faixa de couro costurada, e a costura é sempre a mesma cor', () => {
-    // Picareta e machado voltaram à base fiel sem couro ("cor + forma"); a pá é a
-    // última com a faixa do #122, até chegar a rodada dela.
-    assert.ok(!simbolosDe(PICARETA_GRADE).includes('g'), 'a picareta não tem faixa de couro');
-    assert.ok(!simbolosDe(MACHADO_GRADE).includes('g'), 'o machado não tem faixa de couro');
-    for (const f of TRES.filter((t) => t.nome === 'pá')) {
-        assert.ok(simbolosDe(f.grade).includes('g'), `${f.nome}: tem couro`);
-        assert.ok(simbolosDe(f.grade).includes('s'), `${f.nome}: tem costura`);
-        const px = f.criar('iron');
-        let costuras = 0;
-        for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-            const s = f.grade[y][x];
-            if (s === 's') { costuras++; assert.deepEqual(px[y][x], [...PUNHO_PALETA.s], `${f.nome}: costura em (${x},${y})`); }
-            if (s === 'g') assert.deepEqual(px[y][x], [...PUNHO_PALETA.g], `${f.nome}: couro em (${x},${y})`);
-        }
-        assert.ok(costuras >= 1, `${f.nome}: pelo menos um ponto de costura`);
-        // O couro fica sempre na metade de baixo, onde a mão pega.
-        for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-            if ('gs'.includes(f.grade[y][x])) assert.ok(y >= 7, `${f.nome}: couro em (${x},${y}) está alto demais`);
-        }
+test('nenhuma ferramenta tem faixa de couro', () => {
+    // As três voltaram à base fiel com o cabo liso: o couro do #122 saiu do
+    // machado, depois da picareta, e por último da pá.
+    for (const f of TRES) {
+        assert.ok(!simbolosDe(f.grade).includes('g'), `${f.nome}: sem couro`);
+        assert.ok(!simbolosDe(f.grade).includes('s'), `${f.nome}: sem costura`);
     }
 });
 
@@ -84,8 +69,6 @@ test('as cores da família são exatamente estas', () => {
     // Se alguém mexer nas constantes, o teste avisa: são a identidade das peças.
     assert.deepEqual(Object.fromEntries(Object.entries(CABO_PALETA).map(([k, v]) => [k, hex(v)])),
         { a: '563e22', b: '7b5b33', c: '977443', d: 'caa66a' }, 'tons do cabo');
-    assert.deepEqual(Object.fromEntries(Object.entries(PUNHO_PALETA).map(([k, v]) => [k, hex(v)])),
-        { g: '4a3524', s: 'be9660' }, 'couro e costura');
 });
 
 test('o contorno é tingido — nunca preto puro, e muda com o material', () => {
@@ -104,16 +87,14 @@ test('o contorno é tingido — nunca preto puro, e muda com o material', () => 
 });
 
 test('cada silhueta se afasta da clássica na medida combinada', () => {
-    // Picareta e machado são a base fiel com **2 px** de forma (decisão de
-    // 07/11/2026); a pá é desenho livre e se afasta bastante.
-    const esperado = { picareta: { linhas: 2, px: 70 }, machado: { linhas: 2, px: 62 }, 'pá': { min: 8 } };
+    // As três são a base fiel com **2 px** de forma (decisão de 07/11/2026).
+    const esperado = { picareta: { linhas: 2, px: 70 }, machado: { linhas: 2, px: 62 }, 'pá': { linhas: 2, px: 55 } };
     for (const f of TRES) {
         const nossa = silhueta(f.grade);
         assert.notDeepEqual(nossa, f.classica, `${f.nome}: o perfil não pode ser igual ao clássico`);
         const linhas = linhasDiferentes(nossa, f.classica);
         const alvo = esperado[f.nome];
-        if (alvo.linhas !== undefined) assert.equal(linhas, alvo.linhas, `${f.nome}: ${alvo.linhas} linha(s) diferente(s)`);
-        else assert.ok(linhas >= alvo.min, `${f.nome}: pelo menos ${alvo.min} linhas diferentes (foram ${linhas})`);
+        assert.equal(linhas, alvo.linhas, `${f.nome}: ${alvo.linhas} linha(s) diferente(s)`);
         if (alvo.px !== undefined) assert.equal(cheios(f.grade), alvo.px, `${f.nome}: ${alvo.px} px`);
     }
 });

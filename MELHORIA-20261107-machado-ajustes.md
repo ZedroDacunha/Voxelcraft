@@ -78,7 +78,8 @@ O comparador com as cinco está fora do repo, em
 
 ## Pendências da família
 
-- **Pá** — ainda é o desenho livre do #122, com couro. É a próxima rodada.
+- **Pá** — era o desenho livre do #122, com couro; fechou na rodada seguinte
+  ([`MELHORIA-20261107-pa-ajustes.md`](MELHORIA-20261107-pa-ajustes.md)).
 - **Tesoura** — segue com o desenho antigo.
 - **Cabo**: resolvido logo depois — as três passaram a usar os tons da tábua
   ([`MELHORIA-20261107-cabo-de-tabua.md`](MELHORIA-20261107-cabo-de-tabua.md)).

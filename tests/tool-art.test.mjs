@@ -28,7 +28,7 @@ import {
 import { silhueta, cheios, pecaUnica, simbolosDe, lum, hex } from './tool-art.mjs';
 
 const MATERIAIS = ['wood', 'stone', 'copper', 'iron', 'gold', 'diamond'];
-const SIMBOLOS = ['.', 'O', '1', '2', '3', '4', 'a', 'b', 'c', 'd', 'g', 's'];
+const SIMBOLOS = ['.', 'O', '1', '2', '3', '4', 'a', 'b', 'c', 'd'];
 
 const FERRAMENTAS = [
     {
@@ -58,8 +58,8 @@ const FERRAMENTAS = [
         gradeFor: shovelGradeFor,
         paletteFor: shovelPaletteFor,
         criar: createShovelSpritePixels,
-        silhuetaEsperada: [0, 6, 9, 9, 9, 6, 4, 4, 4, 3, 3, 3, 3, 3, 3, 0],
-        totalEsperado: 69,
+        silhuetaEsperada: [0, 0, 4, 5, 6, 7, 5, 6, 4, 3, 3, 3, 4, 3, 2, 0],
+        totalEsperado: 55,
     },
 ];
 
@@ -184,12 +184,10 @@ test('material fora da arte devolve null, para quem chama cair no desenho antigo
 
 test('as ferramentas são base fiel com ajustes: sem couro e sem acento', () => {
     // As duas ficaram na versão "cor + forma": cabo liso, sem faixa de couro.
-    const SEM_COURO = ['1', '2', '3', '4', 'O', 'a', 'b', 'c', 'd'];
-    assert.deepEqual(simbolosDe(PICARETA_GRADE), SEM_COURO, 'picareta sem couro');
-    assert.deepEqual(simbolosDe(MACHADO_GRADE), SEM_COURO, 'machado sem couro');
-    // A pá ainda tem a faixa do #122: a rodada dela não chegou.
-    assert.ok(simbolosDe(PA_GRADE).includes('g'), 'pá ainda tem couro');
-    assert.ok(simbolosDe(PA_GRADE).includes('s'), 'pá ainda tem costura');
+    const ALFABETO = ['1', '2', '3', '4', 'O', 'a', 'b', 'c', 'd'];
+    assert.deepEqual(simbolosDe(PICARETA_GRADE), ALFABETO, 'picareta sem couro');
+    assert.deepEqual(simbolosDe(MACHADO_GRADE), ALFABETO, 'machado sem couro');
+    assert.deepEqual(simbolosDe(PA_GRADE), ALFABETO, 'pá sem couro');
     // O acento saiu de todas: o símbolo `5` nem existe mais no alfabeto.
     for (const g of [PICARETA_GRADE, MACHADO_GRADE, PA_GRADE]) {
         assert.ok(!g.join('').includes('5'), 'nenhuma ferramenta tem acento');

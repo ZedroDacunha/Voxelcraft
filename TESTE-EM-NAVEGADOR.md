@@ -1168,7 +1168,7 @@ inventário e na mão.
       azulado, cobre alaranjado — e o cobre não confunde com o ouro.
 - [ ] Picareta e machado, lado a lado, **parecem da mesma oficina**.
 - [ ] Na mão e na barra o ícone é o mesmo.
-- [ ] A **pá** continua como ficou no #122, com a faixa de couro — é a próxima.
+- [ ] A **pá** continua como ficou no #122 até a rodada dela (§62).
 
 ## 61. O cabo é das tábuas
 
@@ -1183,4 +1183,25 @@ O cabo das três ferramentas passou a usar os tons do tile de tábuas
       parecem a mesma peça de tábua — é de propósito.
 - [ ] O cabo continua com **quatro tons**: dá para ver o topo claro e o lado de
       baixo escuro; não virou um traço chapado.
-- [ ] Na **pá** o couro continua em cima do cabo novo, e ainda se distingue dele.
+- [ ] A **pá** ainda tem a faixa de couro antiga — sai na rodada dela (§62).
+
+## 62. Sem acento, e a pá na base fiel
+
+Duas mudanças seguidas de 07/11/2026: o **acento** amarelo saiu de todas as
+ferramentas ([`MELHORIA-20261107-sem-acento.md`](MELHORIA-20261107-sem-acento.md))
+e a **pá** voltou à base fiel
+([`MELHORIA-20261107-pa-ajustes.md`](MELHORIA-20261107-pa-ajustes.md)).
+
+- [ ] Nenhuma ferramenta tem mais o **ponto amarelo** — nem no alto, nem na ponta.
+- [ ] Olhando as três de perto, não há **nenhum pixel fora da rampa do material**
+      (só `O` + quatro tons + cabo).
+- [ ] A **pá** agora parece a pá do jogo: concha em paralelogramo no canto de
+      cima, cabo na diagonal. Não é mais a concha redonda do #122.
+- [ ] A pá **não tem couro** no cabo — igual à picareta e ao machado.
+- [ ] As três, lado a lado, têm o **mesmo cabo** (tábua) e o mesmo tamanho de
+      gesto: 2 px de forma fora do clássico.
+- [ ] O topo da pá é 1 px mais largo e o canto de baixo da lâmina tem 1 px de
+      contorno — é o que faz a pá ser nossa sem deixar de ser pá.
+- [ ] Na mão e na barra o ícone é o mesmo, e a pá não se confunde com a picareta
+      nem com o machado.
+- [ ] A **tesoura** segue com o desenho antigo — é a última.

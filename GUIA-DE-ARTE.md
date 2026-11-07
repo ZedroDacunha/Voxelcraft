@@ -32,8 +32,6 @@ ferramentas, itens, minérios, blocos do inventário.
 | `O` | contorno, **tingido** com a sombra do material |
 | `1`…`4` | corpo, do escuro ao claro |
 | `a`…`d` | cabo de madeira, do escuro ao claro |
-| `g` | couro da empunhadura |
-| `s` | costura do couro |
 
 Cada símbolo tem **uma** cor por material. Se um símbolo precisa de duas cores, a
 grade está errada — e o teste pega.
@@ -42,14 +40,12 @@ grade está errada — e o teste pega.
 
 1. **Silhueta reconhecível — e não copiada.** O teste compara o perfil linha a
    linha com as silhuetas de referência. A conta é **por ferramenta**:
-   - picareta e machado (base fiel): **2 linhas** diferentes — **70** e **62 px**
-     cheios —, porque a forma é quase a clássica de propósito e quem carrega a
-     identidade é a cor;
-   - pá (autoral, por enquanto): **pelo menos 8 linhas** diferentes e a contagem
-     de pixels fora da faixa clássica.
+   - **picareta**: 2 linhas diferentes, **70 px**; **machado**: 2 linhas,
+     **62 px**; **pá**: 2 linhas, **55 px**.
 
-   Nenhuma linha pode ser cópia exata de ponta a ponta: mesmo na base fiel, cada
-   ferramenta tem um pixel de assinatura.
+   A forma é quase a clássica de propósito: quem carrega a identidade é a cor.
+   Os 2 px são sempre um no topo da peça e outro na ponta, e nenhuma linha pode
+   ser cópia exata de ponta a ponta.
 2. **Contorno tingido.** O `O` nunca é preto puro e muda com o material: pedra
    puxa azul, ouro puxa verde-escuro, diamante puxa ciano-escuro. É sempre a cor
    mais escura da paleta.
@@ -66,11 +62,9 @@ grade está errada — e o teste pega.
    ferramenta na mão precisa parecer feita do mesmo material do chão — e, nas
    ferramentas de madeira, cabeça e cabo são quase a mesma peça.
    Um teste trava os quatro tons.
-6. **Faixa de couro costurada — só na pá.** `g`/`s` na metade de baixo do cabo
-   (onde a mão pega): uma faixa logo abaixo do encaixe e outra no punho. A
-   **picareta** e o **machado** voltaram à base fiel **sem couro**: a faixa era a
-   assinatura que mais pesava na leitura. Quando a pá voltar à base fiel, deve
-   seguir o mesmo caminho.
+6. **Sem couro.** Nenhuma ferramenta tem faixa costurada (`g`/`s` saíram do
+   alfabeto em 07/11/2026). A faixa do #122 era a assinatura que mais pesava na
+   leitura: o cabo é madeira lisa, do encaixe ao punho.
 
 ## 4. Materiais
 
