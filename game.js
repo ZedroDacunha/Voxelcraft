@@ -54,6 +54,7 @@ import { DAWN_TIME, bedRespawnPoint, canSleepAt, sleepPhaseAt } from './world-sl
 import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld } from './player-physics.js';
 import { canJumpFrom, createJumpState, updateJumpWindow } from './player-jump.js';
 import { createPlayerModel } from './player-model.js';
+import { advanceSwim, createSwimState, swimPose } from './player-swim-animation.js';
 import { createPlayerHeldItem } from './player-held-item.js';
 import { THIRD_PERSON_BODY_MIN_DISTANCE, THIRD_PERSON_DISTANCE, cameraOffsetSign, nextCameraView, thirdPersonDistance, thirdPersonLimbSwing } from './player-third-person.js';
 import { ATTACK_COOLDOWN, attackReady, createCreatureSystemClass } from './world-creature.js';
@@ -3429,6 +3430,7 @@ const spawnPoint = new THREE.Vector3();
 
 // A passada: uma fase só para o som do passo, o braço e o balanço da visão.
 const gait = createGait();
+const swimState = createSwimState();
 const cameraRight = new THREE.Vector3();
 // Janela do pulo tardio (coyote time): ver player-jump.js.
 const jumpState = createJumpState();
@@ -5224,15 +5226,18 @@ function updateThirdPerson() {
     const active = cameraView !== 'first' && !sleep.active;
     playerModel.root.visible = active;
     if (!active) return false;
-    playerModel.root.position.copy(player.pos);
-    playerModel.root.rotation.y = look.yaw + Math.PI;
+    const yaw = look.yaw + Math.PI;
+    const gaitNow = gaitPose(gait);
+    const swing = thirdPersonLimbSwing(gaitNow.phase, gaitNow.amplitude);
+    const pose = swimPose(swimState, { yaw, height: player.height, walkSwing: swing, punch: handSwingAmount(handAnim).swing });
+    // Rotação visual em torno do meio do corpo; posição física continua intacta.
+    playerModel.root.position.set(player.pos.x + pose.offsetX, player.pos.y + pose.offsetY, player.pos.z + pose.offsetZ);
+    playerModel.root.rotation.set(pose.tilt, yaw, 0, 'YXZ');
     playerModel.root.scale.y = player.height / H_STAND;
-    const pose = gaitPose(gait);
-    const swing = thirdPersonLimbSwing(pose.phase, pose.amplitude);
-    playerModel.leftLeg.rotation.x = swing;
-    playerModel.rightLeg.rotation.x = -swing;
-    playerModel.leftArm.rotation.x = -swing;
-    playerModel.rightArm.rotation.x = swing - handSwingAmount(handAnim).swing;
+    playerModel.leftLeg.rotation.x = pose.leftLeg;
+    playerModel.rightLeg.rotation.x = pose.rightLeg;
+    playerModel.leftArm.rotation.x = pose.leftArm;
+    playerModel.rightArm.rotation.x = pose.rightArm;
     camera.getWorldDirection(thirdDirection).multiplyScalar(cameraOffsetSign(cameraView));
     const hit = raycastVoxels(camera.position, thirdDirection, THIRD_PERSON_DISTANCE, {
         getBlock: (x, y, z) => world.getBlock(x, y, z),
@@ -5290,6 +5295,15 @@ function animate() {
         updateEating(dt);
     }
     world.water.updateSubmersion(world, player);
+    // Avança uma vez por quadro, inclusive em primeira pessoa; a câmera de
+    // toque pode chamar updateThirdPerson mais de uma vez no mesmo quadro.
+    if (sleep.active || dead) {
+        swimState.blend = 0;
+        swimState.phase = 0;
+    } else if (worldRunning) {
+        advanceSwim(swimState, { dt, feetInWater: world.water.feetInWater,
+            headInWater: world.water.headInWater, onGround: player.onGround, gaitAmplitude: gait.amplitude });
+    }
     world.water.update(world, dt, now);
 
     if (worldRunning || inventoryOpen) {
