@@ -20,3 +20,10 @@ própria transformação. Blocos, cama, tocha e demais itens não foram alterado
   garantir que continua como antes.
 - A prévia `tools/primeira-pessoa-ferramentas.html` mostra o braço e as
   ferramentas, com um botão de golpe e a imagem de referência embutida.
+
+## Ajuste do eixo lateral
+
+Após o novo print, o eixo Y foi virado 15° a mais (de −20° para −35°),
+reduzindo o quanto a face da ferramenta aponta para a câmera. Posição do cabo,
+escala e inclinação vertical permanecem iguais. A comparação na tela e o
+contato com o bloco ainda precisam da avaliação visual do jogador.

@@ -53,3 +53,25 @@ test('projetada pela câmera do jogo, a ferramenta sobe mais do que avança para
     assert.ok(tip.y - grip.y > 2 * Math.abs(tip.x - grip.x), 'cabo é predominantemente vertical na tela');
     assert.ok(tip.x < 1 && tip.y < 1, 'a cabeça fica dentro do quadro 4:3');
 });
+
+
+test('a face da ferramenta vira um pouco de lado sem deslocar a empunhadura', () => {
+    const arm = new THREE.Group();
+    arm.position.set(0.42, -0.50, -0.25);
+    arm.rotation.set(0.35, 0.25, 0);
+    const anchor = new THREE.Group();
+    arm.add(anchor);
+    applyFirstPersonToolPose(anchor);
+    arm.updateMatrixWorld(true);
+    const grip = anchor.getWorldPosition(new THREE.Vector3());
+    const currentNormal = new THREE.Vector3(0, 0, 1).transformDirection(anchor.matrixWorld);
+    const oldAnchor = anchor.clone();
+    oldAnchor.rotation.y = -20 * Math.PI / 180;
+    arm.add(oldAnchor);
+    arm.updateMatrixWorld(true);
+    const oldNormal = new THREE.Vector3(0, 0, 1).transformDirection(oldAnchor.matrixWorld);
+    assert.ok(currentNormal.z < oldNormal.z, 'face menos voltada para a câmera');
+    assert.ok(currentNormal.z > 0.7, 'ajuste é sutil, não deixa a ferramenta de perfil');
+    assert.ok(grip.distanceTo(oldAnchor.getWorldPosition(new THREE.Vector3())) < 1e-9, 'mão mantém a mesma posição');
+    assert.equal(anchor.rotation.z, 50 * Math.PI / 180, 'inclinação vertical preservada');
+});
