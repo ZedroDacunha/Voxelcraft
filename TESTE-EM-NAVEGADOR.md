@@ -1306,7 +1306,7 @@ A cama é o primeiro bloco do jogo que não é cubo nem painel: são duas metade
 (cabeceira e pés) com pernas, travessa, colchão e travesseiro. Ver
 [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
 
-- [ ] `/give cama` (ou 3 lãs brancas + 3 tábuas na bancada) e coloque no chão.
+- [ ] `/give cama` (ou 3 blocos de lã branca + 3 tábuas na bancada) e coloque no chão.
 - [ ] Ao colocar, a **cabeceira fica do lado oposto ao seu** — o travesseiro
       branco aponta para longe de você.
 - [ ] Gire o jogador e coloque outra: as quatro direções funcionam, e o
@@ -1362,10 +1362,12 @@ A parte 2 da cama. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
 
 Parte 3 da cama. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
 
-- [ ] Na bancada, **3 lãs brancas + 3 tábuas** → **Cama** (a de sempre).
-- [ ] **3 lãs cinzas + 3 tábuas** → **Cama cinza**; **3 lãs pretas + 3 tábuas** →
-      **Cama preta**.
-- [ ] Misturar (2 cinzas + 1 branca) **não** vira cama nenhuma.
+- [ ] Na bancada, **3 blocos de lã branca + 3 tábuas** → **Cama** (a de sempre).
+      Se a versão que você está jogando ainda pede fardo solto, é cache: a
+      receita passou a pedir **bloco** na parte 6 (§74).
+- [ ] **3 blocos de lã cinza + 3 tábuas** → **Cama cinza**; **3 blocos de lã
+      preta + 3 tábuas** → **Cama preta**.
+- [ ] Misturar (2 blocos cinza + 1 branco) **não** vira cama nenhuma.
 - [ ] Colocando a cinza, o colchão é cinza; a preta, preta; a branca, creme. O
       **travesseiro é branco nas três** e a madeira é a mesma.
 - [ ] Na barra, cada uma tem o seu ícone: a cama aparece em 3/4 com a cor certa.
@@ -1434,3 +1436,14 @@ Parte 5 da cama. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
       buraco e a cama desaba do mesmo jeito — o gancho é a remoção do bloco, não
       a picareta.
 - [ ] Tente colocar uma cama no ar (numa beirada, sem bloco embaixo): não cola.
+
+## 74. A cama se costura com bloco de lã
+
+Parte 6 da cama. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
+
+- [ ] Na bancada, **4 fardos de lã branca** (2×2) → **1 bloco de lã branca**.
+- [ ] Na bancada, **3 blocos de lã branca em cima + 3 tábuas embaixo** → **Cama**.
+- [ ] **3 fardos de lã soltos + 3 tábuas** → **nada** (o fardo não costura cama).
+- [ ] O mesmo com cinza e preta: 4 fardos → bloco, 3 blocos → cama da cor.
+- [ ] A receita no livro da bancada mostra o **bloco de lã** no ícone dos
+      ingredientes de cima, e não o fardo.

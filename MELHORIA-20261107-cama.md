@@ -132,8 +132,9 @@ está atrás, nunca um buraco preto.
 
 ## O que o jogador vê
 
-- Receita: **3 fardos de lã branca em cima + 3 tábuas embaixo** → 1 cama (a
-  mesma silhueta da receita clássica).
+- Receita: **3 blocos de lã branca em cima + 3 tábuas embaixo** → 1 cama (a
+  mesma silhueta da receita clássica). Até a parte 6 eram 3 fardos soltos; ver
+  "A cama se costura com bloco de lã", no fim.
 - Colocar, deitar a cabeceira para o lado certo, subir nela e quebrar (levando
   as duas metades) — tudo uma peça só.
 - Som de lã no passo, na quebra e na colocação.
@@ -219,9 +220,12 @@ agora faz a cama da sua cor.
 
 | cama | receita | colchão |
 | --- | --- | --- |
-| **Cama** (a de sempre) | 3 lãs brancas + 3 tábuas | creme `209,204,192` |
-| **Cama cinza** | 3 lãs cinzas + 3 tábuas | cinza `150,150,145` |
-| **Cama preta** | 3 lãs pretas + 3 tábuas | preta `58,58,62` |
+| **Cama** (a de sempre) | 3 blocos de lã branca + 3 tábuas | creme `209,204,192` |
+| **Cama cinza** | 3 blocos de lã cinza + 3 tábuas | cinza `150,150,145` |
+| **Cama preta** | 3 blocos de lã preta + 3 tábuas | preta `58,58,62` |
+
+(Bloco de lã, não fardo solto: a troca foi na parte 6, no fim do documento. Na
+época da parte 3 a receita ainda pedia fardos.)
 
 O **travesseiro é branco nas três** e a madeira é a mesma peça: o que muda é só
 o colchão. Misturar lãs não vira cama nenhuma — não há corante no jogo, e a
@@ -447,3 +451,58 @@ segura (é sólida).
 ## O que fica de fora, ainda
 
 - **As 16 tinturas** seguem fora: o jogo não tem corantes.
+
+# Parte 6 — a cama se costura com **bloco** de lã
+
+A receita pedia três **fardos** de lã — o item solto que a ovelha derruba. Mas o
+fardo já tinha um uso próprio na bancada: quatro deles viram **um bloco de lã**.
+Pedir o fardo cru na cama era pedir o material **antes** do passo que o
+transforma em peça de construção, e a receita ficava diferente da clássica, que
+costura a cama de lã em bloco.
+
+Agora a bancada pede o bloco:
+
+```
+antes                          agora
+[ fardo  fardo  fardo ]        [ bloco  bloco  bloco ]
+[ tábua  tábua  tábua ]        [ tábua  tábua  tábua ]
+```
+
+O caminho do jogador virou o do jogo original, em dois passos, os dois na
+bancada:
+
+1. **4 fardos da mesma cor** (2×2) → **1 bloco de lã** daquela cor;
+2. **3 blocos de lã + 3 tábuas** → **1 cama** daquela cor.
+
+## O que mudou no código
+
+`BED_VARIANTS` tinha um campo `wool` (o fardo) que só a receita lia. Ele virou
+`woolBlock` (o bloco), e o laço das receitas passou a usá-lo:
+
+```js
+for (const bed of BED_VARIANTS) {
+    defRecipe([[bed.woolBlock, bed.woolBlock, bed.woolBlock], [ID.PLANKS, ID.PLANKS, ID.PLANKS]], bed.item);
+}
+```
+
+Nada mais mudou de tabela: a cor continua vindo do catálogo, o bloco de cada cor
+já existia, e a receita de bloco (2×2) continua onde estava — é ela que abastece
+a cama. Misturar cores continua não valendo: três blocos de cores diferentes não
+formam cama nenhuma.
+
+## O custo, dito com franqueza
+
+Um bloco custa quatro fardos, então uma cama passou a custar **12 fardos** (antes
+eram 3), e uma ovelha tosquiada solta de **1 a 3**. São de quatro a doze ovelhas
+por cama, contra uma a três antes — o dobro de passos e bem mais lã.
+
+É o preço de pedir a peça de construção em vez do material cru, como no original.
+Se a conta parecer cara demais no jogo, há dois caminhos de conserto, os dois
+pequenos:
+
+- **a ovelha soltar bloco** em vez de fardo (aí a cama custa 3 tosquias, como
+  antes, e o fardo como item some do jogo); ou
+- **2 fardos por bloco** (a cama custaria 6 fardos).
+
+Nenhum dos dois foi feito: os dois mudam o que a ovelha derruba, e isso é outro
+assunto.

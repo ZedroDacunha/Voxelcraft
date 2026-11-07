@@ -65,18 +65,22 @@ export const ID = { GRASS: 1, STONE: 2, LOG: 3, DIRT: 4, COBBLE: 5, PLANKS: 6, L
  * As três camas, uma por cor de lã.
  *
  * A cor não é enfeite: ela escolhe o **colchão** (tiles próprios, um par claro e
- * um escuro para a aba), o **item** e os **blocos** das duas metades. Quem lê a
- * tabela é o resto do jogo — a receita (`RECIPES`), o mesher (que pergunta ao
- * bloco qual é o seu `bed.color`) e o ícone da barra.
+ * um escuro para a aba), o **item**, os **blocos** das duas metades e o **bloco de
+ * lã** que entra na receita. Quem lê a tabela é o resto do jogo — a receita
+ * (`RECIPES`), o mesher (que pergunta ao bloco qual é o seu `bed.color`) e o
+ * ícone da barra.
+ *
+ * `woolBlock` é o bloco de lã (2×2 fardos), não o fardo solto: a cama se costura
+ * de lã **em bloco**, como a receita clássica — fardo é o que a ovelha solta.
  *
  * O travesseiro não está aqui de propósito: ele é branco nas três.
  */
 export const BED_VARIANTS = Object.freeze([
-    { color: 'white', label: 'branca', wool: ID.WOOL_WHITE, item: ID.BED,
+    { color: 'white', label: 'branca', woolBlock: ID.WOOL_BLOCK_WHITE, item: ID.BED,
       head: ID.BED_HEAD, foot: ID.BED_FOOT, top: TILE.BED_TOP, side: TILE.BED_SIDE },
-    { color: 'gray', label: 'cinza', wool: ID.WOOL_GRAY, item: ID.BED_GRAY,
+    { color: 'gray', label: 'cinza', woolBlock: ID.WOOL_BLOCK_GRAY, item: ID.BED_GRAY,
       head: ID.BED_HEAD_GRAY, foot: ID.BED_FOOT_GRAY, top: TILE.BED_TOP_GRAY, side: TILE.BED_SIDE_GRAY },
-    { color: 'black', label: 'preta', wool: ID.WOOL_BLACK, item: ID.BED_BLACK,
+    { color: 'black', label: 'preta', woolBlock: ID.WOOL_BLOCK_BLACK, item: ID.BED_BLACK,
       head: ID.BED_HEAD_BLACK, foot: ID.BED_FOOT_BLACK, top: TILE.BED_TOP_BLACK, side: TILE.BED_SIDE_BLACK },
 ].map(bed => Object.freeze({ ...bed, name: bed.color === 'white' ? 'Cama' : `Cama ${bed.label}` })));
 
@@ -402,11 +406,13 @@ defRecipe([[ID.IRON_INGOT, null], [null, ID.IRON_INGOT]], ID.SHEARS);
 defRecipe([[ID.WOOL_WHITE, ID.WOOL_WHITE], [ID.WOOL_WHITE, ID.WOOL_WHITE]], ID.WOOL_BLOCK_WHITE);
 defRecipe([[ID.WOOL_GRAY, ID.WOOL_GRAY], [ID.WOOL_GRAY, ID.WOOL_GRAY]], ID.WOOL_BLOCK_GRAY);
 defRecipe([[ID.WOOL_BLACK, ID.WOOL_BLACK], [ID.WOOL_BLACK, ID.WOOL_BLACK]], ID.WOOL_BLOCK_BLACK);
-// Cama: três fardos de lã em cima, três tábuas embaixo — a mesma silhueta da
+// Cama: três **blocos** de lã em cima, três tábuas embaixo — a mesma silhueta da
 // receita clássica, que se reconhece sem tutorial. Sai uma cama por vez e a lã
 // manda na cor: branca, cinza e preta não se misturam (o jogo não tem corante).
+// O fardo solto (o que a ovelha derruba) não entra aqui: ele vira bloco na
+// bancada, 2×2, e é o bloco que costura a cama.
 for (const bed of BED_VARIANTS) {
-    defRecipe([[bed.wool, bed.wool, bed.wool], [ID.PLANKS, ID.PLANKS, ID.PLANKS]], bed.item);
+    defRecipe([[bed.woolBlock, bed.woolBlock, bed.woolBlock], [ID.PLANKS, ID.PLANKS, ID.PLANKS]], bed.item);
 }
 
 function shapesEqual(a, b) {

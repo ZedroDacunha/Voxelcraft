@@ -239,8 +239,10 @@ test('o catálogo liga as metades, o item e a receita', () => {
 
     const receita = RECIPES.find(r => r.result === ID.BED);
     assert.ok(receita, 'cama sem receita');
+    // Lã **em bloco**, não o fardo solto: é a receita clássica (3 de lã em cima,
+    // 3 tábuas embaixo), e o fardo é só o que a ovelha derruba.
     assert.deepEqual(receita.shape, [
-        [ID.WOOL_WHITE, ID.WOOL_WHITE, ID.WOOL_WHITE],
+        [ID.WOOL_BLOCK_WHITE, ID.WOOL_BLOCK_WHITE, ID.WOOL_BLOCK_WHITE],
         [ID.PLANKS, ID.PLANKS, ID.PLANKS],
     ]);
     assert.equal(receita.count, 1);
@@ -268,11 +270,11 @@ test('são três camas: uma por cor de lã, cada uma com a sua receita', () => {
         assert.equal(item.sprite.mat, bed.color, 'o ícone segue a cor da cama');
         assert.ok(item.iconTile < ATLAS_COLUMNS * ATLAS_ROWS, `${item.name}: ícone fora do atlas`);
 
-        // A receita é a de sempre, com a lã daquela cor.
+        // A receita é a de sempre, com o **bloco** de lã daquela cor.
         const receita = RECIPES.find(r => r.result === bed.item);
         assert.ok(receita, `${item.name} sem receita`);
         assert.deepEqual(receita.shape, [
-            [bed.wool, bed.wool, bed.wool],
+            [bed.woolBlock, bed.woolBlock, bed.woolBlock],
             [ID.PLANKS, ID.PLANKS, ID.PLANKS],
         ]);
     }
@@ -295,15 +297,37 @@ test('a bancada reconhece as três receitas e não mistura as lãs', () => {
         return inv;
     };
     for (const bed of BED_VARIANTS) {
-        assert.deepEqual(matchRecipe(grade(bed.wool), 3), { id: bed.item, count: 1 },
-            `3 lãs ${bed.label} + 3 tábuas não viraram ${ITEMS[bed.item].name}`);
+        assert.deepEqual(matchRecipe(grade(bed.woolBlock), 3), { id: bed.item, count: 1 },
+            `3 blocos de lã ${bed.label} + 3 tábuas não viraram ${ITEMS[bed.item].name}`);
     }
-    // Lã trocada no meio: não é receita de nada.
+    // Bloco trocado no meio: não é receita de nada.
     const misturada = new Inventory(9);
-    for (const index of [0, 2]) misturada.slots[index] = { id: ID.WOOL_GRAY, count: 1 };
-    misturada.slots[1] = { id: ID.WOOL_WHITE, count: 1 };
+    for (const index of [0, 2]) misturada.slots[index] = { id: ID.WOOL_BLOCK_GRAY, count: 1 };
+    misturada.slots[1] = { id: ID.WOOL_BLOCK_WHITE, count: 1 };
     for (const index of [3, 4, 5]) misturada.slots[index] = { id: ID.PLANKS, count: 1 };
     assert.equal(matchRecipe(misturada, 3), null, 'mistura de lã não pode dar cama');
+    // O fardo solto não costura cama nenhuma: quem entra na bancada é o bloco.
+    const fardos = grade(ID.WOOL_WHITE);
+    assert.equal(matchRecipe(fardos, 3), null, '3 fardos de lã soltos não podem dar cama');
+    const fardosCinza = grade(ID.WOOL_GRAY);
+    assert.equal(matchRecipe(fardosCinza, 3), null, '3 fardos cinza também não');
+    const fardosPretos = grade(ID.WOOL_BLACK);
+    assert.equal(matchRecipe(fardosPretos, 3), null, '3 fardos pretos também não');
+});
+
+test('o bloco de lã da receita é um item de verdade e sai do fardo na bancada', () => {
+    for (const bed of BED_VARIANTS) {
+        const bloco = ITEMS[bed.woolBlock];
+        assert.ok(bloco, `falta o item do bloco de lã ${bed.label}`);
+        assert.equal(BLOCKS[bed.woolBlock]?.drop, bed.woolBlock, 'quebrar o bloco tem de devolver o bloco');
+        assert.match(bloco.name, /lã/i, 'o nome do bloco tem de dizer que é lã');
+        // Quem colhe o bloco? O fardo, na bancada 2×2 — o caminho até a cama não
+        // pode ficar fechado.
+        const fardos = new Inventory(9);
+        for (const index of [0, 1, 3, 4]) fardos.slots[index] = { id: ID['WOOL_' + bed.color.toUpperCase()], count: 1 };
+        assert.deepEqual(matchRecipe(fardos, 3), { id: bed.woolBlock, count: 1 },
+            `4 fardos ${bed.label} não viraram bloco`);
+    }
 });
 
 test('a cama soa como lã (passo, quebra e colocação)', () => {
