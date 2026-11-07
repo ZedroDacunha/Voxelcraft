@@ -53,7 +53,7 @@ import { DAWN_TIME, bedRespawnPoint, canSleepAt, sleepPhaseAt } from './world-sl
 import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld } from './player-physics.js';
 import { canJumpFrom, createJumpState, updateJumpWindow } from './player-jump.js';
 import { createPlayerModel } from './player-model.js';
-import { THIRD_PERSON_BODY_MIN_DISTANCE, THIRD_PERSON_DISTANCE, thirdPersonDistance, thirdPersonLimbSwing } from './player-third-person.js';
+import { THIRD_PERSON_BODY_MIN_DISTANCE, THIRD_PERSON_DISTANCE, cameraOffsetSign, nextCameraView, thirdPersonDistance, thirdPersonLimbSwing } from './player-third-person.js';
 import { ATTACK_COOLDOWN, attackReady, createCreatureSystemClass } from './world-creature.js';
 import { creatureInReach } from './world-mob-hit.js';
 import { SHEEP_BLEAT_RANGE, SHEEP_WOOL_ITEMS, createSheepSystemClass } from './world-sheep.js';
@@ -3139,8 +3139,9 @@ function updateWaterfall(dt) {
 // 6. ESTADO GERAL
 // =====================================================================
 let camera, thirdCamera, playerModel, scene, renderer, controls, world, creatureSystem, sheepSystem, tallGrassMaterial, tallGrassMaterials = [];
-let thirdPerson = false;
+let cameraView = 'first';
 const thirdDirection = new THREE.Vector3();
+const frontCameraTurn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
 const breakParticles = createBreakParticleSystem({
     THREE,
     getScene: () => scene,
@@ -3919,7 +3920,7 @@ function aimAtScreen(clientX, clientY) {
     const height = canvas.clientHeight || window.innerHeight;
     const ndc = ndcFromPoint(clientX, clientY, width, height);
     touchNdc.set(ndc.x, ndc.y);
-    if (thirdPerson && !sleep.active) {
+    if (cameraView === 'rear' && !sleep.active) {
         // Escolhe o ponto visto sob o dedo e aponta dos olhos até ele. O raio
         // final ainda parte do jogador, portanto não aumenta o alcance nem
         // permite usar blocos através de uma parede próxima ao corpo.
@@ -5206,15 +5207,16 @@ async function init() {
 }
 
 function toggleThirdPerson() {
-    thirdPerson = !thirdPerson;
+    cameraView = nextCameraView(cameraView);
     clearTouchAim();
-    showToast(thirdPerson ? 'Terceira pessoa' : 'Primeira pessoa');
+    document.body.classList.toggle('camera-front', cameraView === 'front');
+    showToast({ first: 'Primeira pessoa', rear: 'Terceira pessoa — costas', front: 'Terceira pessoa — frente' }[cameraView]);
 }
 
-// A câmera de interação permanece nos olhos. A câmera visual fica na mesma
-// linha de visão, atrás deles, para que a mira central continue alinhada.
+// A câmera de interação permanece nos olhos. A câmera visual fica na linha
+// do olhar: atrás ou na frente, conforme a vista escolhida.
 function updateThirdPerson() {
-    const active = thirdPerson && !sleep.active;
+    const active = cameraView !== 'first' && !sleep.active;
     playerModel.root.visible = active;
     if (!active) return false;
     playerModel.root.position.copy(player.pos);
@@ -5226,7 +5228,7 @@ function updateThirdPerson() {
     playerModel.rightLeg.rotation.x = -swing;
     playerModel.leftArm.rotation.x = -swing;
     playerModel.rightArm.rotation.x = swing - handSwingAmount(handAnim).swing;
-    camera.getWorldDirection(thirdDirection).negate();
+    camera.getWorldDirection(thirdDirection).multiplyScalar(cameraOffsetSign(cameraView));
     const hit = raycastVoxels(camera.position, thirdDirection, THIRD_PERSON_DISTANCE, {
         getBlock: (x, y, z) => world.getBlock(x, y, z),
         isIgnoredBlock: (type, x, y, z) => !world.isSolidForPhysics(x, y, z, type),
@@ -5235,6 +5237,7 @@ function updateThirdPerson() {
     playerModel.root.visible = distance >= THIRD_PERSON_BODY_MIN_DISTANCE;
     thirdCamera.position.copy(camera.position).addScaledVector(thirdDirection, distance);
     thirdCamera.quaternion.copy(camera.quaternion);
+    if (cameraView === 'front') thirdCamera.quaternion.multiply(frontCameraTurn);
     if (thirdCamera.fov !== camera.fov || thirdCamera.aspect !== camera.aspect) {
         thirdCamera.fov = camera.fov;
         thirdCamera.aspect = camera.aspect;
