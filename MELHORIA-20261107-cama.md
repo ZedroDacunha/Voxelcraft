@@ -490,19 +490,10 @@ já existia, e a receita de bloco (2×2) continua onde estava — é ela que aba
 a cama. Misturar cores continua não valendo: três blocos de cores diferentes não
 formam cama nenhuma.
 
-## O custo, dito com franqueza
+## O custo e a lã das ovelhas
 
-Um bloco custa quatro fardos, então uma cama passou a custar **12 fardos** (antes
-eram 3), e uma ovelha tosquiada solta de **1 a 3**. São de quatro a doze ovelhas
-por cama, contra uma a três antes — o dobro de passos e bem mais lã.
-
-É o preço de pedir a peça de construção em vez do material cru, como no original.
-Se a conta parecer cara demais no jogo, há dois caminhos de conserto, os dois
-pequenos:
-
-- **a ovelha soltar bloco** em vez de fardo (aí a cama custa 3 tosquias, como
-  antes, e o fardo como item some do jogo); ou
-- **2 fardos por bloco** (a cama custaria 6 fardos).
-
-Nenhum dos dois foi feito: os dois mudam o que a ovelha derruba, e isso é outro
-assunto.
+Um bloco custa quatro fardos, então uma cama custa **12 fardos**, além das
+três tábuas. A tosquia rende de **1 a 4** fardos; matar uma ovelha com velo
+rende de **2 a 4**. Uma ovelha já tosquiada continua sem soltar lã ao morrer,
+mas ainda solta carne. A lã é sempre da cor da ovelha e volta a crescer após a
+tosquia.

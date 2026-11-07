@@ -25,8 +25,8 @@ import {
     SHEEP_KNOCKBACK,
     SHEEP_MUTTON_MAX,
     SHEEP_MUTTON_MIN,
-    SHEEP_WOOL_MAX,
-    SHEEP_WOOL_MIN,
+    SHEEP_DEATH_WOOL_MAX,
+    SHEEP_DEATH_WOOL_MIN,
     SHEEP_WOOL_ITEMS,
     createSheepSystemClass,
     sheepDropsFor,
@@ -190,12 +190,21 @@ test('hurtFlashFor: 1 no instante do golpe, 0 quando o tempo acaba', () => {
 test('morta, ela solta lã (se tinha velo) e carne (sempre)', () => {
     // Sorteios escritos à mão: 0 é o mínimo, 0.99 é o máximo.
     const cheia = sheepDropsFor({ coat: 'gray', sheared: false, woolRoll: 0, meatRoll: 0 });
-    assert.deepEqual(cheia, { coat: 'gray', wool: SHEEP_WOOL_MIN, mutton: SHEEP_MUTTON_MIN });
+    assert.deepEqual(cheia, { coat: 'gray', wool: SHEEP_DEATH_WOOL_MIN, mutton: SHEEP_MUTTON_MIN });
     const sortuda = sheepDropsFor({ coat: 'black', sheared: false, woolRoll: 0.99, meatRoll: 0.99 });
-    assert.equal(sortuda.wool, SHEEP_WOOL_MAX, 'a lã vai até três');
+    assert.equal(sortuda.wool, SHEEP_DEATH_WOOL_MAX, 'a lã vai até quatro');
     assert.equal(sortuda.mutton, SHEEP_MUTTON_MAX, 'a carne vai até dois');
     assert.equal(SHEEP_MUTTON_MIN, 1);
     assert.equal(SHEEP_MUTTON_MAX, 2);
+
+    assert.equal(SHEEP_DEATH_WOOL_MIN, 2);
+    assert.equal(SHEEP_DEATH_WOOL_MAX, 4);
+    assert.deepEqual([0, 1 / 3, 2 / 3, 1].map(woolRoll => sheepDropsFor({ woolRoll }).wool), [2, 3, 4, 4]);
+    for (const woolRoll of [-1, 0, 0.5, 1, 2, NaN]) {
+        const wool = sheepDropsFor({ woolRoll }).wool;
+        assert.ok(wool >= 2 && wool <= 4);
+        assert.equal(sheepDropsFor({ woolRoll, sheared: true }).wool, 0);
+    }
 
     // Tosquiada: nada de lã, mas a carne sai igual.
     const tosquiada = sheepDropsFor({ coat: 'white', sheared: true, woolRoll: 0.99, meatRoll: 0 });
@@ -215,7 +224,7 @@ test('o jogo recebe o que ela soltou (onDeath) e a lã é da cor dela', () => {
     assert.equal(mortes.length, 1, 'avisou uma vez só');
     assert.equal(mortes[0].entity, sheep);
     assert.equal(mortes[0].drops.coat, sheep.coat, 'a lã sai na cor da ovelha');
-    assert.ok(mortes[0].drops.wool >= SHEEP_WOOL_MIN && mortes[0].drops.wool <= SHEEP_WOOL_MAX);
+    assert.ok(mortes[0].drops.wool >= SHEEP_DEATH_WOOL_MIN && mortes[0].drops.wool <= SHEEP_DEATH_WOOL_MAX);
     assert.ok(mortes[0].drops.mutton >= SHEEP_MUTTON_MIN);
     assert.equal(ultimo.drops, mortes[0].drops, 'o mesmo pacote volta para quem bateu');
 });

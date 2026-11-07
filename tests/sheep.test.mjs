@@ -1006,7 +1006,7 @@ function aimAt(sheep) {
     };
 }
 
-test('a tesoura tira a lã: de um a três fardos, na cor da ovelha', () => {
+test('a tesoura tira a lã: de um a quatro fardos, na cor da ovelha', () => {
     const world = makeWorld();
     const clock = { t: 0 };
     const system = makeSystem(world, clock);
@@ -1019,7 +1019,7 @@ test('a tesoura tira a lã: de um a três fardos, na cor da ovelha', () => {
     assert.equal(tosado.entity, sheep);
     assert.equal(tosado.coat, sheep.coat, 'a lã sai na cor dela');
     assert.ok(tosado.count >= SHEEP_WOOL_MIN && tosado.count <= SHEEP_WOOL_MAX,
-        `saiu ${tosado.count} fardo(s), e devia ser de 1 a 3`);
+        `saiu ${tosado.count} fardo(s), e devia ser de 1 a 4`);
 
     assert.equal(sheep.sheared, true, 'ela fica tosquiada');
     assert.equal(sheep.tufts.length, 0, 'e o corpo é o tosado');
@@ -1084,16 +1084,18 @@ test('a lã volta em cinco a oito minutos, e pastar adianta o relógio', () => {
     assert.ok(system.world.scene.children.includes(sheep.group), 'continua na cena');
 });
 
-test('a tosquia dá de um a três fardos, e as três quantias acontecem', () => {
+test('a tosquia dá de um a quatro fardos, e as quatro quantias acontecem', () => {
     assert.equal(woolCountFor(0), 1);
     assert.equal(woolCountFor(0.4), 2);
-    assert.equal(woolCountFor(0.9), 3, 'o terço de cima dá três');
+    assert.equal(woolCountFor(0.5), 3);
+    assert.equal(woolCountFor(0.75), 4);
+    assert.equal(woolCountFor(0.9), 4);
     const vistos = new Set();
     for (let i = 0; i < 3000; i++) vistos.add(woolCountFor(i / 3000));
-    assert.deepEqual([...vistos].sort(), [1, 2, 3], 'não é sempre a mesma quantia');
+    assert.deepEqual([...vistos].sort(), [1, 2, 3, 4], 'não é sempre a mesma quantia');
     for (const roll of [0, 0.5, 1, -1, 2, Number.NaN]) {
         const count = woolCountFor(roll);
-        assert.ok(count >= 1 && count <= 3, `${roll} deu ${count}`);
+        assert.ok(count >= 1 && count <= 4, `${roll} deu ${count}`);
     }
 });
 

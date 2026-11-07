@@ -489,7 +489,7 @@ vez de aparecer parada ao lado — então o teste é esperar e procurar.
 - [ ] A terra comida **volta a ser grama em 5 a 10 minutos** (deixe a tela
       aberta e volte). Se você puser outro bloco no lugar, o seu bloco fica.
 - [ ] Com a **tesoura** na mão, clicar na ovelha a deixa **tosquiada** (lã baixa
-      e lisa, sem topete) e solta de um a três fardos da cor dela — o resto está
+      e lisa, sem topete) e solta de um a quatro fardos da cor dela — o resto está
       na seção 26.
 - [ ] Tosquiada, ela **continua pastando**, e cada pastagem adianta a volta da lã.
 - [ ] Chegar correndo, de perto, agachado ou não, **não espanta** a ovelha: é
@@ -595,7 +595,7 @@ Já coberto por `npm test` (922 testes):
 - [ ] Na bancada, **duas barras de ferro na diagonal** fazem uma **tesoura**
       (uma barra sozinha não faz nada).
 - [ ] Com a tesoura na mão, clicar numa ovelha a **tosquia**: ela fica com a lã
-      baixa e lisa, sem os tufos e sem o topete, e cai no chão de **1 a 3 fardos
+      baixa e lisa, sem os tufos e sem o topete, e cai no chão de **1 a 4 fardos
       de lã da cor dela** (branca, cinza ou preta).
 - [ ] Clicar de novo na mesma ovelha **não tosquia** (ela está sem lã) e o clique
       não quebra o chão atrás dela.
@@ -649,7 +649,7 @@ Já coberto por `npm test` (922 testes):
       corre para longe com o bando.
 - [ ] A ovelha cai no **quarto** golpe (esperando ~0,35 s entre um e outro); o
       Mofim continua caindo no **terceiro**.
-- [ ] Morta, a ovelha solta no chão de **1 a 3 fardos de lã da cor dela** — mas
+- [ ] Morta, a ovelha solta no chão de **2 a 4 fardos de lã da cor dela** — mas
       só se ainda tiver velo; tosquiada, não solta lã.
 - [ ] A **carne de ovelha** cai sempre (1 a 2), com ou sem lã, e é comestível:
       segurando na mão e usando, a barra de fome sobe (3 de fome, menos que a
