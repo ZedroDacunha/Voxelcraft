@@ -50,6 +50,10 @@
     .recipe-empty { margin: 8px 0 0; color: #b9ad96; font: 11px monospace; }
     .inv-grid { display: grid; grid-template-columns: repeat(9, var(--inv-slot-size)); gap: var(--inv-gap); }
     .craft-row { display: flex; align-items: center; gap: clamp(8px, 2vw, 14px); margin-bottom: 12px; }
+    #inv-player { box-sizing: border-box; display: block; flex: 0 0 auto;
+        width: calc(var(--inv-slot-size) * 2); height: calc(var(--inv-slot-size) * 2.67);
+        background: #243026; border: 2px solid #111; image-rendering: pixelated; }
+    #inv-player[hidden] { display: none; }
     .craft-grid { grid-template-columns: repeat(2, var(--inv-slot-size)); }
     .craft-arrow { font: bold 22px monospace; color: #aaa; }
     .inv-sep { height: 12px; }
