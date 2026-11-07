@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="Voxel">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
-<link rel="stylesheet" href="styles.css?v=12c335a14f">
+<link rel="stylesheet" href="styles.css?v=328cc19390">
 <link rel="stylesheet" href="inventory.css?v=3c73d92add">
 <!-- importmap:start (gerado por tools/stamp-importmap.mjs; não editar à mão) -->
 <script type="importmap">
@@ -22,7 +22,7 @@
     "./asset-versions.js": "./asset-versions.js?v=d42b8dc6ff",
     "./game-pause-menu.js": "./game-pause-menu.js?v=f625baba0f",
     "./game-pointer-lock.js": "./game-pointer-lock.js?v=cf53899b88",
-    "./game.js": "./game.js?v=f436aaf6c3",
+    "./game.js": "./game.js?v=e484d3ad24",
     "./inventory-a11y.js": "./inventory-a11y.js?v=25f3dab87d",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
     "./inventory-layout.js": "./inventory-layout.js?v=439823a409",
@@ -65,7 +65,7 @@
     "./world-haptics.js": "./world-haptics.js?v=c6f2e6888c",
     "./world-install-prompt.js": "./world-install-prompt.js?v=bedfbf7894",
     "./world-instanced-manager.js": "./world-instanced-manager.js?v=65840e2b5d",
-    "./world-interaction-rules.js": "./world-interaction-rules.js?v=272fa345fc",
+    "./world-interaction-rules.js": "./world-interaction-rules.js?v=e524a0904f",
     "./world-light-region.js": "./world-light-region.js?v=dd22bd5219",
     "./world-lighting-effects.js": "./world-lighting-effects.js?v=71990bb624",
     "./world-list-store.js": "./world-list-store.js?v=cc5476e288",
@@ -84,7 +84,7 @@
     "./world-pwa.js": "./world-pwa.js?v=aebc169c21",
     "./world-raycast.js": "./world-raycast.js?v=0f025b877c",
     "./world-render-resolution.js": "./world-render-resolution.js?v=c966abb0c4",
-    "./world-save-codec.js": "./world-save-codec.js?v=1c19bba026",
+    "./world-save-codec.js": "./world-save-codec.js?v=b0cc3d8bbb",
     "./world-save-indicator.js": "./world-save-indicator.js?v=464a1a9ddc",
     "./world-save-loader.js": "./world-save-loader.js?v=097322c79d",
     "./world-save-lock.js": "./world-save-lock.js?v=4f86b790ec",
@@ -95,6 +95,7 @@
     "./world-save-settings.js": "./world-save-settings.js?v=5867d317b8",
     "./world-sheep.js": "./world-sheep.js?v=dc36ff7f09",
     "./world-sky.js": "./world-sky.js?v=7a9c1fc6df",
+    "./world-sleep.js": "./world-sleep.js?v=d760ea0366",
     "./world-step-sounds.js": "./world-step-sounds.js?v=be66738775",
     "./world-storage.js": "./world-storage.js?v=706891ec43",
     "./world-survival-rules.js": "./world-survival-rules.js?v=e602b31b0a",
@@ -354,6 +355,9 @@
 </div>
 <div id="toast" role="status" aria-live="polite"></div>
 <div id="hurt"></div>
+<!-- Dormir na cama: a tela fecha no preto, a noite passa e o jogador
+     acorda em pé em cima do colchão. O z z z só aparece com a tela já escura. -->
+<div id="sleep" aria-hidden="true"><span class="sleep-zzz">Zzz…</span></div>
 <div id="death" role="alertdialog" aria-labelledby="death-cause" aria-describedby="death-info" tabindex="-1">
     <h1 id="death-cause">Você morreu</h1>
     <p id="death-info"></p>
