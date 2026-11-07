@@ -46,7 +46,8 @@ import { FurnaceSmokeSystem } from './world-furnace-effects.js';
 import { canHarvest, damageTool as damageToolStack, getBreakTime } from './world-tool-rules.js';
 import { boxOverlapsXZ, woodDoorCollision, woodDoorPart, woodDoorShape, woodDoorType } from './world-door.js';
 import {
-    bedCells, bedColor, bedOtherCell, bedPart, bedShapes, bedTypeForPart, isBedBlock, isBedFoot,
+    bedCells, bedCellsFrom, bedColor, bedHoldsCell, bedOtherCell, bedPart, bedShapes, bedTypeForPart,
+    isBedBlock, isBedFoot, supportsBed,
 } from './world-bed.js';
 import { DAWN_TIME, bedRespawnPoint, canSleepAt, sleepPhaseAt } from './world-sleep.js';
 import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld } from './player-physics.js';
@@ -356,6 +357,9 @@ class World {
         this.animatedSandByKey = new Map();
         this.fallingSandAnimations = [];
         this.nextSandStepAt = 0;
+        // Camas que perderam o chão. O `setBlock` só anota; quem derruba a peça
+        // (item, som, ponto de renascimento) é a camada de cima, no laço.
+        this.unsupportedBeds = [];
         this.editCache = new Map();
         this.genQueue = [];
         this.lastPcx = null;
@@ -658,6 +662,11 @@ class World {
         if (type === ID.SAND) this.queueFallingSand(x, y, z);
         if (type !== oldType && (type === 0 || BLOCKS[type]?.solid === false) && y + 1 < WORLD_HEIGHT) {
             this.queueFallingSand(x, y + 1, z);
+            // Areia desce; cama **desaba**. A célula daqui pra cima perdeu o
+            // apoio, e a cama não fica no ar: entra na fila para o laço do jogo
+            // tirar as duas metades, soltar o item e esquecer o renascimento.
+            const acima = this.getBlock(x, y + 1, z);
+            if (isBedBlock(acima)) this.unsupportedBeds.push({ x, y: y + 1, z, type: acima });
         }
         this.lightDirty.add(chunk);
         if (type !== 0 && y > chunk.maxY) chunk.maxY = y;
@@ -675,6 +684,17 @@ class World {
         if (lz === 0) this.remeshIfReady(cx, cz - 1);
         if (lz === CHUNK_SIZE - 1) this.remeshIfReady(cx, cz + 1);
         return true;
+    }
+
+    /**
+     * As camas que perderam o apoio desde a última vez. Devolve `null` quando não
+     * há nada (o caso comum) para o laço não alocar array todo quadro.
+     */
+    takeUnsupportedBeds() {
+        if (!this.unsupportedBeds.length) return null;
+        const perdidas = this.unsupportedBeds;
+        this.unsupportedBeds = [];
+        return perdidas;
     }
 
     queueFallingSand(x, y, z) {
@@ -1482,6 +1502,25 @@ function otherBedHalf(x, y, z, type) {
     return { x: ox, y, z: oz, part };
 }
 
+/** As células da cama a partir de qualquer metade, ambas no mesmo `y`. */
+function bedCellsAt(x, y, z, type) {
+    const part = bedPart(type);
+    if (!part) return null;
+    const { foot, head } = bedCellsFrom(x, z, part, world.getBlockFacing(x, y, z));
+    return [foot, head].map(cell => ({ x: cell.x, y, z: cell.z }));
+}
+
+/**
+ * As células que a cama ocupa a partir de uma metade — uma ou duas.
+ *
+ * Vem daqui a remoção em par (quebrar uma metade derruba a outra) e a conta do
+ * ponto de renascimento, que pode estar em qualquer das duas.
+ */
+function bedPair(x, y, z, type) {
+    if (!isBedBlock(type)) return null;
+    return bedCellsAt(x, y, z, type);
+}
+
 // O painel colide nos dois estados; se o jogador estiver onde o painel vai
 // ficar, a porta não muda de estado para não prender ninguém dentro dela.
 function doorWouldHitPlayer(x, y, z, type) {
@@ -1543,8 +1582,7 @@ function bedCellFree(x, y, z) {
     if (y < 0 || y >= WORLD_HEIGHT) return false;
     const type = world.getBlock(x, y, z);
     if (type !== 0 && BLOCKS[type]?.solid !== false) return false;
-    const support = world.getBlock(x, y - 1, z);
-    return BLOCKS[support]?.solid ?? false;
+    return supportsBed(world.getBlock(x, y - 1, z));
 }
 
 function placeBed(px, py, pz, facing, footType = ID.BED_FOOT) {
@@ -1853,17 +1891,24 @@ function breakBlock(x, y, z) {
         world.setBlock(doorHalf.x, doorHalf.y, doorHalf.z, 0);
     }
     // Cama: quebrar uma metade leva a outra junto (e cai uma cama só, porque o
-    // `drop` das duas metades é o item da cama).
-    const bedHalf = otherBedHalf(x, y, z, type);
-    if (bedHalf && isBedBlock(world.getBlock(bedHalf.x, bedHalf.y, bedHalf.z))) {
-        world.setBlock(bedHalf.x, bedHalf.y, bedHalf.z, 0);
-    }
-    // Se a cama quebrada era o ponto de renascimento, o jogador volta a nascer
-    // no ponto de partida do mundo (e é avisado).
-    if (bedSpawnStanding() && (x === bedSpawn.x && y === bedSpawn.y && z === bedSpawn.z
-        || (bedHalf && bedHalf.x === bedSpawn.x && bedHalf.y === bedSpawn.y && bedHalf.z === bedSpawn.z))) {
-        clearBedSpawn();
-        showToast('Seu ponto de renascimento voltou ao início do mundo');
+    // `drop` das duas metades é o item da cama). O ponto de renascimento é
+    // conferido **antes** de derrubar a outra metade — a célula salva é sempre a
+    // dos pés, então quebrar a cabeceira apagava o apoio antes da conferência e
+    // o renascimento continuava apontando para uma cama que não existia mais.
+    const bedHalves = bedPair(x, y, z, type);
+    if (bedHalves) {
+        const eraSpawn = bedHoldsSpawn(bedHalves);
+        for (const metade of bedHalves) {
+            // A célula quebrada sai depois, pelo caminho normal (com água e
+            // partículas); aqui só a **outra** metade, e só se ainda for cama.
+            if (metade.x === x && metade.y === y && metade.z === z) continue;
+            if (!isBedBlock(world.getBlock(metade.x, metade.y, metade.z))) continue;
+            world.setBlock(metade.x, metade.y, metade.z, 0);
+        }
+        if (eraSpawn) {
+            clearBedSpawn();
+            showToast('Seu ponto de renascimento voltou ao início do mundo');
+        }
     }
     // A célula fica vazia; a água em volta escorre para dentro como fluxo
     // (nunca como fonte). Ver `world-water.js` › `onBlockBroken()`.
@@ -4196,6 +4241,55 @@ function bedSpawnStanding() {
 }
 
 /**
+ * Alguma destas células é a que guarda o renascimento?
+ *
+ * A pergunta é feita **sem** olhar o mundo: quem chama já sabe que a cama está de
+ * pé, e olhar o mundo aqui dava errado — quebrar a cabeceira derrubava a outra
+ * metade (a dos pés, que é a célula salva) antes desta conferência, e o
+ * renascimento ficava apontando para uma cama que não existia mais, calado.
+ */
+function bedHoldsSpawn(cells) {
+    return bedSpawn.valid && bedHoldsCell(cells, bedSpawn);
+}
+
+/**
+ * A cama perdeu o chão e desaba.
+ *
+ * As duas metades somem, cai **uma** cama no chão (o item das duas metades é o
+ * mesmo) e, se era ela que guardava o renascimento, o jogador volta a nascer no
+ * ponto de partida do mundo — com aviso, porque perder o ponto em silêncio é pior
+ * que a cama no chão.
+ */
+function dropBedWhenUnsupported(cell) {
+    // O apoio pode ter voltado entre o aviso e este quadro (areia que caiu, água
+    // que secou). Quem manda é o mundo agora, não o evento: com chão de novo, a
+    // cama fica onde está.
+    if (supportsBed(world.getBlock(cell.x, cell.y - 1, cell.z))) return;
+    const type = world.getBlock(cell.x, cell.y, cell.z);
+    const halves = bedPair(cell.x, cell.y, cell.z, type);
+    if (!halves) return;
+    const eraSpawn = bedHoldsSpawn(halves);
+    for (const metade of halves) {
+        if (isBedBlock(world.getBlock(metade.x, metade.y, metade.z))) {
+            world.setBlock(metade.x, metade.y, metade.z, 0);
+        }
+    }
+    breakParticles.spawn(cell.x, cell.y, cell.z, type);
+    const drop = BLOCKS[type].drop;
+    if (drop) {
+        spawnItemEntity(drop, 1,
+            new THREE.Vector3(cell.x + 0.5, cell.y + 0.55, cell.z + 0.5),
+            new THREE.Vector3(0, 0.45, 0));
+    }
+    const som = materialSoundName(type, 'break');
+    if (som) audio.play(som, { rate: stepPitch() });
+    if (eraSpawn) {
+        clearBedSpawn();
+        showToast('Sua cama desabou: o ponto de renascimento voltou ao início do mundo');
+    }
+}
+
+/**
  * Onde o corpo aparece ao renascer: em cima do colchão, se a cama do último
  * sonho ainda existir; senão, o ponto de partida do mundo.
  */
@@ -5159,6 +5253,10 @@ function animate() {
     updateWaterfall(dt);
     if (hurtFlash > 0) { hurtFlash = Math.max(0, hurtFlash - dt * 2); hurtEl.style.opacity = hurtFlash; }
     world.update(player.pos.x, player.pos.z);
+    // Cama que perdeu o chão (o jogador cavou embaixo dela) desaba: as duas
+    // metades somem, cai o item e o renascimento que ela guardava se perde.
+    const camasSemApoio = world.takeUnsupportedBeds();
+    if (camasSemApoio) for (const perdida of camasSemApoio) dropBedWhenUnsupported(perdida);
     updateDebug(rawDt);
 
     // Com resolução fixa quem manda é ela: a escala automática fica guardada

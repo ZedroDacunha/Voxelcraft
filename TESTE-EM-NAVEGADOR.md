@@ -1415,3 +1415,22 @@ mais. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
       dupla (não pisca ao girar a câmera).
 - [ ] Uma porta ao lado de outra porta: as duas continuam sólidas e sem
       pisca-pisca na junção.
+
+## 73. A cama precisa de chão (e o renascimento vai com ela)
+
+Parte 5 da cama. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
+
+- [ ] Coloque uma cama no chão, com **terra embaixo das duas metades**.
+- [ ] Durma nela uma noite (o aviso de "ponto de renascimento" aparece ao
+      acordar) e depois **cave o bloco embaixo de uma das metades**.
+- [ ] A cama **desaba**: as duas metades somem, cai **uma** cama no chão, com som
+      de lã e partículas — nada de cama flutuando.
+- [ ] Aparece o aviso de que o ponto de renascimento voltou ao início do mundo.
+- [ ] Pegue a cama do chão, coloque de novo, durma outra noite e agora **quebre
+      a cabeceira** (o lado do travesseiro): a outra metade some junto, e o aviso
+      de renascimento aparece — não pode ser só quebrando os pés.
+- [ ] Morra (`/kill`) sem cama: o corpo volta ao ponto de partida do mundo.
+- [ ] Cave o chão embaixo da cama **com água ao lado**: a água escorre para o
+      buraco e a cama desaba do mesmo jeito — o gancho é a remoção do bloco, não
+      a picareta.
+- [ ] Tente colocar uma cama no ar (numa beirada, sem bloco embaixo): não cola.
