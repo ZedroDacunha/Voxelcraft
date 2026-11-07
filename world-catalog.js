@@ -3,6 +3,7 @@ import {
     MINERAL_IDS, MINERAL_PRODUCTS, MINERAL_SMELTING, MINERAL_TOOL_MATERIALS,
 } from './world-minerals.js';
 import { createMineralBlocks } from './world-mineral-blocks.js';
+import { MEAT_IDS, MEATS, MEAT_SMELTING } from './world-meats.js';
 
 export const TILE = { GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, STONE: 3, WOOD: 4, COBBLE: 5, LEAVES: 6, PLANKS: 7,
                CRAFT_TOP: 8, CRAFT_SIDE: 9, FURNACE_FRONT: 10, FURNACE_TOP: 11, CHEST_TOP: 12, CHEST_SIDE: 13,
@@ -42,8 +43,10 @@ export const ID = { GRASS: 1, STONE: 2, LOG: 3, DIRT: 4, COBBLE: 5, PLANKS: 6, L
              WOOL_BLOCK_WHITE: 93, WOOL_BLOCK_GRAY: 94, WOOL_BLOCK_BLACK: 95,
              WOOL_WHITE: 96, WOOL_GRAY: 97, WOOL_BLACK: 98,
              SHEARS: 99,
-             // 100 é a carne que a ovelha solta quando morre (crua, comestível).
-             MUTTON: 100 };
+             // As carnes moram em `world-meats.js`: 100–116, oito bichos ×
+             // duas entradas (crua e assada). Mob novo que solta carne entra
+             // lá, não aqui.
+             ...MEAT_IDS };
 
 export const BLOCKS = {
     [ID.GRASS]: { name: 'Grama',      hardness: 0.6, drop: ID.DIRT,   tool: 'shovel', tiles: { top: TILE.GRASS_TOP, side: TILE.GRASS_SIDE, bottom: TILE.DIRT } },
@@ -225,13 +228,21 @@ for (const m of toolMaterials) {
 
 ITEMS[ID.APPLE]    = { name: 'Maçã', maxStack: 64, food: { hunger: 4, sat: 2.4 }, sprite: { kind: 'apple', mat: 'food' }, iconTile: nextTile++ };
 ITEMS[ID.CHARCOAL] = { name: 'Carvão vegetal', maxStack: 64, sprite: { kind: 'charcoal', mat: 'coal' }, iconTile: nextTile++ };
-// Carne crua da ovelha: come menos que a maçã (é carne de bicho magro), mas
-// alimenta — e sai **sempre**, com lã ou sem, enquanto a lã só sai de quem
-// ainda está com o velo.
-ITEMS[ID.MUTTON] = {
-    name: 'Carne de ovelha', maxStack: 64, food: { hunger: 3, sat: 1.6 },
-    sprite: { kind: 'mutton', mat: 'meat' }, iconTile: nextTile++,
-};
+// As carnes — crua e assada, uma dupla por bicho, na ordem da tabela de
+// `world-meats.js`. A crua é o que o corpo derruba ao morrer (e come menos que a
+// maçã: é carne de bicho magro); a assada sai do forno e alimenta bem mais.
+// O `mat` do sprite diz se a arte é a crua ou a tostada.
+for (const meat of MEATS) {
+    for (const parte of [meat.raw, meat.cooked]) {
+        ITEMS[parte.id] = {
+            name: parte.name,
+            maxStack: 64,
+            food: { ...parte.food },
+            sprite: { ...parte.sprite },
+            iconTile: nextTile++,
+        };
+    }
+}
 ITEMS[ID.TORCH].sprite = { kind: 'torch', mat: 'wood' };
 
 // O atlas é uma grade fixa, não uma fileira única: com 16 colunas a largura
@@ -289,6 +300,9 @@ export const SMELT = {
     [ID.COBBLE]: { result: ID.STONE, time: 10 },
     [ID.LOG]: { result: ID.CHARCOAL, time: 10 },
     ...Object.fromEntries(MINERAL_SMELTING.map(({ ore, result, time }) => [ore, { result, time }])),
+    // Toda carne assa: a tabela vem de `world-meats.js`, então um bicho novo com
+    // carne entra no forno, no livro de receitas e na dica do slot sozinho.
+    ...Object.fromEntries(MEAT_SMELTING.map(({ raw, cooked, time }) => [raw, { result: cooked, time }])),
 };
 export const FUEL = { [ID.PLANKS]: 15, [ID.LOG]: 15, [ID.STICK]: 5, [ID.COAL]: 80, [ID.CHARCOAL]: 80 };
 

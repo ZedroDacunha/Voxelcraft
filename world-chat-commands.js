@@ -66,6 +66,11 @@ const ITEM_ALIASES = Object.freeze({
     scissors: 'SHEARS',
     carne: 'MUTTON',
     mutton: 'MUTTON',
+    // Carne assada: o atalho em português que o jogador vai digitar primeiro.
+    // (O inglês `cooked_mutton` sai sozinho do sprite: mat + kind.)
+    'carne assada': 'COOKED_MUTTON',
+    'carne de ovelha assada': 'COOKED_MUTTON',
+    assada: 'COOKED_MUTTON',
 });
 
 /**

@@ -1,6 +1,7 @@
 import { hash2, mulberry32 } from './world-math.js';
 import { ATLAS_COLUMNS, ATLAS_ROWS, BLOCKS, ITEMS, TILE, TILE_PX, atlasTileRect } from './world-catalog.js';
 import { createBlockIconPixels } from './world-block-icons.js';
+import { MEAT_SPRITE_CORES } from './world-meats.js';
 import { createCoalItemSpritePixels, createMineralOrePixel, createMineralSpritePixels, isMineralOreTile } from './world-mineral-textures.js';
 import {
     createAxeSpritePixels,
@@ -713,18 +714,33 @@ export function createTextureTools(THREE) {
             return (spriteCache[key] = g);
         }
 
-        if (kind === 'mutton') {
-            // Carne crua: um naco rosado de borda escura, duas veias de gordura
-            // clara e a ponta do osso aparecendo no canto de cima.
-            const carne = [178, 66, 62], borda = [122, 38, 40], gordura = [236, 198, 178], osso = [236, 232, 218];
+        // As carnes: um naco de borda escura, duas veias de gordura clara e a
+        // ponta do osso aparecendo no canto de cima. A silhueta é a **mesma**
+        // para a crua e a assada — o que muda é a paleta (rosado → tostado) e as
+        // marcas de grelha, porque o olho tem que reconhecer que é o mesmo
+        // pedaço, só assado. As cores vêm de `world-meats.js`: bicho novo com
+        // carne ganha o par de sprites só de entrar na tabela de lá.
+        const coresCarne = MEAT_SPRITE_CORES[kind];
+        if (coresCarne) {
+            const cozida = mat === 'cooked';
+            const paleta = cozida ? coresCarne.cooked : coresCarne.raw;
             for (let y = 3; y <= 12; y++) for (let x = 2; x <= 12; x++) {
                 const dx = (x - 7) / 5, dy = (y - 7.6) / 4.4;
                 const d = dx * dx + dy * dy;
                 if (d > 1) continue;
-                put(x, y, d > 0.6 ? borda : carne);
+                put(x, y, d > 0.6 ? paleta.borda : paleta.carne);
             }
-            for (const [x, y] of [[5, 6], [6, 6], [7, 6], [5, 7], [6, 10], [7, 10], [8, 9]]) put(x, y, gordura);
-            for (const [x, y] of [[11, 3], [12, 2], [12, 3], [11, 2]]) put(x, y, osso);
+            for (const [x, y] of [[5, 6], [6, 6], [7, 6], [5, 7], [6, 10], [7, 10], [8, 9]]) put(x, y, paleta.gordura);
+            // A ponta do osso: em contato com o naco, senão ela flutua solta na
+            // barra de itens (era o que acontecia com o desenho antigo).
+            for (const [x, y] of [[10, 4], [11, 3], [12, 2], [12, 3], [11, 2], [11, 4]]) put(x, y, paleta.osso);
+            if (cozida) {
+                // Dois riscos de grelha na diagonal: é o que separa a assada da
+                // crua mesmo a 16×16, na barra de itens.
+                for (const [x, y] of [[4, 7], [5, 8], [6, 9], [7, 7], [8, 8], [9, 9]]) put(x, y, paleta.marca);
+                put(3, 9, paleta.borda);
+                put(9, 11, paleta.borda);
+            }
             return (spriteCache[key] = g);
         }
 
