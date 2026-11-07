@@ -1,7 +1,8 @@
 > **Revisto em 07/11/2026.** A regra de "8 linhas diferentes" valia para as três
 > ferramentas. Depois desse PR, a **picareta** voltou à base fiel, com 2 px de
 > forma e sem couro ([`MELHORIA-20261107-picareta-ajustes.md`](MELHORIA-20261107-picareta-ajustes.md)).
-> O machado e a pá continuam exatamente como descritos aqui.
+> O machado e a pá continuam exatamente como descritos aqui, e o **acento**
+> também ficou mais suave (`#fdf0a8` → `#ead69e`).
 
 # MELHORIA: arte autoral das ferramentas (e o guia de arte)
 
@@ -33,7 +34,7 @@ e detalhes-assinatura, mantendo a leitura de ferramenta na hora.
 2. **Contorno tingido** (`O`) — a sombra do material, nunca preto puro, e diferente
    em cada um dos seis materiais.
 3. **Quatro tons + acento** — `1`…`4` do escuro ao claro e um `5` no máximo 2 px,
-   sempre o amarelo-cítrico `#fdf0a8`, em todos os materiais.
+   sempre o amarelo `#fdf0a8` (hoje `#ead69e`, mais suave), em todos os materiais.
 4. **Cabo comum** — `a`…`d` iguais nas três: mesma oficina.
 5. **Faixa de couro costurada** — `g` couro e `s` costura, na metade de baixo do
    cabo (uma faixa sob o encaixe, outra no punho).

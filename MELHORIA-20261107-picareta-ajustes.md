@@ -55,8 +55,9 @@ A madeira fica discreta (é tábua, tem que parecer tábua); ferro, ouro e diama
 
 Perfil por linha: `[0,0,6,10,8,4,6,6,6,6,6,4,3,3,2,0]` — **70 pixels** cheios,
 **2 linhas** diferentes da referência clássica (a 3ª, que ganhou o sexto pixel de
-cabeça, e a 4ª, que ganhou o `5`). O acento amarelo-cítrico fica em **um** pixel
-no alto da cabeça, `(6,3)`, e é o mesmo `#fdf0a8` das outras ferramentas.
+cabeça, e a 4ª, que ganhou o `5`). O acento fica em **um** pixel no alto da
+cabeça, `(6,3)`, e é o **mesmo das outras ferramentas** — hoje um amarelo-palha
+`#ead69e` (ver o ajuste abaixo).
 
 ## As paletas
 
@@ -73,6 +74,23 @@ no alto da cabeça, `(6,3)`, e é o mesmo `#fdf0a8` das outras ferramentas.
 
 A madeira é a tábua, tom a tom. O cobre é nosso (não existe no sprite clássico).
 O resto: **ferro puxa azul, ouro puxa laranja, diamante puxa azul-esverdeado**.
+
+## O acento mais suave
+
+Pedido seguinte, ainda nesta rodada: *"esse pixel clarinho amarelo na ponta de
+todas pode deixar mais suave?"*. O acento era um cítrico quase branco
+(`#fdf0a8`, luminância 237,6) e, contra a sombra do metal, dava um salto de até
+**+194** de luminância — virava um ponto aceso.
+
+Agora é **amarelo-palha `#ead69e`** (luminância 214,3): 24 pontos abaixo, matiz
+quente em vez de cítrico. O salto máximo contra os vizinhos cai para **+170** e o
+ponto continua legível nos seis materiais. A menor diferença é **−28** (no ferro,
+onde o tom `4` já é quase branco): ali quem separa o acento é o **matiz**, não o
+brilho — e é por isso que ele foi para o amarelo quente em vez de só escurecer.
+
+É **um só** `ACENTO` para as três ferramentas, travado por teste de hex exato em
+`tests/art-style.test.mjs`. Se ainda estiver forte, cada −10 de luminância tira
+~8 do salto máximo.
 
 ## Como isso fica travado nos testes
 

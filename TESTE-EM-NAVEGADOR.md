@@ -1119,7 +1119,8 @@ de ouro`, `… pá de diamante`) e olhe na barra, no inventário e **na mão**.
       logo abaixo do encaixe e outra no punho.
 - [ ] O **contorno é tingido**: pedra puxa azul, ouro puxa verde-escuro, diamante
       puxa ciano-escuro. Nada de preto puro.
-- [ ] Há **um ponto de acento amarelo-cítrico** em cada ferramenta, no alto.
+- [ ] Há **um ponto de acento amarelo-palha** em cada ferramenta, no alto —
+      claro, mas sem acender como um LED.
 - [ ] Os seis materiais se distinguem na hora, e o cobre (nosso) não parece o ouro.
 - [ ] As três **não lembram** os ícones clássicos lado a lado: silhueta diferente.
 - [ ] Na mão e na barra o ícone é o mesmo.
@@ -1135,7 +1136,7 @@ ferro`, `… de ouro`, `… de diamante`) e olhe na barra, no inventário e na m
 - [ ] A picareta **parece a picareta do jogo** — cabo na mesma diagonal, cabeça
       em barra com as duas pontas. É de propósito.
 - [ ] Mesmo assim ela **não é igual**: a cabeça é dois pixels mais larga à direita
-      e tem um pixel amarelo-cítrico no alto.
+      e tem um pixel amarelo-palha no alto.
 - [ ] **Não tem faixa de couro** no cabo. O machado e a pá continuam com a deles.
 - [ ] O cabo é **da cor da tábua**: encoste o ícone num bloco de tábuas e a
       madeira combina.

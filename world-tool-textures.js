@@ -109,8 +109,13 @@ export const PUNHO_PALETA = Object.freeze({
     s: Object.freeze([190, 150, 96]),
 });
 
-/** O acento: um amarelo-cítrico que é a assinatura da casa. */
-export const ACENTO = Object.freeze([253, 240, 168]);
+/**
+ * O acento: a assinatura da casa, em **amarelo-palha**. Era um cítrico
+ * `#fdf0a8`, quase branco, e virava um ponto aceso nas pontas das ferramentas —
+ * pedido de 07/11/2026: mais suave. Desceu 24 pontos de luminância e perdeu
+ * saturação, mas continua sendo o único tom quente-claro da família.
+ */
+export const ACENTO = Object.freeze([234, 214, 158]);
 
 /**
  * Paleta de cada material: contorno `O` + quatro tons `1`…`4` (escuro → claro).

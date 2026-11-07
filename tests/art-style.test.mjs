@@ -77,7 +77,7 @@ test('o acento da casa aparece nas três e é o mesmo amarelo-cítrico', () => {
         assert.ok(acentos >= 1, `${f.nome}: tem acento`);
         assert.ok(acentos <= 2, `${f.nome}: acento é detalhe, não mancha (${acentos} px)`);
     }
-    assert.deepEqual([...ACENTO], [253, 240, 168], 'o amarelo-cítrico da casa');
+    assert.deepEqual([...ACENTO], [234, 214, 158], 'o amarelo-palha da casa');
 });
 
 test('as cores da família são exatamente estas', () => {
@@ -86,7 +86,7 @@ test('as cores da família são exatamente estas', () => {
         { a: '3a2a12', b: '6b4c1e', c: '9a7130', d: 'c39148' }, 'tons do cabo');
     assert.deepEqual(Object.fromEntries(Object.entries(PUNHO_PALETA).map(([k, v]) => [k, hex(v)])),
         { g: '4a3524', s: 'be9660' }, 'couro e costura');
-    assert.equal(hex(ACENTO), 'fdf0a8', 'acento');
+    assert.equal(hex(ACENTO), 'ead69e', 'acento');
 });
 
 test('o contorno é tingido — nunca preto puro, e muda com o material', () => {

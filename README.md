@@ -329,7 +329,7 @@ Se esquecer, o teste `cache-versioning` e o `npm run check` reprovam.
 ## Arte
 
 A arte do jogo é **nossa**: ícones desenhados aqui, em 16×16, com paleta própria,
-contorno tingido, um acento amarelo-cítrico e o cabo de madeira das tábuas do
+contorno tingido, um acento amarelo-palha e o cabo de madeira das tábuas do
 jogo. A **picareta** parte da leitura clássica com pequenos ajustes — cor nossa,
 forma reconhecível —, enquanto **machado e pá** são desenho autoral, e só eles
 levam as faixas de couro costuradas. As regras estão em

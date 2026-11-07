@@ -29,7 +29,7 @@ ferramentas, itens, minérios, blocos do inventário.
 | `.` | vazio (transparente) |
 | `O` | contorno, **tingido** com a sombra do material |
 | `1`…`4` | corpo, do escuro ao claro |
-| `5` | **acento** — o amarelo-cítrico da casa |
+| `5` | **acento** — o amarelo-palha da casa |
 | `a`…`d` | cabo de madeira, do escuro ao claro |
 | `g` | couro da empunhadura |
 | `s` | costura do couro |
@@ -52,8 +52,11 @@ grade está errada — e o teste pega.
    puxa azul, ouro puxa verde-escuro, diamante puxa ciano-escuro. É sempre a cor
    mais escura da paleta.
 3. **Quatro tons + um acento.** `1`…`4` do escuro ao claro, com o `2` no meio; o
-   `5` é detalhe — **no máximo 2 pixels**, sempre o mesmo amarelo-cítrico
-   (`#fdf0a8`), em qualquer material. É a assinatura mais reconhecível.
+   `5` é detalhe — **no máximo 2 pixels**, sempre o mesmo amarelo-palha
+   (`#ead69e`), em qualquer material. É a assinatura mais reconhecível.
+   Ele é **claro, não aceso**: foi cítrico (`#fdf0a8`) até 07/11/2026, quando
+   virava um ponto de luz nas pontas. A régua é o salto de luminância contra os
+   vizinhos — hoje **≤ +170**, contra +194 do cítrico.
 4. **Cabo comum.** `a`…`d` são os mesmos nas três ferramentas: as peças parecem
    saídas da mesma oficina.
 5. **Cabo de madeira = as tábuas do jogo.** `a`…`d` saem do tile `PLANKS`
