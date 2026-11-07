@@ -29,3 +29,25 @@ test('modelos independentes aceitam cores e liberam recursos', () => {
     a.dispose(); b.dispose();
     assert.ok(geometriaLiberada && materialLiberado);
 });
+
+test('cabelo cobre a pele e suas peças não disputam o mesmo espaço', () => {
+    const model = createPlayerModel(THREE);
+    model.root.updateMatrixWorld(true);
+    const bounds = name => new THREE.Box3().setFromObject(model.head.getObjectByName(name));
+    const face = bounds('face');
+    const top = bounds('hair-top');
+    const hair = ['hair-top', 'hair-back', 'hair-left', 'hair-right'].map(bounds);
+    // A pele não pode ter uma face no mesmo plano que o topo visível do cabelo.
+    assert.ok(top.max.y > face.max.y + 0.001);
+    assert.ok(top.min.x < face.min.x && top.max.x > face.max.x);
+    assert.ok(top.min.z < face.min.z && top.max.z > face.max.z);
+    // As peças se encostam, mas não se atravessam nem dividem superfícies visíveis.
+    for (let i = 0; i < hair.length; i++) for (let j = i + 1; j < hair.length; j++) {
+        const overlap = new THREE.Box3().copy(hair[i]).intersect(hair[j]);
+        if (!overlap.isEmpty()) {
+            const size = overlap.getSize(new THREE.Vector3());
+            assert.ok(size.x < 1e-6 || size.y < 1e-6 || size.z < 1e-6, `cabelo ${i} e ${j} se sobrepõem`);
+        }
+    }
+    model.dispose();
+});
