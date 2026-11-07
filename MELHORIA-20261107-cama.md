@@ -305,3 +305,70 @@ que envelhece calada. Ela virou `world-faces.js`, um módulo puro.
 - **As 16 tinturas**: o jogo não tem corantes, então são três cores (a lã da
   ovelha), não dezesseis.
 - **A cama cair quando o chão é cavado**: hoje ela fica no ar, como a porta.
+
+# Correção — a face do travesseiro que o mesher comia
+
+Depois da parte 4 o jogador voltou com o mesmo print: de frente para o pé da
+cama, com a câmera quase na altura do colchão, havia uma **faixa escura embaixo
+do travesseiro**. Não era a mão nem o modelo: era o mesher do mundo.
+
+## O que estava acontecendo
+
+O mesher descarta a face de um bloco quando o vizinho "tapa" aquele lado. Para
+cama e porta a regra era grosseira:
+
+```js
+// antes
+if (currentRender === 'bed') return neighborRender === 'bed';
+```
+
+Ou seja: se a cela vizinha naquela direção é a outra metade da cama, **todas** as
+faces daquele lado somem. Vale para o cubo, não vale para a cama — ela é feita
+de caixas que param no meio da célula:
+
+```
+travesseiro .... 8,5 → 12  (o corpo para em 14,5/16 no comprimento)
+colchão ........ 4 → 8     (é o único que vai até a borda)
+```
+
+A face do travesseiro virada para o meio da cama está em `z = 8,5/16`, muito
+longe do plano da emenda (`z = 0` da célula da cabeceira). Ela é visível — e era
+justamente ela que sumia. O material do mundo é `DoubleSide`, então o buraco não
+aparecia como céu: aparecia como a **face de dentro**, escura. Daí a faixa preta
+sob o travesseiro.
+
+Com a câmera quase rente ao colchão o defeito ficava óbvio: era a única coisa
+que se via do travesseiro de frente.
+
+## A correção
+
+A regra passou a olhar **onde a face está**, não só quem é o vizinho:
+
+```js
+// depois
+if (currentRender === 'door' || currentRender === 'bed') {
+    return neighborRender === currentRender && faceNaBordaDaCelula(shape, dir);
+}
+```
+
+`faceNaBordaDaCelula(shape, dir)` (em `world-faces.js`) responde "esta face
+encosta em 0 ou em 1 na direção dela?". Só a face que está no **plano da
+emenda** é descartada — que era o motivo original da regra (dois planos iguais
+brigando pelo mesmo pixel, o pisca-pisca ao girar a câmera). A tolerância de
+0,01 existe por causa da folga de 0,06/16 que a cama aplica nas faces de fora.
+
+O `solid` do mesher ganhou o parâmetro da forma, e o mesher passa a caixa que
+está desenhando. Efeito colateral bom: as **pernas** da cabeceira também
+perdiam a face virada para o meio da cama (4,5/16 para dentro) — voltaram, e as
+da porta também, pela mesma regra.
+
+## Como isso foi encontrado
+
+Um renderizador de mesa (`preview/cama-mundo-mesher.mjs`, fora do repositório)
+monta a cama **pelo caminho do mesher**: duas células, `bedShapes` por metade e a
+regra de recusa. Rodando com `REGRA=antiga` a faixa preta aparece; com
+`REGRA=nova` ela some, e 6 faces (12 triângulos) voltam a ser desenhadas.
+
+`tests/shape-culling.test.mjs` guarda a regra: a face do travesseiro virada para
+o meio da cama tem de estar entre as desenhadas, a face do colchão na emenda não
+pode voltar, e o `game.js` tem de continuar chamando a regra nova.

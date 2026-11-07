@@ -149,7 +149,7 @@ test('a tabela de faces é única e usada pelo jogo', () => {
     // E o `game.js` não tem mais uma cópia da tabela.
     const jogo = readFileSync(new URL('../game.js', import.meta.url), 'utf8');
     assert.equal(/^const FACES = \[/m.test(jogo), false, 'game.js voltou a definir FACES');
-    assert.match(jogo, /import \{ FACES \} from '\.\/world-faces\.js';/);
+    assert.match(jogo, /import \{ FACES, faceNaBordaDaCelula \} from '\.\/world-faces\.js';/);
 });
 
 test('o jogo usa o modelo 3D na mão, antes do ícone extrudado', () => {

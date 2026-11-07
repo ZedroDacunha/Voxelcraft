@@ -1396,3 +1396,22 @@ Parte 4 da cama. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
 - [ ] Sem objeto na mão (barra vazia), a mão volta ao normal.
 - [ ] Barra de ferramentas: as ferramentas continuam como estavam (ícone
       extrudado) — só a cama virou modelo.
+
+## 72. A parte de baixo do travesseiro no mundo
+
+Correção do mesher: a face do travesseiro virada para o meio da cama não some
+mais. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
+
+- [ ] Coloque uma cama no chão e vá até o **pé dela**, de frente para a
+      cabeceira (o travesseiro no fundo).
+- [ ] Abaixe a câmera até quase a altura do colchão: o travesseiro aparece
+      inteiro, com a face da frente dele na cor do travesseiro — **sem faixa
+      preta** embaixo dele.
+- [ ] Vá para a lateral e olhe por cima: travesseiro, aba do colchão e colchão
+      continuam encaixados, sem vão escuro entre as peças.
+- [ ] Dê a volta na cama: nenhum lado mostra o interior da peça (a face vista
+      por dentro é escura).
+- [ ] Coloque duas camas encostadas: a emenda entre elas continua **sem** face
+      dupla (não pisca ao girar a câmera).
+- [ ] Uma porta ao lado de outra porta: as duas continuam sólidas e sem
+      pisca-pisca na junção.

@@ -18,7 +18,7 @@ import { createPointerLockRequester } from './game-pointer-lock.js';
 import { createInventoryAssets } from './inventory-assets.js';
 import { createTextureTools } from './world-textures.js';
 import { itemRenderMode } from './world-block-icons.js';
-import { FACES } from './world-faces.js';
+import { FACES, faceNaBordaDaCelula } from './world-faces.js';
 import { HELD_BED, bedHandGeometry } from './world-bed-hand.js';
 import { createWorldSaveCodec, WORLD_SAVE_VERSION } from './world-save-codec.js';
 import { createWorldSaveLoader } from './world-save-loader.js';
@@ -879,18 +879,19 @@ class World {
             return sampleLight('blockLight', lx, y, lz, 0);
         };
         const isLayeredLeafFace = dir => dir[0] > 0 || dir[1] > 0 || dir[2] > 0;
-        const solid = (lx, y, lz, currentType, dir) => {
+        const solid = (lx, y, lz, currentType, dir, shape = null) => {
             const nx = lx + dir[0], ny = y + dir[1], nz = lz + dir[2];
             const nType = blockAt(nx, ny, nz);
             const currentRender = BLOCKS[currentType]?.render;
             const neighborRender = BLOCKS[nType]?.render;
             if (currentRender === 'torch') return false;
-            // Portas desenham todas as faces (formato fino); só a face entre as
-            // duas metades é omitida para não haver z-fighting.
-            if (currentRender === 'door') return neighborRender === 'door';
-            // Cama: a única face que não precisa existir é a da emenda entre as
-            // duas metades — o resto é forma fina e aparece sempre.
-            if (currentRender === 'bed') return neighborRender === 'bed';
+            // Portas e camas ocupam mais de uma célula: quando o vizinho é a
+            // outra metade, some só a face que está no plano da emenda. As
+            // outras continuam aparecendo — a cama tem peça que para no meio da
+            // célula (o travesseiro), e descartar a face dela abria um vão preto.
+            if (currentRender === 'door' || currentRender === 'bed') {
+                return neighborRender === currentRender && faceNaBordaDaCelula(shape, dir);
+            }
             if (currentRender === 'liquid') {
                 if (nType === 0) return false;
                 if (neighborRender !== 'liquid') return true;
@@ -1002,7 +1003,7 @@ class World {
                         const neighborX = lx + f.dir[0], neighborY = y + f.dir[1], neighborZ = lz + f.dir[2];
                         const neighborType = blockAt(neighborX, neighborY, neighborZ);
                         const leafLayerFace = renderMode === 'cutout' && BLOCKS[neighborType]?.render === 'cutout' && isLayeredLeafFace(f.dir);
-                        if (renderMode !== 'torch' && solid(lx, y, lz, t, f.dir)) continue;
+                        if (renderMode !== 'torch' && solid(lx, y, lz, t, f.dir, shape)) continue;
                         const frontFace = tiles.front !== undefined && isFrontFace(f.dir, facing);
                         let faceTile = tileForBlockFace(tiles, f.kind, f.dir, facing);
                         const furnaceFlameFace = frontFace && t === ID.FURNACE && furnaces.get(`${wx},${y},${wz}`)?.burn > 0;
