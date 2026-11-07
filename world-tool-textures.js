@@ -3,42 +3,45 @@
 // Módulo puro (sem DOM, sem THREE): devolve os pixels do ícone para o
 // `world-textures.js` montar no atlas. Assim a arte pode ser testada no Node.
 //
-// Esta arte é **nossa**. Não é transcrição de sprite nenhum: as formas, as
-// paletas, o contorno e os detalhes foram desenhados para o Voxelcraft, seguindo
-// as regras do `GUIA-DE-ARTE.md`:
+// A arte segue o `GUIA-DE-ARTE.md`, com duas famílias de desenho:
 //
-// - **silhueta própria** — nenhuma ferramenta repete as proporções clássicas;
-// - **contorno tingido** (`O`) — a sombra do material, nunca preto puro;
-// - **quatro tons** (`1`…`4`, do escuro ao claro) mais **um acento** (`5`), um
-//   amarelo-cítrico que só o nosso jogo tem;
-// - **cabo de madeira** (`a`…`d`) com **faixas de couro costuradas** (`g`
-//   couro, `s` costura) — uma logo abaixo do encaixe e outra no punho.
+// - **picareta** — base fiel (a do #119) com **pequenos ajustes**: mesmo desenho
+//   clássico, 2 px de forma e paleta própria. Foi a decisão do usuário em
+//   07/11/2026: continuar com a leitura clássica e mudar só o suficiente para a
+//   peça ser nossa;
+// - **machado** e **pá** — desenho autoral de forma livre.
+//
+// As regras valem para as três: **contorno tingido** (`O`, nunca preto puro),
+// **quatro tons** (`1`…`4`, do escuro ao claro), **um acento** (`5`, o
+// amarelo-cítrico da casa) e o **cabo de madeira** (`a`…`d`) comum. O machado e
+// a pá ainda levam **faixas de couro** (`g`/`s`).
 //
 // Um desenho por ferramenta, para todos os materiais: o que muda é a paleta.
 
 /**
  * A **picareta** — 16×16. `O` contorno · `1`…`4` cabeça · `5` acento ·
- * `a`…`d` cabo · `g`/`s` couro e costura.
+ * `a`…`d` cabo.
  *
- * Duas pontas: a barra sobe da ponta esquerda (embaixo) até a direita (em cima),
- * com o punho no meio e o cabo descendo na diagonal.
+ * É a base fiel do #119 com **dois ajustes de forma**: o topo da cabeça cresce
+ * 1 px para a direita (a barra fica com 6 px) e a ponta esquerda ganha 1 px.
+ * O acento (`5`) fica no tom mais claro do topo da cabeça.
  */
 export const PICARETA_GRADE = Object.freeze([
     '................',
     '................',
-    '.......O53O.....',
-    '....O4433221O...',
-    '..O33221111O....',
-    '.......O2O......',
-    '......O21O......',
-    '......gsg.......',
-    '.....bda........',
-    '....bca.........',
-    '...bda..........',
-    '..bca...........',
-    '..gsg...........',
-    '.ggg............',
-    '................',
+    '......111111....',
+    '....11532231bc..',
+    '......1OOO22da..',
+    '..........b32O..',
+    '.........bca23O.',
+    '........bda.O2O.',
+    '.......bca..O2O.',
+    '......bda...O3O.',
+    '.....bca....O4O.',
+    '....bda......O..',
+    '...bca..........',
+    '..bda...........',
+    '..aa............',
     '................',
 ]);
 
@@ -112,51 +115,56 @@ export const ACENTO = Object.freeze([253, 240, 168]);
 /**
  * Paleta de cada material: contorno `O` + quatro tons `1`…`4` (escuro → claro).
  *
- * O contorno é **tingido**: puxa a cor do material (pedra azulada, ouro
- * esverdeado, diamante ciano-escuro) em vez de preto puro.
+ * A paleta é **suave**: fica perto da clássica de propósito, para a ferramenta
+ * manter a leitura, mas desloca o matiz o suficiente para a peça ser nossa — e
+ * nos metais o desvio é o mais visível (ferro azulado, ouro mais quente,
+ * diamante mais verde-azulado, cobre mais alaranjado). O contorno é **tingido**:
+ * a sombra do material, nunca preto puro.
  */
 export const PICARETA_PALETAS = Object.freeze({
+    // A madeira imita as **tábuas do jogo** (TILE.PLANKS): o mesmo castanho
+    // claro e quente da tábua, do veio escuro ao topo iluminado.
     wood: Object.freeze({
-        O: Object.freeze([52, 40, 26]),
-        1: Object.freeze([107, 74, 44]),
-        2: Object.freeze([148, 104, 58]),
-        3: Object.freeze([187, 138, 77]),
-        4: Object.freeze([216, 176, 117]),
+        O: Object.freeze([86, 62, 34]),
+        1: Object.freeze([123, 91, 51]),
+        2: Object.freeze([151, 116, 67]),
+        3: Object.freeze([175, 140, 88]),
+        4: Object.freeze([202, 166, 106]),
     }),
     stone: Object.freeze({
-        O: Object.freeze([42, 45, 52]),
-        1: Object.freeze([86, 93, 104]),
-        2: Object.freeze([125, 133, 146]),
-        3: Object.freeze([163, 171, 184]),
-        4: Object.freeze([201, 208, 218]),
+        O: Object.freeze([58, 56, 52]),
+        1: Object.freeze([82, 81, 78]),
+        2: Object.freeze([126, 124, 119]),
+        3: Object.freeze([140, 138, 132]),
+        4: Object.freeze([163, 160, 153]),
     }),
     copper: Object.freeze({
-        O: Object.freeze([63, 42, 28]),
-        1: Object.freeze([140, 79, 46]),
-        2: Object.freeze([192, 125, 76]),
-        3: Object.freeze([221, 159, 104]),
-        4: Object.freeze([241, 192, 142]),
+        O: Object.freeze([70, 38, 24]),
+        1: Object.freeze([122, 62, 38]),
+        2: Object.freeze([190, 112, 66]),
+        3: Object.freeze([208, 146, 96]),
+        4: Object.freeze([232, 178, 130]),
     }),
     iron: Object.freeze({
-        O: Object.freeze([38, 44, 52]),
-        1: Object.freeze([85, 96, 111]),
-        2: Object.freeze([139, 149, 163]),
-        3: Object.freeze([179, 188, 200]),
-        4: Object.freeze([213, 220, 229]),
+        O: Object.freeze([40, 45, 53]),
+        1: Object.freeze([66, 72, 82]),
+        2: Object.freeze([186, 194, 203]),
+        3: Object.freeze([206, 214, 222]),
+        4: Object.freeze([238, 243, 248]),
     }),
     gold: Object.freeze({
-        O: Object.freeze([64, 50, 15]),
-        1: Object.freeze([143, 106, 18]),
-        2: Object.freeze([216, 165, 33]),
-        3: Object.freeze([242, 204, 78]),
-        4: Object.freeze([255, 228, 134]),
+        O: Object.freeze([78, 50, 12]),
+        1: Object.freeze([152, 98, 16]),
+        2: Object.freeze([232, 166, 28]),
+        3: Object.freeze([242, 198, 72]),
+        4: Object.freeze([255, 238, 128]),
     }),
     diamond: Object.freeze({
-        O: Object.freeze([16, 51, 47]),
-        1: Object.freeze([24, 122, 108]),
-        2: Object.freeze([43, 184, 165]),
-        3: Object.freeze([95, 224, 203]),
-        4: Object.freeze([180, 245, 231]),
+        O: Object.freeze([12, 56, 56]),
+        1: Object.freeze([16, 98, 96]),
+        2: Object.freeze([34, 188, 174]),
+        3: Object.freeze([48, 212, 196]),
+        4: Object.freeze([92, 240, 220]),
     }),
 });
 

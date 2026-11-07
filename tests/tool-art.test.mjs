@@ -2,7 +2,7 @@
 //
 // Um teste por regra, valendo para as três ferramentas: grade, silhueta,
 // transparência, papéis dos símbolos, paletas, materiais, determinismo e o
-// `null` de segurança. As regras da família (cabo comum, couro, acento,
+// `null` de segurança. As regras da família (cabo comum, acento,
 // contorno tingido) ficam em `art-style.test.mjs`.
 
 import test from 'node:test';
@@ -39,8 +39,8 @@ const FERRAMENTAS = [
         gradeFor: pickaxeGradeFor,
         paletteFor: pickaxePaletteFor,
         criar: createPickaxeSpritePixels,
-        silhuetaEsperada: [0, 0, 4, 9, 10, 3, 4, 3, 3, 3, 3, 3, 3, 3, 0, 0],
-        totalEsperado: 51,
+        silhuetaEsperada: [0, 0, 6, 10, 8, 4, 6, 6, 6, 6, 6, 4, 3, 3, 2, 0],
+        totalEsperado: 70,
     },
     {
         nome: 'machado',
@@ -187,8 +187,13 @@ test('material fora da arte devolve null, para quem chama cair no desenho antigo
     }
 });
 
-test('a picareta não usa os símbolos do machado só porque são da mesma família', () => {
-    assert.deepEqual(simbolosDe(PICARETA_GRADE), ['1', '2', '3', '4', '5', 'O', 'a', 'b', 'c', 'd', 'g', 's']);
-    assert.ok(simbolosDe(MACHADO_GRADE).includes('s'), 'machado tem costura');
-    assert.ok(simbolosDe(PA_GRADE).includes('g'), 'pá tem couro');
+test('a picareta é a base fiel com ajustes: sem couro, com o acento no topo', () => {
+    // A picareta ficou na versão "cor + forma": cabo liso, sem faixa de couro.
+    assert.deepEqual(simbolosDe(PICARETA_GRADE), ['1', '2', '3', '4', '5', 'O', 'a', 'b', 'c', 'd']);
+    assert.ok(simbolosDe(MACHADO_GRADE).includes('s'), 'machado ainda tem costura');
+    assert.ok(simbolosDe(PA_GRADE).includes('g'), 'pá ainda tem couro');
+    // O acento é um só, no tom mais claro do topo da cabeça.
+    const acentos = [];
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (PICARETA_GRADE[y][x] === '5') acentos.push([x, y]);
+    assert.deepEqual(acentos, [[6, 3]], 'acento em (6,3)');
 });

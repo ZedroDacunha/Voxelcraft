@@ -1124,3 +1124,27 @@ de ouro`, `… pá de diamante`) e olhe na barra, no inventário e **na mão**.
 - [ ] As três **não lembram** os ícones clássicos lado a lado: silhueta diferente.
 - [ ] Na mão e na barra o ícone é o mesmo.
 - [ ] A **tesoura** segue com o desenho antigo — é a próxima, e já nasce no guia.
+
+## 59. A picareta volta à base fiel
+
+A picareta foi refeita **em cima da versão fiel do #119**, com ajustes pequenos
+([`MELHORIA-20261107-picareta-ajustes.md`](MELHORIA-20261107-picareta-ajustes.md)).
+Pegue as seis (`/give picareta de madeira`, `… de pedra`, `… de cobre`, `… de
+ferro`, `… de ouro`, `… de diamante`) e olhe na barra, no inventário e na mão.
+
+- [ ] A picareta **parece a picareta do jogo** — cabo na mesma diagonal, cabeça
+      em barra com as duas pontas. É de propósito.
+- [ ] Mesmo assim ela **não é igual**: a cabeça é dois pixels mais larga à direita
+      e tem um pixel amarelo-cítrico no alto.
+- [ ] **Não tem faixa de couro** no cabo. O machado e a pá continuam com a deles.
+- [ ] O cabo é **da cor da tábua**: encoste o ícone num bloco de tábuas e a
+      madeira combina.
+- [ ] A cor é **mais suave** que a da rodada anterior: sem estouro de contraste,
+      o metal ainda lê como metal.
+- [ ] O metal é o que mais se mexe: **ferro azulado**, **ouro quente**,
+      **diamante azul-esverdeado** — bem longe do clássico, e o cobre não confunde
+      com o ouro.
+- [ ] A pedra continua cinza-neutra, só que mais clara que o ferro.
+- [ ] Na mão e na barra o ícone é o mesmo.
+- [ ] O **machado** (#120) e a **pá** (#121) continuam exatamente como ficaram.
+- [ ] A **tesoura** segue com o desenho antigo — é a próxima.

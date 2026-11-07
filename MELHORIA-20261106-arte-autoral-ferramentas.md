@@ -1,3 +1,8 @@
+> **Revisto em 07/11/2026.** A regra de "8 linhas diferentes" valia para as três
+> ferramentas. Depois desse PR, a **picareta** voltou à base fiel, com 2 px de
+> forma e sem couro ([`MELHORIA-20261107-picareta-ajustes.md`](MELHORIA-20261107-picareta-ajustes.md)).
+> O machado e a pá continuam exatamente como descritos aqui.
+
 # MELHORIA: arte autoral das ferramentas (e o guia de arte)
 
 - **Data:** 06/11/2026

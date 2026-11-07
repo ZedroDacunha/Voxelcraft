@@ -7,6 +7,14 @@ ferramentas, itens, minérios, blocos do inventário.
 > do sprite clássico (256/256 iguais). Funcionava — e era cópia. Este guia é o que
 > passou a valer no lugar disso, começando pelo redesenho da picareta, do machado
 > e da pá ([`MELHORIA-20261106-arte-autoral-ferramentas.md`](MELHORIA-20261106-arte-autoral-ferramentas.md)).
+>
+> **Revisão de 07/11/2026 — base fiel com ajustes.** Depois de ver as três
+> ferramentas prontas, a direção mudou: a **pirâmide de intensidade** caiu para
+> *"parecida com a do jogo, com ajustes pequenos e nossos"*. A picareta voltou à
+> **base fiel** do sprite clássico e recebeu só alguns pixels de forma, paleta
+> suave e veios de metal. O machado e a pá continuam sendo desenhos autorais
+> ([`MELHORIA-20261107-picareta-ajustes.md`](MELHORIA-20261107-picareta-ajustes.md)).
+> Regra prática: **a forma pode ser próxima; a cor e o detalhe são nossos.**
 
 ## 1. A grade
 
@@ -29,11 +37,17 @@ ferramentas, itens, minérios, blocos do inventário.
 Cada símbolo tem **uma** cor por material. Se um símbolo precisa de duas cores, a
 grade está errada — e o teste pega.
 
-## 3. As cinco regras da família
+## 3. As seis regras da família
 
-1. **Silhueta própria.** Nenhuma ferramenta repete o perfil do sprite clássico.
-   O teste compara linha a linha com as silhuetas de referência e exige pelo menos
-   **8 linhas** diferentes.
+1. **Silhueta reconhecível — e não copiada.** O teste compara o perfil linha a
+   linha com as silhuetas de referência. A conta é **por ferramenta**:
+   - picareta (base fiel): **2 linhas** diferentes e **70 px** cheios — a forma é
+     quase a clássica de propósito, quem carrega a identidade é a cor;
+   - machado e pá (autorais): **pelo menos 8 linhas** diferentes e a contagem de
+     pixels fora da faixa clássica.
+
+   Nenhuma linha pode ser cópia exata de ponta a ponta: mesmo na base fiel, cada
+   ferramenta tem um pixel de assinatura.
 2. **Contorno tingido.** O `O` nunca é preto puro e muda com o material: pedra
    puxa azul, ouro puxa verde-escuro, diamante puxa ciano-escuro. É sempre a cor
    mais escura da paleta.
@@ -42,8 +56,14 @@ grade está errada — e o teste pega.
    (`#fdf0a8`), em qualquer material. É a assinatura mais reconhecível.
 4. **Cabo comum.** `a`…`d` são os mesmos nas três ferramentas: as peças parecem
    saídas da mesma oficina.
-5. **Faixa de couro costurada.** Toda ferramenta tem `g`/`s` no cabo, na metade
-   de baixo (onde a mão pega). Uma faixa logo abaixo do encaixe e outra no punho.
+5. **Cabo de madeira = as tábuas do jogo.** `a`…`d` saem do tile `PLANKS`
+   (`[123,91,51]` no veio, `[151,116,67]` na sombra, `[202,166,106]` no claro,
+   `[86,62,34]` no contorno). A ferramenta na mão precisa parecer feita do mesmo
+   material do chão. O teste da picareta trava esses quatro tons.
+6. **Faixa de couro costurada — só no machado e na pá.** `g`/`s` na metade de
+   baixo do cabo (onde a mão pega): uma faixa logo abaixo do encaixe e outra no
+   punho. A **picareta não tem couro**: ela é a base fiel, e o couro era a
+   assinatura que mais pesava na leitura.
 
 ## 4. Materiais
 
@@ -55,6 +75,19 @@ As rampas puxam o matiz, não só o brilho: sombra fria no ferro e na pedra,
 sombra quente no cobre e na madeira. É isso que dá o ar de "forjado" em vez de
 "cinza com brilho".
 
+**O desvio é mais visível no metal.** Na rodada de 07/11/2026 o pedido foi
+explícito: a madeira fica discreta (é tábua), o metal é que se mexe. O teste mede
+contra a paleta clássica, tom a tom:
+
+| material | eixo medido | o que espera |
+| --- | --- | --- |
+| ferro | `b − r` | **todos** os tons azulados (≥ 8) |
+| ouro | `r − b` | média mais quente que o clássico |
+| diamante | `b − r` | média mais azulada que o clássico |
+
+O eixo `r − b` sozinho **não serve para tudo**: o ouro clássico já é muito quente,
+então "mais ouro" não é "mais vermelho" — é mais saturação no mesmo matiz.
+
 ## 5. Luz
 
 A luz vem de cima e da esquerda. Na prática:
@@ -64,13 +97,19 @@ A luz vem de cima e da esquerda. Na prática:
 - aresta de baixo e lado direito com `1`;
 - o `5` no ponto mais alto da peça.
 
-## 6. O que ainda é herdado
+## 6. Ordem de trabalho
+
+**Uma ferramenta por vez**, forma separada: picareta → machado → pá → tesoura.
+Cada uma é uma rodada própria, com comparador ampliado antes de fechar e PR
+próprio. Não mexer na paleta comum sem revisar as três.
+
+## 7. O que ainda é herdado
 
 Blocos, minérios, lingotes e itens de minério já foram desenhados aqui (com
 paletas escolhidas a dedo, nas rodadas de #104 a #118). A **tesoura** é a última
 ferramenta que falta e já nasce debaixo deste guia.
 
-## 7. Aviso de boa-fé
+## 8. Aviso de boa-fé
 
 O Voxelcraft é um jogo próprio, inspirado no gênero voxel — **não é um produto
 oficial** e não tem vínculo com a Mojang ou a Microsoft. Ver o aviso no
