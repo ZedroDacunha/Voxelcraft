@@ -35,7 +35,7 @@ function sliceFn(source, name) {
 // --- storage ------------------------------------------------------------
 
 test('sem nada arrastado, todas as peças ficam no lugar de fábrica', () => {
-    assert.deepEqual(TOUCH_PIECES, ['stick', 'crouch', 'use', 'break', 'jump', 'inventory', 'chat', 'pause']);
+    assert.deepEqual(TOUCH_PIECES, ['stick', 'crouch', 'use', 'break', 'jump', 'inventory', 'chat', 'camera', 'pause']);
     const empty = emptyTouchPositions();
     assert.deepEqual(Object.keys(empty), [...TOUCH_PIECES]);
     for (const piece of TOUCH_PIECES) assert.deepEqual(empty[piece], { x: 0, y: 0 });

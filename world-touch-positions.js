@@ -1,6 +1,6 @@
 // Posição livre dos controles de toque: cada peça guarda um deslocamento em
 // relação ao lugar natural dela no layout (joystick, Pular, Cavar, Usar,
-// Agachar, Mochila, Chat, Pausar).
+// Agachar, Mochila, Chat, Câmera, Pausar).
 //
 // Deslocamento e não coordenada absoluta, de propósito: assim o layout de
 // fábrica continua sendo o do CSS (grade, canto, destro/canhoto, tamanho), e a
@@ -22,7 +22,7 @@ export const TOUCH_EDIT_EVENT = 'touch-edit-positions';
 export const TOUCH_RESET_EVENT = 'touch-positions-reset';
 
 // Ordem estável: é ela que o jogo percorre ao aplicar e o teste confere.
-export const TOUCH_PIECES = Object.freeze(['stick', 'crouch', 'use', 'break', 'jump', 'inventory', 'chat', 'pause']);
+export const TOUCH_PIECES = Object.freeze(['stick', 'crouch', 'use', 'break', 'jump', 'inventory', 'chat', 'camera', 'pause']);
 
 // Trava dura do que pode ser gravado, em % da tela. O limite de verdade é o
 // clamp com o tamanho da peça (a peça não sai da tela); este só impede que um
@@ -43,7 +43,7 @@ function clampPercent(value) {
 }
 
 /**
- * Aceita qualquer coisa vinda do storage e devolve sempre as oito peças, com
+ * Aceita qualquer coisa vinda do storage e devolve sempre as peças, com
  * números válidos. Peça desconhecida é descartada (não vira lixo acumulado) e
  * valor quebrado volta para zero.
  */

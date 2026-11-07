@@ -194,6 +194,7 @@ export const TOUCH_BUTTONS = Object.freeze([
     // Chat: mesmo sem teclado físico, o dedo abre a linha de comando e o
     // teclado virtual do celular aparece.
     Object.freeze({ id: 'chat', label: 'Chat', mode: 'tap' }),
+    Object.freeze({ id: 'camera', label: 'Câmera', mode: 'tap' }),
     Object.freeze({ id: 'pause', label: 'Pausar', mode: 'tap' }),
 ]);
 

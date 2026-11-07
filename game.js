@@ -52,6 +52,8 @@ import {
 import { DAWN_TIME, bedRespawnPoint, canSleepAt, sleepPhaseAt } from './world-sleep.js';
 import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld } from './player-physics.js';
 import { canJumpFrom, createJumpState, updateJumpWindow } from './player-jump.js';
+import { createPlayerModel } from './player-model.js';
+import { THIRD_PERSON_BODY_MIN_DISTANCE, THIRD_PERSON_DISTANCE, thirdPersonDistance, thirdPersonLimbSwing } from './player-third-person.js';
 import { ATTACK_COOLDOWN, attackReady, createCreatureSystemClass } from './world-creature.js';
 import { creatureInReach } from './world-mob-hit.js';
 import { SHEEP_BLEAT_RANGE, SHEEP_WOOL_ITEMS, createSheepSystemClass } from './world-sheep.js';
@@ -3136,7 +3138,9 @@ function updateWaterfall(dt) {
 // =====================================================================
 // 6. ESTADO GERAL
 // =====================================================================
-let camera, scene, renderer, controls, world, creatureSystem, sheepSystem, tallGrassMaterial, tallGrassMaterials = [];
+let camera, thirdCamera, playerModel, scene, renderer, controls, world, creatureSystem, sheepSystem, tallGrassMaterial, tallGrassMaterials = [];
+let thirdPerson = false;
+const thirdDirection = new THREE.Vector3();
 const breakParticles = createBreakParticleSystem({
     THREE,
     getScene: () => scene,
@@ -3502,6 +3506,7 @@ function applyRenderResolution({ buffer = true } = {}) {
     const aspect = renderAspect(target);
     camera.aspect = aspect;
     camera.updateProjectionMatrix();
+    if (thirdCamera) { thirdCamera.aspect = aspect; thirdCamera.updateProjectionMatrix(); }
     // a mão é desenhada noutra cena; ela precisa da mesma proporção
     if (handCamera) {
         handCamera.aspect = aspect;
@@ -3914,9 +3919,21 @@ function aimAtScreen(clientX, clientY) {
     const height = canvas.clientHeight || window.innerHeight;
     const ndc = ndcFromPoint(clientX, clientY, width, height);
     touchNdc.set(ndc.x, ndc.y);
-    touchRaycaster.setFromCamera(touchNdc, camera);
+    if (thirdPerson && !sleep.active) {
+        // Escolhe o ponto visto sob o dedo e aponta dos olhos até ele. O raio
+        // final ainda parte do jogador, portanto não aumenta o alcance nem
+        // permite usar blocos através de uma parede próxima ao corpo.
+        updateThirdPerson();
+        touchRaycaster.setFromCamera(touchNdc, thirdCamera);
+        const ray = touchRaycaster.ray;
+        const visualHit = raycastVoxels(ray.origin, ray.direction, REACH + THIRD_PERSON_DISTANCE, WORLD_RAYCAST_ACCESS);
+        const distance = visualHit ? visualHit.dist + 0.01 : REACH + THIRD_PERSON_DISTANCE;
+        touchAim.dir.copy(ray.direction).multiplyScalar(distance).add(ray.origin).sub(camera.position).normalize();
+    } else {
+        touchRaycaster.setFromCamera(touchNdc, camera);
+        touchAim.dir.copy(touchRaycaster.ray.direction);
+    }
     touchAim.on = true;
-    touchAim.dir.copy(touchRaycaster.ray.direction);
     updateTarget();
 }
 
@@ -4558,6 +4575,10 @@ async function init() {
 
     camera = new THREE.PerspectiveCamera(GAME_SETTINGS.fov, window.innerWidth / window.innerHeight, 0.05, 300);
     scene.add(camera);
+    thirdCamera = new THREE.PerspectiveCamera(GAME_SETTINGS.fov, camera.aspect, 0.05, 300);
+    playerModel = createPlayerModel(THREE);
+    playerModel.root.visible = false;
+    scene.add(playerModel.root);
 
     createHand();
     worldSky.create(scene);
@@ -4803,6 +4824,7 @@ async function init() {
             case 'KeyD': moveRight = true; break;
             case 'Space': jumpHeld = true; break;
             case 'KeyQ': dropSelectedItem(); break;
+            case 'KeyV': if (!event.repeat) toggleThirdPerson(); break;
             case 'KeyE': if (!event.repeat) openInventory(null, { focusFirst: true }); break;
             // T abre o chat vazio; a barra abre já com o `/`, para comando.
             case 'KeyT': if (!event.repeat) { event.preventDefault(); openChat(); } break;
@@ -5099,6 +5121,7 @@ async function init() {
                     pressButton(id, wantToCrouch);
                 } else if (id === 'inventory') openInventory(null);
                 else if (id === 'chat') openChat();
+                else if (id === 'camera') toggleThirdPerson();
                 else if (id === 'pause') pauseTouchPlay();
             });
             if (!hold) continue;
@@ -5180,6 +5203,45 @@ async function init() {
     document.getElementById('btn-play').disabled = false;
     document.getElementById('world-loading').hidden = true;
     if (recoveredSavedPosition) showToast('Posição recuperada no ponto inicial; seu mundo foi preservado.');
+}
+
+function toggleThirdPerson() {
+    thirdPerson = !thirdPerson;
+    clearTouchAim();
+    showToast(thirdPerson ? 'Terceira pessoa' : 'Primeira pessoa');
+}
+
+// A câmera de interação permanece nos olhos. A câmera visual fica na mesma
+// linha de visão, atrás deles, para que a mira central continue alinhada.
+function updateThirdPerson() {
+    const active = thirdPerson && !sleep.active;
+    playerModel.root.visible = active;
+    if (!active) return false;
+    playerModel.root.position.copy(player.pos);
+    playerModel.root.rotation.y = look.yaw + Math.PI;
+    playerModel.root.scale.y = player.height / H_STAND;
+    const pose = gaitPose(gait);
+    const swing = thirdPersonLimbSwing(pose.phase, pose.amplitude);
+    playerModel.leftLeg.rotation.x = swing;
+    playerModel.rightLeg.rotation.x = -swing;
+    playerModel.leftArm.rotation.x = -swing;
+    playerModel.rightArm.rotation.x = swing - handSwingAmount(handAnim).swing;
+    camera.getWorldDirection(thirdDirection).negate();
+    const hit = raycastVoxels(camera.position, thirdDirection, THIRD_PERSON_DISTANCE, {
+        getBlock: (x, y, z) => world.getBlock(x, y, z),
+        isIgnoredBlock: (type, x, y, z) => !world.isSolidForPhysics(x, y, z, type),
+    });
+    const distance = thirdPersonDistance(hit?.dist);
+    playerModel.root.visible = distance >= THIRD_PERSON_BODY_MIN_DISTANCE;
+    thirdCamera.position.copy(camera.position).addScaledVector(thirdDirection, distance);
+    thirdCamera.quaternion.copy(camera.quaternion);
+    if (thirdCamera.fov !== camera.fov || thirdCamera.aspect !== camera.aspect) {
+        thirdCamera.fov = camera.fov;
+        thirdCamera.aspect = camera.aspect;
+        thirdCamera.updateProjectionMatrix();
+    }
+    thirdCamera.updateMatrixWorld();
+    return true;
 }
 
 function animate() {
@@ -5265,11 +5327,12 @@ function animate() {
     if (pendingScale !== null && !resolutionSize(resolutionMode)) renderer.setPixelRatio(pendingScale);
     renderer.info.reset();
     renderer.clear();
-    renderer.render(scene, camera);
+    const thirdViewActive = updateThirdPerson();
+    renderer.render(scene, thirdViewActive ? thirdCamera : camera);
     renderer.clearDepth();
     // Pausado, a mão sai do quadro: o fundo do menu é o mundo, sem um braço
     // atravessado na frente.
-    if (!pauseMenuShown && !sleep.active) renderer.render(handScene, handCamera);
+    if (!pauseMenuShown && !sleep.active && !thirdViewActive) renderer.render(handScene, handCamera);
 
     const cpu = performance.now() - now;
     perf.sum += cpu; perf.frames++; perf.t += rawDt;
