@@ -13,11 +13,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { ID, ITEMS, BLOCKS, RECIPES, TILE, ATLAS_COLUMNS, ATLAS_ROWS } from '../world-catalog.js';
 import {
-    BED_COLLISION_HEIGHT, BED_HEIGHTS, bedCells, bedCollisionBox, bedFacingVector, bedModelBoxes,
-    bedOtherCell, bedPart, bedShapes, bedTypeForPart, isBedBlock,
+    BED_VARIANTS, ID, ITEMS, BLOCKS, RECIPES, TILE, ATLAS_COLUMNS, ATLAS_ROWS, matchRecipe,
+} from '../world-catalog.js';
+import {
+    BED_COLLISION_HEIGHT, BED_COLORS, BED_HEIGHTS, bedCells, bedCollisionBox, bedColor, bedFacingVector,
+    bedModelBoxes, bedOtherCell, bedPart, bedShapes, bedTypeForPart, isBedBlock, isBedFoot,
 } from '../world-bed.js';
+import { Inventory } from '../inventory-model.js';
 import { collidesInWorld, hasGroundSupport } from '../player-physics.js';
 import { blockMaterialFor } from '../world-block-materials.js';
 import { createTextureTools } from '../world-textures.js';
@@ -25,11 +28,11 @@ import { createTextureTools } from '../world-textures.js';
 const FACINGS = ['north', 'south', 'east', 'west'];
 
 /** Os pixels de um sprite pela rota do atlas (o mesmo caminho do jogo). */
-function spriteDaCama() {
+function spriteDaCama(cor = 'white') {
     globalThis.document = { createElement: () => ({ width: 0, height: 0, getContext: () => ({ fillRect() {}, drawImage() {}, getImageData() { return { data: new Uint8ClampedArray(4) }; } }) }) };
     const THREE = { CanvasTexture: class { constructor(image) { this.image = image; } }, NearestFilter: 1006, ClampToEdgeWrapping: 1001, SRGBColorSpace: 'srgb' };
     const tools = createTextureTools(THREE);
-    const icone = tools.spritePixels('bed', 'red');
+    const icone = tools.spritePixels('bed', cor);
     delete globalThis.document;
     return icone;
 }
@@ -243,21 +246,95 @@ test('o catálogo liga as metades, o item e a receita', () => {
     assert.equal(receita.count, 1);
 });
 
+test('são três camas: uma por cor de lã, cada uma com a sua receita', () => {
+    assert.deepEqual(BED_COLORS, ['white', 'gray', 'black']);
+    for (const bed of BED_VARIANTS) {
+        // O bloco sabe a cor e a metade; o item aponta para os pés da sua cor.
+        assert.equal(bedColor(bed.foot), bed.color);
+        assert.equal(bedColor(bed.head), bed.color);
+        assert.equal(bedPart(bed.head), 'head');
+        assert.equal(isBedFoot(bed.foot), true);
+        assert.equal(isBedFoot(bed.head), false);
+        assert.equal(bedTypeForPart('head', bed.color), bed.head);
+
+        const bloco = BLOCKS[bed.foot];
+        assert.equal(bloco.drop, bed.item, 'quebrar tem de devolver a cama da cor certa');
+        assert.equal(BLOCKS[bed.head].drop, bed.item, 'a cabeceira devolve a mesma cama');
+        assert.equal(blockMaterialFor(bed.head), 'wool');
+        assert.equal(blockMaterialFor(bed.foot), 'wool');
+
+        const item = ITEMS[bed.item];
+        assert.equal(item.block, bed.foot);
+        assert.equal(item.sprite.mat, bed.color, 'o ícone segue a cor da cama');
+        assert.ok(item.iconTile < ATLAS_COLUMNS * ATLAS_ROWS, `${item.name}: ícone fora do atlas`);
+
+        // A receita é a de sempre, com a lã daquela cor.
+        const receita = RECIPES.find(r => r.result === bed.item);
+        assert.ok(receita, `${item.name} sem receita`);
+        assert.deepEqual(receita.shape, [
+            [bed.wool, bed.wool, bed.wool],
+            [ID.PLANKS, ID.PLANKS, ID.PLANKS],
+        ]);
+    }
+    // Cada cama tem o seu par de blocos, o seu item e o seu ícone no atlas.
+    const tipos = BED_VARIANTS.flatMap(bed => [bed.head, bed.foot, bed.item]);
+    assert.equal(new Set(tipos).size, tipos.length, 'duas camas dividiram o mesmo ID');
+    const icones = BED_VARIANTS.map(bed => ITEMS[bed.item].iconTile);
+    assert.equal(new Set(icones).size, 3, 'duas camas dividiram a célula do atlas');
+    // E o colchão de cada uma usa tiles próprios: a cor não é um filtro em cima
+    // do mesmo desenho, é o desenho certo.
+    const telhas = BED_VARIANTS.map(bed => bedShapes('foot', 'south', bed.color)[3].tiles.top);
+    assert.equal(new Set(telhas).size, 3, 'duas camas desenharam o mesmo colchão');
+});
+
+test('a bancada reconhece as três receitas e não mistura as lãs', () => {
+    const grade = (acima) => {
+        const inv = new Inventory(9);
+        for (const index of [0, 1, 2]) inv.slots[index] = { id: acima, count: 1 };
+        for (const index of [3, 4, 5]) inv.slots[index] = { id: ID.PLANKS, count: 1 };
+        return inv;
+    };
+    for (const bed of BED_VARIANTS) {
+        assert.deepEqual(matchRecipe(grade(bed.wool), 3), { id: bed.item, count: 1 },
+            `3 lãs ${bed.label} + 3 tábuas não viraram ${ITEMS[bed.item].name}`);
+    }
+    // Lã trocada no meio: não é receita de nada.
+    const misturada = new Inventory(9);
+    for (const index of [0, 2]) misturada.slots[index] = { id: ID.WOOL_GRAY, count: 1 };
+    misturada.slots[1] = { id: ID.WOOL_WHITE, count: 1 };
+    for (const index of [3, 4, 5]) misturada.slots[index] = { id: ID.PLANKS, count: 1 };
+    assert.equal(matchRecipe(misturada, 3), null, 'mistura de lã não pode dar cama');
+});
+
 test('a cama soa como lã (passo, quebra e colocação)', () => {
     assert.equal(blockMaterialFor(ID.BED_HEAD), 'wool');
     assert.equal(blockMaterialFor(ID.BED_FOOT), 'wool');
 });
 
-test('o ícone da cama é 32×32, com vermelho e branco', () => {
+test('o ícone da cama é 32×32, com colchão e travesseiro', () => {
     const icone = spriteDaCama();
     assert.equal(icone.length, 32);
     assert.equal(icone[0].length, 32);
     const cores = icone.flat().filter(Boolean);
     assert.ok(cores.length > 200, 'ícone quase vazio');
-    // Vermelho do cobertor e branco do travesseiro: as duas cores que fazem a
-    // peça ser reconhecida na barra.
-    assert.ok(cores.some(([r, g, b]) => r > 90 && r > g * 2 && r > b * 2), 'sem o vermelho do cobertor');
+    // Branco do travesseiro: a cor que faz a peça ser reconhecida na barra.
     assert.ok(cores.some(([r, g, b]) => r > 190 && g > 185 && b > 175), 'sem o branco do travesseiro');
+});
+
+test('cada cama tem o ícone do seu colchão, sem mudar a silhueta', () => {
+    const media = cor => {
+        const px = spriteDaCama(cor).flat().filter(Boolean);
+        const soma = px.reduce((acc, p) => [acc[0] + p[0], acc[1] + p[1], acc[2] + p[2]], [0, 0, 0]);
+        return soma.map(v => v / px.length);
+    };
+    const branca = media('white'), cinza = media('gray'), preta = media('black');
+    // Da mais clara para a mais escura, com folga de sobra para a trama.
+    assert.ok(branca[0] > cinza[0] + 20, `branca ${branca[0]} x cinza ${cinza[0]}`);
+    assert.ok(cinza[0] > preta[0] + 20, `cinza ${cinza[0]} x preta ${preta[0]}`);
+    // A cor é só tinta: a forma (quantos pixels existem) é a mesma nas três.
+    const pintados = cor => spriteDaCama(cor).flat().filter(Boolean).length;
+    assert.equal(pintados('white'), pintados('gray'));
+    assert.equal(pintados('white'), pintados('black'));
 });
 
 test('o jogador sobe na cama e não a atravessa de pé', () => {

@@ -43,7 +43,9 @@ import { configureTorchFlicker, configureTorchFlameAnimation, updateWorldLightin
 import { FurnaceSmokeSystem } from './world-furnace-effects.js';
 import { canHarvest, damageTool as damageToolStack, getBreakTime } from './world-tool-rules.js';
 import { boxOverlapsXZ, woodDoorCollision, woodDoorPart, woodDoorShape, woodDoorType } from './world-door.js';
-import { bedCells, bedOtherCell, bedPart, bedShapes, isBedBlock } from './world-bed.js';
+import {
+    bedCells, bedColor, bedOtherCell, bedPart, bedShapes, bedTypeForPart, isBedBlock, isBedFoot,
+} from './world-bed.js';
 import { DAWN_TIME, bedRespawnPoint, canSleepAt, sleepPhaseAt } from './world-sleep.js';
 import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld } from './player-physics.js';
 import { canJumpFrom, createJumpState, updateJumpWindow } from './player-jump.js';
@@ -988,7 +990,7 @@ class World {
                     const doorShape = renderMode === 'door' ? doorPartShape(t, facing) : null;
                     // Uma cama é feita de várias caixas (pernas, travessa, colchão,
                     // aba e travesseiro) — o mesmo laço que já servia à tocha.
-                    const shapes = renderMode === 'bed' ? bedShapes(bedPart(t), facing)
+                    const shapes = renderMode === 'bed' ? bedShapes(bedPart(t), facing, bedColor(t))
                         : renderMode === 'torch' ? TORCH_PARTS
                         : renderMode === 'door' ? [doorShape] : [null];
                     const shapeCount = shapes.length;
@@ -1548,14 +1550,17 @@ function bedCellFree(x, y, z) {
     return BLOCKS[support]?.solid ?? false;
 }
 
-function placeBed(px, py, pz, facing) {
+function placeBed(px, py, pz, facing, footType = ID.BED_FOOT) {
+    // A cor sai do item: o bloco dos pés diz de que cama ele é, e a cabeceira é
+    // a metade do mesmo par. Sem isso uma cama preta viraria branca ao colocar.
+    const headType = bedTypeForPart('head', bedColor(footType));
     const oposta = { north: 'south', south: 'north', east: 'west', west: 'east' }[facing] ?? 'north';
     for (const dir of [facing, oposta]) {
         const { head } = bedCells(px, pz, dir);
         if (!bedCellFree(px, py, pz) || !bedCellFree(head.x, py, head.z)) continue;
         if (intersectsPlayer(px, py, pz) || intersectsPlayer(head.x, py, head.z)) return false;
-        if (!world.setBlock(px, py, pz, ID.BED_FOOT, dir)) return false;
-        if (!world.setBlock(head.x, py, head.z, ID.BED_HEAD, dir)) {
+        if (!world.setBlock(px, py, pz, footType, dir)) return false;
+        if (!world.setBlock(head.x, py, head.z, headType, dir)) {
             world.setBlock(px, py, pz, 0);
             return false;
         }
@@ -4772,15 +4777,15 @@ async function init() {
         if (intersectsPlayer(px, py, pz)) return;
         // A cama tem frente própria mesmo sem face frontal: a cabeceira foge do
         // jogador, então a direção é a do jogador **para** o bloco.
-        const facing = placedType === ID.BED_FOOT
+        const facing = isBedFoot(placedType)
             ? facingTowardPlayer(player.pos.x, player.pos.z, px + 0.5, pz + 0.5)
             : BLOCKS[placedType]?.tiles.front !== undefined
                 ? facingTowardPlayer(px + 0.5, pz + 0.5, player.pos.x, player.pos.z)
                 : null;
         const placed = placedType === ID.WOOD_DOOR_BOTTOM
             ? placeWoodDoor(px, py, pz, facing)
-            : placedType === ID.BED_FOOT
-                ? placeBed(px, py, pz, facing)
+            : isBedFoot(placedType)
+                ? placeBed(px, py, pz, facing, placedType)
                 : world.setBlock(px, py, pz, placedType, facing);
         if (placed) {
             inventory.removeOne(selectedSlot);
@@ -4791,7 +4796,7 @@ async function init() {
             haptic('place');
         } else if (placedType === ID.WOOD_DOOR_BOTTOM) {
             showToast('A porta precisa de apoio sólido e de dois blocos livres');
-        } else if (placedType === ID.BED_FOOT) {
+        } else if (isBedFoot(placedType)) {
             showToast('A cama precisa de dois blocos livres e de apoio embaixo');
         }
     }
