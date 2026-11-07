@@ -1279,3 +1279,23 @@ uma mancha só. O que mudou está em
 - [ ] Em todos os materiais o desenho é o mesmo, só muda a cor.
 - [ ] Lado a lado com a picareta, a pá e a tesoura, é da **mesma oficina**.
 - [ ] Cortar madeira continua funcionando igual.
+
+## 67. A carne assa na fornalha
+
+A carne de ovelha ganhou a versão assada, e a tabela das carnes
+([`world-meats.js`](world-meats.js), ver
+[`MELHORIA-20261107-carne-assada.md`](MELHORIA-20261107-carne-assada.md)) já deixa
+o próximo bicho pronto.
+
+- [ ] `/give carne 4` e `/give planks 4` (ou corte madeira) e monte uma
+      **fornalha**.
+- [ ] Coloque a **carne crua** no slot de cima e o combustível embaixo: o forno
+      acende e, em ~10 s, sai a **carne de ovelha assada**.
+- [ ] A assada é **marrom tostada, com duas riscas de grelha** — diferente da
+      crua (rosada) na barra de itens.
+- [ ] Comer a assada mata **mais fome** que a crua.
+- [ ] O **livro de receitas** lista "Carne de ovelha → 1× Carne de ovelha
+      assada · Fornalha · 10s".
+- [ ] Colocar a **assada** no forno não acende nem gasta combustível.
+- [ ] `/give assada` e `/give cooked_mutton` dão o mesmo item.
+- [ ] Mate uma ovelha: ela continua soltando **carne crua** (1–2), não assada.
