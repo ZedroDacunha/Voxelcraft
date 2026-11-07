@@ -165,6 +165,43 @@ export const PICARETA_PALETAS = Object.freeze({
     }),
 });
 
+/**
+ * **A tesoura** — 16×16. Mesmo alfabeto das outras, com uma diferença: as
+ * lâminas são o metal (`O`, `2`…`4`) e o **punho é madeira** (`a`…`d`), a mesma
+ * tábua do cabo das ferramentas.
+ *
+ * É a base fiel do sprite clássico com **2 pixels** de forma nossa, em `(3,12)` e
+ * `(5,13)`: eles fecham as argolas do punho e fazem a tesoura ser **uma peça só**
+ * (no original as pontas das argolas ficam soltas). Sem acento, sem couro.
+ */
+export const TESOURA_GRADE = Object.freeze([
+    '................',
+    '................',
+    '........b3443...',
+    '.......b2443.3..',
+    '......bc343.34..',
+    '.....bd343.344..',
+    '....bda23.3443..',
+    '....bda..3432a..',
+    '...bda...23ba...',
+    '...bca..bbba....',
+    '...33bbbcca.....',
+    '..3..2ccaa......',
+    '..2a.Oaa........',
+    '...OOa..........',
+    '................',
+    '................',
+]);
+
+/**
+ * Os pixels da tesoura — só o ferro, porque a tesoura é um item único.
+ * Devolve `null` se a grade sair do lugar (defesa para quem chama cair no
+ * desenho antigo).
+ */
+export function createShearsSpritePixels() {
+    return pintar(TESOURA_GRADE, { ...CABO_PALETA, ...PICARETA_PALETAS.iron });
+}
+
 /** O machado usa a mesma paleta de material da picareta. */
 export const MACHADO_PALETAS = PICARETA_PALETAS;
 

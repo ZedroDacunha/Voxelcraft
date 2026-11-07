@@ -1205,3 +1205,20 @@ e a **pá** voltou à base fiel
 - [ ] Na mão e na barra o ícone é o mesmo, e a pá não se confunde com a picareta
       nem com o machado.
 - [ ] A **tesoura** segue com o desenho antigo — é a última.
+
+## 63. A tesoura entra na régua
+
+A tesoura deixou de ser desenhada por código e passou a usar a arte da família
+([`MELHORIA-20261107-tesoura.md`](MELHORIA-20261107-tesoura.md)).
+
+- [ ] Faça uma **tesoura** (duas barras de ferro na diagonal) e olhe na barra,
+      no inventário e na mão.
+- [ ] Ela **parece a tesoura do jogo**: duas lâminas cruzadas em cima e o punho
+      curto embaixo — não é mais o "X" de ferro do desenho antigo.
+- [ ] As **lâminas são claras** e o **punho é de madeira**, da cor da tábua: dá
+      para ver que são duas partes.
+- [ ] A tesoura é **uma peça só** — não há pixel solto nas argolas do punho.
+- [ ] Nada de **acento amarelo** nem de **couro** na peça.
+- [ ] Lado a lado com a picareta, o machado e a pá, ela é da **mesma oficina**.
+- [ ] Na mão e na barra o ícone é o mesmo, e ela não se confunde com a pá.
+- [ ] Tosquiar a ovelha continua funcionando igual (§ da lã).

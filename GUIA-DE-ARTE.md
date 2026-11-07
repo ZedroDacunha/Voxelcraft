@@ -104,13 +104,26 @@ A luz vem de cima e da esquerda. Na prática:
 Cada uma é uma rodada própria, com comparador ampliado antes de fechar e PR
 próprio. Não mexer na paleta comum sem revisar as três.
 
-## 7. O que ainda é herdado
+## 7. A tesoura
+
+A tesoura é ferramenta, mas não tem cabo comprido: são **duas lâminas cruzadas**
+com o punho curto embaixo. Ela usa o mesmo alfabeto das outras, com uma divisão
+própria:
+
+- **lâminas** — o metal do material (`O` no fio, `2`…`4` na face);
+- **punho** — madeira (`a`…`d`), a mesma tábua do cabo das ferramentas.
+
+Ela também é base fiel com **2 px** nossos — em `(3,12)` e `(5,13)`, que fecham
+as argolas do punho e fazem a tesoura ser **uma peça só** (no sprite clássico as
+pontas das argolas ficam soltas).
+
+## 8. O que ainda é herdado
 
 Blocos, minérios, lingotes e itens de minério já foram desenhados aqui (com
-paletas escolhidas a dedo, nas rodadas de #104 a #118). A **tesoura** é a última
-ferramenta que falta e já nasce debaixo deste guia.
+paletas escolhidas a dedo, nas rodadas de #104 a #118). Nenhuma ferramenta está
+fora da régua desde 07/11/2026.
 
-## 8. Aviso de boa-fé
+## 9. Aviso de boa-fé
 
 O Voxelcraft é um jogo próprio, inspirado no gênero voxel — **não é um produto
 oficial** e não tem vínculo com a Mojang ou a Microsoft. Ver o aviso no
