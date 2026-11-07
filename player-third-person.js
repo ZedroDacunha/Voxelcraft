@@ -1,4 +1,15 @@
-/** Distância segura da câmera atrás dos olhos, sem atravessar blocos. */
+/** Ordem das vistas tanto no teclado quanto no toque. */
+export const CAMERA_VIEWS = Object.freeze(['first', 'rear', 'front']);
+export function nextCameraView(view) {
+    const index = CAMERA_VIEWS.indexOf(view);
+    return CAMERA_VIEWS[(index + 1) % CAMERA_VIEWS.length];
+}
+/** Sinal do deslocamento em relação ao olhar do jogador. */
+export function cameraOffsetSign(view) {
+    return view === 'front' ? 1 : -1;
+}
+
+/** Distância segura da câmera a partir dos olhos, sem atravessar blocos. */
 export const THIRD_PERSON_DISTANCE = 3.2;
 export const THIRD_PERSON_CLEARANCE = 0.2;
 export const THIRD_PERSON_BODY_MIN_DISTANCE = 0.65;

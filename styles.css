@@ -29,6 +29,8 @@
     body.game-started #menu { display: grid; }
     /* No Minecraft o HUD sai de cena quando o jogo pausa. */
     body.is-paused #hud-bottom, body.is-paused #crosshair { display: none; }
+    /* Na vista frontal, as ações continuam na direção do personagem, não da câmera. */
+    body.camera-front #crosshair { display: none; }
     /* Menu de pausa: um cartão no padrão de botões clássico do jogo (sem raio,
        borda 2px) em vez do texto solto que existia antes. */
     .pause-card { box-sizing: border-box; width: min(26em, 100%); display: grid; gap: .6em; padding: 1.1em 1em;
