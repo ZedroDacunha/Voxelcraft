@@ -16,6 +16,7 @@ import { keyToSlotAction, nextSlotIndex, slotLabel, statusLabels } from './inven
 import { pauseMenuDisplay, shouldShowPauseMenu } from './game-pause-menu.js';
 import { createPointerLockRequester } from './game-pointer-lock.js';
 import { createInventoryAssets } from './inventory-assets.js';
+import { renderInventoryPlayer } from './inventory-player-preview.js';
 import { createTextureTools } from './world-textures.js';
 import { itemRenderMode } from './world-block-icons.js';
 import { FACES, faceNaBordaDaCelula } from './world-faces.js';
@@ -2836,6 +2837,7 @@ function applyInventoryLayout() {
     const isFurnace = !!station && station.type === 'furnace';
     const isChest = !!station && station.type === 'chest';
     document.getElementById('craft-row').style.display = (isFurnace || isChest) ? 'none' : 'flex';
+    document.getElementById('inv-player').hidden = Boolean(station);
     document.getElementById('furnace-row').style.display = isFurnace ? 'flex' : 'none';
     document.getElementById('chest-row').style.display = isChest ? 'block' : 'none';
     document.getElementById('inv-title').textContent =
@@ -2955,6 +2957,15 @@ function openInventory(st = null, { focusFirst = false } = {}) {
     invLastClick = { time: 0, key: '' };
     applyInventoryLayout();
     document.getElementById('inventory').style.display = 'flex';
+    if (!station) {
+        const canvas = document.getElementById('inv-player');
+        try { renderInventoryPlayer({ THREE, renderer, canvas }); }
+        catch (error) {
+            // O inventário continua utilizável se a prévia não puder ser desenhada.
+            canvas.hidden = true;
+            console.warn('Não foi possível desenhar o personagem no inventário:', error);
+        }
+    }
     renderInventory();
     // Aberto pelo teclado: o foco entra direto no primeiro slot do inventário,
     // em vez de começar fora da grade.

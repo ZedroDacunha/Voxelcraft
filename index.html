@@ -12,7 +12,7 @@
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link rel="stylesheet" href="styles.css?v=72221600b9">
-<link rel="stylesheet" href="inventory.css?v=3c73d92add">
+<link rel="stylesheet" href="inventory.css?v=f154ea04ca">
 <!-- importmap:start (gerado por tools/stamp-importmap.mjs; não editar à mão) -->
 <script type="importmap">
 {
@@ -22,12 +22,13 @@
     "./asset-versions.js": "./asset-versions.js?v=d42b8dc6ff",
     "./game-pause-menu.js": "./game-pause-menu.js?v=f625baba0f",
     "./game-pointer-lock.js": "./game-pointer-lock.js?v=cf53899b88",
-    "./game.js": "./game.js?v=390047daeb",
+    "./game.js": "./game.js?v=b809c3f346",
     "./inventory-a11y.js": "./inventory-a11y.js?v=25f3dab87d",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
     "./inventory-layout.js": "./inventory-layout.js?v=439823a409",
     "./inventory-logic.js": "./inventory-logic.js?v=20ec1c5545",
     "./inventory-model.js": "./inventory-model.js?v=473c73a8c5",
+    "./inventory-player-preview.js": "./inventory-player-preview.js?v=c9887ee2e7",
     "./inventory-recipe-book.js": "./inventory-recipe-book.js?v=567593a30b",
     "./inventory-recipe-search.js": "./inventory-recipe-search.js?v=e910d2e22b",
     "./inventory-view.js": "./inventory-view.js?v=fe974fc5f3",
@@ -385,6 +386,7 @@
             <p id="recipe-empty" class="recipe-empty" role="status" hidden>Nenhuma receita encontrada.</p>
         </section>
         <div class="craft-row" id="craft-row">
+            <canvas id="inv-player" role="img" aria-label="Personagem aventureiro" hidden></canvas>
             <div id="inv-craft" class="inv-grid craft-grid"></div>
             <div class="craft-arrow">➜</div>
             <div id="inv-out"></div>
