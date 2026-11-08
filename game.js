@@ -54,7 +54,7 @@ import { DAWN_TIME, bedRespawnPoint, canSleepAt, sleepPhaseAt } from './world-sl
 import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld } from './player-physics.js';
 import { canJumpFrom, createJumpState, updateJumpWindow } from './player-jump.js';
 import { createPlayerModel } from './player-model.js';
-import { advanceSwim, createSwimState, swimPose } from './player-swim-animation.js';
+import { advanceSwim, createSwimState, swimFirstPersonPose, swimPose } from './player-swim-animation.js';
 import { createPlayerHeldItem } from './player-held-item.js';
 import { THIRD_PERSON_BODY_MIN_DISTANCE, THIRD_PERSON_DISTANCE, cameraOffsetSign, nextCameraView, thirdPersonDistance, thirdPersonLimbSwing } from './player-third-person.js';
 import { ATTACK_COOLDOWN, attackReady, createCreatureSystemClass } from './world-creature.js';
@@ -2225,13 +2225,14 @@ function updateHand(dt) {
     // com o corpo e vai e vem de lado no mesmo compasso. Antes era um cronômetro
     // à parte, que podia sair fora de fase do barulho dos pés.
     const gaitNow = gaitPose(gait);
-    const ba = gaitNow.amplitude;
+    const swim = swimFirstPersonPose(swimState);
+    const ba = gaitNow.amplitude * swim.walkWeight;
     handPivot.position.set(
-        HAND_BASE.x + gaitNow.handX * 0.012 * ba - 0.22 * ea,
-        HAND_BASE.y + gaitNow.handY * 0.010 * ba - dip - 0.05 * swing + 0.20 * ea + wob,
-        HAND_BASE.z - 0.12 * swing + 0.08 * ea);
+        HAND_BASE.x + gaitNow.handX * 0.012 * ba + swim.handX - 0.22 * ea,
+        HAND_BASE.y + gaitNow.handY * 0.010 * ba + swim.handY - dip - 0.05 * swing + 0.20 * ea + wob,
+        HAND_BASE.z + swim.handZ - 0.12 * swing + 0.08 * ea);
     handPivot.rotation.set(
-        0.35 - 0.9 * swing + 0.35 * ea + gaitNow.handX * 0.02 * ba, 0.25 - 0.3 * ea, 0);
+        0.35 - 0.9 * swing + 0.35 * ea + gaitNow.handX * 0.02 * ba + swim.handPitch, 0.25 - 0.3 * ea, 0);
     handPivot.scale.setScalar(1);
 }
 
@@ -3143,7 +3144,7 @@ function updateWaterfall(dt) {
 // =====================================================================
 // 6. ESTADO GERAL
 // =====================================================================
-let camera, thirdCamera, playerModel, playerHeldItem, scene, renderer, controls, world, creatureSystem, sheepSystem, tallGrassMaterial, tallGrassMaterials = [];
+let camera, swimCamera, thirdCamera, playerModel, playerHeldItem, scene, renderer, controls, world, creatureSystem, sheepSystem, tallGrassMaterial, tallGrassMaterials = [];
 let cameraView = 'first';
 const thirdDirection = new THREE.Vector3();
 const frontCameraTurn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
@@ -4582,6 +4583,7 @@ async function init() {
 
     camera = new THREE.PerspectiveCamera(GAME_SETTINGS.fov, window.innerWidth / window.innerHeight, 0.05, 300);
     scene.add(camera);
+    swimCamera = camera.clone(false);
     thirdCamera = new THREE.PerspectiveCamera(GAME_SETTINGS.fov, camera.aspect, 0.05, 300);
     playerModel = createPlayerModel(THREE);
     playerHeldItem = createPlayerHeldItem(THREE, playerModel.rightArm);
@@ -5350,7 +5352,16 @@ function animate() {
     renderer.info.reset();
     renderer.clear();
     const thirdViewActive = updateThirdPerson();
-    renderer.render(scene, thirdViewActive ? thirdCamera : camera);
+    let visualCamera = camera;
+    if (!thirdViewActive && !sleep.active && swimState.blend > 0) {
+        // Só a imagem balança. A câmera original continua nos olhos e é usada
+        // por mira, alcance, interação e controles; sem rotação do horizonte.
+        swimCamera.copy(camera, false);
+        swimCamera.position.y += swimFirstPersonPose(swimState).cameraY;
+        swimCamera.updateMatrixWorld();
+        visualCamera = swimCamera;
+    }
+    renderer.render(scene, thirdViewActive ? thirdCamera : visualCamera);
     renderer.clearDepth();
     // Pausado, a mão sai do quadro: o fundo do menu é o mundo, sem um braço
     // atravessado na frente.

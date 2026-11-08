@@ -59,3 +59,33 @@ test('o tempo inválido ou negativo não faz a animação retroceder', () => {
     advanceSwim(state, { dt: -1, headInWater: true, gaitAmplitude: 1 });
     assert.deepEqual(state, { blend: 0, phase: 0 });
 });
+
+test('braçada em primeira pessoa acompanha fase e desaparece ao parar', async () => {
+    const { swimFirstPersonPose } = await import('../player-swim-animation.js');
+    const idle = swimFirstPersonPose({ blend: 0, phase: Math.PI / 2 });
+    assert.equal(idle.handX, 0); assert.equal(idle.handY, 0);
+    assert.equal(idle.handZ, 0); assert.equal(idle.handPitch, 0);
+    assert.equal(idle.cameraY, 0); assert.equal(idle.walkWeight, 1);
+    const a = swimFirstPersonPose({ blend: 1, phase: Math.PI / 2 });
+    const b = swimFirstPersonPose({ blend: 1, phase: 3 * Math.PI / 2 });
+    assert.ok(a.handPitch < 0 && b.handPitch > 0);
+    assert.ok(a.handX < 0 && b.handX > 0);
+    assert.equal(a.walkWeight, 0);
+    const rightA = swimPose({ blend: 1, phase: Math.PI / 2 }).rightArm;
+    const rightB = swimPose({ blend: 1, phase: 3 * Math.PI / 2 }).rightArm;
+    assert.ok(rightA < rightB && a.handPitch < b.handPitch, 'mesma fase do braço direito');
+    for (let phase = 0; phase < Math.PI * 2; phase += .01) {
+        const pose = swimFirstPersonPose({ blend: 1, phase });
+        assert.ok(Math.abs(pose.cameraY) <= .015 && Math.abs(pose.handPitch) <= .14);
+    }
+});
+
+test('a câmera visual é separada da câmera usada para interação', async () => {
+    const { readFileSync } = await import('node:fs');
+    const game = readFileSync(new URL('../game.js', import.meta.url), 'utf8');
+    assert.match(game, /swimCamera = camera\.clone\(false\)/);
+    assert.match(game, /swimCamera\.copy\(camera, false\)/);
+    assert.match(game, /swimCamera\.position\.y \+= swimFirstPersonPose\(swimState\)\.cameraY/);
+    assert.match(game, /raycastVoxels\(camera\.position, tmpDir, REACH/);
+    assert.match(game, /renderer\.render\(scene, thirdViewActive \? thirdCamera : visualCamera\)/);
+});

@@ -34,3 +34,21 @@ export function swimPose(state, { yaw = 0, height = 1.8, walkSwing = 0, punch = 
         rightArm: mix(walkSwing, -2.25 - stroke * 0.55) - punch,
     };
 }
+
+/** Braço e câmera visuais: mesma fase do braço direito em terceira pessoa.
+ * Sem alterar direção, mira, posição física ou câmera usada pelas interações.
+ */
+export function swimFirstPersonPose(state) {
+    const blend = Math.max(0, Math.min(1, Number(state?.blend) || 0));
+    if (blend === 0) return { handX: 0, handY: 0, handZ: 0, handPitch: 0, cameraY: 0, walkWeight: 1 };
+    const phase = Number.isFinite(state?.phase) ? state.phase : 0;
+    const stroke = Math.sin(phase) * blend;
+    return {
+        handX: -0.035 * stroke,
+        handY: -0.025 * Math.cos(phase) * blend,
+        handZ: -0.035 * stroke,
+        handPitch: -0.14 * stroke,
+        cameraY: 0.015 * Math.cos(phase * 2) * blend,
+        walkWeight: 1 - blend,
+    };
+}
