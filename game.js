@@ -91,6 +91,7 @@ import {
 } from './world-touch-controls.js';
 import { getSharedAudio } from './world-audio.js';
 import { touchLayoutState, touchStickRadius } from './world-touch-layout.js';
+import { createTouchImmersive, isPortraitViewport } from './world-touch-immersive.js';
 import { canVibrate, createHapticState, hapticPattern, vibrationEnabled } from './world-haptics.js';
 import {
     TOUCH_EDIT_EVENT, TOUCH_EDIT_MARGIN, TOUCH_PIECES, TOUCH_RESET_EVENT,
@@ -3181,6 +3182,21 @@ const touchMode = urlParams.has('touch')
         touchEvent: 'ontouchstart' in window,
     });
 let touchActive = false;
+const touchStandalone = () => Boolean(navigator.standalone) || Boolean(window.matchMedia?.('(display-mode: standalone)').matches);
+const touchImmersive = createTouchImmersive({
+    doc: document, screen: window.screen, isStandalone: touchStandalone,
+});
+let touchPortraitHinted = false;
+let touchFullscreenHinted = false;
+function hintTouchPortrait() {
+    const portrait = isPortraitViewport(window.innerWidth, window.innerHeight);
+    if (!portrait) { touchPortraitHinted = false; return; }
+    if (touchActive && !touchPortraitHinted) {
+        touchPortraitHinted = true;
+        showToast('Gire o celular para jogar na horizontal', 4000);
+    }
+}
+window.addEventListener('resize', hintTouchPortrait);
 // Último tipo de ponteiro usado: decide se "Jogar" pede lock ou vira toque.
 let lastPointerKind = 'touch';
 if (touchMode) {
@@ -3259,7 +3275,17 @@ function applyTouchPositions() {
     for (const piece of TOUCH_PIECES) {
         const el = touchPieceElement(piece);
         if (!el) continue;
-        const offset = offsetPixels(touchPositions[piece], viewport);
+        let offset = offsetPixels(touchPositions[piece], viewport);
+        const rect = el.getBoundingClientRect();
+        // Posições personalizadas podem sair da tela após a rotação. Limita a
+        // posição exibida sem sobrescrever o que o jogador salvou.
+        if (rect.width && rect.height) {
+            const previousX = parseFloat(el.style.getPropertyValue('--touch-dx')) || 0;
+            const previousY = parseFloat(el.style.getPropertyValue('--touch-dy')) || 0;
+            offset = clampOffsetPx({ naturalLeft: rect.left - previousX, naturalTop: rect.top - previousY,
+                width: rect.width, height: rect.height, offsetX: offset.x, offsetY: offset.y,
+                viewportWidth: viewport.width, viewportHeight: viewport.height });
+        }
         el.style.setProperty('--touch-dx', `${offset.x.toFixed(1)}px`);
         el.style.setProperty('--touch-dy', `${offset.y.toFixed(1)}px`);
     }
@@ -3274,7 +3300,8 @@ function beginPieceDrag(event, piece, el) {
     if (!touchEditing) return false;
     event.preventDefault();
     event.stopPropagation();
-    const offset = offsetPixels(touchPositions[piece], viewportSize());
+    const offset = { x: parseFloat(el.style.getPropertyValue('--touch-dx')) || 0,
+        y: parseFloat(el.style.getPropertyValue('--touch-dy')) || 0 };
     const rect = el.getBoundingClientRect();
     touchDrag.pointerId = event.pointerId;
     touchDrag.piece = piece;
@@ -3396,7 +3423,10 @@ function syncTouchUi() {
     const ui = document.getElementById('touch-ui');
     if (!ui) return;
     const visible = touchMode && (touchActive || touchEditing) && !inventoryOpen && !dead;
-    if (ui.hidden !== !visible) ui.hidden = !visible;
+    if (ui.hidden !== !visible) {
+        ui.hidden = !visible;
+        if (visible) applyTouchPositions();
+    }
     const editBar = document.getElementById('touch-edit-bar');
     if (editBar) editBar.hidden = !touchEditing;
     if (!visible) return;
@@ -3539,6 +3569,7 @@ function requestResolutionFullscreen(value) {
                 );
             } else {
                 resolutionFullscreenPending = false;
+                resolutionFullscreen = false;
             }
         } else if (!fixed && resolutionFullscreen && document.fullscreenElement) {
             resolutionFullscreen = false;
@@ -3552,6 +3583,7 @@ function requestResolutionFullscreen(value) {
 
 document.addEventListener('fullscreenchange', () => {
     if (!document.fullscreenElement) resolutionFullscreen = false;
+    touchImmersive.onFullscreenChange();
 });
 
 // O aviso diz o tamanho que foi aplicado de verdade: num aparelho que não
@@ -4470,6 +4502,19 @@ function beginTouchPlay() {
     touchActive = true;
     document.body.classList.add('touch-mode');
     syncPauseMenu();
+    if (resolutionFullscreen && document.fullscreenElement === document.documentElement) {
+        touchImmersive.adoptFullscreen();
+        resolutionFullscreen = false;
+    }
+    // Chamada imediata pelo toque em Jogar: tela cheia exige gesto do usuário.
+    touchImmersive.enter().then(({ fullscreen }) => {
+        if (!touchActive) return;
+        if (isPortraitViewport(window.innerWidth, window.innerHeight)) hintTouchPortrait();
+        else if (!fullscreen && !touchStandalone() && !touchFullscreenHinted) {
+            touchFullscreenHinted = true;
+            showToast('Tela cheia indisponível neste navegador', 3500);
+        }
+    });
 }
 
 // Caminho único de "começar a jogar": toque entra direto, mouse pede lock.
@@ -4730,6 +4775,7 @@ async function init() {
             );
             if (leaveWithoutSaving) {
                 await saveManager.release();
+                await touchImmersive.release();
                 location.reload();
                 return;
             }
@@ -4737,6 +4783,7 @@ async function init() {
             btnWorlds.textContent = 'Voltar à seleção de mundos';
             return;
         }
+        await touchImmersive.release();
         location.reload();
     });
     // Chat: Enter envia, Esc fecha sem enviar, ↑/↓ voltam o que já foi enviado.

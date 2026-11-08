@@ -465,6 +465,22 @@
         #touch-stick { bottom: 14px; }
         #touch-actions { bottom: 12px; }
     }
+    /* Em tela cheia, controles e HUD não podem ficar sob notch ou barra de gesto. */
+    body.touch-mode #touch-stick { left: calc(16px + env(safe-area-inset-left, 0px)); bottom: calc(22px + env(safe-area-inset-bottom, 0px)); }
+    body.touch-mode #touch-actions { right: calc(14px + env(safe-area-inset-right, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
+    body.touch-mode #touch-top { right: calc(14px + env(safe-area-inset-right, 0px)); top: calc(12px + env(safe-area-inset-top, 0px)); }
+    body.touch-mode #touch-hint { left: calc(14px + env(safe-area-inset-left, 0px)); top: calc(10px + env(safe-area-inset-top, 0px)); right: calc(40px + 3 * var(--touch-top-size, 46px) + env(safe-area-inset-right, 0px)); }
+    body.touch-mode.touch-left #touch-stick { left: auto; right: calc(16px + env(safe-area-inset-right, 0px)); }
+    body.touch-mode.touch-left #touch-actions { right: auto; left: calc(14px + env(safe-area-inset-left, 0px)); }
+    body.touch-mode.touch-left #touch-top { right: auto; left: calc(14px + env(safe-area-inset-left, 0px)); }
+    body.touch-mode.touch-left #touch-hint { left: calc(32px + 2 * var(--touch-top-size, 46px) + env(safe-area-inset-left, 0px)); right: calc(14px + env(safe-area-inset-right, 0px)); }
+    body.touch-mode #hud-bottom { bottom: calc(14px + 2 * var(--touch-btn-size, 64px) + var(--touch-gap-size, 10px) + env(safe-area-inset-bottom, 0px)); }
+    body.touch-mode #chat { bottom: calc(40px + 2 * var(--touch-btn-size, 64px) + var(--touch-gap-size, 10px) + var(--hud-slot-size, 46px) + env(safe-area-inset-bottom, 0px)); }
+    body.touch-mode #touch-edit-bar { top: calc(12px + env(safe-area-inset-top, 0px)); }
+    @media (max-height: 460px) {
+        body.touch-mode #touch-stick { bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+        body.touch-mode #touch-actions { bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+    }
     @media (max-width: 520px) {
         .title-screen-footer span:last-child { display: none; }
         .title-screen-logo { margin-bottom: 34px; }
