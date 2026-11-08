@@ -14,9 +14,19 @@ centro, sem alterar física, colisões, posição dos olhos, fôlego, mira ou co
 O item continua preso ao braço; golpe é somado à braçada.
 
 Por ser somente visual, o corpo horizontal pode atravessar visualmente paredes ou
-margens estreitas: a colisão continua sendo a caixa em pé existente. A primeira
-pessoa mantém o braço e a câmera atuais. Não há animação específica de descida
-vertical ou braço em primeira pessoa neste recorte.
+margens estreitas: a colisão continua sendo a caixa em pé existente. Não há
+animação específica para deslocamento apenas vertical.
+
+## Primeira pessoa
+
+O braço direito visível e o item acompanham a mesma fase do braço direito do
+modelo de terceira pessoa, em movimentos leves; a passada anterior é atenuada
+durante o nado. Golpe, troca de item e comida continuam se somando ao movimento.
+A cena é desenhada com uma câmera visual que sobe e desce até 1,5 cm, sem
+inclinar o horizonte. A câmera original continua sendo usada pela mira e pelas
+interações, então o pequeno deslocamento visual pode gerar discreta paralaxe,
+mas não altera o alcance nem a física. Ao parar ou sair, o movimento desaparece
+com a mesma transição suave do corpo. A animação respeita a pausa e a cama.
 
 ## Testar no navegador
 
@@ -29,3 +39,13 @@ vertical ou braço em primeira pessoa neste recorte.
 - [ ] Abrir inventário, morrer/renascer e dormir; não ficar preso na pose.
 - [ ] Prévia em `tools/personagem-nado.html`: controles de nado/parar/sair e
       giro por arraste; o desenho no topo é um esquema, não uma captura do jogo.
+
+## Testar primeira pessoa
+
+- [ ] Nadar em água funda com a mão vazia, ferramentas, bloco e tocha; conferir
+      a braçada e o balanço leve, sem giro do horizonte.
+- [ ] Parar, sair, caminhar em água rasa e voltar a nadar; a transição é suave.
+- [ ] Cavar, golpear, comer, trocar item e alternar câmeras enquanto nada;
+      conferir mira, alcance, pausa, inventário, cama e controles de toque.
+- [ ] A prévia `tools/nado-primeira-pessoa.html` mostra um esquema e uma cena
+      demonstrativa com os botões Nadar e Parar; validar também no jogo real.
