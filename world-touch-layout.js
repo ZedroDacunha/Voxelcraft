@@ -5,7 +5,7 @@
 // poder testar sem navegador.
 //
 // O tamanho é um multiplicador aplicado a todas as medidas do toque (botão,
-// ícone, joystick e a faixa que a hotbar sobe). Medir em múltiplo e não em
+// ícone e joystick). Medir em múltiplo e não em
 // pixels absolutos é o que faz "150%" querer dizer a mesma coisa em qualquer
 // tela.
 

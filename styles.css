@@ -476,6 +476,16 @@
     body.touch-mode.touch-left #touch-hint { left: calc(32px + 2 * var(--touch-top-size, 46px) + env(safe-area-inset-left, 0px)); right: calc(14px + env(safe-area-inset-right, 0px)); }
     body.touch-mode #hud-bottom { bottom: calc(14px + 2 * var(--touch-btn-size, 64px) + var(--touch-gap-size, 10px) + env(safe-area-inset-bottom, 0px)); }
     body.touch-mode #chat { bottom: calc(40px + 2 * var(--touch-btn-size, 64px) + var(--touch-gap-size, 10px) + var(--hud-slot-size, 46px) + env(safe-area-inset-bottom, 0px)); }
+    /* Só em paisagem e quando cabe entre os controles: centralizada e menor.
+       --stat-* é redefinido aqui porque as variáveis do :root são herdadas já
+       resolvidas, e as barras de vida/fome também precisam acompanhar as casas. */
+    body.touch-mode.touch-hud-compact #hud-bottom {
+        --hud-slot-size: var(--touch-hud-slot, 38px);
+        --hud-slot-gap: 3px;
+        --stat-size: clamp(9px, calc(var(--hud-slot-size) * 0.3), 14px);
+        --stat-gap: clamp(2px, calc(var(--hud-slot-size) * 0.08), 4px);
+        bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    }
     body.touch-mode #touch-edit-bar { top: calc(12px + env(safe-area-inset-top, 0px)); }
     @media (max-height: 460px) {
         body.touch-mode #touch-stick { bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }

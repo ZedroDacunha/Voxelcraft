@@ -91,6 +91,7 @@ import {
 } from './world-touch-controls.js';
 import { getSharedAudio } from './world-audio.js';
 import { touchLayoutState, touchStickRadius } from './world-touch-layout.js';
+import { compactTouchHotbar } from './world-touch-hotbar.js';
 import { createTouchImmersive, isPortraitViewport } from './world-touch-immersive.js';
 import { canVibrate, createHapticState, hapticPattern, vibrationEnabled } from './world-haptics.js';
 import {
@@ -3270,6 +3271,19 @@ function viewportSize() {
     return { width: window.innerWidth, height: window.innerHeight };
 }
 
+// Mede os controles de verdade, inclusive escala, canhoto e posições livres.
+// Se não houver espaço para nove casas tocáveis, conserva o HUD elevado.
+function updateTouchHotbar() {
+    const ui = document.getElementById('touch-ui');
+    if (!ui || ui.hidden || !document.body.classList.contains('touch-mode')) return;
+    const pieces = ['stick', 'crouch', 'use', 'break', 'jump'];
+    const controls = pieces.map(piece => touchPieceElement(piece)?.getBoundingClientRect());
+    const layout = compactTouchHotbar({ width: window.innerWidth, height: window.innerHeight, controls });
+    document.body.classList.toggle('touch-hud-compact', Boolean(layout));
+    if (layout) document.body.style.setProperty('--touch-hud-slot', `${layout.slot}px`);
+    else document.body.style.removeProperty('--touch-hud-slot');
+}
+
 function applyTouchPositions() {
     const viewport = viewportSize();
     for (const piece of TOUCH_PIECES) {
@@ -3289,6 +3303,7 @@ function applyTouchPositions() {
         el.style.setProperty('--touch-dx', `${offset.x.toFixed(1)}px`);
         el.style.setProperty('--touch-dy', `${offset.y.toFixed(1)}px`);
     }
+    updateTouchHotbar();
 }
 
 // Arrasto de uma peça no modo de edição. O retângulo "natural" (sem
@@ -3333,6 +3348,7 @@ function movePieceDrag(event) {
     touchPositions[touchDrag.piece] = offsetPercent(next, viewport);
     touchDrag.el?.style.setProperty('--touch-dx', `${next.x.toFixed(1)}px`);
     touchDrag.el?.style.setProperty('--touch-dy', `${next.y.toFixed(1)}px`);
+    updateTouchHotbar();
 }
 
 function endPieceDrag(event) {
