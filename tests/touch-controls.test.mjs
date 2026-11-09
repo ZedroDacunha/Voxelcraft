@@ -202,12 +202,12 @@ test('nenhum caminho de entrada ignora o modo toque', () => {
     assert.match(game, /if \(touchMode\) \{ beginTouchPlay\(\); return true; \}/);
 });
 
-// --- toque no mundo (o dedo é a mira) -----------------------------------
+// --- toque no mundo (a cruz central é a mira) -----------------------------
 
 test('dedo parado é toque curto; parado demais vira segurar; andar vira olhar', () => {
     // ainda no ar, sem andar e sem tempo: nada decidido
     assert.equal(touchGesture({ elapsed: 0 }), 'wait');
-    // soltou cedo e parado: toque curto = usar
+    // soltou cedo e parado: toque curto = golpear
     assert.equal(touchGesture({ elapsed: 90, released: true }), 'tap');
     // chegou no tempo e continua com o dedo: segurar = cavar
     assert.equal(touchGesture({ elapsed: TOUCH_HOLD_MS }), 'hold');
@@ -247,30 +247,23 @@ test('ponto da tela vira direção de câmera com o y invertido', () => {
     assert.deepEqual(ndcFromPoint(NaN, NaN, 800, 600), { x: 0, y: 0 });
 });
 
-test('o jogo usa o dedo como mira, sem congelar o alvo', () => {
-    // a direção vem do ponto tocado, pelo mesmo par NDC que o mouse usaria
-    assert.match(game, /const ndc = ndcFromPoint\(clientX, clientY, width, height\);/);
-    assert.match(game, /touchRaycaster\.setFromCamera\(touchNdc, camera\);/);
-    // e o alvo é recalculado a cada quadro a partir da direção: quebrar um bloco
-    // não pode deixar a mira apontando para o buraco que ficou no lugar
-    assert.match(game, /if \(touchAim\.on\) \{[\s\S]{0,300}?currentHit = raycastVoxels\(camera\.position, touchAim\.dir, REACH, WORLD_RAYCAST_ACCESS\);/);
-    // o golpe no Mofim segue a mesma linha do dedo
-    assert.match(game, /if \(touchAim\.on\) creatureAim\.copy\(touchAim\.dir\);/);
+test('blocos e criaturas usam a direção da câmera, não a posição do dedo', () => {
+    assert.match(game, /function updateTarget\(\) \{\s*camera\.getWorldDirection\(tmpDir\);\s*currentHit = raycastVoxels\(camera\.position, tmpDir, REACH, WORLD_RAYCAST_ACCESS\)/);
+    assert.match(game, /function strikeCreature\([\s\S]*?camera\.getWorldDirection\(creatureAim\)/);
+    assert.doesNotMatch(game, /aimAtScreen|touchAim|touchRaycaster/);
 });
 
-test('toque curto usa o item; segurar cava; arrastar olha', () => {
-    // o relógio do "segurar" não pode depender de pointermove
+test('toque golpeia, segurar minera e arrastar olha sem ativar golpe no retorno', () => {
     assert.match(game, /touchLook\.holdTimer = setTimeout\(\(\) => \{/);
     assert.match(game, /\}, TOUCH_HOLD_MS\);/);
-    assert.match(game, /function startBreaking\(\) \{\n {12}touchLook\.mode = 'hold';/);
-    assert.match(game, /leftHeld = true;\n {12}pressButton\('break', true\);/);
-    // soltar sempre desliga a escavação e devolve a mira para a câmera
-    assert.match(game, /leftHeld = false;\n {16}pressButton\('break', false\);/);
-    assert.match(game, /clearTouchAim\(\);\n {12}updateTarget\(\);/);
-    // sair do jogo, morrer ou abrir inventário também encerra o gesto
+    assert.match(game, /function startBreaking\(\) \{\n {12}touchLook\.mode = 'hold';\n {12}syncAttackHeld\(\)/);
+    assert.match(game, /touchLook\.mode === 'wait' && gesture === 'tap' && playing\(\) && !sleep\.active/);
+    assert.match(game, /performTouchTapAttack\(\{ updateTarget, strikeCreature, updateMining/);
+    assert.match(game, /touchLook\.mode !== 'look' && touchLook\.mode !== 'hold'/);
+    assert.match(game, /touchLook\.mode = 'wait';\n {12}syncAttackHeld\(\)/);
     assert.match(game, /stopTouchGesture\(\);\n {4}stopHaptics\(\);\n {4}resetMining\(\);/);
-    // e nenhum botão de toque fica desenhado como apertado
     assert.match(game, /for \(const button of document\.querySelectorAll\('\.touch-btn\.pressed'\)\)/);
+    assert.match(game, /if \(id === 'use'\) useHeldItem\(\{ sneaking: wantToCrouch \}\)/);
 });
 
 test('os controles são só ícones, mas continuam dizendo o que fazem', () => {

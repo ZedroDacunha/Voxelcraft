@@ -42,7 +42,7 @@ test('as duas entradas alternam a vista e a câmera frontal não muda a mira por
     const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
     assert.match(game, /case 'KeyV': if \(!event\.repeat\) toggleThirdPerson\(\)/);
     assert.match(game, /id === 'camera'\) toggleThirdPerson\(\)/);
-    assert.match(game, /cameraView === 'rear' && !sleep\.active/);
+    assert.match(game, /function updateTarget\(\) \{\s*camera\.getWorldDirection\(tmpDir\)/);
     assert.match(game, /cameraView === 'front'\) thirdCamera\.quaternion\.multiply\(frontCameraTurn\)/);
     assert.match(css, /body\.camera-front #crosshair\s*\{\s*display:\s*none/);
 });
