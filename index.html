@@ -11,8 +11,8 @@
 <meta name="apple-mobile-web-app-title" content="Voxel">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
-<link rel="stylesheet" href="styles.css?v=9ea17cf1af">
-<link rel="stylesheet" href="inventory.css?v=f154ea04ca">
+<link rel="stylesheet" href="styles.css?v=fab613a2c9">
+<link rel="stylesheet" href="inventory.css?v=1ca7545960">
 <!-- importmap:start (gerado por tools/stamp-importmap.mjs; não editar à mão) -->
 <script type="importmap">
 {
@@ -22,7 +22,7 @@
     "./asset-versions.js": "./asset-versions.js?v=d42b8dc6ff",
     "./game-pause-menu.js": "./game-pause-menu.js?v=f625baba0f",
     "./game-pointer-lock.js": "./game-pointer-lock.js?v=cf53899b88",
-    "./game.js": "./game.js?v=5b8f0ce581",
+    "./game.js": "./game.js?v=8826b9f599",
     "./inventory-a11y.js": "./inventory-a11y.js?v=25f3dab87d",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
     "./inventory-layout.js": "./inventory-layout.js?v=439823a409",
@@ -362,6 +362,7 @@
         <input id="chat-input" type="text" maxlength="200" autocomplete="off" autocapitalize="off"
                autocorrect="off" spellcheck="false" enterkeyhint="send"
                placeholder="Mensagem ou /comando">
+        <button id="chat-close" class="classic-btn overlay-close" type="button" aria-label="Fechar chat" title="Fechar chat">×</button>
     </form>
 </div>
 <div id="toast" role="status" aria-live="polite"></div>
@@ -381,6 +382,7 @@
             <button id="recipe-book-toggle" class="recipe-book-toggle" type="button" aria-expanded="false" aria-controls="recipe-book">
                 <span class="recipe-book-icon" aria-hidden="true"></span> Receitas
             </button>
+            <button id="inv-close" class="classic-btn overlay-close" type="button" aria-label="Fechar inventário ou estação" title="Fechar">×</button>
         </div>
         <section id="recipe-book" class="recipe-book" aria-label="Livro de receitas" hidden>
             <div class="recipe-book-head">

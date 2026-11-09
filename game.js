@@ -2683,6 +2683,11 @@ function buildInventoryUI() {
         setRecipeBookOpen(document.getElementById('recipe-book').hidden === true);
     });
     document.getElementById('recipe-book-close').addEventListener('click', () => setRecipeBookOpen(false));
+    document.getElementById('inv-close').addEventListener('click', () => {
+        // Pede antes de qualquer await: este clique é o gesto exigido pela API.
+        restoreTouchFullscreen();
+        closeInventory(true);
+    });
 
     const markGrid = (el, columns, label) => {
         if (!el) return;
@@ -2983,6 +2988,8 @@ function giveBack(s) {
 function closeInventory(relock) {
     if (!inventoryOpen) return;
     inventoryOpen = false;
+    const panel = document.getElementById('inventory');
+    if (panel.contains(document.activeElement)) document.activeElement.blur();
     setRecipeBookOpen(false);
 
     if (station && station.type === 'chest') setChestOpen(station.chestKey, false);
@@ -3187,6 +3194,12 @@ const touchImmersive = createTouchImmersive({
 });
 let touchPortraitHinted = false;
 let touchFullscreenHinted = false;
+// Reaproveita um gesto explícito de voltar ao jogo, sem reconquistar a tela
+// cheia sozinha após o navegador ou o usuário a ter encerrado.
+function restoreTouchFullscreen() {
+    if (!touchActive || document.fullscreenElement || touchStandalone()) return;
+    touchImmersive.enter().then(() => { if (touchActive) hintTouchPortrait(); });
+}
 function hintTouchPortrait() {
     const portrait = isPortraitViewport(window.innerWidth, window.innerHeight);
     if (!portrait) { touchPortraitHinted = false; return; }
@@ -4759,11 +4772,16 @@ async function init() {
         location.reload();
     });
     // Chat: Enter envia, Esc fecha sem enviar, ↑/↓ voltam o que já foi enviado.
+    document.getElementById('chat-close').addEventListener('click', () => {
+        restoreTouchFullscreen();
+        closeChat();
+    });
     const chatForm = document.getElementById('chat-form');
     const chatInput = document.getElementById('chat-input');
     if (chatForm && chatInput) {
         chatForm.addEventListener('submit', (event) => {
             event.preventDefault();
+            restoreTouchFullscreen();
             submitChat();
         });
         chatInput.addEventListener('input', () => {
@@ -4793,6 +4811,7 @@ async function init() {
             }
             if (event.key === 'Enter') {
                 event.preventDefault();
+                restoreTouchFullscreen();
                 submitChat();
                 return;
             }
@@ -4969,7 +4988,7 @@ async function init() {
     }
 
     document.addEventListener('mousedown', (event) => {
-        if (!playing()) return;
+        if (!playing() || inventoryOpen || chat.open) return;
         if (event.button === 0) { mouseLeftHeld = true; syncAttackHeld(); return; }
         if (event.button !== 2) return;
         useHeldItem({ sneaking: event.shiftKey || wantToCrouch });
