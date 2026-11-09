@@ -1,6 +1,6 @@
 # Inventário no celular: toque e segurar
 
-- Toque em uma casa pega, coloca, empilha ou troca a pilha usando as mesmas regras do clique esquerdo. Segurar 500 ms pega metade (arredonda para cima) ou coloca uma unidade, usando as regras do botão direito. A saída de craft respeita o rendimento da receita e não é dividida.
+- Toque em uma casa pega, coloca, empilha ou troca a pilha usando as mesmas regras do clique esquerdo. Segurar 500 ms pega metade (arredonda para cima) ou coloca uma unidade, usando as regras do botão direito. Segurar sobre uma pilha incompatível não troca os itens; toque curto continua trocando. A saída de craft respeita o rendimento da receita e não é dividida.
 - Um aviso informa qual item e quantidade estão sendo segurados; fechar o inventário devolve as pilhas ao inventário como antes. No toque, encostar fora do painel não joga fora a pilha acidentalmente.
 - Mover o dedo antes de completar o gesto cancela a ação para permitir rolagem; troca de slot, cancelamento, perda de foco, tela oculta ou fechamento não executam gesto pendente. Um segundo dedo não toma controle da ação. O mouse e teclado conservam as regras anteriores.
 - Esta etapa não adiciona arrastar itens nem redimensiona slots. Baú, bancada e forno usam os mesmos gestos e regras já existentes, inclusive restrições de entrada e saída do forno.

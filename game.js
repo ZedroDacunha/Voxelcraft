@@ -8,7 +8,7 @@ import { findSpawn, TerrainGenerator } from './world-terrain.js';
 import { createTerrainWorkerSource } from './world-terrain-worker.js';
 import { createWaterSystemClass } from './world-water.js';
 import { Inventory } from './inventory-model.js';
-import { craftConsume, invCollectSame, invFillRecipe, invLeftClick, invQuickMove, invQuickMoveToCraft, invRightClick, invSwapHotbar, stackable } from './inventory-logic.js';
+import { craftConsume, invCollectSame, invFillRecipe, invLeftClick, invQuickMove, invQuickMoveToCraft, invRightClick, invTouchRightClick, invSwapHotbar, stackable } from './inventory-logic.js';
 import { stackHtml, updateSlotElement } from './inventory-view.js';
 import { createRecipeBook } from './inventory-recipe-book.js';
 import { craftGridTemplateColumns } from './inventory-layout.js';
@@ -2368,8 +2368,11 @@ function furnaceClick(e, i) {
     }
     if (c && !(i === 0 ? SMELT[c.id] : FUEL[c.id])) return;
     if (e.shiftKey && !c) invQuickMove(f.inv, i, inventory, 0, 36);
-    else if (e.button === 2) invRightClick(f.inv, i, cursorHeld);
-    else invLeftClick(f.inv, i, cursorHeld);
+    else if (e.button === 2) {
+        if (e.touch) {
+            if (!invTouchRightClick(f.inv, i, cursorHeld)) return;
+        } else invRightClick(f.inv, i, cursorHeld);
+    } else invLeftClick(f.inv, i, cursorHeld);
     if (i === 0) f.cook = 0;
 }
 
@@ -2956,6 +2959,7 @@ function onInventoryMouseDown(e) {
 function activateSlot(el, { button = 0, shiftKey = false, touch = false } = {}) {
     const name = el.dataset.inv, i = Number(el.dataset.index);
     invHover = { inv: name, i };
+    if (touch) invLastClick = { time: 0, key: '' };
 
     if (name === 'out') {
         if (button === 0 || button === 2) handleOutputClick({ button, shiftKey });
@@ -2963,7 +2967,7 @@ function activateSlot(el, { button = 0, shiftKey = false, touch = false } = {}) 
         return;
     }
     if (name === 'furnace') {
-        if (station && station.furnace) furnaceClick({ button, shiftKey }, i);
+        if (station && station.furnace) furnaceClick({ button, shiftKey, touch }, i);
         renderInventory();
         return;
     }
@@ -2983,7 +2987,8 @@ function activateSlot(el, { button = 0, shiftKey = false, touch = false } = {}) 
         else invLeftClick(target, i, cursorHeld);
         invLastClick = touch ? { time: 0, key: '' } : { time: now, key };
     } else if (button === 2) {
-        invRightClick(target, i, cursorHeld);
+        if (touch) invTouchRightClick(target, i, cursorHeld);
+        else invRightClick(target, i, cursorHeld);
     }
     renderInventory();
 }

@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createInventoryTouchGesture, INVENTORY_HOLD_MS, INVENTORY_TOUCH_SLOP } from '../inventory-touch-gesture.js';
-import { invLeftClick, invRightClick } from '../inventory-logic.js';
+import { invLeftClick, invRightClick, invTouchRightClick } from '../inventory-logic.js';
 import { Inventory } from '../inventory-model.js';
-import { ID } from '../world-catalog.js';
+import { ID, ITEMS } from '../world-catalog.js';
 
 function fixture(activate = () => {}) {
     let sequence = 0;
@@ -67,13 +67,31 @@ test('segundo dedo não rouba nem encerra o primeiro gesto', () => {
 test('gestos reutilizam as regras reais de pilha, metade e unidade', () => {
     const inv = new Inventory(3), cursor = { stack: null };
     inv.slots[0] = { id: ID.DIRT, count: 9 };
-    const { gesture, fire } = fixture((index, button) => button === 2 ? invRightClick(inv, index, cursor) : invLeftClick(inv, index, cursor));
+    const { gesture, fire } = fixture((index, button) => button === 2 ? invTouchRightClick(inv, index, cursor) : invLeftClick(inv, index, cursor));
     gesture.start(point(1, 0)); fire(); gesture.end(point(1, 0));
     assert.equal(cursor.stack.count, 5); assert.equal(inv.slots[0].count, 4);
     gesture.start(point(2, 1)); fire(); gesture.end(point(2, 1));
     assert.equal(inv.slots[1].count, 1); assert.equal(cursor.stack.count, 4);
     gesture.start(point(3, 2)); gesture.end(point(3, 2));
     assert.equal(inv.slots[2].count, 4); assert.equal(cursor.stack, null);
+});
+
+test('segurar sobre item incompatível não troca pilhas; mouse continua trocando', () => {
+    const inv = new Inventory(2), cursor = { stack: { id: ID.DIRT, count: 5 } };
+    inv.slots[0] = { id: ID.STONE, count: 3 };
+    assert.equal(invTouchRightClick(inv, 0, cursor), false);
+    assert.deepEqual(cursor.stack, { id: ID.DIRT, count: 5 });
+    assert.deepEqual(inv.slots[0], { id: ID.STONE, count: 3 });
+    invRightClick(inv, 0, cursor);
+    assert.equal(cursor.stack.id, ID.STONE);
+    assert.equal(inv.slots[0].id, ID.DIRT);
+
+    const toolId = Number(Object.keys(ITEMS).find(id => ITEMS[id].maxStack === 1));
+    cursor.stack = { id: toolId, count: 1, damage: 2 };
+    inv.slots[1] = { id: toolId, count: 1, damage: 3 };
+    assert.equal(invTouchRightClick(inv, 1, cursor), false);
+    assert.equal(cursor.stack.damage, 2);
+    assert.equal(inv.slots[1].damage, 3);
 });
 
 test('fiação protege o mouse, o cursor e os itens ao sair', () => {
@@ -84,6 +102,8 @@ test('fiação protege o mouse, o cursor e os itens ao sair', () => {
     assert.match(game, /event\.preventDefault\(\);\s*inventoryTouchGesture\.start/);
     assert.match(game, /activateSlot\(slot, \{ button, touch: true \}\)/);
     assert.match(game, /!touch && cursorHeld\.stack && invLastClick\.key/);
+    assert.match(game, /if \(touch\) invTouchRightClick\(target, i, cursorHeld\)/);
+    assert.match(game, /furnaceClick\(\{ button, shiftKey, touch \}, i\)/);
     assert.match(game, /function closeInventory\(relock\) \{\s*if \(!inventoryOpen\) return;\s*inventoryTouchGesture\?\.cancel\(\)/);
     assert.match(game, /Não jogar fora uma pilha por um toque acidental no fundo/);
     assert.match(html, /id="inv-touch-held" role="status" aria-live="polite" hidden/);
