@@ -33,7 +33,7 @@ export function touchLookSensitivity(settings) {
     return TOUCH_LOOK_SENSITIVITY * scale;
 }
 
-// Dedo parado na tela: até este tempo ainda é um toque curto (usar); depois
+// Dedo parado na tela: até este tempo ainda é um toque curto (golpear); depois
 // vira "segurar" (cavar). A folga em pixels separa tremida de arrasto.
 export const TOUCH_HOLD_MS = 240;
 export const TOUCH_LOOK_SLOP = 12;
@@ -158,8 +158,8 @@ export function ndcFromPoint(clientX, clientY, width, height) {
  * O que um dedo na tela está fazendo.
  *
  * - `look`: andou mais que a folga — está olhando em volta;
- * - `hold`: ficou parado tempo bastante — está cavando o bloco sob o dedo;
- * - `tap`: soltou cedo e sem andar — é um toque curto (usar/colocar);
+ * - `hold`: ficou parado tempo bastante — está cavando o bloco na mira;
+ * - `tap`: soltou cedo e sem andar — é um toque curto (golpear);
  * - `wait`: ainda não deu para saber (dedo no chão, pouco tempo).
  *
  * A ordem importa: quem arrastou nunca vira toque, nem que fique parado depois.

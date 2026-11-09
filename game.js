@@ -84,11 +84,11 @@ import {
     isTouchDevice,
     lookAfterDrag,
     movementFromStick,
-    ndcFromPoint,
     stickVector,
     touchGesture,
     touchLookSensitivity,
 } from './world-touch-controls.js';
+import { attackHeld, performTouchTapAttack } from './world-touch-tap-attack.js';
 import { getSharedAudio } from './world-audio.js';
 import { touchLayoutState, touchStickRadius } from './world-touch-layout.js';
 import { compactTouchHotbar } from './world-touch-hotbar.js';
@@ -1960,12 +1960,10 @@ function mobHitPuff(entity, count = 6) {
 // Golpe em bicho. A mira é a da câmera e o alcance é curto: se acertou, o bicho
 // se assusta e o bloco que estava atrás dele não é minerado neste quadro (senão
 // o golpe viraria uma mineração silenciosa do cenário).
-function strikeCreature() {
-    if (!leftHeld) return false;
-    // Com o dedo na tela a mira é o dedo, não a cruz: o golpe segue a mesma
-    // linha que escolheu o bloco.
-    if (touchAim.on) creatureAim.copy(touchAim.dir);
-    else camera.getWorldDirection(creatureAim);
+function strikeCreature({ tap = false } = {}) {
+    if (!leftHeld && !tap) return false;
+    // Golpes e mineração usam a mesma direção da mira central.
+    camera.getWorldDirection(creatureAim);
     // O bloco na mira limita o alcance do golpe — com a folga de
     // `MOB_HIT_BLOCK_SLACK`, para o bicho encostado no chão não perder o clique.
     const aim = { maxDistance: currentHit ? currentHit.dist + MOB_HIT_BLOCK_SLACK : Infinity };
@@ -2028,9 +2026,9 @@ function strikeCreature() {
     return true;
 }
 
-function updateMining(dt) {
+function updateMining(dt, { tap = false } = {}) {
     mining.cooldown = Math.max(0, mining.cooldown - dt);
-    if (!leftHeld || !currentHit) { resetMining(); return; }
+    if ((!leftHeld && !tap) || !currentHit) { resetMining(); return; }
 
     if (currentHit.y === 0) {
         mining.progress = 0;
@@ -3208,7 +3206,7 @@ if (touchMode) {
 // Estado do joystick: onde o dedo começou e onde está agora.
 const touchStick = { pointerId: null, centerX: 0, centerY: 0, x: 0, y: 0 };
 // Arrasto de olhar: um dedo na tela (fora dos controles) gira a câmera. O mesmo
-// dedo, se ficar parado, vira toque curto (usar) ou segurar (cavar) — ver
+// dedo, se ficar parado, vira toque curto (golpear) ou segurar (cavar) — ver
 // `touchGesture()` em world-touch-controls.js.
 const touchLook = {
     pointerId: null,
@@ -3220,11 +3218,6 @@ const touchLook = {
     mode: 'wait',
     holdTimer: 0,
 };
-// Mira do dedo: quando o jogador toca na tela, o bloco escolhido é o que está
-// embaixo do dedo, não o da cruz do centro. Enquanto `touchAim.on` estiver
-// ligado, `updateTarget()` mira pela direção do dedo; soltar devolve a mira
-// para a câmera.
-const touchAim = { on: false, hit: null, dir: new THREE.Vector3() };
 // Layout de toque vindo das opções: multiplicador de tamanho (CSS
 // `--touch-scale`, que o joystick, os botões e a hotbar leem) e o lado em que
 // ficam os controles. É aplicado em `applyGameSettings`, que roda no começo e a
@@ -3399,6 +3392,8 @@ function resetInputFlags() {
     moveForward = moveBackward = moveLeft = moveRight = false;
     jumpHeld = swimStrokeLocked = isSprinting = wantToCrouch = false;
     leftHeld = false;
+    mouseLeftHeld = false;
+    touchBreakPointerId = null;
     touchStick.pointerId = null;
     touchStick.x = touchStick.y = 0;
     stopTouchGesture();
@@ -3414,17 +3409,10 @@ function resetInputFlags() {
     }
 }
 
-function clearTouchAim() {
-    touchAim.on = false;
-    touchAim.hit = null;
-    touchAim.dir.set(0, 0, 0);
-}
-
 function stopTouchGesture() {
     if (touchLook.holdTimer) { clearTimeout(touchLook.holdTimer); touchLook.holdTimer = 0; }
     touchLook.pointerId = null;
     touchLook.mode = 'wait';
-    clearTouchAim();
 }
 
 function resetTouchStickVisual() {
@@ -3487,6 +3475,11 @@ const audio = getSharedAudio();
 let selectedSlot = 0;
 const inventory = new Inventory(PLAYER_INVENTORY_SIZE);
 let leftHeld = false;
+let mouseLeftHeld = false;
+let touchBreakPointerId = null;
+function syncAttackHeld() {
+    leftHeld = attackHeld({ mouse: mouseLeftHeld, button: touchBreakPointerId !== null, gesture: touchLook.mode === 'hold' });
+}
 
 // Status
 let health = MAX_HEALTH, hunger = MAX_HUNGER, saturation = 5, exhaustion = 0;
@@ -3963,46 +3956,9 @@ function intersectsPlayer(bx, by, bz) {
 // =====================================================================
 // 9. RAYCAST POR VOXELS (DDA)
 // =====================================================================
-const touchRaycaster = new THREE.Raycaster();
-const touchNdc = new THREE.Vector2();
-
-// Mira do dedo: o bloco escolhido é o que está embaixo do toque, e não o da
-// cruz do centro. Guarda também a direção para o golpe no Mofim usar a mesma
-// linha — senão o bicho apanharia sem estar na frente do dedo.
-function aimAtScreen(clientX, clientY) {
-    const canvas = renderer.domElement;
-    const width = canvas.clientWidth || window.innerWidth;
-    const height = canvas.clientHeight || window.innerHeight;
-    const ndc = ndcFromPoint(clientX, clientY, width, height);
-    touchNdc.set(ndc.x, ndc.y);
-    if (cameraView === 'rear' && !sleep.active) {
-        // Escolhe o ponto visto sob o dedo e aponta dos olhos até ele. O raio
-        // final ainda parte do jogador, portanto não aumenta o alcance nem
-        // permite usar blocos através de uma parede próxima ao corpo.
-        updateThirdPerson();
-        touchRaycaster.setFromCamera(touchNdc, thirdCamera);
-        const ray = touchRaycaster.ray;
-        const visualHit = raycastVoxels(ray.origin, ray.direction, REACH + THIRD_PERSON_DISTANCE, WORLD_RAYCAST_ACCESS);
-        const distance = visualHit ? visualHit.dist + 0.01 : REACH + THIRD_PERSON_DISTANCE;
-        touchAim.dir.copy(ray.direction).multiplyScalar(distance).add(ray.origin).sub(camera.position).normalize();
-    } else {
-        touchRaycaster.setFromCamera(touchNdc, camera);
-        touchAim.dir.copy(touchRaycaster.ray.direction);
-    }
-    touchAim.on = true;
-    updateTarget();
-}
-
 function updateTarget() {
-    if (touchAim.on) {
-        // A mira do dedo é uma direção, não um bloco congelado: quebrar um bloco
-        // não pode deixar o alvo apontando para o buraco que ficou no lugar.
-        currentHit = raycastVoxels(camera.position, touchAim.dir, REACH, WORLD_RAYCAST_ACCESS);
-        touchAim.hit = currentHit;
-    } else {
-        camera.getWorldDirection(tmpDir);
-        currentHit = raycastVoxels(camera.position, tmpDir, REACH, WORLD_RAYCAST_ACCESS);
-    }
+    camera.getWorldDirection(tmpDir);
+    currentHit = raycastVoxels(camera.position, tmpDir, REACH, WORLD_RAYCAST_ACCESS);
     if (currentHit) {
         targetMesh.position.set(currentHit.x + 0.5, currentHit.y + 0.5, currentHit.z + 0.5);
         targetMesh.visible = true;
@@ -5014,13 +4970,13 @@ async function init() {
 
     document.addEventListener('mousedown', (event) => {
         if (!playing()) return;
-        if (event.button === 0) { leftHeld = true; return; }
+        if (event.button === 0) { mouseLeftHeld = true; syncAttackHeld(); return; }
         if (event.button !== 2) return;
         useHeldItem({ sneaking: event.shiftKey || wantToCrouch });
     });
 
     document.addEventListener('mouseup', (event) => {
-        if (event.button === 0) leftHeld = false;
+        if (event.button === 0) { mouseLeftHeld = false; syncAttackHeld(); }
         if (event.button === 2) cancelEating();
     });
 
@@ -5082,13 +5038,8 @@ async function init() {
             });
         }
 
-        // Dedo na tela, em qualquer ponto livre (os controles têm
-        // `pointer-events: auto` e consomem o próprio dedo). Três gestos saem do
-        // mesmo dedo, como no Minecraft de celular:
-        //   - arrastar  → olhar em volta (o mesmo `look` do mouse);
-        //   - toque curto parado → usar/colocar no bloco sob o dedo;
-        //   - segurar parado → cavar o bloco sob o dedo.
-        // A mira é o ponto tocado, não a cruz do centro: o dedo é a mira.
+        // Arrastar olha; toque curto golpeia; segurar minera. Todos usam a
+        // mira central, independentemente de onde o dedo encostou na tela.
         function gestureAt(event, released = false) {
             return touchGesture({
                 dx: event.clientX - touchLook.startX,
@@ -5100,20 +5051,17 @@ async function init() {
 
         function startBreaking() {
             touchLook.mode = 'hold';
-            aimAtScreen(touchLook.startX, touchLook.startY);
-            leftHeld = true;
+            syncAttackHeld();
             pressButton('break', true);
         }
 
         function endGesture() {
             if (touchLook.holdTimer) { clearTimeout(touchLook.holdTimer); touchLook.holdTimer = 0; }
-            if (touchLook.mode === 'hold') {
-                leftHeld = false;
-                pressButton('break', false);
-            }
+            const wasHolding = touchLook.mode === 'hold';
             touchLook.pointerId = null;
             touchLook.mode = 'wait';
-            clearTouchAim();
+            syncAttackHeld();
+            if (wasHolding) pressButton('break', touchBreakPointerId !== null);
             updateTarget();
         }
 
@@ -5136,15 +5084,10 @@ async function init() {
         canvas.addEventListener('pointermove', (event) => {
             if (event.pointerId !== touchLook.pointerId) return;
             event.preventDefault();
-            if (touchLook.mode === 'hold') {
-                // Segurando, o dedo anda e a mira acompanha: cavar uma fileira.
-                aimAtScreen(event.clientX, event.clientY);
-                touchLook.lastX = event.clientX;
-                touchLook.lastY = event.clientY;
-                return;
-            }
-            if (gestureAt(event) === 'look') touchLook.mode = 'look';
-            if (touchLook.mode !== 'look') return;
+            // Depois de iniciar a mineração, arrastar continua girando a câmera
+            // sem soltar a ação: a mira central segue a direção do olhar.
+            if (touchLook.mode !== 'hold' && gestureAt(event) === 'look') touchLook.mode = 'look';
+            if (touchLook.mode !== 'look' && touchLook.mode !== 'hold') return;
             const next = lookAfterDrag(look, event.clientX - touchLook.lastX, event.clientY - touchLook.lastY, {
                 sensitivity: touchLookScale,
                 maxPitch: MAX_PITCH,
@@ -5158,11 +5101,9 @@ async function init() {
         canvas.addEventListener('pointerup', (event) => {
             if (event.pointerId !== touchLook.pointerId) return;
             const gesture = gestureAt(event, true);
-            if (gesture === 'tap') {
-                // Toque curto: o mesmo "usar" do botão direito do mouse, só que
-                // no bloco que o dedo escolheu.
-                aimAtScreen(event.clientX, event.clientY);
-                useHeldItem({ sneaking: wantToCrouch });
+            if (touchLook.mode === 'wait' && gesture === 'tap' && playing() && !sleep.active) {
+                performTouchTapAttack({ updateTarget, strikeCreature, updateMining,
+                    punch: () => startPunch(handAnim) });
             }
             endGesture();
         });
@@ -5187,7 +5128,11 @@ async function init() {
                 haptic('button');
                 button.setPointerCapture?.(event.pointerId);
                 if (id === 'jump') { jumpHeld = true; pressButton(id, true); return; }
-                if (id === 'break') { leftHeld = true; pressButton(id, true); return; }
+                if (id === 'break') {
+                    if (touchBreakPointerId !== null) return;
+                    touchBreakPointerId = event.pointerId;
+                    syncAttackHeld(); pressButton(id, true); return;
+                }
                 if (id === 'use') useHeldItem({ sneaking: wantToCrouch });
                 else if (id === 'crouch') {
                     wantToCrouch = !wantToCrouch;
@@ -5198,10 +5143,16 @@ async function init() {
                 else if (id === 'pause') pauseTouchPlay();
             });
             if (!hold) continue;
-            for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
-                button.addEventListener(type, () => {
+            for (const type of (id === 'jump' ? ['pointerup', 'pointercancel', 'pointerleave'] : ['pointerup', 'pointercancel', 'lostpointercapture'])) {
+                button.addEventListener(type, (event) => {
                     if (id === 'jump') { jumpHeld = false; swimStrokeLocked = false; }
-                    else leftHeld = false;
+                    else {
+                        if (event.pointerId !== touchBreakPointerId) return;
+                        touchBreakPointerId = null;
+                        syncAttackHeld();
+                        pressButton(id, touchLook.mode === 'hold');
+                        return;
+                    }
                     pressButton(id, false);
                 });
             }

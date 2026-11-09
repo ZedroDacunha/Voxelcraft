@@ -22,7 +22,7 @@
     "./asset-versions.js": "./asset-versions.js?v=d42b8dc6ff",
     "./game-pause-menu.js": "./game-pause-menu.js?v=f625baba0f",
     "./game-pointer-lock.js": "./game-pointer-lock.js?v=cf53899b88",
-    "./game.js": "./game.js?v=7b458e2bb8",
+    "./game.js": "./game.js?v=5b8f0ce581",
     "./inventory-a11y.js": "./inventory-a11y.js?v=25f3dab87d",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
     "./inventory-layout.js": "./inventory-layout.js?v=439823a409",
@@ -113,11 +113,12 @@
     "./world-textures.js": "./world-textures.js?v=896bdae3f0",
     "./world-tool-rules.js": "./world-tool-rules.js?v=85347f4434",
     "./world-tool-textures.js": "./world-tool-textures.js?v=1ddec1c6e7",
-    "./world-touch-controls.js": "./world-touch-controls.js?v=eb1e4cf45e",
+    "./world-touch-controls.js": "./world-touch-controls.js?v=250dbd7b1e",
     "./world-touch-hotbar.js": "./world-touch-hotbar.js?v=ff7700878d",
     "./world-touch-immersive.js": "./world-touch-immersive.js?v=7fa9b0ee80",
     "./world-touch-layout.js": "./world-touch-layout.js?v=76205e0b9b",
     "./world-touch-positions.js": "./world-touch-positions.js?v=877c6d0890",
+    "./world-touch-tap-attack.js": "./world-touch-tap-attack.js?v=d855065f48",
     "./world-water-sounds.js": "./world-water-sounds.js?v=b620be020b",
     "./world-water.js": "./world-water.js?v=e16cf2152e",
     "./world-waterfall.js": "./world-waterfall.js?v=80c041820a",
@@ -435,7 +436,7 @@
             <p><kbd>F3</kbd> depuração · <kbd>F4</kbd> qualidade · botão esquerdo minera, botão direito usa ou coloca</p>
             <p>Na água, segure <kbd>C</kbd> para mergulhar e <kbd>Espaço</kbd> para subir; solte e pressione <kbd>Espaço</kbd> de novo para outro impulso na superfície.</p>
         </details>
-        <p id="menu-touch-hint" style="display: none;">No toque: joystick à esquerda, arraste na tela para olhar. Toque num bloco para usar e segure para cavar; os botões à direita são Pular, Cavar, Usar, Agachar, Mochila e Pausar.</p>
+        <p id="menu-touch-hint" style="display: none;">No toque: joystick à esquerda, arraste na tela para olhar. Toque para golpear, segure para cavar pela mira central e use o botão da mão para usar ou colocar; os botões à direita são Pular, Cavar, Usar, Agachar, Mochila e Pausar.</p>
     </div>
 </div>
 
@@ -477,7 +478,7 @@
         <button class="classic-btn touch-btn" type="button" data-touch="camera" aria-label="Câmera" title="Alternar câmera"><svg class="touch-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 4h8l1.5 2.5H21a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2v-10a2 2 0 0 1 2-2h3.5zm4 4a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"/></svg></button>
         <button class="classic-btn touch-btn" type="button" data-touch="pause" aria-label="Pausar" title="Pausar"><svg class="touch-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><rect x="6.5" y="5" width="4" height="14"/><rect x="13.5" y="5" width="4" height="14"/></svg></button>
     </div>
-    <p id="touch-hint">Arraste para olhar · toque no bloco para usar · segure para cavar</p>
+    <p id="touch-hint">Arraste para olhar · toque para golpear · segure para cavar pela mira · mão para usar</p>
     <div id="touch-edit-bar" hidden>
         <button class="classic-btn touch-edit-btn" type="button" id="btn-touch-positions-reset">Restaurar</button>
         <button class="classic-btn touch-edit-btn" type="button" id="btn-touch-positions-done">Pronto</button>
