@@ -45,6 +45,12 @@ export const GAME_SETTING_FIELDS = Object.freeze({
     // Toque: de que lado ficam joystick e botões (canhoto troca tudo de lado) e
     // o tamanho dos controles. Valem só no modo toque; no desktop não há o que
     // mudar, mas a preferência fica guardada para o celular.
+    touchAimMode: Object.freeze({
+        choices: Object.freeze(['center', 'finger']),
+        labels: Object.freeze({ center: 'Mira central', finger: 'Sem mira' }),
+        default: 'center',
+        format: value => GAME_SETTING_FIELDS.touchAimMode.labels[value] ?? 'Mira central',
+    }),
     touchLayout: Object.freeze({
         choices: Object.freeze(['right', 'left']),
         labels: Object.freeze({ right: 'Destro', left: 'Canhoto' }),

@@ -247,16 +247,16 @@ test('ponto da tela vira direção de câmera com o y invertido', () => {
     assert.deepEqual(ndcFromPoint(NaN, NaN, 800, 600), { x: 0, y: 0 });
 });
 
-test('blocos e criaturas usam a direção da câmera, não a posição do dedo', () => {
-    assert.match(game, /function updateTarget\(\) \{\s*camera\.getWorldDirection\(tmpDir\);\s*currentHit = raycastVoxels\(camera\.position, tmpDir, REACH, WORLD_RAYCAST_ACCESS\)/);
-    assert.match(game, /function strikeCreature\([\s\S]*?camera\.getWorldDirection\(creatureAim\)/);
-    assert.doesNotMatch(game, /aimAtScreen|touchAim|touchRaycaster/);
+test('blocos e criaturas compartilham a direção do modo selecionado', () => {
+    assert.match(game, /if \(fingerAimEnabled\(\) && touchAim\.on\) creatureAim\.copy\(touchAim\.dir\)/);
+    assert.match(game, /currentHit = raycastVoxels\(camera\.position, touchAim\.dir, REACH/);
+    assert.match(game, /camera\.getWorldDirection\(tmpDir\);\s*currentHit = raycastVoxels\(camera\.position, tmpDir, REACH/);
 });
 
 test('toque golpeia, segurar minera e arrastar olha sem ativar golpe no retorno', () => {
     assert.match(game, /touchLook\.holdTimer = setTimeout\(\(\) => \{/);
     assert.match(game, /\}, TOUCH_HOLD_MS\);/);
-    assert.match(game, /function startBreaking\(\) \{\n {12}touchLook\.mode = 'hold';\n {12}syncAttackHeld\(\)/);
+    assert.match(game, /function startBreaking\(\) \{\n {12}touchLook\.mode = 'hold';[\s\S]*?syncAttackHeld\(\)/);
     assert.match(game, /touchLook\.mode === 'wait' && gesture === 'tap' && playing\(\) && !sleep\.active/);
     assert.match(game, /performTouchTapAttack\(\{ updateTarget, strikeCreature, updateMining/);
     assert.match(game, /touchLook\.mode !== 'look' && touchLook\.mode !== 'hold'/);

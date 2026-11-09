@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="Voxel">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
-<link rel="stylesheet" href="styles.css?v=fab613a2c9">
+<link rel="stylesheet" href="styles.css?v=bf2a31501b">
 <link rel="stylesheet" href="inventory.css?v=1ca7545960">
 <!-- importmap:start (gerado por tools/stamp-importmap.mjs; não editar à mão) -->
 <script type="importmap">
@@ -22,7 +22,7 @@
     "./asset-versions.js": "./asset-versions.js?v=d42b8dc6ff",
     "./game-pause-menu.js": "./game-pause-menu.js?v=f625baba0f",
     "./game-pointer-lock.js": "./game-pointer-lock.js?v=cf53899b88",
-    "./game.js": "./game.js?v=8826b9f599",
+    "./game.js": "./game.js?v=365849a0fe",
     "./inventory-a11y.js": "./inventory-a11y.js?v=25f3dab87d",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
     "./inventory-layout.js": "./inventory-layout.js?v=439823a409",
@@ -66,7 +66,7 @@
     "./world-furnace-rules.js": "./world-furnace-rules.js?v=195bb6a8fc",
     "./world-furnace-sounds.js": "./world-furnace-sounds.js?v=a844b58f3c",
     "./world-gait.js": "./world-gait.js?v=59f38aef73",
-    "./world-game-settings.js": "./world-game-settings.js?v=51c16bd21d",
+    "./world-game-settings.js": "./world-game-settings.js?v=962f8311fb",
     "./world-graphics-quality.js": "./world-graphics-quality.js?v=1aafc939df",
     "./world-grid.js": "./world-grid.js?v=be11481d71",
     "./world-hand-animation.js": "./world-hand-animation.js?v=5db4d45ae7",
@@ -86,7 +86,7 @@
     "./world-mineral-textures.js": "./world-mineral-textures.js?v=8bb1ae7527",
     "./world-minerals.js": "./world-minerals.js?v=2f66ff7350",
     "./world-mob-hit.js": "./world-mob-hit.js?v=1b2a522b2a",
-    "./world-options-view.js": "./world-options-view.js?v=a48ae4af26",
+    "./world-options-view.js": "./world-options-view.js?v=915ec33da6",
     "./world-ore-generation.js": "./world-ore-generation.js?v=7fe35588d3",
     "./world-point-lights.js": "./world-point-lights.js?v=495370ce08",
     "./world-pwa.js": "./world-pwa.js?v=aebc169c21",
@@ -113,6 +113,7 @@
     "./world-textures.js": "./world-textures.js?v=896bdae3f0",
     "./world-tool-rules.js": "./world-tool-rules.js?v=85347f4434",
     "./world-tool-textures.js": "./world-tool-textures.js?v=1ddec1c6e7",
+    "./world-touch-aim.js": "./world-touch-aim.js?v=635d914114",
     "./world-touch-controls.js": "./world-touch-controls.js?v=250dbd7b1e",
     "./world-touch-hotbar.js": "./world-touch-hotbar.js?v=ff7700878d",
     "./world-touch-immersive.js": "./world-touch-immersive.js?v=7fa9b0ee80",
@@ -260,6 +261,9 @@
         </div>
 
         <div class="options-grid" id="options-touch-grid" hidden>
+            <button type="button" class="classic-btn option-btn" id="opt-touch-aim" aria-label="Modo de mira">
+                <span class="option-text"><span class="option-name">Modo de mira</span>: <span class="option-value" id="opt-touch-aim-value">Mira central</span></span>
+            </button>
             <button type="button" class="classic-btn option-btn option-slider" id="opt-touch-sensitivity" aria-label="Sensibilidade do olhar">
                 <span class="option-track" aria-hidden="true"><span class="option-knob"></span></span>
                 <span class="option-text"><span class="option-name">Sensibilidade do olhar</span>: <span class="option-value" id="opt-touch-sensitivity-value">80%</span></span>

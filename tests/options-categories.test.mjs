@@ -72,7 +72,7 @@ test('as linhas de valor ficam na categoria certa', () => {
     assert.deepEqual(GRAPHICS_OPTION_CONTROLS.map(row => row.key), ['graphics', 'resolution', 'fov', 'renderDistance']);
     assert.deepEqual(CONTROL_OPTION_CONTROLS.map(row => row.key), ['sensitivity']);
     assert.deepEqual(TOUCH_OPTION_CONTROLS.map(row => row.key),
-        ['touchSensitivity', 'touchLayout', 'touchButtonSize', 'touchVibration']);
+        ['touchAimMode', 'touchSensitivity', 'touchLayout', 'touchButtonSize', 'touchVibration']);
     // toda linha é um campo de verdade e aparece no HTML dentro da grade da tela
     for (const screen of OPTION_SCREENS.filter(s => s.controls)) {
         const grid = gridBlock(screen.grid);
