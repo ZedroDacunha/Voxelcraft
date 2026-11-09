@@ -45,6 +45,15 @@ export function invRightClick(inv, index, cursor) {
     inv.slots[index] = held; cursor.stack = slot;
 }
 
+// No toque prolongado, a intenção é dividir/colocar uma unidade. Ao contrário
+// do botão direito do mouse, não troca pilhas incompatíveis por acidente.
+export function invTouchRightClick(inv, index, cursor) {
+    const slot = inv.slots[index], held = cursor.stack;
+    if (held && slot && (held.id !== slot.id || !stackable(slot.id))) return false;
+    invRightClick(inv, index, cursor);
+    return true;
+}
+
 export function invQuickMove(source, index, destination, from, to) {
     const stack = source.slots[index];
     if (!stack) return;

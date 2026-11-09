@@ -12,7 +12,7 @@
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link rel="stylesheet" href="styles.css?v=bf2a31501b">
-<link rel="stylesheet" href="inventory.css?v=1ca7545960">
+<link rel="stylesheet" href="inventory.css?v=245bb17808">
 <!-- importmap:start (gerado por tools/stamp-importmap.mjs; não editar à mão) -->
 <script type="importmap">
 {
@@ -22,15 +22,16 @@
     "./asset-versions.js": "./asset-versions.js?v=d42b8dc6ff",
     "./game-pause-menu.js": "./game-pause-menu.js?v=f625baba0f",
     "./game-pointer-lock.js": "./game-pointer-lock.js?v=cf53899b88",
-    "./game.js": "./game.js?v=365849a0fe",
+    "./game.js": "./game.js?v=60af66a155",
     "./inventory-a11y.js": "./inventory-a11y.js?v=25f3dab87d",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
     "./inventory-layout.js": "./inventory-layout.js?v=439823a409",
-    "./inventory-logic.js": "./inventory-logic.js?v=20ec1c5545",
+    "./inventory-logic.js": "./inventory-logic.js?v=2b03734f23",
     "./inventory-model.js": "./inventory-model.js?v=473c73a8c5",
     "./inventory-player-preview.js": "./inventory-player-preview.js?v=c9887ee2e7",
     "./inventory-recipe-book.js": "./inventory-recipe-book.js?v=567593a30b",
     "./inventory-recipe-search.js": "./inventory-recipe-search.js?v=e910d2e22b",
+    "./inventory-touch-gesture.js": "./inventory-touch-gesture.js?v=4e6b5fd9cd",
     "./inventory-view.js": "./inventory-view.js?v=fe974fc5f3",
     "./menu-background.js": "./menu-background.js?v=ac7a9852c1",
     "./menu-framing.js": "./menu-framing.js?v=d140428fa7",
@@ -388,6 +389,7 @@
             </button>
             <button id="inv-close" class="classic-btn overlay-close" type="button" aria-label="Fechar inventário ou estação" title="Fechar">×</button>
         </div>
+        <div id="inv-touch-held" role="status" aria-live="polite" hidden></div>
         <section id="recipe-book" class="recipe-book" aria-label="Livro de receitas" hidden>
             <div class="recipe-book-head">
                 <div><small>GUIA DE SOBREVIVÊNCIA</small><h2>Livro de receitas</h2></div>
