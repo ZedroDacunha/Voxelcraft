@@ -94,6 +94,7 @@ import { fingerAimDirection } from './world-touch-aim.js';
 import { getSharedAudio } from './world-audio.js';
 import { touchLayoutState, touchStickRadius } from './world-touch-layout.js';
 import { compactTouchHotbar } from './world-touch-hotbar.js';
+import { findFreeTouchRect, overlappingTouchPieces, touchMoveAllowed } from './world-touch-collision.js';
 import { createTouchImmersive, isPortraitViewport } from './world-touch-immersive.js';
 import { canVibrate, createHapticState, hapticPattern, vibrationEnabled } from './world-haptics.js';
 import {
@@ -3348,6 +3349,68 @@ function updateTouchHotbar() {
     else document.body.style.removeProperty('--touch-hud-slot');
 }
 
+function visibleTouchPieces() {
+    return TOUCH_PIECES.map(piece => {
+        const el = touchPieceElement(piece);
+        return { piece, el, rect: el?.getBoundingClientRect() };
+    }).filter(entry => entry.rect && entry.rect.width > 0 && entry.rect.height > 0);
+}
+
+function touchSafeBounds() {
+    const rect = document.getElementById('touch-safe-zone')?.getBoundingClientRect();
+    if (!rect?.width || !rect?.height) return { left: TOUCH_EDIT_MARGIN, top: TOUCH_EDIT_MARGIN, right: window.innerWidth - TOUCH_EDIT_MARGIN, bottom: window.innerHeight - TOUCH_EDIT_MARGIN };
+    return { left: rect.left + TOUCH_EDIT_MARGIN, top: rect.top + TOUCH_EDIT_MARGIN, right: rect.right - TOUCH_EDIT_MARGIN, bottom: rect.bottom - TOUCH_EDIT_MARGIN };
+}
+
+let touchNoRoom = false;
+function showTouchCollisionStatus(blocked = false) {
+    const entries = visibleTouchPieces();
+    const overlapping = overlappingTouchPieces(entries);
+    if (touchNoRoom && entries.length && !overlapping.size) {
+        const bounds = touchSafeBounds();
+        if (entries.every(({ rect }) => rect.left >= bounds.left && rect.top >= bounds.top
+            && rect.right <= bounds.right && rect.bottom <= bounds.bottom)) touchNoRoom = false;
+    }
+    for (const { piece, el } of entries) el.classList.toggle('touch-overlap', touchEditing && overlapping.has(piece));
+    const notice = document.getElementById('touch-edit-notice');
+    if (notice) {
+        notice.hidden = !touchEditing || (!blocked && !touchNoRoom && overlapping.size === 0);
+        notice.textContent = blocked ? 'Não sobreponha os controles' : touchNoRoom ? 'Sem espaço: reduza ou mova os controles' : overlapping.size ? 'Controles sobrepostos: mova para separar' : '';
+    }
+    return overlapping.size > 0;
+}
+
+let touchCollisionNotice = '';
+function resolveTouchPositions() {
+    const ui = document.getElementById('touch-ui');
+    if (!ui || ui.hidden) return;
+    const placed = [], bounds = touchSafeBounds();
+    let moved = false, noRoom = false;
+    for (const { el, rect } of visibleTouchPieces()) {
+        const free = findFreeTouchRect(rect, bounds, placed);
+        if (!free) { noRoom = true; placed.push(rect); continue; }
+        const dx = free.left - rect.left, dy = free.top - rect.top;
+        if (Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05) {
+            const x = (parseFloat(el.style.getPropertyValue('--touch-dx')) || 0) + dx;
+            const y = (parseFloat(el.style.getPropertyValue('--touch-dy')) || 0) + dy;
+            el.style.setProperty('--touch-dx', `${x.toFixed(1)}px`);
+            el.style.setProperty('--touch-dy', `${y.toFixed(1)}px`);
+            moved = true;
+        }
+        placed.push(el.getBoundingClientRect());
+    }
+    touchNoRoom = noRoom;
+    const overlap = showTouchCollisionStatus();
+    const state = overlap ? 'overlap' : touchNoRoom ? 'no-room' : moved ? 'moved' : '';
+    if (touchActive && state && state !== touchCollisionNotice) {
+        const message = state === 'overlap' ? 'Controles sobrepostos: ajuste as posições'
+            : state === 'no-room' ? 'Sem espaço: reduza ou mova os controles'
+            : 'Controles ajustados para não se sobrepor';
+        showToast(message, 3500);
+    }
+    touchCollisionNotice = touchActive ? state : '';
+}
+
 function applyTouchPositions() {
     const viewport = viewportSize();
     for (const piece of TOUCH_PIECES) {
@@ -3367,6 +3430,7 @@ function applyTouchPositions() {
         el.style.setProperty('--touch-dx', `${offset.x.toFixed(1)}px`);
         el.style.setProperty('--touch-dy', `${offset.y.toFixed(1)}px`);
     }
+    resolveTouchPositions();
     updateTouchHotbar();
 }
 
@@ -3377,6 +3441,7 @@ const touchDrag = { pointerId: null, piece: null, el: null, rect: null, natural:
 
 function beginPieceDrag(event, piece, el) {
     if (!touchEditing) return false;
+    if (touchDrag.pointerId !== null) return false;
     event.preventDefault();
     event.stopPropagation();
     const offset = { x: parseFloat(el.style.getPropertyValue('--touch-dx')) || 0,
@@ -3398,30 +3463,43 @@ function movePieceDrag(event) {
     if (touchDrag.pointerId === null || event.pointerId !== touchDrag.pointerId) return;
     event.preventDefault();
     const viewport = viewportSize();
+    const bounds = touchSafeBounds();
     const next = clampOffsetPx({
-        naturalLeft: touchDrag.natural.left,
-        naturalTop: touchDrag.natural.top,
+        naturalLeft: touchDrag.natural.left - bounds.left,
+        naturalTop: touchDrag.natural.top - bounds.top,
         width: touchDrag.rect.width,
         height: touchDrag.rect.height,
         offsetX: touchDrag.offset.x + (event.clientX - touchDrag.start.x),
         offsetY: touchDrag.offset.y + (event.clientY - touchDrag.start.y),
-        viewportWidth: viewport.width,
-        viewportHeight: viewport.height,
-        margin: TOUCH_EDIT_MARGIN,
+        viewportWidth: bounds.right - bounds.left,
+        viewportHeight: bounds.bottom - bounds.top,
+        margin: 0,
     });
+    const current = touchDrag.el.getBoundingClientRect();
+    const left = touchDrag.natural.left + next.x, top = touchDrag.natural.top + next.y;
+    const candidate = { left, top, right: left + touchDrag.rect.width, bottom: top + touchDrag.rect.height };
+    const others = visibleTouchPieces().filter(entry => entry.piece !== touchDrag.piece).map(entry => entry.rect);
+    if (!touchMoveAllowed(current, candidate, others)) {
+        touchDrag.el.classList.add('touch-blocked');
+        showTouchCollisionStatus(true);
+        return;
+    }
+    touchDrag.el.classList.remove('touch-blocked');
     touchPositions[touchDrag.piece] = offsetPercent(next, viewport);
     touchDrag.el?.style.setProperty('--touch-dx', `${next.x.toFixed(1)}px`);
     touchDrag.el?.style.setProperty('--touch-dy', `${next.y.toFixed(1)}px`);
+    showTouchCollisionStatus();
     updateTouchHotbar();
 }
 
 function endPieceDrag(event) {
     if (touchDrag.pointerId === null) return;
     if (event && event.pointerId !== touchDrag.pointerId) return;
-    touchDrag.el?.classList.remove('dragging');
+    touchDrag.el?.classList.remove('dragging', 'touch-blocked');
     touchDrag.pointerId = null;
     touchDrag.piece = null;
     touchDrag.el = null;
+    showTouchCollisionStatus();
     // grava a cada solta: se o navegador fechar, o que ficou arrastado ficou
     touchPositions = saveTouchPositions(touchPositions);
 }
@@ -3440,6 +3518,7 @@ function setTouchEditing(on) {
     resetInputFlags();
     if (on) applyTouchPositions();
     syncPauseMenu();
+    showTouchCollisionStatus();
 }
 
 function applyTouchLayout(settings = GAME_SETTINGS) {
@@ -3729,6 +3808,7 @@ document.addEventListener(TOUCH_RESET_EVENT, () => {
     applyTouchPositions();
 });
 // Girar o celular muda a relação % ↔ px: reaplica em vez de deixar a peça torta.
+window.addEventListener('resize', () => endPieceDrag());
 window.addEventListener('resize', applyTouchPositions);
 
 // =====================================================================
