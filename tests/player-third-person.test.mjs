@@ -36,13 +36,13 @@ test('câmera frontal olha para o personagem em qualquer direção', async () =>
     }
 });
 
-test('as duas entradas alternam a vista e a câmera frontal não muda a mira por toque', async () => {
+test('as duas entradas alternam a vista e a câmera frontal mantém a mira oculta', async () => {
     const { readFileSync } = await import('node:fs');
     const game = readFileSync(new URL('../game.js', import.meta.url), 'utf8');
     const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
     assert.match(game, /case 'KeyV': if \(!event\.repeat\) toggleThirdPerson\(\)/);
     assert.match(game, /id === 'camera'\) toggleThirdPerson\(\)/);
-    assert.match(game, /function updateTarget\(\) \{\s*camera\.getWorldDirection\(tmpDir\)/);
+    assert.match(game, /fingerAimDirection\(\{[\s\S]*?viewCamera: third \? thirdCamera : camera/);
     assert.match(game, /cameraView === 'front'\) thirdCamera\.quaternion\.multiply\(frontCameraTurn\)/);
     assert.match(css, /body\.camera-front #crosshair\s*\{\s*display:\s*none/);
 });

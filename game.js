@@ -89,6 +89,7 @@ import {
     touchLookSensitivity,
 } from './world-touch-controls.js';
 import { attackHeld, performTouchTapAttack } from './world-touch-tap-attack.js';
+import { fingerAimDirection } from './world-touch-aim.js';
 import { getSharedAudio } from './world-audio.js';
 import { touchLayoutState, touchStickRadius } from './world-touch-layout.js';
 import { compactTouchHotbar } from './world-touch-hotbar.js';
@@ -1962,8 +1963,9 @@ function mobHitPuff(entity, count = 6) {
 // o golpe viraria uma mineração silenciosa do cenário).
 function strikeCreature({ tap = false } = {}) {
     if (!leftHeld && !tap) return false;
-    // Golpes e mineração usam a mesma direção da mira central.
-    camera.getWorldDirection(creatureAim);
+    // Ataque usa a mesma direção que selecionou o bloco, inclusive pelo dedo.
+    if (fingerAimEnabled() && touchAim.on) creatureAim.copy(touchAim.dir);
+    else camera.getWorldDirection(creatureAim);
     // O bloco na mira limita o alcance do golpe — com a folga de
     // `MOB_HIT_BLOCK_SLACK`, para o bicho encostado no chão não perder o clique.
     const aim = { maxDistance: currentHit ? currentHit.dist + MOB_HIT_BLOCK_SLACK : Infinity };
@@ -3231,6 +3233,15 @@ const touchLook = {
     mode: 'wait',
     holdTimer: 0,
 };
+// O modo sem mira só mantém o ponto enquanto um gesto está ativo.
+let touchAimMode = 'center';
+const touchAim = { on: false, x: 0, y: 0, dir: new THREE.Vector3() };
+const touchRaycaster = new THREE.Raycaster();
+const touchNdc = new THREE.Vector2();
+function clearTouchAim() { touchAim.on = false; }
+function fingerAimEnabled() { return touchActive && touchAimMode === 'finger'; }
+function setFingerAim(x, y) { touchAim.x = x; touchAim.y = y; touchAim.on = true; }
+
 // Layout de toque vindo das opções: multiplicador de tamanho (CSS
 // `--touch-scale`, que o joystick, os botões e a hotbar leem) e o lado em que
 // ficam os controles. É aplicado em `applyGameSettings`, que roda no começo e a
@@ -3387,6 +3398,17 @@ function setTouchEditing(on) {
 function applyTouchLayout(settings = GAME_SETTINGS) {
     const state = touchLayoutState(settings);
     touchScale = state.size;
+    touchAimMode = settings.touchAimMode === 'finger' ? 'finger' : 'center';
+    if (!fingerAimEnabled()) clearTouchAim();
+    document.body.classList.toggle('touch-aim-finger', fingerAimEnabled());
+    const hint = document.getElementById('touch-hint');
+    if (hint) hint.textContent = touchAimMode === 'finger'
+        ? 'Arraste para olhar · toque ou segure no alvo · mão para usar'
+        : 'Arraste para olhar · toque para golpear · segure para cavar pela mira · mão para usar';
+    const menuHint = document.getElementById('menu-touch-hint');
+    if (menuHint) menuHint.textContent = touchAimMode === 'finger'
+        ? 'No toque: joystick à esquerda; arraste para olhar, toque ou segure no alvo. Use o botão da mão para usar ou colocar.'
+        : 'No toque: joystick à esquerda; arraste para olhar, toque para golpear e segure para cavar pela mira central. Use o botão da mão para usar ou colocar.';
     document.body.classList.toggle('touch-left', state.lefty);
     document.body.classList.toggle('touch-right', !state.lefty);
     document.body.style.setProperty('--touch-scale', String(state.size));
@@ -3426,6 +3448,7 @@ function stopTouchGesture() {
     if (touchLook.holdTimer) { clearTimeout(touchLook.holdTimer); touchLook.holdTimer = 0; }
     touchLook.pointerId = null;
     touchLook.mode = 'wait';
+    clearTouchAim();
 }
 
 function resetTouchStickVisual() {
@@ -3437,6 +3460,7 @@ function resetTouchStickVisual() {
 // menu de pausa, inventário e tela de morte continuam sendo telas de dedo, mas
 // sem joystick por cima.
 function syncTouchUi() {
+    document.body.classList.toggle('touch-aim-finger', fingerAimEnabled());
     const ui = document.getElementById('touch-ui');
     if (!ui) return;
     const visible = touchMode && (touchActive || touchEditing) && !inventoryOpen && !dead;
@@ -3970,9 +3994,20 @@ function intersectsPlayer(bx, by, bz) {
 // 9. RAYCAST POR VOXELS (DDA)
 // =====================================================================
 function updateTarget() {
-    camera.getWorldDirection(tmpDir);
-    currentHit = raycastVoxels(camera.position, tmpDir, REACH, WORLD_RAYCAST_ACCESS);
-    if (currentHit) {
+    if (fingerAimEnabled() && touchAim.on) {
+        const rect = renderer.domElement.getBoundingClientRect();
+        const third = cameraView !== 'first' && !sleep.active && updateThirdPerson();
+        fingerAimDirection({ x: touchAim.x, y: touchAim.y, rect,
+            viewCamera: third ? thirdCamera : camera, eye: camera.position,
+            raycaster: touchRaycaster, ndc: touchNdc, direction: touchAim.dir,
+            third, reach: REACH, cameraDistance: THIRD_PERSON_DISTANCE,
+            raycast: (origin, direction, distance) => raycastVoxels(origin, direction, distance, WORLD_RAYCAST_ACCESS) });
+        currentHit = raycastVoxels(camera.position, touchAim.dir, REACH, WORLD_RAYCAST_ACCESS);
+    } else {
+        camera.getWorldDirection(tmpDir);
+        currentHit = raycastVoxels(camera.position, tmpDir, REACH, WORLD_RAYCAST_ACCESS);
+    }
+    if (currentHit && (!fingerAimEnabled() || touchAim.on || touchBreakPointerId !== null)) {
         targetMesh.position.set(currentHit.x + 0.5, currentHit.y + 0.5, currentHit.z + 0.5);
         targetMesh.visible = true;
     } else {
@@ -5057,8 +5092,8 @@ async function init() {
             });
         }
 
-        // Arrastar olha; toque curto golpeia; segurar minera. Todos usam a
-        // mira central, independentemente de onde o dedo encostou na tela.
+        // Arrastar olha; toque curto golpeia; segurar minera. No modo sem
+        // mira, o alvo é o ponto tocado; no outro, é sempre o centro.
         function gestureAt(event, released = false) {
             return touchGesture({
                 dx: event.clientX - touchLook.startX,
@@ -5070,6 +5105,7 @@ async function init() {
 
         function startBreaking() {
             touchLook.mode = 'hold';
+            if (fingerAimEnabled()) setFingerAim(touchLook.lastX, touchLook.lastY);
             syncAttackHeld();
             pressButton('break', true);
         }
@@ -5081,6 +5117,7 @@ async function init() {
             touchLook.mode = 'wait';
             syncAttackHeld();
             if (wasHolding) pressButton('break', touchBreakPointerId !== null);
+            clearTouchAim();
             updateTarget();
         }
 
@@ -5103,6 +5140,11 @@ async function init() {
         canvas.addEventListener('pointermove', (event) => {
             if (event.pointerId !== touchLook.pointerId) return;
             event.preventDefault();
+            if (touchLook.mode === 'hold' && fingerAimEnabled()) {
+                touchLook.lastX = event.clientX; touchLook.lastY = event.clientY;
+                setFingerAim(event.clientX, event.clientY);
+                return;
+            }
             // Depois de iniciar a mineração, arrastar continua girando a câmera
             // sem soltar a ação: a mira central segue a direção do olhar.
             if (touchLook.mode !== 'hold' && gestureAt(event) === 'look') touchLook.mode = 'look';
@@ -5121,6 +5163,7 @@ async function init() {
             if (event.pointerId !== touchLook.pointerId) return;
             const gesture = gestureAt(event, true);
             if (touchLook.mode === 'wait' && gesture === 'tap' && playing() && !sleep.active) {
+                if (fingerAimEnabled()) setFingerAim(event.clientX, event.clientY);
                 performTouchTapAttack({ updateTarget, strikeCreature, updateMining,
                     punch: () => startPunch(handAnim) });
             }
@@ -5250,7 +5293,7 @@ async function init() {
 
 function toggleThirdPerson() {
     cameraView = nextCameraView(cameraView);
-    clearTouchAim();
+    if (touchLook.mode !== 'hold') clearTouchAim();
     document.body.classList.toggle('camera-front', cameraView === 'front');
     showToast({ first: 'Primeira pessoa', rear: 'Terceira pessoa — costas', front: 'Terceira pessoa — frente' }[cameraView]);
 }

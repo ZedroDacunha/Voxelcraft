@@ -452,6 +452,7 @@
     body.touch-mode #hud-bottom { pointer-events: none; }
     body.touch-mode .slot { pointer-events: auto; }
     body.touch-mode #crosshair { opacity: .85; }
+    body.touch-mode.touch-aim-finger #crosshair { display: none; }
     /* o dedo arrastando na tela não pode rolar nem dar zoom na página */
     body.touch-mode canvas { touch-action: none; -webkit-touch-callout: none; }
     @media (max-height: 460px) {
