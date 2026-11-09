@@ -88,6 +88,7 @@ import {
     touchGesture,
     touchLookSensitivity,
 } from './world-touch-controls.js';
+import { createInventoryTouchGesture } from './inventory-touch-gesture.js';
 import { attackHeld, performTouchTapAttack } from './world-touch-tap-attack.js';
 import { fingerAimDirection } from './world-touch-aim.js';
 import { getSharedAudio } from './world-audio.js';
@@ -2324,6 +2325,7 @@ function updateEmitterLights(now) {
 // 5D. TELA DE INVENTÁRIO
 // =====================================================================
 const cursorHeld = { stack: null };
+let inventoryTouchGesture = null;
 const craftInv = new Inventory(9);
 let craftN = 2;
 
@@ -2711,6 +2713,35 @@ function buildInventoryUI() {
     resetRovingTabIndex();
 
     const overlay = document.getElementById('inventory');
+    inventoryTouchGesture = createInventoryTouchGesture({ activate: (slot, button) => {
+        if (!inventoryOpen || !overlay.contains(slot)) return;
+        invMouse.seen = false;
+        haptic('button');
+        activateSlot(slot, { button, touch: true });
+    } });
+    overlay.addEventListener('pointerdown', event => {
+        if (event.pointerType !== 'touch' || !inventoryOpen) return;
+        const slot = event.target.closest?.('.islot');
+        if (slot && overlay.contains(slot)) {
+            // Impede a sequência sintética de mouse; rolar cancela pelo movimento.
+            event.preventDefault();
+            inventoryTouchGesture.start({ pointerId: event.pointerId, x: event.clientX, y: event.clientY, slot });
+        } else if (!event.target.closest?.('#inv-panel')) {
+            // Não jogar fora uma pilha por um toque acidental no fundo.
+            event.preventDefault();
+        }
+    });
+    document.addEventListener('pointermove', event => {
+        if (event.pointerType === 'touch') inventoryTouchGesture.move({ pointerId: event.pointerId, x: event.clientX, y: event.clientY });
+    });
+    document.addEventListener('pointerup', event => {
+        if (event.pointerType !== 'touch') return;
+        const slot = document.elementFromPoint(event.clientX, event.clientY)?.closest?.('.islot');
+        inventoryTouchGesture.end({ pointerId: event.pointerId, slot });
+    });
+    document.addEventListener('pointercancel', event => inventoryTouchGesture.pointerCancel(event.pointerId));
+    window.addEventListener('blur', () => inventoryTouchGesture.cancel());
+    document.addEventListener('visibilitychange', () => { if (document.hidden) inventoryTouchGesture.cancel(); });
     overlay.addEventListener('mousedown', onInventoryMouseDown);
     overlay.addEventListener('mousemove', onInventoryMouseMove);
     overlay.addEventListener('keydown', onInventoryKeyDown);
@@ -2859,6 +2890,14 @@ function refreshSlot(el, stack) {
     if (el.getAttribute('aria-label') !== label) el.setAttribute('aria-label', label);
 }
 
+function renderInventoryTouchHeld() {
+    const indicator = document.getElementById('inv-touch-held');
+    if (!indicator) return;
+    const stack = cursorHeld.stack;
+    indicator.hidden = !touchMode || !inventoryOpen || !stack;
+    if (!indicator.hidden) indicator.textContent = `Segurando: ${ITEMS[stack.id].name} × ${stack.count}`;
+}
+
 function renderInventory() {
     for (let i = 0; i < 36; i++) {
         const el = invSlotEls[i];
@@ -2878,6 +2917,7 @@ function renderInventory() {
         refreshSlot(outSlotEl, craftResult);
     }
     updateInventoryFloaters();
+    renderInventoryTouchHeld();
     updateHotbarUI();
     recipeBook?.refreshAvailability();
 }
@@ -2913,7 +2953,7 @@ function onInventoryMouseDown(e) {
 // Uma ativação de slot — vem do mouse ou da tecla Enter/Espaço (ver
 // `onInventoryKeyDown`). Recebe só `button`/`shiftKey` para não depender de um
 // evento de ponteiro.
-function activateSlot(el, { button = 0, shiftKey = false } = {}) {
+function activateSlot(el, { button = 0, shiftKey = false, touch = false } = {}) {
     const name = el.dataset.inv, i = Number(el.dataset.index);
     invHover = { inv: name, i };
 
@@ -2939,9 +2979,9 @@ function activateSlot(el, { button = 0, shiftKey = false } = {}) {
             else if (name === 'chest') invQuickMove(station.chest.inv, i, inventory, 0, 36);
             else invQuickMove(craftInv, i, inventory, 0, 36);
         }
-        else if (cursorHeld.stack && invLastClick.key === key && now - invLastClick.time < 350) invCollectSame(target, cursorHeld);
+        else if (!touch && cursorHeld.stack && invLastClick.key === key && now - invLastClick.time < 350) invCollectSame(target, cursorHeld);
         else invLeftClick(target, i, cursorHeld);
-        invLastClick = { time: now, key };
+        invLastClick = touch ? { time: 0, key: '' } : { time: now, key };
     } else if (button === 2) {
         invRightClick(target, i, cursorHeld);
     }
@@ -2989,7 +3029,9 @@ function giveBack(s) {
 
 function closeInventory(relock) {
     if (!inventoryOpen) return;
+    inventoryTouchGesture?.cancel();
     inventoryOpen = false;
+    renderInventoryTouchHeld();
     const panel = document.getElementById('inventory');
     if (panel.contains(document.activeElement)) document.activeElement.blur();
     setRecipeBookOpen(false);
