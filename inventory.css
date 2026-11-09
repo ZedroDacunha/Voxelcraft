@@ -1,13 +1,13 @@
 /* Estilos da interface de inventário e das estações de crafting. */
 #inventory { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.55); z-index: 9; user-select: none; }
     #inv-panel { position: relative; box-sizing: border-box; width: min(560px, calc(100vw - 24px)); max-width: calc(100vw - 24px); background: #2b2b2b; border: 3px solid #111; outline: 3px solid #555; border-radius: 4px; padding: clamp(8px, 2vw, 14px); box-shadow: 0 8px 30px rgba(0,0,0,0.6); color: #eee; max-height: calc(100dvh - 24px); overflow-y: auto; }
-    .inv-titlebar { min-height: 30px; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
-    .inv-title { font: bold 14px monospace; color: #ddd; }
+    .inv-titlebar { position: sticky; top: 0; z-index: 2; background: #2b2b2b; min-height: 44px; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
+    .inv-title { flex: 1; min-width: 0; font: bold 14px monospace; color: #ddd; }
     .recipe-book-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; color: #f0e4c5; background: linear-gradient(#695439, #46351f); border: 2px solid #21180f; box-shadow: inset 1px 1px #a58a5d, 1px 2px #111; font: bold 11px monospace; cursor: pointer; }
     .recipe-book-toggle:hover, .recipe-book-toggle[aria-expanded="true"] { background: linear-gradient(#806641, #574126); color: #fff5d8; }
     .recipe-book-icon { position: relative; width: 14px; height: 12px; display: inline-block; border: 1px solid #23190f; background: linear-gradient(90deg, #d9c48e 0 45%, #72532e 45% 55%, #eee0ad 55%); box-shadow: 1px 1px 0 #111; }
     .recipe-book-icon::after { content: ''; position: absolute; inset: 3px 2px; border-top: 1px solid #94794d; border-bottom: 1px solid #94794d; }
-    .recipe-book-toggle:focus-visible, .recipe-book-close:focus-visible, .recipe-search:focus-visible { outline: 2px solid #f3d58a; outline-offset: 2px; }
+    .overlay-close:focus-visible, .recipe-book-toggle:focus-visible, .recipe-book-close:focus-visible, .recipe-search:focus-visible { outline: 2px solid #f3d58a; outline-offset: 2px; }
     .recipe-book { margin: 0 0 12px; padding: 10px; background: #1e1b18; border: 2px solid #111; box-shadow: inset 0 0 0 1px #64523a; }
     /* hidden precisa vencer os displays de grid/flex usados pelas receitas. */
     .recipe-book[hidden], .recipe-book [hidden] { display: none; }
@@ -75,3 +75,5 @@
     #fur-prog { height: 100%; width: 0; background: #eee; }
 
     
+
+    body.touch-mode .recipe-book-close { width: 44px; height: 44px; flex: 0 0 44px; }

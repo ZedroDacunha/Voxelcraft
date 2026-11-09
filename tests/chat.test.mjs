@@ -409,7 +409,7 @@ test('a tecla T e a barra abrem o chat; Esc fecha; Enter envia', () => {
     assert.match(game, /case 'KeyT': if \(!event\.repeat\) \{ event\.preventDefault\(\); openChat\(\); \} break;/);
     assert.match(game, /case 'Slash': if \(!event\.repeat\) \{ event\.preventDefault\(\); openChat\(COMMAND_PREFIX\); \} break;/);
     assert.match(game, /if \(event\.key === 'Escape'\) \{\s*event\.preventDefault\(\);\s*closeChat\(\);/);
-    assert.match(game, /if \(event\.key === 'Enter'\) \{\s*event\.preventDefault\(\);\s*submitChat\(\);/);
+    assert.match(game, /if \(event\.key === 'Enter'\) \{\s*event\.preventDefault\(\);\s*restoreTouchFullscreen\(\);\s*submitChat\(\);/);
     assert.match(game, /chatInput\.value = chat\.recall\(event\.key === 'ArrowUp' \? -1 : 1\);/);
     // com o chat aberto o teclado é dele: nada de andar/saltar enquanto digita
     assert.match(game, /\/\/ Com o chat aberto, o teclado é dele \(inclusive o T que abriu\)\.\n {8}if \(chat\.open\) return;/);

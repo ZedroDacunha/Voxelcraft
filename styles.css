@@ -220,11 +220,13 @@
     .chat-suggestion-hint { color: #a8a8a8; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .chat-suggestion.active .chat-suggestion-hint { color: #e2e2e2; }
     .chat-suggestion-more { padding: 1px 6px; color: #9a9a9a; background: rgba(0, 0, 0, .35); cursor: default; }
-    #chat-form { margin: 4px 0 0; pointer-events: auto; }
+    #chat-form { margin: 4px 0 0; pointer-events: auto; display: flex; align-items: stretch; gap: 4px; }
     #chat-form[hidden] { display: none; }
-    #chat-input { box-sizing: border-box; width: 100%; margin: 0; padding: 3px 6px;
+    #chat-input { box-sizing: border-box; width: 100%; min-width: 0; flex: 1; margin: 0; padding: 3px 6px;
         background: rgba(0, 0, 0, .72); color: #fff; border: 2px solid #555; border-radius: 2px;
         font: 13px/1.35 monospace; outline: none; }
+    .overlay-close { box-sizing: border-box; display: grid; place-items: center; flex: 0 0 44px;
+        width: 44px; height: 44px; min-height: 44px; padding: 0; font: bold 26px/1 monospace; touch-action: manipulation; }
     #chat-input::placeholder { color: #9a9a9a; }
     #chat-input:focus { border-color: #d0d0d0; }
     /* Pausa e edição dos botões: o chat sai da frente como o resto do HUD. */
