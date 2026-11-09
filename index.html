@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="Voxel">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
-<link rel="stylesheet" href="styles.css?v=bf2a31501b">
+<link rel="stylesheet" href="styles.css?v=c5921fdc29">
 <link rel="stylesheet" href="inventory.css?v=245bb17808">
 <!-- importmap:start (gerado por tools/stamp-importmap.mjs; não editar à mão) -->
 <script type="importmap">
@@ -22,7 +22,7 @@
     "./asset-versions.js": "./asset-versions.js?v=d42b8dc6ff",
     "./game-pause-menu.js": "./game-pause-menu.js?v=f625baba0f",
     "./game-pointer-lock.js": "./game-pointer-lock.js?v=cf53899b88",
-    "./game.js": "./game.js?v=60af66a155",
+    "./game.js": "./game.js?v=eb8eb222b8",
     "./inventory-a11y.js": "./inventory-a11y.js?v=25f3dab87d",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
     "./inventory-layout.js": "./inventory-layout.js?v=439823a409",
@@ -115,6 +115,7 @@
     "./world-tool-rules.js": "./world-tool-rules.js?v=85347f4434",
     "./world-tool-textures.js": "./world-tool-textures.js?v=1ddec1c6e7",
     "./world-touch-aim.js": "./world-touch-aim.js?v=635d914114",
+    "./world-touch-collision.js": "./world-touch-collision.js?v=eb95e6db6b",
     "./world-touch-controls.js": "./world-touch-controls.js?v=250dbd7b1e",
     "./world-touch-hotbar.js": "./world-touch-hotbar.js?v=ff7700878d",
     "./world-touch-immersive.js": "./world-touch-immersive.js?v=7fa9b0ee80",
@@ -471,6 +472,7 @@
 
 
 <div id="touch-ui" hidden>
+    <div id="touch-safe-zone" aria-hidden="true"></div>
     <div id="touch-stick" aria-label="Joystick de movimento">
         <div id="touch-stick-knob"></div>
     </div>
@@ -487,6 +489,7 @@
         <button class="classic-btn touch-btn" type="button" data-touch="pause" aria-label="Pausar" title="Pausar"><svg class="touch-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><rect x="6.5" y="5" width="4" height="14"/><rect x="13.5" y="5" width="4" height="14"/></svg></button>
     </div>
     <p id="touch-hint">Arraste para olhar · toque para golpear · segure para cavar pela mira · mão para usar</p>
+    <div id="touch-edit-notice" role="status" aria-live="polite" hidden></div>
     <div id="touch-edit-bar" hidden>
         <button class="classic-btn touch-edit-btn" type="button" id="btn-touch-positions-reset">Restaurar</button>
         <button class="classic-btn touch-edit-btn" type="button" id="btn-touch-positions-done">Pronto</button>
