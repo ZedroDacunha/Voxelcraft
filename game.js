@@ -33,6 +33,7 @@ import { createWorldClock } from './world-clock.js';
 import { createWorldClouds, WORLD_CLOUD_CONFIG } from './world-clouds.js';
 import { createWorldSkySystem } from './world-sky.js';
 import { createWorldGraphicsQuality } from './world-graphics-quality.js';
+import { createFrameSamples } from './world-performance-samples.js';
 import { raycastVoxels } from './world-raycast.js';
 import { createBreakParticleSystem } from './world-break-particles.js';
 import { InstancedBlockManager, testInstancedMesh } from './world-instanced-manager.js';
@@ -4065,6 +4066,10 @@ function updateSurvival(dt) {
 }
 
 const debugEl = document.getElementById('debug');
+const debugFrameSamples = createFrameSamples();
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) debugFrameSamples.record(0, false);
+});
 let debugVisible = false, fpsFrames = 0, fpsTime = 0, fps = 0;
 function updateDebug(rawDt) {
     fpsFrames++; fpsTime += rawDt;
@@ -4072,6 +4077,8 @@ function updateDebug(rawDt) {
     fps = Math.round(fpsFrames / fpsTime);
     fpsFrames = 0; fpsTime = 0;
     if (!debugVisible) return;
+    const frameSample = debugFrameSamples.summary();
+    const sampleText = frameSample ? `${frameSample.frames} quadros / ${frameSample.seconds.toFixed(1)} s | FPS médio ${frameSample.fps.toFixed(1)} | p95 ${frameSample.p95.toFixed(1)} ms | >50 ms: ${frameSample.slow}` : 'aguardando quadros';
     const p = player.pos;
     const target = currentHit
         ? `${BLOCKS[currentHit.type].name} (${currentHit.x}, ${currentHit.y}, ${currentHit.z})`
@@ -4079,6 +4086,7 @@ function updateDebug(rawDt) {
     const tt = currentHit ? getBreakTime(currentHit.type, inventory.slots[selectedSlot]).toFixed(2) + 's' : '—';
     debugEl.textContent =
 `Voxel Sandbox — Parte 11 (Mares)
+Amostra recente: ${sampleText}
 FPS: ${fps} | Água: ${world.water.headInWater ? 'Mergulhado' : (world.water.feetInWater ? 'Cintura' : 'Não')}
 Nuvens: ${worldClouds.cells} células (de ${WORLD_CLOUD_CONFIG.gridSize * WORLD_CLOUD_CONFIG.gridSize}) | altura ${WORLD_CLOUD_CONFIG.height}
 Seed: ${SEED}
@@ -5045,6 +5053,7 @@ async function init() {
             case 'F3':
                 event.preventDefault();
                 debugVisible = !debugVisible;
+                debugFrameSamples.reset();
                 debugEl.style.display = debugVisible ? 'block' : 'none';
                 document.body.classList.toggle('debug-visible', debugVisible);
                 break;
@@ -5474,6 +5483,7 @@ function animate() {
     // anda, a água corre, os bichos vivem. Só o jogador é que fica parado,
     // porque o mouse está solto e as teclas vão para a linha de digitação.
     const worldRunning = playing() || chat.open;
+    debugFrameSamples.record(rawDt * 1000, debugVisible && worldRunning && !document.hidden);
     if (worldRunning) {
         // Dormindo, o corpo fica parado: quem manda na câmera é `updateSleep`,
         // e o jogador não anda, não cava e não come.
