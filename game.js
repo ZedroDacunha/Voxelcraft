@@ -4071,6 +4071,18 @@ document.addEventListener('visibilitychange', () => {
     if (document.hidden) debugFrameSamples.record(0, false);
 });
 let debugVisible = false, fpsFrames = 0, fpsTime = 0, fps = 0;
+const debugOption = document.getElementById('opt-debug');
+function setDebugVisible(visible) {
+    if (debugVisible === visible) return;
+    debugVisible = visible;
+    debugFrameSamples.reset();
+    debugEl.style.display = visible ? 'block' : 'none';
+    document.body.classList.toggle('debug-visible', visible);
+    debugOption?.setAttribute('aria-pressed', String(visible));
+    const value = document.getElementById('opt-debug-value');
+    if (value) value.textContent = visible ? 'Ligado' : 'Desligado';
+}
+debugOption?.addEventListener('click', () => setDebugVisible(!debugVisible));
 function updateDebug(rawDt) {
     fpsFrames++; fpsTime += rawDt;
     if (fpsTime < 0.25) return;
@@ -4079,6 +4091,14 @@ function updateDebug(rawDt) {
     if (!debugVisible) return;
     const frameSample = debugFrameSamples.summary();
     const sampleText = frameSample ? `${frameSample.frames} quadros / ${frameSample.seconds.toFixed(1)} s | FPS médio ${frameSample.fps.toFixed(1)} | p95 ${frameSample.p95.toFixed(1)} ms | >50 ms: ${frameSample.slow}` : 'aguardando quadros';
+    if (document.body.classList.contains('touch-mode')) {
+        debugEl.textContent = `Diagnóstico | FPS: ${fps}
+${sampleText}
+Filas: geração ${world.genQueue.length} | malha ${world.dirty.size}
+CPU ${perf.avg.toFixed(1)} ms | malha ${world.lastMeshMs.toFixed(1)} ms | luz ${world.lastLightMs.toFixed(1)} ms
+Escala ${gfx.scale.toFixed(2)} (${gfx.auto ? 'auto' : 'manual'})`;
+        return;
+    }
     const p = player.pos;
     const target = currentHit
         ? `${BLOCKS[currentHit.type].name} (${currentHit.x}, ${currentHit.y}, ${currentHit.z})`
@@ -5052,10 +5072,7 @@ async function init() {
             case 'F4': event.preventDefault(); cycleQuality(); break;
             case 'F3':
                 event.preventDefault();
-                debugVisible = !debugVisible;
-                debugFrameSamples.reset();
-                debugEl.style.display = debugVisible ? 'block' : 'none';
-                document.body.classList.toggle('debug-visible', debugVisible);
+                setDebugVisible(!debugVisible);
                 break;
         }
         if (event.code.startsWith('Digit')) {
@@ -5387,6 +5404,7 @@ async function init() {
     }
 
     if (touchMode) setupTouchControls();
+    if (debugOption) debugOption.hidden = false;
 
     setInterval(() => { if (playing()) saveGame(true); }, 30000);
     document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(true, true); });

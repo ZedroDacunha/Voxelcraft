@@ -25,6 +25,6 @@ test('ignora intervalo de retorno e dados inválidos; reset limpa', () => {
 test('integração não coleta no fundo ou sem jogo e F3 reinicia', () => {
     const source = readFileSync(new URL('../game.js', import.meta.url), 'utf8');
     assert.match(source, /debugFrameSamples\.record\(rawDt \* 1000, debugVisible && worldRunning && !document\.hidden\)/);
-    assert.match(source, /debugVisible = !debugVisible;\s*debugFrameSamples\.reset\(\)/);
+    assert.match(source, /debugVisible = visible;\s*debugFrameSamples\.reset\(\)/);
     assert.match(source, /visibilitychange[\s\S]*?document\.hidden\) debugFrameSamples\.record\(0, false\)/);
 });
