@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="Voxel">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
-<link rel="stylesheet" href="styles.css?v=c5921fdc29">
+<link rel="stylesheet" href="styles.css?v=bc6f6a86a4">
 <link rel="stylesheet" href="inventory.css?v=245bb17808">
 <!-- importmap:start (gerado por tools/stamp-importmap.mjs; não editar à mão) -->
 <script type="importmap">
@@ -22,7 +22,7 @@
     "./asset-versions.js": "./asset-versions.js?v=d42b8dc6ff",
     "./game-pause-menu.js": "./game-pause-menu.js?v=f625baba0f",
     "./game-pointer-lock.js": "./game-pointer-lock.js?v=cf53899b88",
-    "./game.js": "./game.js?v=660fcfe705",
+    "./game.js": "./game.js?v=fbb14e00df",
     "./inventory-a11y.js": "./inventory-a11y.js?v=25f3dab87d",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
     "./inventory-layout.js": "./inventory-layout.js?v=439823a409",
@@ -246,6 +246,9 @@
             <button type="button" class="classic-btn option-btn option-slider" id="opt-fov" aria-label="Campo de visão">
                 <span class="option-track" aria-hidden="true"><span class="option-knob"></span></span>
                 <span class="option-text"><span class="option-name">Campo de visão</span>: <span class="option-value" id="opt-fov-value">75°</span></span>
+            </button>
+            <button type="button" class="classic-btn option-btn" id="opt-debug" aria-pressed="false" hidden>
+                <span class="option-text">Diagnóstico: <span id="opt-debug-value">Desligado</span></span>
             </button>
             <button type="button" class="classic-btn option-btn option-slider" id="opt-render-distance" aria-label="Distância de render">
                 <span class="option-track" aria-hidden="true"><span class="option-knob"></span></span>
