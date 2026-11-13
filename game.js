@@ -54,7 +54,7 @@ import {
 import { DAWN_TIME, bedRespawnPoint, canSleepAt, sleepPhaseAt } from './world-sleep.js';
 import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld } from './player-physics.js';
 import { canJumpFrom, createJumpState, updateJumpWindow } from './player-jump.js';
-import { createPlayerModel } from './player-model.js';
+import { createPlayerModel, PLAYER_MODEL_COLORS } from './player-model.js';
 import { advanceSwim, createSwimState, swimFirstPersonPose, swimPose } from './player-swim-animation.js';
 import { createPlayerHeldItem } from './player-held-item.js';
 import { THIRD_PERSON_BODY_MIN_DISTANCE, THIRD_PERSON_DISTANCE, cameraOffsetSign, nextCameraView, thirdPersonDistance, thirdPersonLimbSwing } from './player-third-person.js';
@@ -2121,7 +2121,9 @@ function createHand() {
     handPivot = new THREE.Group();
     handSleeve = new THREE.Mesh(
         new THREE.BoxGeometry(0.16, 0.16, 0.40),
-        new THREE.MeshLambertMaterial({ map: createNoiseTexture([70, 110, 190], 11) }));
+        new THREE.MeshLambertMaterial({ map: createNoiseTexture([
+            (PLAYER_MODEL_COLORS.tunic >> 16) & 255, (PLAYER_MODEL_COLORS.tunic >> 8) & 255, PLAYER_MODEL_COLORS.tunic & 255,
+        ], 11) }));
     handSleeve.position.z = -0.20;
     handBlock = new THREE.Mesh(
         new THREE.BoxGeometry(0.13, 0.13, 0.20),
