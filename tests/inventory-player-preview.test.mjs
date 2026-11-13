@@ -6,12 +6,12 @@ import { renderInventoryPlayer } from '../inventory-player-preview.js';
 
 test('prévia reutiliza renderer, inverte pixels e restaura destino anterior', () => {
     const previous = {};
-    let current = previous, image, rendered = false;
+    let current = previous, image, rendered = false, angle;
     const renderer = {
         getRenderTarget: () => current,
         setRenderTarget: target => { current = target; },
         clear: () => {},
-        render: scene => { rendered = Boolean(scene.getObjectByName('player')); },
+        render: scene => { rendered = Boolean(scene.getObjectByName('player')); angle = scene.getObjectByName('player').rotation.y; },
         readRenderTargetPixels(target, x, y, w, h, pixels) {
             for (let row = 0; row < h; row++) pixels[row * w * 4] = row;
         },
@@ -20,8 +20,9 @@ test('prévia reutiliza renderer, inverte pixels e restaura destino anterior', (
         createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4) }),
         putImageData: data => { image = data; },
     }) };
-    renderInventoryPlayer({ THREE, renderer, canvas });
+    renderInventoryPlayer({ THREE, renderer, canvas, angle: 1.2 });
     assert.ok(rendered);
+    assert.equal(angle, 1.2);
     assert.equal(current, previous);
     assert.equal(canvas.width, 144);
     assert.equal(canvas.height, 192);
@@ -42,8 +43,8 @@ test('personagem aparece só no inventário pessoal, com rótulo acessível', ()
     const game = readFileSync(new URL('../game.js', import.meta.url), 'utf8');
     const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
     const css = readFileSync(new URL('../inventory.css', import.meta.url), 'utf8');
-    assert.match(html, /<canvas id="inv-player" role="img" aria-label="Personagem aventureiro" hidden><\/canvas>/);
+    assert.match(html, /<canvas id="inv-player" role="img" tabindex="0" aria-label="Personagem aventureiro: arraste ou use as setas esquerda e direita para girar" hidden><\/canvas>/);
     assert.match(game, /getElementById\('inv-player'\)\.hidden = Boolean\(station\)/);
-    assert.match(game, /if \(!station\)\s*\{\s*const canvas = document\.getElementById\('inv-player'\)/);
+    assert.match(game, /if \(!station\) inventoryPlayerRotation\.open\(\)/);
     assert.match(css, /#inv-player\[hidden\]\s*\{\s*display:\s*none/);
 });
