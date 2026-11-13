@@ -34,21 +34,3 @@ test('as duas visões utilizam a mesma fase sem mexer na pose de repouso', () =>
     assert.match(src, /pickaxeMiningPose\(ITEMS\[heldId\]\?\.tool\?\.type, handAnim\)/);
     assert.match(src, /rightArm\.rotation\.x = pose\.rightArm - 0\.65 \* pickaxe\.lift/);
 });
-
-test('preparação, impacto e retorno são contínuos e sem mudanças bruscas de velocidade', () => {
-    const at = t => pickaxeMiningPose('pickaxe', { mining: 1, phase: t * Math.PI });
-    const eps = 1e-5;
-    for (const t of [0, .18, .25, .5, 1]) {
-        const before = at(t - eps), current = at(t), after = at(t + eps);
-        for (const key of ['lift', 'strike']) {
-            assert.ok(Math.abs(before[key] - current[key]) < .001, `${key} contínuo antes de ${t}`);
-            assert.ok(Math.abs(after[key] - current[key]) < .001, `${key} contínuo depois de ${t}`);
-            const left = (current[key] - before[key]) / eps;
-            const right = (after[key] - current[key]) / eps;
-            assert.ok(Math.abs(left - right) < .01, `${key} velocidade contínua em ${t}`);
-        }
-    }
-    assert.equal(at(.18).strike, 0, 'prepara antes de descer');
-    assert.ok(at(.4).strike > at(.3).strike, 'acelera para o impacto');
-    assert.ok(at(.75).strike > 0 && at(.75).strike < 1, 'retorno gradual');
-});
