@@ -67,6 +67,7 @@ import { createChatCompleter, visibleSuggestions } from './world-chat-completion
 import { DUST_COLOR, dustScaleFor } from './world-creature-dust.js';
 import { configureWindSway, updateWindSway, windDirectionFor, windStep, windTargetFor } from './world-wind.js';
 import { advanceHandAnimation, countStrikes, createHandAnimation, handSwingAmount, startPunch } from './world-hand-animation.js';
+import { pickaxeMiningPose } from './world-pickaxe-animation.js';
 import { FIRST_TOOL_POSE, applyFirstPersonToolPose } from './world-first-person-tool.js';
 import { STEP_MAX_MOVED, stepDistanceThisFrame, stepPitch, stepSoundFor } from './world-step-sounds.js';
 import { advanceGait, createGait, gaitPose } from './world-gait.js';
@@ -2217,6 +2218,7 @@ function updateHand(dt) {
     advanceHandAnimation(handAnim, dt, { mining: miningNow });
     if (miningNow) playMiningHits(countStrikes(phaseBefore, handAnim.phase));
     const { swing, dip } = handSwingAmount(handAnim);
+    const pickaxe = pickaxeMiningPose(item?.tool?.type, handAnim);
     const heldToolKind = ITEMS[heldId]?.sprite?.kind;
     if (HELD_TOOL_KINDS.has(heldToolKind)) {
         applyFirstPersonToolPose(heldAnchor);
@@ -2234,10 +2236,10 @@ function updateHand(dt) {
     const ba = gaitNow.amplitude * swim.walkWeight;
     handPivot.position.set(
         HAND_BASE.x + gaitNow.handX * 0.012 * ba + swim.handX - 0.22 * ea,
-        HAND_BASE.y + gaitNow.handY * 0.010 * ba + swim.handY - dip - 0.05 * swing + 0.20 * ea + wob,
+        HAND_BASE.y + gaitNow.handY * 0.010 * ba + swim.handY - dip - 0.05 * swing + 0.20 * ea + wob + 0.07 * pickaxe.lift - 0.04 * pickaxe.strike,
         HAND_BASE.z + swim.handZ - 0.12 * swing + 0.08 * ea);
     handPivot.rotation.set(
-        0.35 - 0.9 * swing + 0.35 * ea + gaitNow.handX * 0.02 * ba + swim.handPitch, 0.25 - 0.3 * ea, 0);
+        0.35 - 0.9 * swing + 0.35 * ea + gaitNow.handX * 0.02 * ba + swim.handPitch + 0.5 * pickaxe.lift - 0.2 * pickaxe.strike, 0.25 - 0.3 * ea, 0);
     handPivot.scale.setScalar(1);
 }
 
@@ -5469,7 +5471,8 @@ function updateThirdPerson() {
     playerModel.leftLeg.rotation.x = pose.leftLeg;
     playerModel.rightLeg.rotation.x = pose.rightLeg;
     playerModel.leftArm.rotation.x = pose.leftArm;
-    playerModel.rightArm.rotation.x = pose.rightArm;
+    const pickaxe = pickaxeMiningPose(ITEMS[heldId]?.tool?.type, handAnim);
+    playerModel.rightArm.rotation.x = pose.rightArm - 0.65 * pickaxe.lift + 0.4 * pickaxe.strike;
     camera.getWorldDirection(thirdDirection).multiplyScalar(cameraOffsetSign(cameraView));
     const hit = raycastVoxels(camera.position, thirdDirection, THIRD_PERSON_DISTANCE, {
         getBlock: (x, y, z) => world.getBlock(x, y, z),
