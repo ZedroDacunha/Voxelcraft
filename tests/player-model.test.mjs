@@ -65,7 +65,26 @@ test('rosto tem olhos maiores, sobrancelhas e mechas sem faces coplanares com a 
         assert.ok(bounds(fringe).min.z > face.max.z);
     }
     for (const eyebrow of parts('eyebrow')) assert.ok(bounds(eyebrow).min.z > face.max.z);
-    for (const eye of parts('eye-white')) assert.equal(eye.geometry.parameters.height, 1.7 * PLAYER_MODEL_HEIGHT / 32);
+    for (const eye of parts('eye-white')) assert.equal(eye.geometry.parameters.height, 2.0 * PLAYER_MODEL_HEIGHT / 32);
     let released = false; model.head.getObjectByName('fringe-left').geometry.addEventListener('dispose', () => released = true);
     model.dispose(); assert.equal(released, true);
+});
+
+test('olhos da referência têm pupilas simétricas dentro da parte branca e não sobrepõem sobrancelhas', () => {
+    const model = createPlayerModel(THREE); model.root.updateMatrixWorld(true);
+    const list = name => model.head.children.filter(part => part.name === name).sort((a, b) => a.position.x - b.position.x);
+    const whites = list('eye-white'), pupils = list('pupil'), eyebrows = list('eyebrow');
+    assert.equal(whites.length, 2); assert.equal(pupils.length, 2);
+    for (let i = 0; i < 2; i++) {
+        const white = new THREE.Box3().setFromObject(whites[i]);
+        const pupil = new THREE.Box3().setFromObject(pupils[i]);
+        const brow = new THREE.Box3().setFromObject(eyebrows[i]);
+        assert.ok(pupil.min.x > white.min.x && pupil.max.x < white.max.x);
+        assert.ok(pupil.min.y > white.min.y && pupil.max.y < white.max.y);
+        assert.ok(pupil.max.z > white.max.z, 'pupila à frente do branco');
+        assert.ok(white.max.y < brow.min.y, 'olho não atravessa a sobrancelha');
+        assert.ok(Math.abs(pupils[i].position.x) < Math.abs(whites[i].position.x));
+    }
+    assert.ok(Math.abs(pupils[0].position.x + pupils[1].position.x) < 1e-10);
+    model.dispose();
 });
