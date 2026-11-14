@@ -2893,6 +2893,7 @@ function applyInventoryLayout() {
     const isChest = !!station && station.type === 'chest';
     document.getElementById('craft-row').style.display = (isFurnace || isChest) ? 'none' : 'flex';
     document.getElementById('inv-player').hidden = Boolean(station);
+    document.getElementById('inv-armor').hidden = Boolean(station);
     document.getElementById('furnace-row').style.display = isFurnace ? 'flex' : 'none';
     document.getElementById('chest-row').style.display = isChest ? 'block' : 'none';
     document.getElementById('inv-title').textContent =

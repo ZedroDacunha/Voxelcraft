@@ -50,6 +50,13 @@
     .recipe-empty { margin: 8px 0 0; color: #b9ad96; font: 11px monospace; }
     .inv-grid { display: grid; grid-template-columns: repeat(9, var(--inv-slot-size)); gap: var(--inv-gap); }
     .craft-row { display: flex; align-items: center; gap: clamp(8px, 2vw, 14px); margin-bottom: 12px; }
+    #inv-armor { display: grid; flex: 0 0 auto; grid-template-columns: var(--inv-slot-size); gap: var(--inv-gap); }
+    #inv-armor[hidden] { display: none; }
+    .armor-slot { box-sizing: border-box; width: var(--inv-slot-size); height: var(--inv-slot-size);
+        display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.12);
+        border: 2px solid #555; border-radius: 3px; }
+    .armor-slot svg { width: 70%; height: 70%; fill: none; stroke: #969696;
+        stroke-width: 2; stroke-linejoin: round; pointer-events: none; }
     #inv-player { box-sizing: border-box; display: block; flex: 0 0 auto;
         width: calc(var(--inv-slot-size) * 2); height: calc(var(--inv-slot-size) * 2.67);
         background: #000; border: 2px solid #111; image-rendering: pixelated; touch-action: none; cursor: grab; }
