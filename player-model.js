@@ -41,9 +41,15 @@ export function createPlayerModel(THREE, colors = {}) {
     box(head, 'hair-back', 'hair', [8, 5.4, 0.08], [0, 3.9, -4.04]);
     box(head, 'hair-left', 'hair', [0.08, 2.6, 8], [-4.04, 5.3, 0]);
     box(head, 'hair-right', 'hair', [0.08, 2.6, 8], [4.04, 5.3, 0]);
+    // As mechas avançam sobre a testa e sobre o topo, sem faces visíveis no
+    // mesmo plano: a sobreposição com o cabelo de cima fica dentro do volume.
+    box(head, 'fringe-left', 'hair', [1.15, 1.05, 0.22], [-2.7, 6.5, 4.12]);
+    box(head, 'fringe-middle', 'hair', [1.15, 0.8, 0.22], [-0.6, 6.62, 4.12]);
+    box(head, 'fringe-right', 'hair', [1.3, 0.65, 0.22], [2.35, 6.7, 4.12]);
     for (const x of [-2, 2]) {
-        box(head, 'eye-white', 'eyeWhite', [1.5, 1, 0.08], [x, 4.15, 4.03]);
-        box(head, 'pupil', 'eyes', [0.7, 0.9, 0.09], [x, 4.15, 4.08]);
+        box(head, 'eyebrow', 'hair', [1.6, 0.42, 0.08], [x, 5.5, 4.07]);
+        box(head, 'eye-white', 'eyeWhite', [1.5, 1.7, 0.08], [x, 4.1, 4.03]);
+        box(head, 'pupil', 'eyes', [0.7, 1.305, 0.09], [x, 4.1, 4.08]);
     }
     box(head, 'mouth', 'belt', [2, 0.45, 0.08], [0, 2.1, 4.04]);
     const torso = part('torso', 0, 12, 0);

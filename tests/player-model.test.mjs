@@ -51,3 +51,21 @@ test('cabelo cobre a pele e suas peças não disputam o mesmo espaço', () => {
     }
     model.dispose();
 });
+
+test('rosto tem olhos maiores, sobrancelhas e mechas sem faces coplanares com a pele', () => {
+    const model = createPlayerModel(THREE); model.root.updateMatrixWorld(true);
+    const parts = name => model.head.children.filter(part => part.name === name);
+    const bounds = part => new THREE.Box3().setFromObject(part);
+    const face = bounds(model.head.getObjectByName('face'));
+    assert.equal(parts('eyebrow').length, 2);
+    assert.equal(parts('eye-white').length, 2);
+    assert.equal(parts('pupil').length, 2);
+    for (const name of ['fringe-left', 'fringe-middle', 'fringe-right']) {
+        const fringe = model.head.getObjectByName(name); assert.ok(fringe);
+        assert.ok(bounds(fringe).min.z > face.max.z);
+    }
+    for (const eyebrow of parts('eyebrow')) assert.ok(bounds(eyebrow).min.z > face.max.z);
+    for (const eye of parts('eye-white')) assert.equal(eye.geometry.parameters.height, 1.7 * PLAYER_MODEL_HEIGHT / 32);
+    let released = false; model.head.getObjectByName('fringe-left').geometry.addEventListener('dispose', () => released = true);
+    model.dispose(); assert.equal(released, true);
+});
