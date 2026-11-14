@@ -12,7 +12,7 @@
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link rel="stylesheet" href="styles.css?v=bc6f6a86a4">
-<link rel="stylesheet" href="inventory.css?v=6b500dbb23">
+<link rel="stylesheet" href="inventory.css?v=4c790c6f21">
 <!-- importmap:start (gerado por tools/stamp-importmap.mjs; não editar à mão) -->
 <script type="importmap">
 {
@@ -22,7 +22,7 @@
     "./asset-versions.js": "./asset-versions.js?v=d42b8dc6ff",
     "./game-pause-menu.js": "./game-pause-menu.js?v=f625baba0f",
     "./game-pointer-lock.js": "./game-pointer-lock.js?v=cf53899b88",
-    "./game.js": "./game.js?v=7cc9ff6340",
+    "./game.js": "./game.js?v=78a07b6856",
     "./inventory-a11y.js": "./inventory-a11y.js?v=25f3dab87d",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
     "./inventory-layout.js": "./inventory-layout.js?v=439823a409",
@@ -407,6 +407,20 @@
             <p id="recipe-empty" class="recipe-empty" role="status" hidden>Nenhuma receita encontrada.</p>
         </section>
         <div class="craft-row" id="craft-row">
+            <div id="inv-armor" aria-label="Espaços de armadura, ainda indisponíveis" role="group" hidden>
+                <div class="armor-slot" role="img" aria-label="Capacete: espaço indisponível" title="Capacete">
+                    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 25v-8C5 8 9 4 16 4s11 4 11 13v8h-6v-7H11v7z"/></svg>
+                </div>
+                <div class="armor-slot" role="img" aria-label="Peitoral: espaço indisponível" title="Peitoral">
+                    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 5l5-2 3 4 3-4 5 2 5 8-4 3-2-3v15H9V13l-2 3-4-3z"/></svg>
+                </div>
+                <div class="armor-slot" role="img" aria-label="Calças: espaço indisponível" title="Calças">
+                    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 4h16l2 24h-7l-3-14-3 14H6z"/></svg>
+                </div>
+                <div class="armor-slot" role="img" aria-label="Botas: espaço indisponível" title="Botas">
+                    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 5h7v14h-2l-2 5H2v-5l4-3zM19 5h7v11l4 3v5h-7l-2-5h-2z"/></svg>
+                </div>
+            </div>
             <canvas id="inv-player" role="img" tabindex="0" aria-label="Personagem aventureiro: arraste ou use as setas esquerda e direita para girar" hidden></canvas>
             <div id="inv-craft" class="inv-grid craft-grid"></div>
             <div class="craft-arrow">➜</div>
