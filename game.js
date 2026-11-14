@@ -17,6 +17,7 @@ import { pauseMenuDisplay, shouldShowPauseMenu } from './game-pause-menu.js';
 import { createPointerLockRequester } from './game-pointer-lock.js';
 import { createInventoryAssets } from './inventory-assets.js';
 import { renderInventoryPlayer } from './inventory-player-preview.js';
+import { createInventoryPlayerRotation } from './inventory-player-rotation.js';
 import { createTextureTools } from './world-textures.js';
 import { itemRenderMode } from './world-block-icons.js';
 import { FACES, faceNaBordaDaCelula } from './world-faces.js';
@@ -2332,6 +2333,7 @@ function updateEmitterLights(now) {
 // =====================================================================
 const cursorHeld = { stack: null };
 let inventoryTouchGesture = null;
+let inventoryPlayerRotation = null;
 const craftInv = new Inventory(9);
 let craftN = 2;
 
@@ -2722,6 +2724,17 @@ function buildInventoryUI() {
     resetRovingTabIndex();
 
     const overlay = document.getElementById('inventory');
+    const playerCanvas = document.getElementById('inv-player');
+    inventoryPlayerRotation = createInventoryPlayerRotation({ canvas: playerCanvas, render: angle => {
+        try { renderInventoryPlayer({ THREE, renderer, canvas: playerCanvas, angle }); }
+        catch (error) {
+            playerCanvas.hidden = true;
+            inventoryPlayerRotation?.close();
+            console.warn('Não foi possível desenhar o personagem no inventário:', error);
+        }
+    } });
+    window.addEventListener('blur', () => inventoryPlayerRotation.cancel());
+    document.addEventListener('visibilitychange', () => { if (document.hidden) inventoryPlayerRotation.cancel(); });
     inventoryTouchGesture = createInventoryTouchGesture({ activate: (slot, button) => {
         if (!inventoryOpen || !overlay.contains(slot)) return;
         invMouse.seen = false;
@@ -3010,15 +3023,7 @@ function openInventory(st = null, { focusFirst = false } = {}) {
     invLastClick = { time: 0, key: '' };
     applyInventoryLayout();
     document.getElementById('inventory').style.display = 'flex';
-    if (!station) {
-        const canvas = document.getElementById('inv-player');
-        try { renderInventoryPlayer({ THREE, renderer, canvas }); }
-        catch (error) {
-            // O inventário continua utilizável se a prévia não puder ser desenhada.
-            canvas.hidden = true;
-            console.warn('Não foi possível desenhar o personagem no inventário:', error);
-        }
-    }
+    if (!station) inventoryPlayerRotation.open();
     renderInventory();
     // Aberto pelo teclado: o foco entra direto no primeiro slot do inventário,
     // em vez de começar fora da grade.
@@ -3041,6 +3046,7 @@ function giveBack(s) {
 function closeInventory(relock) {
     if (!inventoryOpen) return;
     inventoryTouchGesture?.cancel();
+    inventoryPlayerRotation?.close();
     inventoryOpen = false;
     renderInventoryTouchHeld();
     const panel = document.getElementById('inventory');

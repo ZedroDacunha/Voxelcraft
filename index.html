@@ -12,7 +12,7 @@
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link rel="stylesheet" href="styles.css?v=bc6f6a86a4">
-<link rel="stylesheet" href="inventory.css?v=245bb17808">
+<link rel="stylesheet" href="inventory.css?v=d933fb94b1">
 <!-- importmap:start (gerado por tools/stamp-importmap.mjs; não editar à mão) -->
 <script type="importmap">
 {
@@ -22,13 +22,14 @@
     "./asset-versions.js": "./asset-versions.js?v=d42b8dc6ff",
     "./game-pause-menu.js": "./game-pause-menu.js?v=f625baba0f",
     "./game-pointer-lock.js": "./game-pointer-lock.js?v=cf53899b88",
-    "./game.js": "./game.js?v=8eff1c7da2",
+    "./game.js": "./game.js?v=7cc9ff6340",
     "./inventory-a11y.js": "./inventory-a11y.js?v=25f3dab87d",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
     "./inventory-layout.js": "./inventory-layout.js?v=439823a409",
     "./inventory-logic.js": "./inventory-logic.js?v=2b03734f23",
     "./inventory-model.js": "./inventory-model.js?v=473c73a8c5",
-    "./inventory-player-preview.js": "./inventory-player-preview.js?v=c9887ee2e7",
+    "./inventory-player-preview.js": "./inventory-player-preview.js?v=5cb8926d4f",
+    "./inventory-player-rotation.js": "./inventory-player-rotation.js?v=fc1b2f53c9",
     "./inventory-recipe-book.js": "./inventory-recipe-book.js?v=567593a30b",
     "./inventory-recipe-search.js": "./inventory-recipe-search.js?v=e910d2e22b",
     "./inventory-touch-gesture.js": "./inventory-touch-gesture.js?v=4e6b5fd9cd",
@@ -406,7 +407,7 @@
             <p id="recipe-empty" class="recipe-empty" role="status" hidden>Nenhuma receita encontrada.</p>
         </section>
         <div class="craft-row" id="craft-row">
-            <canvas id="inv-player" role="img" aria-label="Personagem aventureiro" hidden></canvas>
+            <canvas id="inv-player" role="img" tabindex="0" aria-label="Personagem aventureiro: arraste ou use as setas esquerda e direita para girar" hidden></canvas>
             <div id="inv-craft" class="inv-grid craft-grid"></div>
             <div class="craft-arrow">➜</div>
             <div id="inv-out"></div>

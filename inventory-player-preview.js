@@ -1,7 +1,7 @@
 import { createPlayerModel } from './player-model.js';
 
 /** Renderiza uma vez no contexto do jogo, sem criar um segundo WebGLRenderer. */
-export function renderInventoryPlayer({ THREE, renderer, canvas }) {
+export function renderInventoryPlayer({ THREE, renderer, canvas, angle = -0.22 }) {
     const width = 144, height = 192;
     const context = canvas.getContext('2d');
     if (!context) throw new Error('Canvas 2D indisponível para o personagem');
@@ -13,7 +13,7 @@ export function renderInventoryPlayer({ THREE, renderer, canvas }) {
     scene.add(light);
     const model = createPlayerModel(THREE);
     scene.add(model.root);
-    model.root.rotation.y = -0.22;
+    model.root.rotation.y = Number.isFinite(angle) ? angle : -0.22;
     const camera = new THREE.OrthographicCamera(-0.78, 0.78, 1.04, -1.04, 0.1, 10);
     camera.position.set(0, 1.15, 5);
     camera.lookAt(0, 0.9, 0);
