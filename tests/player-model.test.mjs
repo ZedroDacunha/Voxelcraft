@@ -8,7 +8,7 @@ test('corpo do jogador tem seis partes articuladas e medidas em blocos', () => {
     assert.deepEqual(model.root.children.map(part => part.name), ['head', 'torso', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg']);
     const bounds = new THREE.Box3().setFromObject(model.root);
     assert.ok(Math.abs(bounds.min.y) < 1e-6);
-    assert.ok(Math.abs(bounds.max.y - PLAYER_MODEL_HEIGHT) < 1e-6);
+    assert.ok(Math.abs(bounds.max.y - (PLAYER_MODEL_HEIGHT + 2 * PLAYER_MODEL_HEIGHT / 32)) < 1e-6);
     assert.equal(model.leftArm.position.y, 24 * PLAYER_MODEL_HEIGHT / 32);
     assert.equal(model.leftLeg.position.y, 12 * PLAYER_MODEL_HEIGHT / 32);
     assert.ok(model.head.getObjectByName('pupil').position.z > 0);
@@ -30,7 +30,7 @@ test('modelos independentes aceitam cores e liberam recursos', () => {
     assert.ok(geometriaLiberada && materialLiberado);
 });
 
-test('cabeça tem couro cabeludo completo, sem geometria de cabelo e com rosto preservado', () => {
+test('cabeça tem couro cabeludo completo, cabelo separado e rosto preservado', () => {
     const model = createPlayerModel(THREE); model.root.updateMatrixWorld(true);
     const head = model.head;
     const face = head.getObjectByName('face');
@@ -39,7 +39,7 @@ test('cabeça tem couro cabeludo completo, sem geometria de cabelo e com rosto p
     assert.equal(face.geometry.parameters.width, 8 * PLAYER_MODEL_HEIGHT / 32);
     assert.equal(face.geometry.parameters.height, 8 * PLAYER_MODEL_HEIGHT / 32);
     assert.equal(face.geometry.parameters.depth, 8 * PLAYER_MODEL_HEIGHT / 32);
-    assert.equal(head.children.filter(p => p.name.startsWith('hair-') || p.name.startsWith('fringe-')).length, 0);
+    assert.equal(head.children.filter(p => p.name === 'player-hair').length, 1);
     assert.equal(head.children.filter(p => p.name === 'eyebrow').length, 2);
     assert.equal(head.children.filter(p => p.name === 'eye-white').length, 2);
     assert.equal(head.children.filter(p => p.name === 'pupil').length, 2);
