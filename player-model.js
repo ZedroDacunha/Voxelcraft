@@ -1,3 +1,5 @@
+import { createPlayerHair } from './player-hair.js';
+
 /** Modelo visual independente da câmera, do mundo e da rede.
  * Frente aponta para +Z; pés ficam em y=0. Medidas em blocos.
  * Os pivôs de braços e pernas permitem animá-los sem alterar a geometria.
@@ -33,9 +35,10 @@ export function createPlayerModel(THREE, colors = {}) {
         return mesh;
     };
     const head = part('head', 0, 24, 0);
-    // Cabeça completa sem cabelo: a peça de cabelo será tratada separadamente
-    // numa etapa futura. Sobrancelhas e olhos continuam parte do rosto.
+    // Cabeça completa e cabelo independente, preso ao pivô da cabeça.
     box(head, 'face', 'skin', [8, 8, 8], [0, 4, 0]);
+    const hair = createPlayerHair(THREE, unit);
+    head.add(hair.mesh);
     for (const x of [-2, 2]) {
         box(head, 'eyebrow', 'hair', [1.6, 0.42, 0.08], [x, 5.5, 4.07]);
         box(head, 'eye-white', 'eyeWhite', [1.5, 2.0, 0.08], [x, 4.05, 4.03]);
@@ -61,6 +64,6 @@ export function createPlayerModel(THREE, colors = {}) {
     });
     return {
         root, head, torso, leftArm: arms[0], rightArm: arms[1], leftLeg: legs[0], rightLeg: legs[1],
-        dispose() { geometries.forEach(geometry => geometry.dispose()); Object.values(materials).forEach(material => material.dispose()); },
+        dispose() { hair.dispose(); geometries.forEach(geometry => geometry.dispose()); Object.values(materials).forEach(material => material.dispose()); },
     };
 }
