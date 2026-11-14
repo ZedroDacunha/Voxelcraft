@@ -33,19 +33,9 @@ export function createPlayerModel(THREE, colors = {}) {
         return mesh;
     };
     const head = part('head', 0, 24, 0);
-    // O topo da pele termina abaixo do cabelo: duas faces no mesmo plano
-    // piscavam conforme a câmera se movia (z-fighting). As mechas laterais e
-    // de trás terminam na base do topo, sem ocupar o mesmo volume entre si.
-    box(head, 'face', 'skin', [8, 7.9, 8], [0, 3.95, 0]);
-    box(head, 'hair-top', 'hair', [8.16, 1.4, 8.16], [0, 7.3, 0]);
-    box(head, 'hair-back', 'hair', [8, 5.4, 0.08], [0, 3.9, -4.04]);
-    box(head, 'hair-left', 'hair', [0.08, 2.6, 8], [-4.04, 5.3, 0]);
-    box(head, 'hair-right', 'hair', [0.08, 2.6, 8], [4.04, 5.3, 0]);
-    // As mechas avançam sobre a testa e sobre o topo, sem faces visíveis no
-    // mesmo plano: a sobreposição com o cabelo de cima fica dentro do volume.
-    box(head, 'fringe-left', 'hair', [1.15, 1.05, 0.22], [-2.7, 6.5, 4.12]);
-    box(head, 'fringe-middle', 'hair', [1.15, 0.8, 0.22], [-0.6, 6.62, 4.12]);
-    box(head, 'fringe-right', 'hair', [1.3, 0.65, 0.22], [2.35, 6.7, 4.12]);
+    // Cabeça completa sem cabelo: a peça de cabelo será tratada separadamente
+    // numa etapa futura. Sobrancelhas e olhos continuam parte do rosto.
+    box(head, 'face', 'skin', [8, 8, 8], [0, 4, 0]);
     for (const x of [-2, 2]) {
         box(head, 'eyebrow', 'hair', [1.6, 0.42, 0.08], [x, 5.5, 4.07]);
         box(head, 'eye-white', 'eyeWhite', [1.5, 2.0, 0.08], [x, 4.05, 4.03]);
