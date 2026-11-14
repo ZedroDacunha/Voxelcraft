@@ -52,7 +52,7 @@
     .craft-row { display: flex; align-items: center; gap: clamp(8px, 2vw, 14px); margin-bottom: 12px; }
     #inv-player { box-sizing: border-box; display: block; flex: 0 0 auto;
         width: calc(var(--inv-slot-size) * 2); height: calc(var(--inv-slot-size) * 2.67);
-        background: #243026; border: 2px solid #111; image-rendering: pixelated; touch-action: none; cursor: grab; }
+        background: #000; border: 2px solid #111; image-rendering: pixelated; touch-action: none; cursor: grab; }
     #inv-player:active { cursor: grabbing; }
     #inv-player:focus-visible { outline: 2px solid #f3d58a; outline-offset: 2px; }
     #inv-player[hidden] { display: none; }

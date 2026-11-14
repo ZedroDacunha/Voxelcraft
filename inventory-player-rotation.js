@@ -1,6 +1,8 @@
+import { INVENTORY_PLAYER_INITIAL_ANGLE } from './inventory-player-preview.js';
+
 // Redesenha apenas ao interagir, coalescendo movimentos num único quadro.
 export function createInventoryPlayerRotation({ canvas, render, requestFrame = requestAnimationFrame, cancelFrame = cancelAnimationFrame }) {
-    let angle = -0.22, pointer = null, lastX = 0, frame = null, enabled = false;
+    let angle = INVENTORY_PLAYER_INITIAL_ANGLE, pointer = null, lastX = 0, frame = null, enabled = false;
     const queue = () => {
         if (frame !== null) return;
         frame = requestFrame(() => { frame = null; if (enabled) render(angle); });
@@ -36,7 +38,7 @@ export function createInventoryPlayerRotation({ canvas, render, requestFrame = r
         queue();
     });
     return {
-        open() { cancel(); angle = -0.22; enabled = true; render(angle); },
+        open() { cancel(); angle = INVENTORY_PLAYER_INITIAL_ANGLE; enabled = true; render(angle); },
         close() { enabled = false; cancel(); },
         cancel,
     };
