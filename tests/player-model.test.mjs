@@ -66,3 +66,21 @@ test('olhos da referência têm pupilas simétricas dentro da parte branca e nã
     assert.ok(Math.abs(pupils[0].position.x + pupils[1].position.x) < 1e-10);
     model.dispose();
 });
+
+test('nariz 3D independente fica fora da face e não encobre olhos ou boca', () => {
+    const model = createPlayerModel(THREE); model.root.updateMatrixWorld(true);
+    const head = model.head, nose = head.getObjectByName('nose');
+    assert.ok(nose && nose.parent === head);
+    assert.equal(nose.material.color.getHex(), PLAYER_MODEL_COLORS.nose);
+    const n = new THREE.Box3().setFromObject(nose);
+    const face = new THREE.Box3().setFromObject(head.getObjectByName('face'));
+    const mouth = new THREE.Box3().setFromObject(head.getObjectByName('mouth'));
+    assert.ok(n.min.z > face.max.z, 'nariz não coincide com a superfície da pele');
+    assert.ok(n.min.y > mouth.max.y, 'nariz não encobre a boca');
+    for (const eye of head.children.filter(p => p.name === 'eye-white')) {
+        const b = new THREE.Box3().setFromObject(eye);
+        assert.ok(n.max.x < b.min.x || n.min.x > b.max.x, 'nariz não encobre olhos');
+    }
+    let released = false; nose.geometry.addEventListener('dispose', () => released = true);
+    model.dispose(); assert.equal(released, true);
+});

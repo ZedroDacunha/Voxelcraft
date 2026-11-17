@@ -6,7 +6,7 @@ import { createPlayerHair } from './player-hair.js';
  */
 export const PLAYER_MODEL_HEIGHT = 1.8;
 export const PLAYER_MODEL_COLORS = Object.freeze({
-    skin: 0xb77c5f, hair: 0x38281f, tunic: 0x536b47, sleeve: 0xb4a582,
+    skin: 0xb77c5f, nose: 0xac7358, hair: 0x38281f, tunic: 0x536b47, sleeve: 0xb4a582,
     trousers: 0x514b43, boots: 0x302e2b, belt: 0x654a32, buckle: 0xc2aa72,
     eyes: 0x292923, eyeWhite: 0xeee6d4, trim: 0x384f35,
 });
@@ -44,6 +44,8 @@ export function createPlayerModel(THREE, colors = {}) {
         box(head, 'eye-white', 'eyeWhite', [1.5, 2.0, 0.08], [x, 4.05, 4.03]);
         box(head, 'pupil', 'eyes', [0.72, 1.35, 0.09], [x - Math.sign(x) * 0.28, 3.90, 4.08]);
     }
+    // Nariz 3D separado, levemente à frente da superfície do rosto.
+    box(head, 'nose', 'nose', [0.85, 0.85, 0.42], [0, 3.18, 4.22]);
     box(head, 'mouth', 'belt', [2, 0.45, 0.08], [0, 2.1, 4.04]);
     const torso = part('torso', 0, 12, 0);
     box(torso, 'tunic', 'tunic', [8, 12, 4], [0, 6, 0]);
