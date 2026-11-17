@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from '../vendor/three/three.module.js';
-import { hairCells, hairSurface } from '../player-hair.js';
+import { hairCells, hairSurface, hairShade } from '../player-hair.js';
 import { createPlayerModel, PLAYER_MODEL_HEIGHT } from '../player-model.js';
 
 const neighbors = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
@@ -25,7 +25,7 @@ test('peça de cabelo é contínua e gera só as faces sem vizinho', () => {
     assert.equal(surface.colors.length, surface.positions.length);
     for (let i = 0; i < surface.colors.length; i += 3) {
         const [r,g,b] = surface.colors.slice(i, i+3);
-        assert.ok(r > g && g > b && r < .1, 'marrom escuro');
+        assert.ok(r > g && g > b && r < .11, 'marrom escuro');
     }
 });
 test('a peça acompanha o pivô da cabeça e libera seus recursos', () => {
@@ -49,4 +49,18 @@ test('mechas não ocupam a região das sobrancelhas', () => {
         }
     }
     model.dispose();
+});
+
+
+test('tonalidades são determinísticas e limitadas sem alterar a geometria', () => {
+    const first = hairSurface(), second = hairSurface();
+    assert.deepEqual(first.colors, second.colors);
+    assert.deepEqual(first.positions, second.positions);
+    const tones = new Set();
+    for (const {x, y, z} of hairCells().values()) {
+        const shade = hairShade(x, y, z);
+        assert.ok(shade >= .72 && shade <= 1.2);
+        tones.add(shade.toFixed(4));
+    }
+    assert.ok(tones.size > 20, 'variação discreta de tons por bloco');
 });

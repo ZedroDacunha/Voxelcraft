@@ -22,12 +22,22 @@ const DIRECTIONS = [
     { n: [0, 0, 1], c: [[1,0,1],[1,1,1],[0,1,1],[0,0,1]] },
     { n: [0, 0, -1], c: [[0,0,0],[0,1,0],[1,1,0],[1,0,0]] },
 ];
+// Padrão determinístico: manchas maiores com variação sutil por bloco.
+function textureHash(x, y, z) {
+    let n = Math.imul(x, 73856093) ^ Math.imul(y, 19349663) ^ Math.imul(z, 83492791);
+    n ^= n >>> 13; n = Math.imul(n, 1274126177); n ^= n >>> 16;
+    return (n >>> 0) / 4294967295;
+}
+export function hairShade(x, y, z) {
+    const patch = textureHash(Math.floor(x/2), Math.floor(y/2), Math.floor(z/2));
+    return .72 + .32 * patch + .16 * textureHash(x, y, z);
+}
+
 export function hairSurface(cells = hairCells()) {
     const positions = [], normals = [], colors = [];
     for (const { x, y, z } of cells.values()) for (const { n, c } of DIRECTIONS) {
         if (cells.has(`${x+n[0]},${y+n[1]},${z+n[2]}`)) continue;
-        const seed = ((x*17 + y*31 + z*13) % 7 + 7) % 7;
-        const shade = [0.77, 0.82, 0.88, 0.93, 0.97, 1.02, 1.06][seed];
+        const shade = hairShade(x, y, z);
         for (const i of [0, 1, 2, 0, 2, 3]) {
             const p = c[i]; positions.push(x+p[0], y+p[1], z+p[2]); normals.push(...n);
             colors.push(.09*shade, .045*shade, .025*shade);
