@@ -34,7 +34,7 @@ Abram a mesma versão do jogo e escolham **Jogar online** no menu principal.
 
 1. Quem vai hospedar escolhe **Criar sala**, copia o convite e o envia ao colega.
 2. O colega escolhe **Entrar com convite**, cola o código, clica em **Gerar resposta** e devolve a resposta ao anfitrião.
-3. O anfitrião cola a resposta e clica em **Conectar**. Mantenham as duas abas abertas. Quando o terreno carregar, cada um clica em **Jogar**.
+3. O anfitrião cola a resposta e clica em **Conectar**. Mantenham as duas abas abertas. Quando o terreno carregar, cada um seleciona **Voltar ao jogo**.
 
 Vocês aparecem no mesmo mundo e podem se ver, conversar pelo chat, minerar e construir juntos. Cada sala começa com um mundo novo. Para guardar a construção, o anfitrião usa **Salvar e sair para os mundos**. O mundo fica na lista de **Um jogador** dele. O inventário do convidado dura uma partida. Criaturas, itens no chão e conteúdos de baús e fornalhas são locais a cada jogador.
 

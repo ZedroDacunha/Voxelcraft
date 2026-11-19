@@ -19,11 +19,11 @@ async def main():
         )
         # Cada página tem armazenamento independente, como em dois computadores.
         host = await browser.new_page(viewport={"width": 800, "height": 520})
-        guest = await browser.new_page(viewport={"width": 800, "height": 520})
+        guest = await browser.new_page(viewport={"width": 800, "height": 520}, has_touch=True)
         for page in (host, guest):
             await page.add_init_script("""localStorage.setItem('voxel-sandbox/game-settings/v1',
                 JSON.stringify({renderDistance: 2, graphics: '0.5', volume: 0}))""")
-            await page.goto("http://localhost:8000/?debug&sw=0")
+            await page.goto("http://localhost:8000/?debug&sw=0" + ("&touch=1" if page == guest else ""))
             await page.locator("#online-open").click()
 
         await host.locator("#online-host").click()
@@ -42,8 +42,8 @@ async def main():
             assert await sender.evaluate("([b, pos]) => dbg.setBlock(b, ...pos)", [block, coords])
             await receiver.wait_for_function("([b, pos]) => dbg.blockAt(...pos) === b", arg=[block, coords])
 
-        await guest.locator("#btn-play").click()
-        await guest.keyboard.press("t")
+        await guest.locator("#btn-play").tap()
+        await guest.locator('[data-touch="chat"]').tap()
         await guest.locator("#chat-input").fill("Oi, colega!")
         await guest.locator("#chat-input").press("Enter")
         await host.get_by_text("Colega: Oi, colega!", exact=True).wait_for()
