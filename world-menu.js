@@ -1,3 +1,4 @@
+import { bindOnlineMenu } from './world-online-menu.js';
 import { storeRequest } from './world-storage.js';
 import { createWorldRecord, deleteWorldRecord, getWorlds, markWorldSaved, renameWorldRecord } from './world-list-store.js';
 import { createWorldSaveOptions } from './world-save-options.js';
@@ -96,12 +97,13 @@ async function renderWorlds() {
     await worldListView.refresh();
 }
 
-async function launchWorld(world) {
+async function launchWorld(world, online = null) {
     showError();
     document.getElementById('btn-create-world').disabled = true;
     for (const button of worldListView.element.querySelectorAll('button')) button.disabled = true;
-    window.ACTIVE_WORLD = { id: world.id, name: world.name, seed: world.seed, saveKey: world.saveKey };
+    window.ACTIVE_WORLD = { online, id: world.id, name: world.name, seed: world.seed, saveKey: world.saveKey };
     menu.hidden = true;
+    titleScreen.hidden = true;
     document.body.classList.add('game-started');
     const loading = document.getElementById('world-loading');
     loading.hidden = false;
@@ -115,8 +117,23 @@ async function launchWorld(world) {
         document.getElementById('btn-create-world').disabled = false;
         showError('Não foi possível abrir este mundo. Confira a conexão e tente novamente.');
         await renderWorlds();
+        if (online) {
+            menu.hidden = true;
+            titleScreen.hidden = false;
+            throw error;
+        }
     }
 }
+
+bindOnlineMenu({
+    randomSeed,
+    async launch(session) {
+        const id = globalThis.crypto.randomUUID?.() || `${Date.now()}-${session.seed}`;
+        const world = { id, seed: session.seed, name: `Dupla · ${new Date().toLocaleDateString('pt-BR')}`, saveKey: `world-${id}`, createdAt: Date.now() };
+        if (session.host) await createWorldRecord(world);
+        await launchWorld(world, session);
+    },
+});
 
 function openWorldDialog(world = null) {
     editingWorldId = world?.id || null;

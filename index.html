@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="Voxel">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
-<link rel="stylesheet" href="styles.css?v=bc6f6a86a4">
+<link rel="stylesheet" href="styles.css?v=e21a0c8099">
 <link rel="stylesheet" href="inventory.css?v=4c790c6f21">
 <!-- importmap:start (gerado por tools/stamp-importmap.mjs; não editar à mão) -->
 <script type="importmap">
@@ -22,7 +22,7 @@
     "./asset-versions.js": "./asset-versions.js?v=d42b8dc6ff",
     "./game-pause-menu.js": "./game-pause-menu.js?v=f625baba0f",
     "./game-pointer-lock.js": "./game-pointer-lock.js?v=cf53899b88",
-    "./game.js": "./game.js?v=78a07b6856",
+    "./game.js": "./game.js?v=2ee4000d45",
     "./inventory-a11y.js": "./inventory-a11y.js?v=25f3dab87d",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
     "./inventory-layout.js": "./inventory-layout.js?v=439823a409",
@@ -83,12 +83,14 @@
     "./world-list-view.js": "./world-list-view.js?v=9ec40da58c",
     "./world-math.js": "./world-math.js?v=ce4a6d9232",
     "./world-meats.js": "./world-meats.js?v=fa6e21fd92",
-    "./world-menu.js": "./world-menu.js?v=848a925210",
+    "./world-menu.js": "./world-menu.js?v=1df43bf47f",
     "./world-mesh-buffers.js": "./world-mesh-buffers.js?v=ceba787639",
     "./world-mineral-blocks.js": "./world-mineral-blocks.js?v=4c39bc041e",
     "./world-mineral-textures.js": "./world-mineral-textures.js?v=8bb1ae7527",
     "./world-minerals.js": "./world-minerals.js?v=2f66ff7350",
     "./world-mob-hit.js": "./world-mob-hit.js?v=1b2a522b2a",
+    "./world-online-menu.js": "./world-online-menu.js?v=89e4a3af28",
+    "./world-online.js": "./world-online.js?v=3e9f33771e",
     "./world-options-view.js": "./world-options-view.js?v=915ec33da6",
     "./world-ore-generation.js": "./world-ore-generation.js?v=7fe35588d3",
     "./world-performance-samples.js": "./world-performance-samples.js?v=65fe75cba2",
@@ -185,6 +187,7 @@
         </div>
         <div class="title-screen-actions">
             <button class="classic-btn classic-btn-wide" id="btn-open-worlds">Um jogador</button>
+            <button class="classic-btn classic-btn-wide" id="online-open">Jogar online</button>
             <div class="title-screen-secondary">
                 <button class="classic-btn" id="btn-open-options">Opções...</button>
                 <button class="classic-btn" id="btn-quit-game">Sair do jogo</button>
@@ -199,6 +202,28 @@
         <span>Uma aventura em blocos</span>
     </footer>
 </main>
+<dialog class="world-dialog" id="online-dialog" aria-labelledby="online-title">
+    <h2 id="online-title">Jogar em dupla</h2>
+    <p id="online-status" role="status"></p>
+    <div id="online-choices">
+        <button class="classic-btn" id="online-host">Criar sala</button>
+        <button class="classic-btn" id="online-join">Entrar com convite</button>
+    </div>
+    <div id="online-outgoing" hidden>
+        <label class="world-field"><span id="online-output-label"></span><textarea id="online-output" rows="2" readonly></textarea></label>
+        <button class="classic-btn" id="online-copy">Copiar código</button>
+    </div>
+    <label id="online-incoming" class="world-field" hidden><span id="online-input-label"></span><textarea id="online-input" maxlength="65536" rows="2" spellcheck="false"></textarea></label>
+    <div class="world-dialog-actions">
+        <button class="classic-btn" id="online-cancel">Voltar</button>
+        <button class="classic-btn" id="online-next" hidden>Conectar</button>
+    </div>
+</dialog>
+<dialog class="world-dialog" id="online-ended" aria-labelledby="online-ended-title">
+    <h2 id="online-ended-title">Partida encerrada</h2>
+    <p>A conexão com o anfitrião foi encerrada.</p>
+    <button class="classic-btn" id="online-leave">Voltar ao menu</button>
+</dialog>
 <section id="world-menu" aria-labelledby="world-menu-title" hidden>
     <section class="world-menu-card">
         <button class="classic-btn world-menu-back" id="btn-back-title" aria-label="Voltar ao menu principal">‹ Menu principal</button>
@@ -516,6 +541,6 @@
         <button class="classic-btn touch-edit-btn" type="button" id="btn-touch-positions-done">Pronto</button>
     </div>
 </div>
-<script type="module" src="world-menu.js?v=848a925210"></script>
+<script type="module" src="world-menu.js?v=1df43bf47f"></script>
 </body>
 </html>

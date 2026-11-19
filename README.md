@@ -28,6 +28,18 @@ python3 -m http.server 8000 --bind 0.0.0.0
 > Abrir `index.html` por `file://` **não** funciona: `type="module"`, o import
 > map e o Web Worker do terreno exigem HTTP.
 
+## Jogar online em dupla
+
+Abram a mesma versão do jogo e escolham **Jogar online** no menu principal.
+
+1. Quem vai hospedar escolhe **Criar sala**, copia o convite e o envia ao colega.
+2. O colega escolhe **Entrar com convite**, cola o código, clica em **Gerar resposta** e devolve a resposta ao anfitrião.
+3. O anfitrião cola a resposta e clica em **Conectar**. Mantenham as duas abas abertas. Quando o terreno carregar, cada um clica em **Jogar**.
+
+Vocês aparecem no mesmo mundo e podem se ver, conversar pelo chat, minerar e construir juntos. Cada sala começa com um mundo novo. Para guardar a construção, o anfitrião usa **Salvar e sair para os mundos**. O mundo fica na lista de **Um jogador** dele. O inventário do convidado dura uma partida. Criaturas, itens no chão e conteúdos de baús e fornalhas são locais a cada jogador.
+
+A conexão usa um canal WebRTC direto e um servidor STUN para descobrir rotas entre redes. Em redes que bloqueiam a conexão direta, tentem outra rede ou o mesmo Wi-Fi. Esta versão não possui um retransmissor TURN. Compartilhem os códigos apenas entre vocês.
+
 ## Publicando (GitHub Pages)
 
 O jogo fica em <https://zedrodacunha.github.io/Voxelcraft/> e **a publicação é

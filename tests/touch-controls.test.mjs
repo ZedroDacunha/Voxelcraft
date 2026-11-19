@@ -177,7 +177,7 @@ test('playing() substitui o pointer lock sem deixar buracos', () => {
     // a física só para enquanto o jogador dorme (quem mexe na câmera é a cama)
     assert.match(game, /if \(worldRunning\) \{[\s\S]{0,400}?if \(!sleep\.active\) updatePhysics\(dt\);/);
     assert.match(game, /if \(worldRunning \|\| inventoryOpen\) \{\n        updateWorldClock\(dt\);/);
-    assert.match(game, /setInterval\(\(\) => \{ if \(playing\(\)\) saveGame\(true\); \}, 30000\);/);
+    assert.match(game, /setInterval\(\(\) => \{ if \(playing\(\) \|\| online\?\.host\) saveGame\(true\); \}, 30000\);/);
     assert.match(game, /locked: playing\(\)/);
 
     // e morrer desliga o toque, senão a física seguiria rodando na tela de morte
