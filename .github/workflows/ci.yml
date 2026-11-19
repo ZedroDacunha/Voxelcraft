@@ -26,3 +26,18 @@ jobs:
 
       - name: Sintaxe dos módulos e importmap
         run: npm run check
+
+  dupla:
+    name: Partida online em dois navegadores
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Testar convite, avatares, blocos, chat e saída
+        run: |
+          python -m pip install playwright==1.56.0
+          node tools/serve.mjs &
+          CHROME_BIN="$(command -v google-chrome)" python tools/test-online-browser.py

@@ -180,6 +180,8 @@ if (!ACTIVE_WORLD || !Number.isFinite(ACTIVE_WORLD.seed) || !ACTIVE_WORLD.saveKe
     throw new Error('Selecione um mundo antes de iniciar o jogo.');
 }
 const SEED = ACTIVE_WORLD.seed;
+const online = ACTIVE_WORLD.online;
+const onlineGuest = online && !online.host;
 const SKY_COLOR = 0x87CEEB;
 const GPU_PREF = new URLSearchParams(location.search).get('gpu') === 'default' ? 'default' : 'high-performance';
 const FRAME_BUDGET_MS = 7;     // tempo máximo por quadro gasto gerando/montando chunks
@@ -647,7 +649,32 @@ class World {
         return type !== 0 && (BLOCKS[type]?.solid ?? true);
     }
 
-    setBlock(x, y, z, type, facing = null) {
+    rememberEdit(cx, cz, index, type) {
+        const key = chunkKey(cx, cz);
+        let edits = this.edits.get(key);
+        if (!edits) { edits = new Map(); this.edits.set(key, edits); }
+        edits.set(index, type);
+        this.editCache.delete(key);
+    }
+
+    applyOnlineBlock({ x, y, z, type, facing }) {
+        const cx = floorDiv(x, CHUNK_SIZE), cz = floorDiv(z, CHUNK_SIZE);
+        if (this.getChunk(cx, cz)) {
+            if (this.getBlock(x, y, z) !== type || this.getBlockFacing(x, y, z) !== facing) {
+                this.setBlock(x, y, z, type, facing, true);
+            }
+        } else {
+            // O colega pode construir fora da nossa distância de renderização.
+            this.rememberEdit(cx, cz, idx(x - cx * CHUNK_SIZE, y, z - cz * CHUNK_SIZE), type);
+            if (BLOCKS[type]?.tiles.front !== undefined || BLOCKS[type]?.render === 'bed') this.blockFacings.set(x, y, z, facing);
+            else this.blockFacings.delete(x, y, z);
+        }
+        const key = `${x},${y},${z}`;
+        if (type !== ID.CHEST) chests.delete(key);
+        if (type !== ID.FURNACE) furnaces.delete(key);
+    }
+
+    setBlock(x, y, z, type, facing = null, fromPeer = false) {
         if (y < 0 || y >= WORLD_HEIGHT) return false;
         const cx = floorDiv(x, CHUNK_SIZE), cz = floorDiv(z, CHUNK_SIZE);
         const chunk = this.getChunk(cx, cz);
@@ -679,11 +706,8 @@ class World {
         this.lightDirty.add(chunk);
         if (type !== 0 && y > chunk.maxY) chunk.maxY = y;
 
-        const key = chunkKey(cx, cz);
-        let ed = this.edits.get(key);
-        if (!ed) { ed = new Map(); this.edits.set(key, ed); }
-        ed.set(i, type);
-        this.editCache.delete(key);
+        this.rememberEdit(cx, cz, i, type);
+        if (online && !fromPeer) online.send({ kind: 'block', x, y, z, type, facing: this.getBlockFacing(x, y, z) });
 
         // Agenda a remalha para o orçamento de frame de World.update().
         this.dirty.add(chunk);
@@ -2538,6 +2562,7 @@ function submitChat() {
         const result = runChatCommand(text, chatCommandContext(), { ITEMS, BLOCKS, ID });
         for (const line of result.messages) chat.add(line, { kind: result.ok ? 'system' : 'error', at });
     } else {
+        online?.send({ kind: 'chat', text });
         chat.add(`Jogador: ${text}`, { kind: 'say', at });
     }
     chatRenderSignature = '';
@@ -4429,7 +4454,7 @@ const saveManager = createWorldSaveManager({
     seed: SEED,
     codec: saveCodec,
     buildSave,
-    hasWorld: () => Boolean(world),
+    hasWorld: () => Boolean(world) && !onlineGuest,
     onToast: showToast,
     onSaveState: setSaveIndicator,
     onBuildDuration: duration => { perf.buildMs = duration; },
@@ -4441,7 +4466,7 @@ const saveManager = createWorldSaveManager({
 });
 
 function saveGame(quiet, immediate = false) {
-    saveManager.requestSave(quiet, immediate);
+    if (!onlineGuest) saveManager.requestSave(quiet, immediate);
 }
 
 const loadGame = createWorldSaveLoader({
@@ -4782,6 +4807,7 @@ async function waitForWorldRegion(x, z, { driveUpdates = true, onProgress = null
 }
 
 function showWorldLoadError(error) {
+    online?.close();
     console.error('Falha ao preparar o mundo:', error);
     document.getElementById('world-loading-title').textContent = 'Não foi possível carregar o mundo';
     document.getElementById('world-loading-detail').textContent = 'Recarregue a página para tentar novamente.';
@@ -4879,7 +4905,7 @@ async function init() {
     world = new World(scene, SEED, decorations, grassGeometries, tallGrassMaterials);
     creatureSystem = new CreatureSystem(world);
     sheepSystem = new SheepSystem(world);
-    const save = await loadGame();
+    const save = onlineGuest ? null : await loadGame();
     if (save) {
         world.edits = save.edits;
         world.blockFacings = new BlockFacingStore(save.blockFacings);
@@ -4919,7 +4945,7 @@ async function init() {
     if (recoveredSavedPosition) console.warn('Posição do jogador fora do mundo; mantendo o restante do save e recuperando no ponto inicial.');
     const start = savedPositionIsInWorld ? save.player : spawnPoint;
     await waitForWorldRegion(start.x, start.z, { driveUpdates: true, onProgress: setWorldLoadProgress, radius: START_LOAD_RADIUS });
-    player.pos.set(start.x, start.y, start.z);
+    player.pos.set(start.x + (onlineGuest ? 1.5 : 0), start.y, start.z);
     if (!unstickPlayer()) {
         for (let guard = 0; guard < 70 && collides(player.pos.x, player.pos.y, player.pos.z, player.height); guard++) player.pos.y += 1;
     }
@@ -4951,7 +4977,9 @@ async function init() {
         document.body.classList.remove('options-open');
     });
     const btnWorlds = document.getElementById('btn-worlds');
+    if (onlineGuest) btnWorlds.textContent = 'Sair da partida online';
     btnWorlds.addEventListener('click', async () => {
+        if (onlineGuest) { online.leave(); location.reload(); return; }
         btnWorlds.disabled = true;
         btnWorlds.textContent = 'Salvando mundo...';
         const saved = await saveManager.flushAndRelease(false);
@@ -5417,11 +5445,13 @@ async function init() {
     if (touchMode) setupTouchControls();
     if (debugOption) debugOption.hidden = false;
 
-    setInterval(() => { if (playing()) saveGame(true); }, 30000);
+    setInterval(() => { if (playing() || online?.host) saveGame(true); }, 30000);
     document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(true, true); });
 
     if (new URLSearchParams(location.search).has('debug')) {
         window.dbg = {
+            position: () => player.pos.toArray(),
+            peerPosition: () => peerAvatar?.root.visible ? peerAvatar.root.position.toArray() : null,
             damage: (n = 1) => { invuln = 0; takeDamage(n); },
             kill: () => { invuln = 0; takeDamage(999); },
             hunger: (n) => { hunger = n; updateSurvivalUI(); },
@@ -5450,6 +5480,7 @@ async function init() {
         };
     }
 
+    if (online) startOnlinePlay();
     updateSurvivalUI();
     document.getElementById('btn-play').disabled = false;
     document.getElementById('world-loading').hidden = true;
@@ -5499,6 +5530,55 @@ function updateThirdPerson() {
     }
     thirdCamera.updateMatrixWorld();
     return true;
+}
+
+let peerAvatar, peerPose, nextPoseAt = 0;
+function startOnlinePlay() {
+    peerAvatar = createPlayerModel(THREE);
+    peerAvatar.root.visible = false;
+    scene.add(peerAvatar.root);
+    function disconnected() {
+        peerAvatar.root.visible = false;
+        peerPose = null;
+        if (onlineGuest) {
+            if (document.pointerLockElement) document.exitPointerLock();
+            const ended = document.getElementById('online-ended');
+            ended.oncancel = event => event.preventDefault();
+            document.getElementById('online-leave').onclick = () => location.reload();
+            ended.showModal();
+        } else {
+            saveGame(true, true);
+            showToast('O colega saiu da partida.', 4500);
+        }
+    }
+    window.addEventListener('online-room-closed', disconnected, { once: true });
+    if (!online.connected) { disconnected(); return; }
+    online.receive(packet => {
+        if (packet.kind === 'block') {
+            world.applyOnlineBlock(packet);
+            // O anfitrião ordena as edições, inclusive quando ambos mexem na mesma célula.
+            if (online.host) online.send(packet);
+        } else if (packet.kind === 'chat') {
+            chat.add(`Colega: ${packet.text}`, { kind: 'say', at: chatNow() });
+        } else if (packet.kind === 'pose') {
+            peerPose = packet;
+            if (!peerAvatar.root.visible) peerAvatar.root.position.set(packet.x, packet.y, packet.z);
+            peerAvatar.root.visible = true;
+            if (onlineGuest) worldClock.time = packet.clock;
+        }
+    });
+}
+
+function updateOnlinePlay(now, dt) {
+    if (!online.connected) return;
+    if (now >= nextPoseAt) {
+        nextPoseAt = now + 100;
+        online.send({ kind: 'pose', x: player.pos.x, y: player.pos.y, z: player.pos.z, yaw: look.yaw, clock: worldClock.time });
+    }
+    if (!peerPose) return;
+    const body = peerAvatar.root;
+    body.position.lerp(peerPose, 1 - Math.exp(-18 * dt));
+    body.rotation.y = peerPose.yaw + Math.PI;
 }
 
 function animate() {
@@ -5594,6 +5674,7 @@ function animate() {
     if (pendingScale !== null && !resolutionSize(resolutionMode)) renderer.setPixelRatio(pendingScale);
     renderer.info.reset();
     renderer.clear();
+    if (online) updateOnlinePlay(now, dt);
     const thirdViewActive = updateThirdPerson();
     let visualCamera = camera;
     if (!thirdViewActive && !sleep.active && swimState.blend > 0) {
