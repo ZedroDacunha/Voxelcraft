@@ -57,8 +57,9 @@ import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld 
 import { canJumpFrom, createJumpState, updateJumpWindow } from './player-jump.js';
 import { createPlayerModel, PLAYER_MODEL_COLORS } from './player-model.js';
 import { advanceSwim, createSwimState, swimFirstPersonPose, swimPose } from './player-swim-animation.js';
+import { advanceLocomotion, applyGroundPose, createLocomotion, groundPose, rigLocomotion } from './player-locomotion.js';
 import { createPlayerHeldItem } from './player-held-item.js';
-import { THIRD_PERSON_BODY_MIN_DISTANCE, THIRD_PERSON_DISTANCE, cameraOffsetSign, nextCameraView, thirdPersonDistance, thirdPersonLimbSwing } from './player-third-person.js';
+import { THIRD_PERSON_BODY_MIN_DISTANCE, THIRD_PERSON_DISTANCE, cameraOffsetSign, nextCameraView, thirdPersonDistance } from './player-third-person.js';
 import { ATTACK_COOLDOWN, attackReady, createCreatureSystemClass } from './world-creature.js';
 import { creatureInReach } from './world-mob-hit.js';
 import { SHEEP_BLEAT_RANGE, SHEEP_WOOL_ITEMS, createSheepSystemClass } from './world-sheep.js';
@@ -3665,6 +3666,8 @@ const spawnPoint = new THREE.Vector3();
 
 // A passada: uma fase só para o som do passo, o braço e o balanço da visão.
 const gait = createGait();
+const locomotion = createLocomotion();
+let locomotionRig;
 const swimState = createSwimState();
 const cameraRight = new THREE.Vector3();
 // Janela do pulo tardio (coyote time): ver player-jump.js.
@@ -4405,6 +4408,7 @@ function updateGait(dt, inWater) {
         sprinting: isSprinting,
         crouching: isCrouching,
     });
+    advanceLocomotion(locomotion, passos, isSprinting && hunger >= SPRINT_MIN_HUNGER && !isCrouching && !inWater, dt);
     const pisa = stepDistanceThisFrame({ moved, dt, onGround: player.onGround, inWater });
     return pisa > 0 ? passos : 0;
 }
@@ -4844,6 +4848,7 @@ async function init() {
     thirdCamera = new THREE.PerspectiveCamera(GAME_SETTINGS.fov, camera.aspect, 0.05, 300);
     playerModel = createPlayerModel(THREE);
     playerHeldItem = createPlayerHeldItem(THREE, playerModel.rightArm);
+    locomotionRig = rigLocomotion(THREE, playerModel);
     playerModel.root.visible = false;
     scene.add(playerModel.root);
 
@@ -5502,8 +5507,8 @@ function updateThirdPerson() {
     if (!active) return false;
     const yaw = look.yaw + Math.PI;
     const gaitNow = gaitPose(gait);
-    const swing = thirdPersonLimbSwing(gaitNow.phase, gaitNow.amplitude);
-    const pose = swimPose(swimState, { yaw, height: player.height, walkSwing: swing, punch: handSwingAmount(handAnim).swing });
+    const ground = groundPose(locomotion, gaitNow.phase, gaitNow.amplitude);
+    const pose = swimPose(swimState, { yaw, height: player.height, punch: handSwingAmount(handAnim).swing });
     // Rotação visual em torno do meio do corpo; posição física continua intacta.
     playerModel.root.position.set(player.pos.x + pose.offsetX, player.pos.y + pose.offsetY, player.pos.z + pose.offsetZ);
     playerModel.root.rotation.set(pose.tilt, yaw, 0, 'YXZ');
@@ -5513,6 +5518,7 @@ function updateThirdPerson() {
     playerModel.leftArm.rotation.x = pose.leftArm;
     const pickaxe = pickaxeMiningPose(ITEMS[heldId]?.tool?.type, handAnim);
     playerModel.rightArm.rotation.x = pose.rightArm - 0.65 * pickaxe.lift + 0.4 * pickaxe.strike;
+    applyGroundPose(playerModel, locomotionRig, ground, 1 - swimState.blend);
     camera.getWorldDirection(thirdDirection).multiplyScalar(cameraOffsetSign(cameraView));
     const hit = raycastVoxels(camera.position, thirdDirection, THIRD_PERSON_DISTANCE, {
         getBlock: (x, y, z) => world.getBlock(x, y, z),
