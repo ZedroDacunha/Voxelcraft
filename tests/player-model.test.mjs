@@ -84,3 +84,24 @@ test('nariz 3D independente fica fora da face e não encobre olhos ou boca', () 
     let released = false; nose.geometry.addEventListener('dispose', () => released = true);
     model.dispose(); assert.equal(released, true);
 });
+
+test('roupa 3D articulada substitui peças antigas e libera seus recursos', () => {
+    const model=createPlayerModel(THREE), unit=PLAYER_MODEL_HEIGHT/32;
+    assert.ok(model.outfit);
+    for(const [part,name] of [[model.torso,'tunic-3d-preview'],[model.torso,'v-collar-preview'],[model.torso,'belt-preview'],[model.leftArm,'sleeve-3d-preview'],[model.rightArm,'sleeve-3d-preview'],[model.leftLeg,'trousers-preview'],[model.rightLeg,'boot-preview']]) assert.ok(part.getObjectByName(name),name);
+    for(const [part,name] of [[model.torso,'collar'],[model.torso,'belt'],[model.leftArm,'sleeve'],[model.leftLeg,'trousers'],[model.leftLeg,'boot']]) assert.equal(part.getObjectByName(name).visible,false,name);
+    assert.equal(model.leftArm.position.x,-6.08*unit);
+    assert.equal(model.leftArm.getObjectByName('hand').position.y,-11*unit);
+    const sleeve=model.leftArm.getObjectByName('sleeve-3d-preview');model.leftArm.rotation.x=.5;
+    assert.equal(sleeve.parent,model.leftArm);
+    const mesh=model.leftLeg.getObjectByName('trouser-leg'), texture=mesh.material.map;
+    assert.equal(texture.magFilter,THREE.NearestFilter);
+    let geo=false,mat=false,tex=false;mesh.geometry.addEventListener('dispose',()=>geo=true);mesh.material.addEventListener('dispose',()=>mat=true);texture.addEventListener('dispose',()=>tex=true);
+    model.dispose();assert.ok(geo&&mat&&tex);
+});
+
+test('modelo base é opcional para prévias e cor da túnica é aplicada à textura', () => {
+    const plain=createPlayerModel(THREE,{}, {outfit:false});assert.equal(plain.outfit,null);assert.equal(plain.leftLeg.getObjectByName('boot').visible,true);plain.dispose();
+    const red=createPlayerModel(THREE,{tunic:0xff0000});const panel=red.torso.getObjectByName('tunic-3d-preview').children[0];
+    const px=panel.material.map.image.data;assert.ok(px[0]>230 && px[1]<20 && px[2]<20);red.dispose();
+});
