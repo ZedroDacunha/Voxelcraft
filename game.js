@@ -8,6 +8,8 @@ import { findSpawn, TerrainGenerator } from './world-terrain.js';
 import { createTerrainWorkerSource } from './world-terrain-worker.js';
 import { createWaterSystemClass } from './world-water.js';
 import { Inventory } from './inventory-model.js';
+import { armorClick, canEquipArmor } from './inventory-armor.js';
+import { createPlayerArmor } from './player-armor.js';
 import { craftConsume, invCollectSame, invFillRecipe, invLeftClick, invQuickMove, invQuickMoveToCraft, invRightClick, invTouchRightClick, invSwapHotbar, stackable } from './inventory-logic.js';
 import { stackHtml, updateSlotElement } from './inventory-view.js';
 import { createRecipeBook } from './inventory-recipe-book.js';
@@ -56,6 +58,7 @@ import { DAWN_TIME, bedRespawnPoint, canSleepAt, sleepPhaseAt } from './world-sl
 import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld } from './player-physics.js';
 import { canJumpFrom, createJumpState, updateJumpWindow } from './player-jump.js';
 import { createPlayerModel, PLAYER_MODEL_COLORS } from './player-model.js';
+import { PLAYER_MODEL_HEIGHT } from './player-model.js';
 import { advanceSwim, createSwimState, swimFirstPersonPose, swimPose } from './player-swim-animation.js';
 import { advanceLocomotion, applyGroundPose, createLocomotion, groundPose, rigLocomotion } from './player-locomotion.js';
 import { createPlayerHeldItem } from './player-held-item.js';
@@ -2357,6 +2360,8 @@ function updateEmitterLights(now) {
 // 5D. TELA DE INVENTÁRIO
 // =====================================================================
 const cursorHeld = { stack: null };
+const armorSlots = [null, null];
+let armorSlotEls = [], armorPlaceholders = [];
 let inventoryTouchGesture = null;
 let inventoryPlayerRotation = null;
 const craftInv = new Inventory(9);
@@ -2710,6 +2715,8 @@ function buildInventoryUI() {
     for (let i = 9; i < 36; i++) invSlotEls[i] = make('main', i, main);
     for (let i = 0; i < 9; i++) invSlotEls[i] = make('main', i, bar);
     for (let i = 0; i < 9; i++) craftSlotEls[i] = make('craft', i, craft);
+    armorSlotEls = [...document.querySelectorAll('#inv-armor .islot')];
+    armorPlaceholders = armorSlotEls.map(el => el.innerHTML);
     outSlotEl = make('out', 0, out);
     outSlotEl.classList.add('out');
     furnaceSlotEls[0] = make('furnace', 0, document.getElementById('fur-in'));
@@ -2752,7 +2759,7 @@ function buildInventoryUI() {
     const overlay = document.getElementById('inventory');
     const playerCanvas = document.getElementById('inv-player');
     inventoryPlayerRotation = createInventoryPlayerRotation({ canvas: playerCanvas, render: angle => {
-        try { renderInventoryPlayer({ THREE, renderer, canvas: playerCanvas, angle }); }
+        try { renderInventoryPlayer({ THREE, renderer, canvas: playerCanvas, angle, armor: armorSlots }); }
         catch (error) {
             playerCanvas.hidden = true;
             inventoryPlayerRotation?.close();
@@ -2880,6 +2887,7 @@ function setRecipeBookOpen(isOpen) {
 
 function hoveredStack() {
     if (!invHover) return null;
+    if (invHover.inv === 'armor') return armorSlots[invHover.i];
     if (invHover.inv === 'main') return inventory.slots[invHover.i];
     if (invHover.inv === 'craft') return craftInv.slots[invHover.i];
     if (invHover.inv === 'chest') return station && station.chest ? station.chest.inv.slots[invHover.i] : null;
@@ -2948,6 +2956,12 @@ function renderInventoryTouchHeld() {
 }
 
 function renderInventory() {
+    for (let i = 0; i < armorSlotEls.length; i++) {
+        const el = armorSlotEls[i], stack = armorSlots[i];
+        refreshSlot(el, stack);
+        if (!stack) el.innerHTML = armorPlaceholders[i];
+        el.setAttribute('aria-label', `${i === 0 ? 'Capacete' : 'Peitoral'}: ${stack ? ITEMS[stack.id].name : 'vazio'}`);
+    }
     for (let i = 0; i < 36; i++) {
         const el = invSlotEls[i];
         refreshSlot(el, inventory.slots[i]);
@@ -3007,6 +3021,17 @@ function activateSlot(el, { button = 0, shiftKey = false, touch = false } = {}) 
     invHover = { inv: name, i };
     if (touch) invLastClick = { time: 0, key: '' };
 
+    if (name === 'armor') {
+        let changed = false;
+        if (shiftKey && !cursorHeld.stack && armorSlots[i]) {
+            const stack = armorSlots[i];
+            if (inventory.add(stack.id, stack.count, 0, inventory.slots.length, stack.damage || 0) === 0) { armorSlots[i] = null; changed = true; }
+        } else if (button === 0 || button === 2) changed = armorClick(armorSlots, i, cursorHeld);
+        if (changed) { playerArmor?.setEquipment(armorSlots); inventoryPlayerRotation?.refresh(); }
+        renderInventory();
+        return;
+    }
+
     if (name === 'out') {
         if (button === 0 || button === 2) handleOutputClick({ button, shiftKey });
         renderInventory();
@@ -3025,6 +3050,12 @@ function activateSlot(el, { button = 0, shiftKey = false, touch = false } = {}) 
         if (shiftKey && !cursorHeld.stack) {
             if (name === 'main' && station && station.type === 'furnace') quickToFurnace(i);
             else if (name === 'main' && station && station.type === 'chest') invQuickMove(inventory, i, station.chest.inv, 0, 27);
+            else if (name === 'main' && !station && inventory.slots[i] && [0,1].some(index => !armorSlots[index] && canEquipArmor(index, inventory.slots[i]))) {
+                const index = [0,1].find(index => !armorSlots[index] && canEquipArmor(index, inventory.slots[i]));
+                armorSlots[index] = inventory.slots[i]; inventory.slots[i] = null;
+                playerArmor?.setEquipment(armorSlots); inventoryPlayerRotation?.refresh();
+            }
+            else if (name === 'main' && !station && ITEMS[inventory.slots[i]?.id]?.armorSlot) { /* slot já ocupado */ }
             else if (name === 'main') invQuickMoveToCraft(inventory, craftInv, i, craftN);
             else if (name === 'chest') invQuickMove(station.chest.inv, i, inventory, 0, 36);
             else invQuickMove(craftInv, i, inventory, 0, 36);
@@ -3239,7 +3270,7 @@ function updateWaterfall(dt) {
 // =====================================================================
 // 6. ESTADO GERAL
 // =====================================================================
-let camera, swimCamera, thirdCamera, playerModel, playerHeldItem, scene, renderer, controls, world, creatureSystem, sheepSystem, tallGrassMaterial, tallGrassMaterials = [];
+let camera, swimCamera, thirdCamera, playerModel, playerArmor, playerHeldItem, scene, renderer, controls, world, creatureSystem, sheepSystem, tallGrassMaterial, tallGrassMaterials = [];
 let cameraView = 'first';
 const thirdDirection = new THREE.Vector3();
 const frontCameraTurn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
@@ -3996,6 +4027,14 @@ function die(source = 'generic') {
             1.5, st.damage || 0, { ttl: DEATH_DROP_TTL, noMerge: true });
     });
 
+    armorSlots.forEach((st, i) => {
+        if (!st) return;
+        armorSlots[i] = null; lost += st.count;
+        spawnItemEntity(st.id, st.count, origin,
+            new THREE.Vector3((Math.random() - 0.5) * 5, 3 + Math.random() * 3, (Math.random() - 0.5) * 5),
+            1.5, st.damage || 0, { ttl: DEATH_DROP_TTL, noMerge: true });
+    });
+    playerArmor?.setEquipment(armorSlots);
     resetStats();
     invuln = 2;
     // Cama do último sonho (se ela ainda está de pé) ou o ponto de partida.
@@ -4443,6 +4482,7 @@ function buildSave() {
         player: { x: player.pos.x, y: player.pos.y, z: player.pos.z, health, hunger, saturation, breath },
         selectedSlot,
         inventory: inventory.slots,
+        armor: armorSlots,
         drops: itemEntities,
         chests,
         furnaces,
@@ -4847,6 +4887,7 @@ async function init() {
     swimCamera = camera.clone(false);
     thirdCamera = new THREE.PerspectiveCamera(GAME_SETTINGS.fov, camera.aspect, 0.05, 300);
     playerModel = createPlayerModel(THREE);
+    playerArmor = createPlayerArmor(THREE, playerModel, PLAYER_MODEL_HEIGHT/32);
     playerHeldItem = createPlayerHeldItem(THREE, playerModel.rightArm);
     locomotionRig = rigLocomotion(THREE, playerModel);
     playerModel.root.visible = false;
@@ -4915,6 +4956,8 @@ async function init() {
         world.edits = save.edits;
         world.blockFacings = new BlockFacingStore(save.blockFacings);
         inventory.slots = save.inventory;
+        armorSlots.splice(0, armorSlots.length, ...save.armor);
+        playerArmor.setEquipment(armorSlots);
         selectedSlot = save.selectedSlot;
         health = save.player.health;
         hunger = save.player.hunger;
@@ -5519,6 +5562,7 @@ function updateThirdPerson() {
     const pickaxe = pickaxeMiningPose(ITEMS[heldId]?.tool?.type, handAnim);
     playerModel.rightArm.rotation.x = pose.rightArm - 0.65 * pickaxe.lift + 0.4 * pickaxe.strike;
     applyGroundPose(playerModel, locomotionRig, ground, 1 - swimState.blend);
+    playerArmor.sync();
     camera.getWorldDirection(thirdDirection).multiplyScalar(cameraOffsetSign(cameraView));
     const hit = raycastVoxels(camera.position, thirdDirection, THIRD_PERSON_DISTANCE, {
         getBlock: (x, y, z) => world.getBlock(x, y, z),

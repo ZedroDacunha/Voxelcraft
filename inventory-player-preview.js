@@ -1,9 +1,10 @@
-import { createPlayerModel } from './player-model.js';
+import { createPlayerModel, PLAYER_MODEL_HEIGHT } from './player-model.js';
+import { createPlayerArmor } from './player-armor.js';
 
 export const INVENTORY_PLAYER_INITIAL_ANGLE = -0.55;
 
 /** Renderiza uma vez no contexto do jogo, sem criar um segundo WebGLRenderer. */
-export function renderInventoryPlayer({ THREE, renderer, canvas, angle = INVENTORY_PLAYER_INITIAL_ANGLE }) {
+export function renderInventoryPlayer({ THREE, renderer, canvas, angle = INVENTORY_PLAYER_INITIAL_ANGLE, armor = [] }) {
     const width = 144, height = 192;
     const context = canvas.getContext('2d');
     if (!context) throw new Error('Canvas 2D indisponível para o personagem');
@@ -14,6 +15,8 @@ export function renderInventoryPlayer({ THREE, renderer, canvas, angle = INVENTO
     light.position.set(3, 5, 4);
     scene.add(light);
     const model = createPlayerModel(THREE);
+    const equipment = createPlayerArmor(THREE, model, PLAYER_MODEL_HEIGHT/32);
+    equipment.setEquipment(armor);
     scene.add(model.root);
     model.root.rotation.y = Number.isFinite(angle) ? angle : INVENTORY_PLAYER_INITIAL_ANGLE;
     const camera = new THREE.PerspectiveCamera(25.5, width / height, 0.1, 10);
@@ -40,6 +43,7 @@ export function renderInventoryPlayer({ THREE, renderer, canvas, angle = INVENTO
     } finally {
         renderer.setRenderTarget(previous);
         target.dispose();
+        equipment.dispose();
         model.dispose();
     }
 }

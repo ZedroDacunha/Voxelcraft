@@ -22,14 +22,15 @@
     "./asset-versions.js": "./asset-versions.js?v=d42b8dc6ff",
     "./game-pause-menu.js": "./game-pause-menu.js?v=f625baba0f",
     "./game-pointer-lock.js": "./game-pointer-lock.js?v=cf53899b88",
-    "./game.js": "./game.js?v=711659518f",
+    "./game.js": "./game.js?v=45475a6032",
     "./inventory-a11y.js": "./inventory-a11y.js?v=25f3dab87d",
+    "./inventory-armor.js": "./inventory-armor.js?v=61ee3be280",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
     "./inventory-layout.js": "./inventory-layout.js?v=439823a409",
     "./inventory-logic.js": "./inventory-logic.js?v=2b03734f23",
     "./inventory-model.js": "./inventory-model.js?v=473c73a8c5",
-    "./inventory-player-preview.js": "./inventory-player-preview.js?v=a443b31076",
-    "./inventory-player-rotation.js": "./inventory-player-rotation.js?v=91adeca1e3",
+    "./inventory-player-preview.js": "./inventory-player-preview.js?v=c7f259921a",
+    "./inventory-player-rotation.js": "./inventory-player-rotation.js?v=ddb4ef51f8",
     "./inventory-recipe-book.js": "./inventory-recipe-book.js?v=567593a30b",
     "./inventory-recipe-search.js": "./inventory-recipe-search.js?v=e910d2e22b",
     "./inventory-touch-gesture.js": "./inventory-touch-gesture.js?v=4e6b5fd9cd",
@@ -37,6 +38,9 @@
     "./menu-background.js": "./menu-background.js?v=ac7a9852c1",
     "./menu-framing.js": "./menu-framing.js?v=d140428fa7",
     "./menu-panorama.js": "./menu-panorama.js?v=2455dfa321",
+    "./player-armor-copper-chest.js": "./player-armor-copper-chest.js?v=08c84bc260",
+    "./player-armor-copper-helmet.js": "./player-armor-copper-helmet.js?v=fb10c5e465",
+    "./player-armor.js": "./player-armor.js?v=0b6199a760",
     "./player-hair.js": "./player-hair.js?v=eb669659cc",
     "./player-held-item.js": "./player-held-item.js?v=cbf8e6a092",
     "./player-jump.js": "./player-jump.js?v=32f1d93157",
@@ -62,12 +66,13 @@
     "./world-block-materials.js": "./world-block-materials.js?v=fee3236293",
     "./world-block-orientation.js": "./world-block-orientation.js?v=f6af440217",
     "./world-break-particles.js": "./world-break-particles.js?v=c2dcada0e8",
-    "./world-catalog.js": "./world-catalog.js?v=29b413711e",
+    "./world-catalog.js": "./world-catalog.js?v=a49cb60d3c",
     "./world-chat-commands.js": "./world-chat-commands.js?v=25c36325cf",
     "./world-chat-completion.js": "./world-chat-completion.js?v=69db7a1519",
     "./world-chat.js": "./world-chat.js?v=dbb76832dc",
     "./world-clock.js": "./world-clock.js?v=77473e68d7",
     "./world-clouds.js": "./world-clouds.js?v=1e269cf3ec",
+    "./world-copper-armor-icons.js": "./world-copper-armor-icons.js?v=990597f223",
     "./world-creature-base.js": "./world-creature-base.js?v=58074a3268",
     "./world-creature-dust.js": "./world-creature-dust.js?v=ffefda88af",
     "./world-creature.js": "./world-creature.js?v=6b66154c88",
@@ -109,7 +114,7 @@
     "./world-pwa.js": "./world-pwa.js?v=aebc169c21",
     "./world-raycast.js": "./world-raycast.js?v=0f025b877c",
     "./world-render-resolution.js": "./world-render-resolution.js?v=c966abb0c4",
-    "./world-save-codec.js": "./world-save-codec.js?v=b0cc3d8bbb",
+    "./world-save-codec.js": "./world-save-codec.js?v=903554376c",
     "./world-save-indicator.js": "./world-save-indicator.js?v=464a1a9ddc",
     "./world-save-loader.js": "./world-save-loader.js?v=097322c79d",
     "./world-save-lock.js": "./world-save-lock.js?v=4f86b790ec",
@@ -127,7 +132,7 @@
     "./world-tall-grass.js": "./world-tall-grass.js?v=fa4f3af748",
     "./world-terrain-worker.js": "./world-terrain-worker.js?v=06cc0dee23",
     "./world-terrain.js": "./world-terrain.js?v=5f100389a1",
-    "./world-textures.js": "./world-textures.js?v=896bdae3f0",
+    "./world-textures.js": "./world-textures.js?v=2f4bdfc443",
     "./world-tool-rules.js": "./world-tool-rules.js?v=85347f4434",
     "./world-tool-textures.js": "./world-tool-textures.js?v=1ddec1c6e7",
     "./world-touch-aim.js": "./world-touch-aim.js?v=635d914114",
@@ -443,11 +448,11 @@
             <p id="recipe-empty" class="recipe-empty" role="status" hidden>Nenhuma receita encontrada.</p>
         </section>
         <div class="craft-row" id="craft-row">
-            <div id="inv-armor" aria-label="Espaços de armadura, ainda indisponíveis" role="group" hidden>
-                <div class="armor-slot" role="img" aria-label="Capacete: espaço indisponível" title="Capacete">
+            <div id="inv-armor" aria-label="Espaços de armadura" role="grid" data-columns="1" hidden>
+                <div class="armor-slot islot" role="gridcell" tabindex="-1" data-inv="armor" data-index="0" aria-label="Capacete: vazio" title="Capacete">
                     <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 25v-8C5 8 9 4 16 4s11 4 11 13v8h-6v-7H11v7z"/></svg>
                 </div>
-                <div class="armor-slot" role="img" aria-label="Peitoral: espaço indisponível" title="Peitoral">
+                <div class="armor-slot islot" role="gridcell" tabindex="-1" data-inv="armor" data-index="1" aria-label="Peitoral: vazio" title="Peitoral">
                     <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 5l5-2 3 4 3-4 5 2 5 8-4 3-2-3v15H9V13l-2 3-4-3z"/></svg>
                 </div>
                 <div class="armor-slot" role="img" aria-label="Calças: espaço indisponível" title="Calças">
