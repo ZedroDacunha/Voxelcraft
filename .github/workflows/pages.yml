@@ -1,15 +1,5 @@
-# Publica o jogo no GitHub Pages a cada push em `main`.
-#
-# O jogo não tem etapa de build: o que está no repositório é o que vai para o ar.
-# Mas o Pages deste repositório está com a fonte **GitHub Actions**
-# (Settings → Pages → Source), e nesse modo quem publica é um workflow — sem um
-# workflow de deploy, push em `main` não muda nada no site, por mais builds que
-# tenham passado no CI.
-#
-# Este arquivo é esse deploy. Ele também dispensa o construtor antigo do Pages
-# (o do "Deploy from a branch"), que estava falhando com "Page build failed" por
-# causa do Jekyll — o `.nojekyll` na raiz cobre o caso de alguém voltar para
-# aquele modo.
+# Publica via Actions apenas quando essa for a fonte escolhida em Settings → Pages.
+# Se a fonte for uma branch, o próprio GitHub publica e este fluxo não compete.
 name: Pages
 
 on:
@@ -22,30 +12,46 @@ permissions:
   pages: write
   id-token: write
 
-# Um deploy por vez. O que chega durante um deploy espera o anterior terminar em
-# vez de ser cancelado — cancelar no meio é o jeito mais fácil de deixar o site
-# servindo uma versão pela metade.
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
+  fonte:
+    name: Verificar fonte do Pages
+    runs-on: ubuntu-latest
+    outputs:
+      tipo: ${{ steps.source.outputs.tipo }}
+    steps:
+      - name: Consultar configuração do Pages
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          tipo="$(gh api "repos/$GH_REPO/pages" --jq '.build_type')"
+          case "$tipo" in
+            legacy|workflow) ;;
+            *) echo "Fonte do Pages inesperada: $tipo" >&2; exit 1 ;;
+          esac
+          echo "tipo=$tipo" >> "$GITHUB_OUTPUT"
+          if [ "$tipo" = legacy ]; then
+            echo 'Pages publica pela branch configurada; deploy por Actions não será executado.'
+          fi
+
   publicar:
     name: Publicar no Pages
+    needs: fonte
+    if: needs.fonte.outputs.tipo == 'workflow'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      url: ${{ steps.deploy_retry.outputs.page_url || steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-
-      # Falha cedo, e com mensagem clara, se a fonte do Pages não for
-      # "GitHub Actions".
       - uses: actions/configure-pages@v5
-
-      # Só o que o navegador pede: a página, os módulos da raiz, `assets/`,
-      # `icons/` e o three.js em `vendor/`. Testes, ferramentas, workflows e a
-      # documentação em `.md` ficam de fora do site.
+      # Testes, ferramentas e documentação não fazem parte do site.
       - name: Preparar o site
         run: |
           mkdir _site
@@ -61,6 +67,16 @@ jobs:
         with:
           path: _site
 
+      # A API pode demorar para listar o artefato recém-criado. Se a primeira
+      # tentativa falhar, aguardar e tentar novamente; a segunda falha o job.
       - name: Publicar
         id: deploy
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+      - name: Aguardar antes da nova tentativa
+        if: steps.deploy.outcome == 'failure'
+        run: sleep 20
+      - name: Publicar novamente
+        if: steps.deploy.outcome == 'failure'
+        id: deploy_retry
         uses: actions/deploy-pages@v4
