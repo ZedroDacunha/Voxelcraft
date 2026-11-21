@@ -39,6 +39,7 @@ export function createInventoryPlayerRotation({ canvas, render, requestFrame = r
     });
     return {
         open() { cancel(); angle = INVENTORY_PLAYER_INITIAL_ANGLE; enabled = true; render(angle); },
+        refresh() { if (enabled) queue(); },
         close() { enabled = false; cancel(); },
         cancel,
     };

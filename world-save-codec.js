@@ -1,4 +1,5 @@
 import { BLOCKS, ID, ITEMS } from './world-catalog.js';
+import { ARMOR_SLOTS, canEquipArmor } from './inventory-armor.js';
 import { LEGACY_MINERAL_ITEM_MAP } from './world-minerals.js';
 import { parseBlockFacings } from './world-block-orientation.js';
 import { chunkKey, floorDiv, idx } from './world-grid.js';
@@ -41,6 +42,7 @@ export function createWorldSaveCodec({ version = WORLD_SAVE_VERSION } = {}) {
             player: state.player,
             selectedSlot: state.selectedSlot,
             inventory: state.inventory.map(packStack),
+            armor: ARMOR_SLOTS.map((_,i) => packStack(state.armor?.[i])),
             drops: state.drops.filter(drop => drop.age < drop.ttl).map(drop => ({
                 id: drop.id, count: drop.count, damage: drop.damage || 0,
                 x: drop.pos.x, y: drop.pos.y, z: drop.pos.z, age: drop.age, ttl: drop.ttl,
@@ -126,6 +128,11 @@ export function createWorldSaveCodec({ version = WORLD_SAVE_VERSION } = {}) {
             if (player.breath !== undefined && !Number.isFinite(player.breath)) return null;
             if (!Array.isArray(data.inventory) || data.inventory.length !== PLAYER_INVENTORY_SIZE) return null;
             const inventory = data.inventory.map(sanitizeStack);
+            // Saves anteriores não possuem armadura; um item incompatível nunca é equipado.
+            const armor = ARMOR_SLOTS.map((_,i) => {
+                const stack = sanitizeStack(Array.isArray(data.armor) ? data.armor[i] : null);
+                return canEquipArmor(i, stack) ? stack : null;
+            });
 
             const edits = new Map();
             const maxIndex = CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT;
@@ -175,6 +182,7 @@ export function createWorldSaveCodec({ version = WORLD_SAVE_VERSION } = {}) {
                 },
                 selectedSlot: data.selectedSlot >= 0 && data.selectedSlot < 9 ? data.selectedSlot | 0 : 0,
                 inventory,
+                armor,
                 edits,
                 blockFacings,
                 furnaces,
