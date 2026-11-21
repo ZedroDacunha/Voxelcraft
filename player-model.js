@@ -1,4 +1,5 @@
 import { createPlayerHair } from './player-hair.js';
+import { createPlayerOutfit } from './player-outfit.js';
 
 /** Modelo visual independente da câmera, do mundo e da rede.
  * Frente aponta para +Z; pés ficam em y=0. Medidas em blocos.
@@ -11,7 +12,7 @@ export const PLAYER_MODEL_COLORS = Object.freeze({
     eyes: 0x292923, eyeWhite: 0xeee6d4, trim: 0x384f35,
 });
 
-export function createPlayerModel(THREE, colors = {}) {
+export function createPlayerModel(THREE, colors = {}, { outfit: withOutfit = true } = {}) {
     const palette = { ...PLAYER_MODEL_COLORS, ...colors };
     const materials = Object.fromEntries(Object.entries(palette).map(([key, color]) => [key, new THREE.MeshLambertMaterial({ color })]));
     const geometries = [];
@@ -64,8 +65,10 @@ export function createPlayerModel(THREE, colors = {}) {
         box(leg, 'boot', 'boots', [4, 3, 4], [0, -10.5, 0]);
         return leg;
     });
+    const model = {root, head, torso, leftArm: arms[0], rightArm: arms[1], leftLeg: legs[0], rightLeg: legs[1]};
+    const outfit = withOutfit ? createPlayerOutfit(THREE, model, unit, palette) : null;
     return {
-        root, head, torso, leftArm: arms[0], rightArm: arms[1], leftLeg: legs[0], rightLeg: legs[1],
-        dispose() { hair.dispose(); geometries.forEach(geometry => geometry.dispose()); Object.values(materials).forEach(material => material.dispose()); },
+        ...model, outfit,
+        dispose() { outfit?.dispose(); hair.dispose(); geometries.forEach(geometry => geometry.dispose()); Object.values(materials).forEach(material => material.dispose()); },
     };
 }
