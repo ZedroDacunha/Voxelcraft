@@ -94,3 +94,9 @@
         padding: 6px 8px; margin-bottom: 8px; background: #222; color: #f5e5bd;
         border: 1px solid #8b7956; font: bold 12px/1.3 monospace; overflow-wrap: anywhere; }
     #inv-touch-held[hidden] { display: none; }
+/* Catálogo do criativo ocupa apenas o inventário pessoal; o fundo e a grade
+   existentes continuam iguais em bancada, baú e forno. */
+#creative-catalog[hidden] { display: none; }
+#creative-catalog { margin: 4px 0 8px; }
+#creative-search { box-sizing: border-box; width: 100%; margin-bottom: 5px; padding: 5px; background: #333; color: #fff; border: 2px solid #777; }
+#creative-items { display: grid; grid-template-columns: repeat(9, var(--inv-slot-size)); gap: var(--inv-gap); max-height: calc(var(--inv-slot-size) * 3.3); overflow-y: auto; }

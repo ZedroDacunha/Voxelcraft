@@ -101,7 +101,7 @@ async function launchWorld(world, online = null) {
     showError();
     document.getElementById('btn-create-world').disabled = true;
     for (const button of worldListView.element.querySelectorAll('button')) button.disabled = true;
-    window.ACTIVE_WORLD = { online, id: world.id, name: world.name, seed: world.seed, saveKey: world.saveKey };
+    window.ACTIVE_WORLD = { online, id: world.id, name: world.name, seed: world.seed, saveKey: world.saveKey, gameMode: world.gameMode };
     menu.hidden = true;
     titleScreen.hidden = true;
     document.body.classList.add('game-started');
@@ -142,6 +142,8 @@ function openWorldDialog(world = null) {
     nameInput.value = world?.name || `Meu mundo ${new Date().toLocaleDateString('pt-BR')}`;
     seedInput.value = world ? String(world.seed) : '';
     seedInput.disabled = Boolean(world);
+    document.getElementById('world-mode-field').hidden = Boolean(world);
+    document.getElementById('world-mode').value = 'survival';
     dialog.showModal();
     nameInput.focus();
     nameInput.select();
@@ -167,7 +169,7 @@ form.addEventListener('submit', async event => {
                 throw new Error('Use uma seed inteira entre -2147483648 e 2147483647.');
             }
             const id = crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-            const world = { id, name, seed, saveKey: `world-${id}`, createdAt: Date.now() };
+            const world = { id, name, seed, gameMode: document.getElementById('world-mode').value, saveKey: `world-${id}`, createdAt: Date.now() };
             await createWorldRecord(world);
         }
         dialog.close();

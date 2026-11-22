@@ -1,3 +1,4 @@
+import { parseGameMode } from './world-creative.js';
 /**
  * Os comandos do chat — os do Minecraft, no que cabe neste jogo.
  *
@@ -200,6 +201,17 @@ export const CHAT_COMMANDS = Object.freeze([
             const command = findCommand(args[0]);
             if (!command) return fail(`Não existe o comando /${args[0]}.`);
             return succeed(command.usage, command.summary);
+        },
+    },
+    {
+        name: 'gamemode',
+        usage: '/gamemode <creative|survival>',
+        summary: 'altera o modo de jogo',
+        run(ctx, args) {
+            const mode = args.length === 1 ? parseGameMode(args[0]) : null;
+            if (!mode) return usageOf(this);
+            if (typeof ctx.setGameMode !== 'function' || !ctx.setGameMode(mode)) return fail('Não é possível alterar o modo nesta partida.');
+            return succeed(`Modo de jogo: ${mode === 'creative' ? 'Criativo' : 'Sobrevivência'}.`);
         },
     },
     {

@@ -11,8 +11,8 @@
 <meta name="apple-mobile-web-app-title" content="Voxel">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
-<link rel="stylesheet" href="styles.css?v=8fdbc1ab44">
-<link rel="stylesheet" href="inventory.css?v=4c790c6f21">
+<link rel="stylesheet" href="styles.css?v=8b8d33cd0b">
+<link rel="stylesheet" href="inventory.css?v=a3c52e382b">
 <!-- importmap:start (gerado por tools/stamp-importmap.mjs; não editar à mão) -->
 <script type="importmap">
 {
@@ -22,7 +22,7 @@
     "./asset-versions.js": "./asset-versions.js?v=d42b8dc6ff",
     "./game-pause-menu.js": "./game-pause-menu.js?v=f625baba0f",
     "./game-pointer-lock.js": "./game-pointer-lock.js?v=cf53899b88",
-    "./game.js": "./game.js?v=c2e3051205",
+    "./game.js": "./game.js?v=7eb08bb8fa",
     "./inventory-a11y.js": "./inventory-a11y.js?v=1bbf8184b5",
     "./inventory-armor.js": "./inventory-armor.js?v=19964c655c",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
@@ -71,12 +71,13 @@
     "./world-block-orientation.js": "./world-block-orientation.js?v=f6af440217",
     "./world-break-particles.js": "./world-break-particles.js?v=c2dcada0e8",
     "./world-catalog.js": "./world-catalog.js?v=841af44550",
-    "./world-chat-commands.js": "./world-chat-commands.js?v=25c36325cf",
-    "./world-chat-completion.js": "./world-chat-completion.js?v=69db7a1519",
+    "./world-chat-commands.js": "./world-chat-commands.js?v=989aac2a6a",
+    "./world-chat-completion.js": "./world-chat-completion.js?v=f920c11c92",
     "./world-chat.js": "./world-chat.js?v=dbb76832dc",
     "./world-clock.js": "./world-clock.js?v=77473e68d7",
     "./world-clouds.js": "./world-clouds.js?v=1e269cf3ec",
     "./world-copper-armor-icons.js": "./world-copper-armor-icons.js?v=57fd55b13f",
+    "./world-creative.js": "./world-creative.js?v=0317fcd4a6",
     "./world-creature-base.js": "./world-creature-base.js?v=58074a3268",
     "./world-creature-dust.js": "./world-creature-dust.js?v=ffefda88af",
     "./world-creature.js": "./world-creature.js?v=6b66154c88",
@@ -102,7 +103,7 @@
     "./world-list-view.js": "./world-list-view.js?v=9ec40da58c",
     "./world-math.js": "./world-math.js?v=ce4a6d9232",
     "./world-meats.js": "./world-meats.js?v=fa6e21fd92",
-    "./world-menu.js": "./world-menu.js?v=1df43bf47f",
+    "./world-menu.js": "./world-menu.js?v=dbac63c1a5",
     "./world-mesh-buffers.js": "./world-mesh-buffers.js?v=ceba787639",
     "./world-mineral-blocks.js": "./world-mineral-blocks.js?v=4c39bc041e",
     "./world-mineral-textures.js": "./world-mineral-textures.js?v=8bb1ae7527",
@@ -118,7 +119,7 @@
     "./world-pwa.js": "./world-pwa.js?v=aebc169c21",
     "./world-raycast.js": "./world-raycast.js?v=0f025b877c",
     "./world-render-resolution.js": "./world-render-resolution.js?v=c966abb0c4",
-    "./world-save-codec.js": "./world-save-codec.js?v=1c93234503",
+    "./world-save-codec.js": "./world-save-codec.js?v=01ed64e41c",
     "./world-save-indicator.js": "./world-save-indicator.js?v=464a1a9ddc",
     "./world-save-loader.js": "./world-save-loader.js?v=097322c79d",
     "./world-save-lock.js": "./world-save-lock.js?v=4f86b790ec",
@@ -372,6 +373,9 @@
         <label class="world-field">Seed (opcional; deixe em branco para gerar uma)
             <input id="world-seed" name="seed" type="number" step="1" placeholder="Aleatória">
         </label>
+        <label class="world-field" id="world-mode-field">Modo de jogo
+            <select id="world-mode" name="gameMode"><option value="survival">Sobrevivência</option><option value="creative">Criativo</option></select>
+        </label>
         <div class="world-dialog-actions">
             <button class="world-action" type="button" id="btn-world-cancel">Cancelar</button>
             <button class="btn" type="submit" id="btn-world-confirm">Criar mundo</button>
@@ -481,6 +485,10 @@
             <div id="fur-out"></div>
         </div>
         <div id="chest-row" style="display:none; margin-bottom:12px"><div id="inv-chest" class="inv-grid"></div></div>
+        <section id="creative-catalog" hidden aria-label="Inventário criativo">
+            <input id="creative-search" type="search" autocomplete="off" placeholder="Buscar item" aria-label="Buscar item no criativo">
+            <div id="creative-items" role="grid" data-columns="9" aria-label="Itens do criativo"></div>
+        </section>
         <div id="inv-main" class="inv-grid"></div>
         <div class="inv-sep"></div>
         <div id="inv-hotbar" class="inv-grid"></div>
@@ -561,6 +569,6 @@
         <button class="classic-btn touch-edit-btn" type="button" id="btn-touch-positions-done">Pronto</button>
     </div>
 </div>
-<script type="module" src="world-menu.js?v=1df43bf47f"></script>
+<script type="module" src="world-menu.js?v=dbac63c1a5"></script>
 </body>
 </html>
