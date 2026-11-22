@@ -9,6 +9,7 @@ import { createTerrainWorkerSource } from './world-terrain-worker.js';
 import { createWaterSystemClass } from './world-water.js';
 import { Inventory } from './inventory-model.js';
 import { armorClick, canEquipArmor } from './inventory-armor.js';
+import { CREATIVE, SURVIVAL, parseGameMode, creativeItems, creativeStack, flightTap } from './world-creative.js';
 import { damageEquippedArmor } from './world-armor-durability.js';
 import { armorPoints, damageAfterArmor } from './world-armor-protection.js';
 import { createPlayerArmor } from './player-armor.js';
@@ -188,6 +189,9 @@ if (!ACTIVE_WORLD || !Number.isFinite(ACTIVE_WORLD.seed) || !ACTIVE_WORLD.saveKe
 const SEED = ACTIVE_WORLD.seed;
 const online = ACTIVE_WORLD.online;
 const onlineGuest = online && !online.host;
+let gameMode = online ? SURVIVAL : (parseGameMode(ACTIVE_WORLD.gameMode) || SURVIVAL);
+const creativeFlight = { flying: false, lastTap: -Infinity };
+const isCreative = () => gameMode === CREATIVE;
 const SKY_COLOR = 0x87CEEB;
 const GPU_PREF = new URLSearchParams(location.search).get('gpu') === 'default' ? 'default' : 'high-performance';
 const FRAME_BUDGET_MS = 7;     // tempo máximo por quadro gasto gerando/montando chunks
@@ -1402,6 +1406,7 @@ const SheepSystem = createSheepSystemClass({
 // 5B. INVENTÁRIO E FERRAMENTAS
 // =====================================================================
 function damageTool(slotIndex, amount = 1) {
+    if (isCreative()) return;
     const result = damageToolStack(inventory.slots[slotIndex], amount);
     if (!result) return;
     if (result.broken) {
@@ -1952,7 +1957,7 @@ function breakBlock(x, y, z) {
     // (nunca como fonte). Ver `world-water.js` › `onBlockBroken()`.
     world.water.onBlockBroken(world, x, y, z);
     breakParticles.spawn(x, y, z, type);
-    if (harvest && drop && Math.random() < dropChance) {
+    if (!isCreative() && harvest && drop && Math.random() < dropChance) {
         spawnItemEntity(
             drop, 1,
             new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5),
@@ -2067,12 +2072,17 @@ function updateMining(dt, { tap = false } = {}) {
     mining.cooldown = Math.max(0, mining.cooldown - dt);
     if ((!leftHeld && !tap) || !currentHit) { resetMining(); return; }
 
-    if (currentHit.y === 0) {
+    if (currentHit.y === 0 && !isCreative()) {
         mining.progress = 0;
         crackMesh.visible = false;
         return;
     }
     if (mining.cooldown > 0) return;
+    if (isCreative()) {
+        breakBlock(currentHit.x, currentHit.y, currentHit.z);
+        resetMining(); mining.cooldown = 0.2;
+        return;
+    }
 
     if (currentHit.type === ID.TALL_GRASS) {
         breakBlock(currentHit.x, currentHit.y, currentHit.z);
@@ -2548,6 +2558,15 @@ function chatCommandContext() {
             updateHotbarUI();
             return removed;
         },
+        setGameMode(mode) {
+            if (online || !parseGameMode(mode)) return false;
+            gameMode = parseGameMode(mode);
+            creativeFlight.flying = false; creativeFlight.lastTap = -Infinity;
+            player.vel.y = 0; player.fallDistance = 0;
+            document.getElementById('survival-hud').style.display = isCreative() ? 'none' : '';
+            saveGame(true, true);
+            return true;
+        },
         killPlayer() {
             invuln = 0;
             takeDamage(999, 'kill');
@@ -2758,6 +2777,7 @@ function buildInventoryUI() {
     for (let i = 0; i < 9; i++) document.getElementById(`slot-${i}`)?.setAttribute('role', 'img');
     resetRovingTabIndex();
 
+    document.getElementById('creative-search').addEventListener('input', renderCreativeCatalog);
     const overlay = document.getElementById('inventory');
     const playerCanvas = document.getElementById('inv-player');
     inventoryPlayerRotation = createInventoryPlayerRotation({ canvas: playerCanvas, render: angle => {
@@ -2889,6 +2909,7 @@ function setRecipeBookOpen(isOpen) {
 
 function hoveredStack() {
     if (!invHover) return null;
+    if (invHover.inv === 'creative') return creativeStack(invHover.i, true);
     if (invHover.inv === 'armor') return armorSlots[invHover.i];
     if (invHover.inv === 'main') return inventory.slots[invHover.i];
     if (invHover.inv === 'craft') return craftInv.slots[invHover.i];
@@ -2924,7 +2945,24 @@ function updateInventoryFloaters() {
     }
 }
 
+function renderCreativeCatalog() {
+    const grid = document.getElementById('creative-items');
+    const query = document.getElementById('creative-search').value;
+    grid.replaceChildren();
+    for (const id of creativeItems(query)) {
+        const el = document.createElement('div');
+        el.className = 'islot'; el.dataset.inv = 'creative'; el.dataset.index = id;
+        el.setAttribute('role', 'gridcell'); el.setAttribute('aria-label', ITEMS[id].name);
+        el.tabIndex = grid.children.length ? -1 : 0;
+        el.innerHTML = stackHtml({ id, count: 1 });
+        grid.appendChild(el);
+    }
+}
+
 function applyInventoryLayout() {
+    const catalogue = document.getElementById('creative-catalog');
+    catalogue.hidden = !isCreative() || Boolean(station);
+    if (!catalogue.hidden) renderCreativeCatalog();
     const isFurnace = !!station && station.type === 'furnace';
     const isChest = !!station && station.type === 'chest';
     document.getElementById('craft-row').style.display = (isFurnace || isChest) ? 'none' : 'flex';
@@ -3022,6 +3060,16 @@ function activateSlot(el, { button = 0, shiftKey = false, touch = false } = {}) 
     const name = el.dataset.inv, i = Number(el.dataset.index);
     invHover = { inv: name, i };
     if (touch) invLastClick = { time: 0, key: '' };
+
+    if (name === 'creative') {
+        if (!isCreative() || station || cursorHeld.stack) return;
+        const stack = creativeStack(i, button === 2);
+        if (!stack) return;
+        if (shiftKey) inventory.add(stack.id, stack.count);
+        else cursorHeld.stack = stack;
+        renderInventory();
+        return;
+    }
 
     if (name === 'armor') {
         let changed = false;
@@ -3942,6 +3990,7 @@ function updateArmorUI() {
 }
 
 function updateSurvivalUI() {
+    document.getElementById('survival-hud').style.display = isCreative() ? 'none' : '';
     const healthBar = document.getElementById('health-bar');
     const hungerBar = document.getElementById('hunger-bar');
     if (!healthBar || !hungerBar) return;
@@ -3996,7 +4045,7 @@ function updateHotbarUI() {
     }
 }
 
-function addExhaustion(x) { exhaustion += x; }
+function addExhaustion(x) { if (!isCreative()) exhaustion += x; }
 
 function resetStats() {
     health = MAX_HEALTH; hunger = MAX_HUNGER; saturation = 5; exhaustion = 0;
@@ -4007,7 +4056,7 @@ function resetStats() {
 }
 
 function takeDamage(amount, source = 'generic') {
-    if (dead || amount <= 0) return;
+    if (dead || amount <= 0 || (isCreative() && source !== 'kill')) return;
     if (invuln > 0 && source !== 'starve' && source !== 'drown') return;
     // A peça que quebra ainda protege contra o golpe que a quebrou.
     const reducedDamage = damageAfterArmor(amount, armorPoints(armorSlots), source);
@@ -4037,6 +4086,7 @@ function die(source = 'generic') {
     dead = true;
     touchActive = false;
     resetInputFlags();
+    creativeFlight.flying = false; creativeFlight.lastTap = -Infinity;
     cancelEating();
     // Morrer dormindo (um bicho pode chegar) não pode deixar a tela preta.
     stopSleep();
@@ -4118,7 +4168,8 @@ function updateEating(dt) {
 
 function updateSurvival(dt) {
     invuln = Math.max(0, invuln - dt);
-    
+    if (isCreative()) return;
+
     // --- Lógica de Fôlego e Afogamento ---
     if (world.water.headInWater) {
         breathTimer += dt;
@@ -4290,7 +4341,7 @@ function updatePhysics(dt) {
     if (waterSound) audio.play(waterSound.name, { gainScale: waterSound.gainScale, rate: stepPitch() });
     const atWaterSurface = world.water.feetInWater && !world.water.headInWater;
     const wantsDive = inWater && wantToCrouch;
-    const wantsCrouch = !inWater && wantToCrouch;
+    const wantsCrouch = !creativeFlight.flying && !inWater && wantToCrouch;
 
     if (wantsCrouch && !isCrouching) {
         isCrouching = true;
@@ -4300,10 +4351,11 @@ function updatePhysics(dt) {
         player.height = H_STAND;
     }
 
-    const sprintNow = isSprinting && hunger >= SPRINT_MIN_HUNGER;
+    const sprintNow = isSprinting && (isCreative() || hunger >= SPRINT_MIN_HUNGER);
     // Reduz velocidade geral se estiver na água
     let speed = isCrouching ? CROUCH_SPEED : (sprintNow ? SPRINT_SPEED : WALK_SPEED);
-    if (inWater) speed *= 0.5;
+    if (inWater && !creativeFlight.flying) speed *= 0.5;
+    if (creativeFlight.flying) speed = sprintNow ? 10 : 6;
 
     const yaw = look.yaw;
     const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
@@ -4316,7 +4368,7 @@ function updatePhysics(dt) {
     const tz = (rz * ix + fz * iz) * speed;
 
     // Atrito/Desaceleração
-    if (player.onGround || hasInput || inWater) {
+    if (player.onGround || hasInput || inWater || creativeFlight.flying) {
         // Atrito maior na água se não tiver no chão (5) para nadar suavemente, chão normal (14), ar (3)
         const frictionBase = player.onGround ? 14 : (inWater ? 5 : 3);
         const k = 1 - Math.exp(-frictionBase * dt);
@@ -4326,7 +4378,10 @@ function updatePhysics(dt) {
 
     // Pulo e Gravidade com Natação
     let jumpedNow = false;
-    if (inWater) {
+    if (creativeFlight.flying) {
+        player.vel.y = (Number(jumpHeld) - Number(wantToCrouch)) * 5;
+        player.fallDistance = 0;
+    } else if (inWater) {
         if (wantsDive) {
             player.vel.y = Math.max(player.vel.y - 12.0 * dt, -3.2);
         } else if (atWaterSurface && jumpHeld && !swimStrokeLocked) {
@@ -4361,7 +4416,7 @@ function updatePhysics(dt) {
 
     // Agachado e apoiado no chão, o corpo não sai andando pelo vazio: dá para
     // espiar a beirada (e chegar perto do Mofim sem assustar) sem cair.
-    const guardEdge = isCrouching && player.onGround && !inWater;
+    const guardEdge = isCrouching && player.onGround && !inWater && !creativeFlight.flying;
     if (moveAxis('x', player.vel.x * dt, guardEdge)) player.vel.x = 0;
     if (moveAxis('z', player.vel.z * dt, guardEdge)) player.vel.z = 0;
 
@@ -4396,6 +4451,7 @@ function updatePhysics(dt) {
     if (blockedY) {
         if (player.vel.y < 0) {
             player.onGround = true;
+            if (creativeFlight.flying) creativeFlight.flying = false;
             if (!crossedWater && player.fallDistance > 3) takeDamage(Math.floor(player.fallDistance - 3), 'fall');
             player.fallDistance = 0;
         }
@@ -4502,6 +4558,7 @@ const saveCodec = createWorldSaveCodec({ version: WORLD_SAVE_VERSION });
 function buildSave() {
     return saveCodec.build({
         seed: SEED,
+        gameMode,
         worldTime: worldClock.time,
         world,
         player: { x: player.pos.x, y: player.pos.y, z: player.pos.z, health, hunger, saturation, breath },
@@ -4978,6 +5035,7 @@ async function init() {
     sheepSystem = new SheepSystem(world);
     const save = onlineGuest ? null : await loadGame();
     if (save) {
+        gameMode = online ? SURVIVAL : save.gameMode;
         world.edits = save.edits;
         world.blockFacings = new BlockFacingStore(save.blockFacings);
         inventory.slots = save.inventory;
@@ -5162,6 +5220,13 @@ async function init() {
         }, 1300);
     });
 
+    function pressJump() {
+        if (flightTap(creativeFlight, performance.now() / 1000, isCreative())) {
+            player.vel.y = 0; player.fallDistance = 0;
+            showToast(creativeFlight.flying ? 'Voando' : 'Voo desligado');
+        }
+    }
+
     document.addEventListener('keydown', (event) => {
         // Com o chat aberto, o teclado é dele (inclusive o T que abriu).
         if (chat.open) return;
@@ -5172,7 +5237,7 @@ async function init() {
             case 'KeyA': moveLeft = true; break;
             case 'KeyS': moveBackward = true; break;
             case 'KeyD': moveRight = true; break;
-            case 'Space': jumpHeld = true; break;
+            case 'Space': if (!event.repeat) pressJump(); jumpHeld = true; break;
             case 'KeyQ': dropSelectedItem(); break;
             case 'KeyV': if (!event.repeat) toggleThirdPerson(); break;
             case 'KeyE': if (!event.repeat) openInventory(null, { focusFirst: true }); break;
@@ -5235,6 +5300,7 @@ async function init() {
         if (intent === 'bed') { trySleep(currentHit); return; }
         // Comer funciona mirando para qualquer lugar (inclusive um bloco).
         if (intent === 'eat') {
+            if (isCreative()) return;
             if (hunger < MAX_HUNGER) { eat.active = true; eat.progress = 0; eat.slot = selectedSlot; eat.id = held.id; }
             else showToast('Você não está com fome');
             return;
@@ -5274,7 +5340,7 @@ async function init() {
                 ? placeBed(px, py, pz, facing, placedType)
                 : world.setBlock(px, py, pz, placedType, facing);
         if (placed) {
-            inventory.removeOne(selectedSlot);
+            if (!isCreative()) inventory.removeOne(selectedSlot);
             updateHotbarUI();
             startPunch(handAnim);
             const placeSound = materialSoundName(placedType, 'place');
@@ -5454,7 +5520,7 @@ async function init() {
                 if (!playing()) return;
                 haptic('button');
                 button.setPointerCapture?.(event.pointerId);
-                if (id === 'jump') { jumpHeld = true; pressButton(id, true); return; }
+                if (id === 'jump') { pressJump(); jumpHeld = true; pressButton(id, true); return; }
                 if (id === 'break') {
                     if (touchBreakPointerId !== null) return;
                     touchBreakPointerId = event.pointerId;

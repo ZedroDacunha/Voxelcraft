@@ -96,6 +96,9 @@ export function completionsFor(text, { catalog = {} } = {}) {
     const command = raw.slice(COMMAND_PREFIX.length, firstSpace).toLowerCase();
     const tokenKey = token.toLowerCase();
 
+    if (command === 'gamemode' && argIndex === 0) {
+        return { base, token, argIndex, matches: plainMatches(tokenKey, ['creative', 'survival']) };
+    }
     if (command === 'give' && argIndex === 0) {
         return { base, token, argIndex, matches: itemMatches(token, catalog) };
     }

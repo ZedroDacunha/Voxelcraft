@@ -1,5 +1,6 @@
 import { BLOCKS, ID, ITEMS } from './world-catalog.js';
 import { ARMOR_SLOTS, canEquipArmor } from './inventory-armor.js';
+import { parseGameMode, SURVIVAL } from './world-creative.js';
 import { LEGACY_MINERAL_ITEM_MAP } from './world-minerals.js';
 import { parseBlockFacings } from './world-block-orientation.js';
 import { chunkKey, floorDiv, idx } from './world-grid.js';
@@ -36,6 +37,7 @@ export function createWorldSaveCodec({ version = WORLD_SAVE_VERSION } = {}) {
         return {
             v: version,
             seed: state.seed,
+            gameMode: parseGameMode(state.gameMode) || SURVIVAL,
             time: Date.now(),
             worldTime: state.worldTime,
             blockFacings: state.world.blockFacings.serialize(WORLD_HEIGHT),
@@ -182,6 +184,7 @@ export function createWorldSaveCodec({ version = WORLD_SAVE_VERSION } = {}) {
                 },
                 selectedSlot: data.selectedSlot >= 0 && data.selectedSlot < 9 ? data.selectedSlot | 0 : 0,
                 inventory,
+                gameMode: parseGameMode(data.gameMode) || SURVIVAL,
                 armor,
                 edits,
                 blockFacings,

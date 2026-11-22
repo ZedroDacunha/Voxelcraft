@@ -22,7 +22,7 @@ const values = (text, catalog = CATALOG) => completionsFor(text, { catalog }).ma
 
 test('no nome do comando, o Tab oferece os comandos da tabela', () => {
     assert.deepEqual(values('/'), CHAT_COMMANDS.map(command => `/${command.name}`));
-    assert.deepEqual(values('/g'), ['/give']);
+    assert.deepEqual(values('/g'), ['/gamemode', '/give']);
     assert.deepEqual(values('/TI'), ['/time'], 'não liga para maiúscula');
     assert.deepEqual(values('/t'), ['/time', '/tp']);
     assert.deepEqual(values('/zzz'), [], 'sem candidato, nada de lista');
@@ -150,7 +150,7 @@ test('Tab e Shift+Tab andam em sentidos opostos na mesma lista', () => {
     assert.equal(primeiro.matches.length, CHAT_COMMANDS.length);
 
     const segundo = completer.complete(primeiro.text);
-    assert.equal(segundo.text, '/help give ');
+    assert.equal(segundo.text, '/help gamemode ');
     const volta = completer.complete(segundo.text, { backwards: true });
     assert.equal(volta.text, '/help help ', 'Shift+Tab desfaz o Tab');
 });
