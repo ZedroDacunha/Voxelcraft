@@ -65,8 +65,22 @@ export function previewConnectedHemChest(THREE,model,unit){
         box(arm,'front-dark-pixel',shade,[.38,.26,.06],[side*1.1,-4.3,2.53]);
         box(arm,'back-dark-pixel',shade,[.38,.26,.06],[side*1.1,-4.3,-2.53]);
     }
-    const pairs=[[torso,model.torso],[left,model.leftArm],[right,model.rightArm]];
-    function sync(){for(const [piece,bone] of pairs){piece.position.copy(bone.position);piece.quaternion.copy(bone.quaternion);piece.scale.copy(bone.scale);}}
+    // As ombreiras pertencem ao peitoral e seguem o tronco, nunca a rotação
+    // dos braços. As posições de repouso são as já aprovadas para os ombros.
+    const offsets=[model.leftArm.position.clone().sub(model.torso.position),
+                   model.rightArm.position.clone().sub(model.torso.position)];
+    const scratch=new THREE.Vector3();
+    function sync(){
+        torso.position.copy(model.torso.position);
+        torso.quaternion.copy(model.torso.quaternion);
+        torso.scale.copy(model.torso.scale);
+        for(const [i,shoulder] of [left,right].entries()){
+            scratch.copy(offsets[i]).multiply(model.torso.scale).applyQuaternion(model.torso.quaternion);
+            shoulder.position.copy(model.torso.position).add(scratch);
+            shoulder.quaternion.copy(model.torso.quaternion);
+            shoulder.scale.copy(model.torso.scale);
+        }
+    }
     // A manga verde está totalmente encoberta pela armadura. Suas faces
     // internas coincidiam exatamente com as da ombreira. Apenas sua exibição
     // é suspensa quando equipada; a geometria/material da roupa é preservada.
