@@ -306,10 +306,10 @@ for (const meat of MEATS) {
     }
 }
 // Peças de armadura independentes; apenas aparência nesta etapa.
-ITEMS[ID.COPPER_HELMET] = { name: 'Capacete de cobre', maxStack: 1, armorSlot: 'helmet', sprite: {kind:'copper-helmet', mat:'copper'}, iconTile: nextTile++ };
-ITEMS[ID.COPPER_CHESTPLATE] = { name: 'Peitoral de cobre', maxStack: 1, armorSlot: 'chest', sprite: {kind:'copper-chestplate', mat:'copper'}, iconTile: nextTile++ };
-ITEMS[ID.COPPER_LEGGINGS] = { name: 'Calça de cobre', maxStack: 1, armorSlot: 'legs', sprite: {kind:'copper-leggings', mat:'copper'}, iconTile: nextTile++ };
-ITEMS[ID.COPPER_BOOTS] = { name: 'Botas de cobre', maxStack: 1, armorSlot: 'feet', sprite: {kind:'copper-boots', mat:'copper'}, iconTile: nextTile++ };
+ITEMS[ID.COPPER_HELMET] = { name: 'Capacete de cobre', maxStack: 1, maxDurability: 121, armorSlot: 'helmet', sprite: {kind:'copper-helmet', mat:'copper'}, iconTile: nextTile++ };
+ITEMS[ID.COPPER_CHESTPLATE] = { name: 'Peitoral de cobre', maxStack: 1, maxDurability: 176, armorSlot: 'chest', sprite: {kind:'copper-chestplate', mat:'copper'}, iconTile: nextTile++ };
+ITEMS[ID.COPPER_LEGGINGS] = { name: 'Calça de cobre', maxStack: 1, maxDurability: 165, armorSlot: 'legs', sprite: {kind:'copper-leggings', mat:'copper'}, iconTile: nextTile++ };
+ITEMS[ID.COPPER_BOOTS] = { name: 'Botas de cobre', maxStack: 1, maxDurability: 143, armorSlot: 'feet', sprite: {kind:'copper-boots', mat:'copper'}, iconTile: nextTile++ };
 ITEMS[ID.TORCH].sprite = { kind: 'torch', mat: 'wood' };
 
 // O atlas é uma grade fixa, não uma fileira única: com 16 colunas a largura
@@ -407,6 +407,14 @@ defRecipe([[ID.MOFIM_DUST, ID.MOFIM_DUST], [ID.MOFIM_DUST, ID.PLANKS]], ID.MOFIM
 // Tesoura: duas barras de ferro na diagonal (como no Minecraft — reconhecível
 // sem tutorial). Ela não mina mais rápido nada: serve para tosquiar.
 defRecipe([[ID.IRON_INGOT, null], [null, ID.IRON_INGOT]], ID.SHEARS);
+// Armadura de cobre: silhuetas clássicas, com barras (não minério bruto).
+// A bancada 3×3 é necessária para capacete, peitoral e calça.
+const C = ID.COPPER_INGOT;
+defRecipe([[C, C, C], [C, null, C]], ID.COPPER_HELMET);
+defRecipe([[C, null, C], [C, C, C], [C, C, C]], ID.COPPER_CHESTPLATE);
+defRecipe([[C, C, C], [C, null, C], [C, null, C]], ID.COPPER_LEGGINGS);
+defRecipe([[C, null, C], [C, null, C]], ID.COPPER_BOOTS);
+
 // Quatro fardos da mesma cor viram o bloco daquela cor. Sem mistura: lã cinza
 // não entra na receita da branca.
 defRecipe([[ID.WOOL_WHITE, ID.WOOL_WHITE], [ID.WOOL_WHITE, ID.WOOL_WHITE]], ID.WOOL_BLOCK_WHITE);
