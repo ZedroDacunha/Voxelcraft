@@ -8,22 +8,32 @@ import { previewIronChest } from './player-armor-iron-peitoral.js';
 import { previewIronLeggings } from './player-armor-iron-calca.js';
 import { previewIronBoots } from './player-armor-iron-botas.js';
 import { addIronArmorDetails } from './player-armor-iron-details.js';
+import { previewGoldHelmet } from './player-armor-gold-capacete.js';
+import { previewGoldChest } from './player-armor-gold-peitoral.js';
+import { previewGoldLeggings } from './player-armor-gold-calca.js';
+import { previewGoldBoots } from './player-armor-gold-botas.js';
+import { addGoldArmorDetails } from './player-armor-gold-details.js';
 
 /** Peças visuais separadas e articuladas, inclusive conjuntos mistos. */
 export function createPlayerArmor(THREE, model, unit) {
     const copper = [previewCopperHelmet(THREE, model, unit), previewConnectedHemChest(THREE, model, unit),
         previewCopperLeggings(THREE, model, unit), previewCopperBoots(THREE, model, unit, 2)];
-    // Cada modelo guarda a visibilidade original da roupa. O cobre precisa ser
-    // desativado antes de criar o ferro para que ambos capturem o mesmo estado.
+    // Desativar cada conjunto antes de criar o próximo preserva o estado
+    // original de cabelo e roupas ao trocar de material.
     copper.forEach(piece => piece.setVisible(false));
     const iron = [previewIronHelmet(THREE, model, unit), previewIronChest(THREE, model, unit),
         previewIronLeggings(THREE, model, unit), previewIronBoots(THREE, model, unit, 2)];
     addIronArmorDetails(THREE, unit, { helmet: iron[0], chest: iron[1], leggings: iron[2], boots: iron[3] });
     iron.forEach(piece => piece.setVisible(false));
-    const groups = [copper, iron];
+    const gold = [previewGoldHelmet(THREE, model, unit), previewGoldChest(THREE, model, unit),
+        previewGoldLeggings(THREE, model, unit), previewGoldBoots(THREE, model, unit, 2)];
+    addGoldArmorDetails(THREE, unit, { helmet: gold[0], chest: gold[1], leggings: gold[2], boots: gold[3] });
+    gold.forEach(piece => piece.setVisible(false));
+    const groups = [copper, iron, gold];
     const ids = [
         [ID.COPPER_HELMET, ID.COPPER_CHESTPLATE, ID.COPPER_LEGGINGS, ID.COPPER_BOOTS],
         [ID.IRON_HELMET, ID.IRON_CHESTPLATE, ID.IRON_LEGGINGS, ID.IRON_BOOTS],
+        [ID.GOLD_HELMET, ID.GOLD_CHESTPLATE, ID.GOLD_LEGGINGS, ID.GOLD_BOOTS],
     ];
     const active = [null, null, null, null];
     function setEquipment(slots = []) {
@@ -32,7 +42,7 @@ export function createPlayerArmor(THREE, model, unit) {
             const old = active[i];
             if (old === next) continue;
             // Restaura antes de ocultar de novo: evita roupa/cabelo visível ao
-            // trocar diretamente de cobre para ferro, ou vice-versa.
+            // trocar diretamente entre materiais diferentes.
             if (old !== null && old >= 0) groups[old][i].setVisible(false);
             if (next >= 0) groups[next][i].setVisible(true);
             active[i] = next;

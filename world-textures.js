@@ -1,6 +1,7 @@
 import { hash2, mulberry32 } from './world-math.js';
 import { copperArmorSprite } from './world-copper-armor-icons.js';
 import { ironArmorSprite } from './world-iron-armor-icons.js';
+import { goldArmorSprite } from './world-gold-armor-icons.js';
 import { ATLAS_COLUMNS, ATLAS_ROWS, BLOCKS, ITEMS, TILE, TILE_PX, atlasTileRect } from './world-catalog.js';
 import { createBlockIconPixels, createModelIconPixels } from './world-block-icons.js';
 import { BED_COLORS, bedModelBoxes } from './world-bed.js';
@@ -663,7 +664,7 @@ export function createTextureTools(THREE) {
                 size: TILE_PX, yaw: 36, pitch: 30, scale: 14.8, center: [0.5, 0.38, 1],
             }));
         }
-        const armorSprite = copperArmorSprite(kind) || ironArmorSprite(kind);
+        const armorSprite = copperArmorSprite(kind) || ironArmorSprite(kind) || goldArmorSprite(kind);
         if (armorSprite) return (spriteCache[key] = armorSprite);
         const mineralSprite = createMineralSpritePixels(kind, mat);
         if (mineralSprite) return (spriteCache[key] = mineralSprite);

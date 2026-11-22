@@ -61,6 +61,7 @@ export const ID = { GRASS: 1, STONE: 2, LOG: 3, DIRT: 4, COBBLE: 5, PLANKS: 6, L
              // lá, não aqui.
              COPPER_HELMET: 126, COPPER_CHESTPLATE: 127, COPPER_LEGGINGS: 128, COPPER_BOOTS: 129,
              IRON_HELMET: 130, IRON_CHESTPLATE: 131, IRON_LEGGINGS: 132, IRON_BOOTS: 133,
+             GOLD_HELMET: 134, GOLD_CHESTPLATE: 135, GOLD_LEGGINGS: 136, GOLD_BOOTS: 137,
              ...MEAT_IDS };
 
 /**
@@ -315,6 +316,10 @@ ITEMS[ID.IRON_HELMET] = { name: 'Capacete de ferro', maxStack: 1, maxDurability:
 ITEMS[ID.IRON_CHESTPLATE] = { name: 'Peitoral de ferro', maxStack: 1, maxDurability: 240, armorSlot: 'chest', armorPoints: 6, sprite: {kind:'iron-chestplate', mat:'iron'}, iconTile: nextTile++ };
 ITEMS[ID.IRON_LEGGINGS] = { name: 'Calça de ferro', maxStack: 1, maxDurability: 225, armorSlot: 'legs', armorPoints: 5, sprite: {kind:'iron-leggings', mat:'iron'}, iconTile: nextTile++ };
 ITEMS[ID.IRON_BOOTS] = { name: 'Botas de ferro', maxStack: 1, maxDurability: 195, armorSlot: 'feet', armorPoints: 2, sprite: {kind:'iron-boots', mat:'iron'}, iconTile: nextTile++ };
+ITEMS[ID.GOLD_HELMET] = { name: 'Capacete de ouro', maxStack: 1, maxDurability: 77, armorSlot: 'helmet', armorPoints: 2, sprite: {kind:'gold-helmet', mat:'gold'}, iconTile: nextTile++ };
+ITEMS[ID.GOLD_CHESTPLATE] = { name: 'Peitoral de ouro', maxStack: 1, maxDurability: 112, armorSlot: 'chest', armorPoints: 5, sprite: {kind:'gold-chestplate', mat:'gold'}, iconTile: nextTile++ };
+ITEMS[ID.GOLD_LEGGINGS] = { name: 'Calça de ouro', maxStack: 1, maxDurability: 105, armorSlot: 'legs', armorPoints: 3, sprite: {kind:'gold-leggings', mat:'gold'}, iconTile: nextTile++ };
+ITEMS[ID.GOLD_BOOTS] = { name: 'Botas de ouro', maxStack: 1, maxDurability: 91, armorSlot: 'feet', armorPoints: 1, sprite: {kind:'gold-boots', mat:'gold'}, iconTile: nextTile++ };
 ITEMS[ID.TORCH].sprite = { kind: 'torch', mat: 'wood' };
 
 // O atlas é uma grade fixa, não uma fileira única: com 16 colunas a largura
@@ -424,6 +429,11 @@ defRecipe([[I, I, I], [I, null, I]], ID.IRON_HELMET);
 defRecipe([[I, null, I], [I, I, I], [I, I, I]], ID.IRON_CHESTPLATE);
 defRecipe([[I, I, I], [I, null, I], [I, null, I]], ID.IRON_LEGGINGS);
 defRecipe([[I, null, I], [I, null, I]], ID.IRON_BOOTS);
+const G = ID.GOLD_INGOT;
+defRecipe([[G, G, G], [G, null, G]], ID.GOLD_HELMET);
+defRecipe([[G, null, G], [G, G, G], [G, G, G]], ID.GOLD_CHESTPLATE);
+defRecipe([[G, G, G], [G, null, G], [G, null, G]], ID.GOLD_LEGGINGS);
+defRecipe([[G, null, G], [G, null, G]], ID.GOLD_BOOTS);
 
 // Quatro fardos da mesma cor viram o bloco daquela cor. Sem mistura: lã cinza
 // não entra na receita da branca.
