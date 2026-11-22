@@ -9,6 +9,7 @@ import { createTerrainWorkerSource } from './world-terrain-worker.js';
 import { createWaterSystemClass } from './world-water.js';
 import { Inventory } from './inventory-model.js';
 import { armorClick, canEquipArmor } from './inventory-armor.js';
+import { damageEquippedArmor } from './world-armor-durability.js';
 import { createPlayerArmor } from './player-armor.js';
 import { craftConsume, invCollectSame, invFillRecipe, invLeftClick, invQuickMove, invQuickMoveToCraft, invRightClick, invTouchRightClick, invSwapHotbar, stackable } from './inventory-logic.js';
 import { stackHtml, updateSlotElement } from './inventory-view.js';
@@ -2548,7 +2549,7 @@ function chatCommandContext() {
         },
         killPlayer() {
             invuln = 0;
-            takeDamage(999);
+            takeDamage(999, 'kill');
         },
         getSeed: () => world.seed,
     };
@@ -3993,6 +3994,13 @@ function resetStats() {
 function takeDamage(amount, source = 'generic') {
     if (dead || amount <= 0) return;
     if (invuln > 0 && source !== 'starve' && source !== 'drown') return;
+    const brokenArmor = damageEquippedArmor(armorSlots, amount, source);
+    if (brokenArmor.length) {
+        playerArmor?.setEquipment(armorSlots);
+        inventoryPlayerRotation?.refresh();
+        if (inventoryOpen) renderInventory();
+        showToast(brokenArmor.length === 1 ? `${brokenArmor[0]} quebrou!` : 'Peças de armadura quebraram!');
+    }
     health = Math.max(0, health - amount);
     invuln = INVULN_TIME;
     hurtFlash = 1;
@@ -5501,7 +5509,7 @@ async function init() {
             position: () => player.pos.toArray(),
             peerPosition: () => peerAvatar?.root.visible ? peerAvatar.root.position.toArray() : null,
             damage: (n = 1) => { invuln = 0; takeDamage(n); },
-            kill: () => { invuln = 0; takeDamage(999); },
+            kill: () => { invuln = 0; takeDamage(999, 'kill'); },
             hunger: (n) => { hunger = n; updateSurvivalUI(); },
             saturation: (n) => { saturation = n; },
             exhaust: (n) => addExhaustion(n),
