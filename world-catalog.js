@@ -60,6 +60,7 @@ export const ID = { GRASS: 1, STONE: 2, LOG: 3, DIRT: 4, COBBLE: 5, PLANKS: 6, L
              // duas entradas (crua e assada). Mob novo que solta carne entra
              // lá, não aqui.
              COPPER_HELMET: 126, COPPER_CHESTPLATE: 127, COPPER_LEGGINGS: 128, COPPER_BOOTS: 129,
+             IRON_HELMET: 130, IRON_CHESTPLATE: 131, IRON_LEGGINGS: 132, IRON_BOOTS: 133,
              ...MEAT_IDS };
 
 /**
@@ -310,6 +311,10 @@ ITEMS[ID.COPPER_HELMET] = { name: 'Capacete de cobre', maxStack: 1, maxDurabilit
 ITEMS[ID.COPPER_CHESTPLATE] = { name: 'Peitoral de cobre', maxStack: 1, maxDurability: 176, armorSlot: 'chest', armorPoints: 4, sprite: {kind:'copper-chestplate', mat:'copper'}, iconTile: nextTile++ };
 ITEMS[ID.COPPER_LEGGINGS] = { name: 'Calça de cobre', maxStack: 1, maxDurability: 165, armorSlot: 'legs', armorPoints: 3, sprite: {kind:'copper-leggings', mat:'copper'}, iconTile: nextTile++ };
 ITEMS[ID.COPPER_BOOTS] = { name: 'Botas de cobre', maxStack: 1, maxDurability: 143, armorSlot: 'feet', armorPoints: 1, sprite: {kind:'copper-boots', mat:'copper'}, iconTile: nextTile++ };
+ITEMS[ID.IRON_HELMET] = { name: 'Capacete de ferro', maxStack: 1, maxDurability: 165, armorSlot: 'helmet', armorPoints: 2, sprite: {kind:'iron-helmet', mat:'iron'}, iconTile: nextTile++ };
+ITEMS[ID.IRON_CHESTPLATE] = { name: 'Peitoral de ferro', maxStack: 1, maxDurability: 240, armorSlot: 'chest', armorPoints: 6, sprite: {kind:'iron-chestplate', mat:'iron'}, iconTile: nextTile++ };
+ITEMS[ID.IRON_LEGGINGS] = { name: 'Calça de ferro', maxStack: 1, maxDurability: 225, armorSlot: 'legs', armorPoints: 5, sprite: {kind:'iron-leggings', mat:'iron'}, iconTile: nextTile++ };
+ITEMS[ID.IRON_BOOTS] = { name: 'Botas de ferro', maxStack: 1, maxDurability: 195, armorSlot: 'feet', armorPoints: 2, sprite: {kind:'iron-boots', mat:'iron'}, iconTile: nextTile++ };
 ITEMS[ID.TORCH].sprite = { kind: 'torch', mat: 'wood' };
 
 // O atlas é uma grade fixa, não uma fileira única: com 16 colunas a largura
@@ -414,6 +419,11 @@ defRecipe([[C, C, C], [C, null, C]], ID.COPPER_HELMET);
 defRecipe([[C, null, C], [C, C, C], [C, C, C]], ID.COPPER_CHESTPLATE);
 defRecipe([[C, C, C], [C, null, C], [C, null, C]], ID.COPPER_LEGGINGS);
 defRecipe([[C, null, C], [C, null, C]], ID.COPPER_BOOTS);
+const I = ID.IRON_INGOT;
+defRecipe([[I, I, I], [I, null, I]], ID.IRON_HELMET);
+defRecipe([[I, null, I], [I, I, I], [I, I, I]], ID.IRON_CHESTPLATE);
+defRecipe([[I, I, I], [I, null, I], [I, null, I]], ID.IRON_LEGGINGS);
+defRecipe([[I, null, I], [I, null, I]], ID.IRON_BOOTS);
 
 // Quatro fardos da mesma cor viram o bloco daquela cor. Sem mistura: lã cinza
 // não entra na receita da branca.
