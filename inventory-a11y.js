@@ -72,7 +72,7 @@ const clampInt = (value, max) => Math.max(0, Math.min(max, Math.round(Number(val
 
 /** Textos das três barras da HUD, para `aria-label`/região viva. */
 export function statusLabels({ health = 0, hunger = 0, breath = 0, maxHealth = 20, maxHunger = 20, maxBreath = 20 } = {}) {
-    const h = clampInt(health, maxHealth);
+    const h = health > 0 ? Math.max(1, clampInt(health, maxHealth)) : 0;
     const f = clampInt(hunger, maxHunger);
     const b = clampInt(breath, maxBreath);
     const stage = hungerStage(f);

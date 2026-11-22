@@ -10,6 +10,7 @@ import { createWaterSystemClass } from './world-water.js';
 import { Inventory } from './inventory-model.js';
 import { armorClick, canEquipArmor } from './inventory-armor.js';
 import { damageEquippedArmor } from './world-armor-durability.js';
+import { armorPoints, damageAfterArmor } from './world-armor-protection.js';
 import { createPlayerArmor } from './player-armor.js';
 import { craftConsume, invCollectSame, invFillRecipe, invLeftClick, invQuickMove, invQuickMoveToCraft, invRightClick, invTouchRightClick, invSwapHotbar, stackable } from './inventory-logic.js';
 import { stackHtml, updateSlotElement } from './inventory-view.js';
@@ -3028,7 +3029,7 @@ function activateSlot(el, { button = 0, shiftKey = false, touch = false } = {}) 
             const stack = armorSlots[i];
             if (inventory.add(stack.id, stack.count, 0, inventory.slots.length, stack.damage || 0) === 0) { armorSlots[i] = null; changed = true; }
         } else if (button === 0 || button === 2) changed = armorClick(armorSlots, i, cursorHeld);
-        if (changed) { playerArmor?.setEquipment(armorSlots); inventoryPlayerRotation?.refresh(); }
+        if (changed) { playerArmor?.setEquipment(armorSlots); inventoryPlayerRotation?.refresh(); updateArmorUI(); }
         renderInventory();
         return;
     }
@@ -3054,7 +3055,7 @@ function activateSlot(el, { button = 0, shiftKey = false, touch = false } = {}) 
             else if (name === 'main' && !station && inventory.slots[i] && [0,1,2,3].some(index => !armorSlots[index] && canEquipArmor(index, inventory.slots[i]))) {
                 const index = [0,1,2,3].find(index => !armorSlots[index] && canEquipArmor(index, inventory.slots[i]));
                 armorSlots[index] = inventory.slots[i]; inventory.slots[i] = null;
-                playerArmor?.setEquipment(armorSlots); inventoryPlayerRotation?.refresh();
+                playerArmor?.setEquipment(armorSlots); inventoryPlayerRotation?.refresh(); updateArmorUI();
             }
             else if (name === 'main' && !station && ITEMS[inventory.slots[i]?.id]?.armorSlot) { /* slot já ocupado */ }
             else if (name === 'main') invQuickMoveToCraft(inventory, craftInv, i, craftN);
@@ -3886,8 +3887,8 @@ window.addEventListener('resize', applyTouchPositions);
 // =====================================================================
 // 7. HUD E STATUS DE SOBREVIVÊNCIA
 // =====================================================================
-const uiShown = { h: -1, f: -1, b: -1, breathVisible: null };
-const survivalIcons = { hearts: [], food: [], bubbles: [] };
+const uiShown = { h: -1, f: -1, b: -1, armor: -1, breathVisible: null };
+const survivalIcons = { hearts: [], food: [], bubbles: [], armor: [] };
 
 function ensureSurvivalIcons(bar, cache, className) {
     if (cache.length) return;
@@ -3927,14 +3928,28 @@ function updateBreathUI() {
     uiShown.b = breath;
 }
 
+function updateArmorUI() {
+    const bar = document.getElementById('armor-bar');
+    if (!bar) return;
+    const points = armorPoints(armorSlots);
+    bar.hidden = points === 0;
+    setAriaLabel(bar, `Armadura: ${points} de 20`);
+    if (points > 0 && points !== uiShown.armor) {
+        ensureSurvivalIcons(bar, survivalIcons.armor, 'armor-stat');
+        updateSurvivalIcons(survivalIcons.armor, 'armor-stat', points);
+    }
+    uiShown.armor = points;
+}
+
 function updateSurvivalUI() {
     const healthBar = document.getElementById('health-bar');
     const hungerBar = document.getElementById('hunger-bar');
     if (!healthBar || !hungerBar) return;
     updateBreathUI();
+    updateArmorUI();
     if (health !== uiShown.h) {
         ensureSurvivalIcons(healthBar, survivalIcons.hearts, 'heart');
-        updateSurvivalIcons(survivalIcons.hearts, 'heart', health);
+        updateSurvivalIcons(survivalIcons.hearts, 'heart', Math.ceil(health));
         uiShown.h = health;
     }
     if (hunger !== uiShown.f) {
@@ -3994,14 +4009,16 @@ function resetStats() {
 function takeDamage(amount, source = 'generic') {
     if (dead || amount <= 0) return;
     if (invuln > 0 && source !== 'starve' && source !== 'drown') return;
+    // A peça que quebra ainda protege contra o golpe que a quebrou.
+    const reducedDamage = damageAfterArmor(amount, armorPoints(armorSlots), source);
     const brokenArmor = damageEquippedArmor(armorSlots, amount, source);
     if (brokenArmor.length) {
         playerArmor?.setEquipment(armorSlots);
         inventoryPlayerRotation?.refresh();
-        if (inventoryOpen) renderInventory();
         showToast(brokenArmor.length === 1 ? `${brokenArmor[0]} quebrou!` : 'Peças de armadura quebraram!');
     }
-    health = Math.max(0, health - amount);
+    if (inventoryOpen) renderInventory();
+    health = Math.max(0, health - reducedDamage);
     invuln = INVULN_TIME;
     hurtFlash = 1;
     addExhaustion(0.1);

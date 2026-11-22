@@ -175,7 +175,7 @@ export function createWorldSaveCodec({ version = WORLD_SAVE_VERSION } = {}) {
             return {
                 player: {
                     x: player.x, y: player.y, z: player.z,
-                    health: Math.min(MAX_HEALTH, Math.max(1, player.health)),
+                    health: player.health > 0 ? Math.min(MAX_HEALTH, player.health) : 1,
                     hunger: Math.min(MAX_HUNGER, Math.max(0, player.hunger)),
                     saturation: Math.min(MAX_HUNGER, Math.max(0, Number.isFinite(player.saturation) ? player.saturation : 5)),
                     breath: Math.min(MAX_BREATH, Math.max(0, Number.isFinite(player.breath) ? player.breath : MAX_BREATH)),
