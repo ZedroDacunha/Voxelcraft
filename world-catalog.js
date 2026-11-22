@@ -306,10 +306,10 @@ for (const meat of MEATS) {
     }
 }
 // Peças de armadura independentes; apenas aparência nesta etapa.
-ITEMS[ID.COPPER_HELMET] = { name: 'Capacete de cobre', maxStack: 1, maxDurability: 121, armorSlot: 'helmet', sprite: {kind:'copper-helmet', mat:'copper'}, iconTile: nextTile++ };
-ITEMS[ID.COPPER_CHESTPLATE] = { name: 'Peitoral de cobre', maxStack: 1, maxDurability: 176, armorSlot: 'chest', sprite: {kind:'copper-chestplate', mat:'copper'}, iconTile: nextTile++ };
-ITEMS[ID.COPPER_LEGGINGS] = { name: 'Calça de cobre', maxStack: 1, maxDurability: 165, armorSlot: 'legs', sprite: {kind:'copper-leggings', mat:'copper'}, iconTile: nextTile++ };
-ITEMS[ID.COPPER_BOOTS] = { name: 'Botas de cobre', maxStack: 1, maxDurability: 143, armorSlot: 'feet', sprite: {kind:'copper-boots', mat:'copper'}, iconTile: nextTile++ };
+ITEMS[ID.COPPER_HELMET] = { name: 'Capacete de cobre', maxStack: 1, maxDurability: 121, armorSlot: 'helmet', armorPoints: 2, sprite: {kind:'copper-helmet', mat:'copper'}, iconTile: nextTile++ };
+ITEMS[ID.COPPER_CHESTPLATE] = { name: 'Peitoral de cobre', maxStack: 1, maxDurability: 176, armorSlot: 'chest', armorPoints: 4, sprite: {kind:'copper-chestplate', mat:'copper'}, iconTile: nextTile++ };
+ITEMS[ID.COPPER_LEGGINGS] = { name: 'Calça de cobre', maxStack: 1, maxDurability: 165, armorSlot: 'legs', armorPoints: 3, sprite: {kind:'copper-leggings', mat:'copper'}, iconTile: nextTile++ };
+ITEMS[ID.COPPER_BOOTS] = { name: 'Botas de cobre', maxStack: 1, maxDurability: 143, armorSlot: 'feet', armorPoints: 1, sprite: {kind:'copper-boots', mat:'copper'}, iconTile: nextTile++ };
 ITEMS[ID.TORCH].sprite = { kind: 'torch', mat: 'wood' };
 
 // O atlas é uma grade fixa, não uma fileira única: com 16 colunas a largura

@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="Voxel">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
-<link rel="stylesheet" href="styles.css?v=e21a0c8099">
+<link rel="stylesheet" href="styles.css?v=8fdbc1ab44">
 <link rel="stylesheet" href="inventory.css?v=4c790c6f21">
 <!-- importmap:start (gerado por tools/stamp-importmap.mjs; não editar à mão) -->
 <script type="importmap">
@@ -22,8 +22,8 @@
     "./asset-versions.js": "./asset-versions.js?v=d42b8dc6ff",
     "./game-pause-menu.js": "./game-pause-menu.js?v=f625baba0f",
     "./game-pointer-lock.js": "./game-pointer-lock.js?v=cf53899b88",
-    "./game.js": "./game.js?v=db5dfd03cb",
-    "./inventory-a11y.js": "./inventory-a11y.js?v=25f3dab87d",
+    "./game.js": "./game.js?v=d23448a53d",
+    "./inventory-a11y.js": "./inventory-a11y.js?v=1bbf8184b5",
     "./inventory-armor.js": "./inventory-armor.js?v=19964c655c",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
     "./inventory-layout.js": "./inventory-layout.js?v=439823a409",
@@ -61,7 +61,8 @@
     "./player-swim-animation.js": "./player-swim-animation.js?v=835bcddfd0",
     "./player-third-person.js": "./player-third-person.js?v=eba87164cb",
     "./world-ambient-sounds.js": "./world-ambient-sounds.js?v=cbaab239fe",
-    "./world-armor-durability.js": "./world-armor-durability.js?v=f68eead465",
+    "./world-armor-durability.js": "./world-armor-durability.js?v=e61dfcc416",
+    "./world-armor-protection.js": "./world-armor-protection.js?v=b8ab1bb0a5",
     "./world-audio.js": "./world-audio.js?v=1cce08e53f",
     "./world-bed-hand.js": "./world-bed-hand.js?v=bbcfa37b5f",
     "./world-bed.js": "./world-bed.js?v=333e2bc08a",
@@ -69,7 +70,7 @@
     "./world-block-materials.js": "./world-block-materials.js?v=fee3236293",
     "./world-block-orientation.js": "./world-block-orientation.js?v=f6af440217",
     "./world-break-particles.js": "./world-break-particles.js?v=c2dcada0e8",
-    "./world-catalog.js": "./world-catalog.js?v=57c11a201f",
+    "./world-catalog.js": "./world-catalog.js?v=841af44550",
     "./world-chat-commands.js": "./world-chat-commands.js?v=25c36325cf",
     "./world-chat-completion.js": "./world-chat-completion.js?v=69db7a1519",
     "./world-chat.js": "./world-chat.js?v=dbb76832dc",
@@ -117,7 +118,7 @@
     "./world-pwa.js": "./world-pwa.js?v=aebc169c21",
     "./world-raycast.js": "./world-raycast.js?v=0f025b877c",
     "./world-render-resolution.js": "./world-render-resolution.js?v=c966abb0c4",
-    "./world-save-codec.js": "./world-save-codec.js?v=903554376c",
+    "./world-save-codec.js": "./world-save-codec.js?v=1c93234503",
     "./world-save-indicator.js": "./world-save-indicator.js?v=464a1a9ddc",
     "./world-save-loader.js": "./world-save-loader.js?v=097322c79d",
     "./world-save-lock.js": "./world-save-lock.js?v=4f86b790ec",
@@ -517,6 +518,7 @@
 <div id="survival-hud">
     <div id="left-stats">
         <div class="stat-bar" id="breath-bar" role="img" aria-label="Fôlego: 20 de 20"></div>
+        <div class="stat-bar" id="armor-bar" role="img" aria-label="Armadura: 0 de 20" hidden></div>
         <div class="stat-bar" id="health-bar" role="img" aria-label="Vida: 20 de 20"></div>
     </div>
     <div class="stat-bar" id="hunger-bar" role="img" aria-label="Fome: 20 de 20"></div>
