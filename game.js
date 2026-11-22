@@ -2360,7 +2360,7 @@ function updateEmitterLights(now) {
 // 5D. TELA DE INVENTÁRIO
 // =====================================================================
 const cursorHeld = { stack: null };
-const armorSlots = [null, null];
+const armorSlots = [null, null, null, null];
 let armorSlotEls = [], armorPlaceholders = [];
 let inventoryTouchGesture = null;
 let inventoryPlayerRotation = null;
@@ -2960,7 +2960,7 @@ function renderInventory() {
         const el = armorSlotEls[i], stack = armorSlots[i];
         refreshSlot(el, stack);
         if (!stack) el.innerHTML = armorPlaceholders[i];
-        el.setAttribute('aria-label', `${i === 0 ? 'Capacete' : 'Peitoral'}: ${stack ? ITEMS[stack.id].name : 'vazio'}`);
+        el.setAttribute('aria-label', `${['Capacete', 'Peitoral', 'Calças', 'Botas'][i]}: ${stack ? ITEMS[stack.id].name : 'vazio'}`);
     }
     for (let i = 0; i < 36; i++) {
         const el = invSlotEls[i];
@@ -3050,8 +3050,8 @@ function activateSlot(el, { button = 0, shiftKey = false, touch = false } = {}) 
         if (shiftKey && !cursorHeld.stack) {
             if (name === 'main' && station && station.type === 'furnace') quickToFurnace(i);
             else if (name === 'main' && station && station.type === 'chest') invQuickMove(inventory, i, station.chest.inv, 0, 27);
-            else if (name === 'main' && !station && inventory.slots[i] && [0,1].some(index => !armorSlots[index] && canEquipArmor(index, inventory.slots[i]))) {
-                const index = [0,1].find(index => !armorSlots[index] && canEquipArmor(index, inventory.slots[i]));
+            else if (name === 'main' && !station && inventory.slots[i] && [0,1,2,3].some(index => !armorSlots[index] && canEquipArmor(index, inventory.slots[i]))) {
+                const index = [0,1,2,3].find(index => !armorSlots[index] && canEquipArmor(index, inventory.slots[i]));
                 armorSlots[index] = inventory.slots[i]; inventory.slots[i] = null;
                 playerArmor?.setEquipment(armorSlots); inventoryPlayerRotation?.refresh();
             }

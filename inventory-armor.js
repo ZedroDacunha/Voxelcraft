@@ -1,5 +1,5 @@
 import { ITEMS } from './world-catalog.js';
-export const ARMOR_SLOTS = Object.freeze(['helmet', 'chest']);
+export const ARMOR_SLOTS = Object.freeze(['helmet', 'chest', 'legs', 'feet']);
 export function canEquipArmor(index, stack) {
     return Number.isInteger(index) && index >= 0 && index < ARMOR_SLOTS.length &&
         !!stack && stack.count === 1 && ITEMS[stack.id]?.armorSlot === ARMOR_SLOTS[index];

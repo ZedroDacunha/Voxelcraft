@@ -59,7 +59,7 @@ export const ID = { GRASS: 1, STONE: 2, LOG: 3, DIRT: 4, COBBLE: 5, PLANKS: 6, L
              // As carnes moram em `world-meats.js`: 100–116, oito bichos ×
              // duas entradas (crua e assada). Mob novo que solta carne entra
              // lá, não aqui.
-             COPPER_HELMET: 126, COPPER_CHESTPLATE: 127,
+             COPPER_HELMET: 126, COPPER_CHESTPLATE: 127, COPPER_LEGGINGS: 128, COPPER_BOOTS: 129,
              ...MEAT_IDS };
 
 /**
@@ -308,6 +308,8 @@ for (const meat of MEATS) {
 // Peças de armadura independentes; apenas aparência nesta etapa.
 ITEMS[ID.COPPER_HELMET] = { name: 'Capacete de cobre', maxStack: 1, armorSlot: 'helmet', sprite: {kind:'copper-helmet', mat:'copper'}, iconTile: nextTile++ };
 ITEMS[ID.COPPER_CHESTPLATE] = { name: 'Peitoral de cobre', maxStack: 1, armorSlot: 'chest', sprite: {kind:'copper-chestplate', mat:'copper'}, iconTile: nextTile++ };
+ITEMS[ID.COPPER_LEGGINGS] = { name: 'Calça de cobre', maxStack: 1, armorSlot: 'legs', sprite: {kind:'copper-leggings', mat:'copper'}, iconTile: nextTile++ };
+ITEMS[ID.COPPER_BOOTS] = { name: 'Botas de cobre', maxStack: 1, armorSlot: 'feet', sprite: {kind:'copper-boots', mat:'copper'}, iconTile: nextTile++ };
 ITEMS[ID.TORCH].sprite = { kind: 'torch', mat: 'wood' };
 
 // O atlas é uma grade fixa, não uma fileira única: com 16 colunas a largura
