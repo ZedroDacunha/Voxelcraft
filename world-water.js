@@ -14,11 +14,54 @@ export function createWaterSystemClass({ THREE, BLOCKS, ID, WORLD_HEIGHT, onSubm
         }
         static surfaceHeightFor(type, aboveType) {
             const block = BLOCKS[type];
-            if (block?.falling) return 1;
+            if (block?.falling || WaterSystem.isBlock(aboveType)) return 1;
             if (block?.flowing) return block.waterLevel;
             return aboveType === 0 ? WaterSystem.surfaceHeight : 1;
         }
     
+        // Os quatro blocos que tocam este vértice usam a mesma amostra, inclusive
+        // quando a coordenada está na borda de outro chunk.
+        static cornerHeight(blockAt, cornerX, y, cornerZ) {
+            let sum = 0, count = 0;
+            for (let x = cornerX - 1; x <= cornerX; x++) {
+                for (let z = cornerZ - 1; z <= cornerZ; z++) {
+                    const type = blockAt(x, y, z);
+                    if (!WaterSystem.isBlock(type)) continue;
+                    const acrossX = x === cornerX ? x - 1 : x + 1;
+                    const acrossZ = z === cornerZ ? z - 1 : z + 1;
+                    const height = WaterSystem.surfaceHeightFor(type, blockAt(x, y + 1, z));
+                    // A água de baixo alcança a base da queda, inclusive quando
+                    // a corrente de cima corre sobre um degrau de pedra.
+                    if (height === 1 || WaterSystem.isBlock(blockAt(acrossX, y + 1, z)) ||
+                        WaterSystem.isBlock(blockAt(x, y + 1, acrossZ))) return 1;
+                    let sample = height;
+                    if (BLOCKS[type].flowing) {
+                        const dropX = blockAt(acrossX, y, z) === 0 && WaterSystem.isBlock(blockAt(acrossX, y - 1, z));
+                        const dropZ = blockAt(x, y, acrossZ) === 0 && WaterSystem.isBlock(blockAt(x, y - 1, acrossZ));
+                        // A lâmina afina no lábio do degrau em direção à água de baixo.
+                        if (dropX || dropZ) sample = Math.min(height, BLOCKS[ID.WATER_FLOW_1].waterLevel);
+                    }
+                    sum += sample;
+                    count++;
+                }
+            }
+            return count ? sum / count : 0;
+        }
+
+        static surfaceAt(blockAt, x, y, z) {
+            const bx = Math.floor(x), bz = Math.floor(z);
+            const fx = x - bx, fz = z - bz;
+            const h00 = WaterSystem.cornerHeight(blockAt, bx, y, bz);
+            const h11 = WaterSystem.cornerHeight(blockAt, bx + 1, y, bz + 1);
+            // Mesma diagonal dos dois triângulos do topo em FACES.
+            if (fx <= fz) {
+                const h01 = WaterSystem.cornerHeight(blockAt, bx, y, bz + 1);
+                return h00 * (1 - fz) + h01 * (fz - fx) + h11 * fx;
+            }
+            const h10 = WaterSystem.cornerHeight(blockAt, bx + 1, y, bz);
+            return h00 * (1 - fx) + h10 * (fx - fz) + h11 * fz;
+        }
+
         constructor(atlas) {
             this.material = new THREE.MeshLambertMaterial({
                 map: atlas, transparent: true, opacity: 0.75, depthWrite: false, side: THREE.DoubleSide, vertexColors: true

@@ -721,10 +721,11 @@ class World {
 
         // Agenda a remalha para o orçamento de frame de World.update().
         this.dirty.add(chunk);
-        if (lx === 0) this.remeshIfReady(cx - 1, cz);
-        if (lx === CHUNK_SIZE - 1) this.remeshIfReady(cx + 1, cz);
-        if (lz === 0) this.remeshIfReady(cx, cz - 1);
-        if (lz === CHUNK_SIZE - 1) this.remeshIfReady(cx, cz + 1);
+        const edgeX = lx === 0 ? -1 : lx === CHUNK_SIZE - 1 ? 1 : 0;
+        const edgeZ = lz === 0 ? -1 : lz === CHUNK_SIZE - 1 ? 1 : 0;
+        if (edgeX) this.remeshIfReady(cx + edgeX, cz);
+        if (edgeZ) this.remeshIfReady(cx, cz + edgeZ);
+        if (edgeX && edgeZ) this.remeshIfReady(cx + edgeX, cz + edgeZ);
         return true;
     }
 
@@ -881,10 +882,8 @@ class World {
         this.chunks.set(key, chunk);
         if (hasEditedLightSource) this.refreshLightSourceChunk(chunk.cx, chunk.cz, chunk);
         this.lightDirty.add(chunk);
-        this.dirty.add(chunk);
-        for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
-            const neighbor = this.getChunk(chunk.cx + dx, chunk.cz + dz);
-            if (neighbor) this.dirty.add(neighbor);
+        for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+            this.remeshIfReady(chunk.cx + dx, chunk.cz + dz);
         }
     }
 
@@ -924,6 +923,18 @@ class World {
             return data[lx + lz * CS + y * CS2];
         };
 
+        const cornerStride = CS + 1;
+        const waterHeights = this.meshScratch.waterHeights ??= new Float32Array(cornerStride * cornerStride);
+        let waterLayer = -1;
+        const waterCornerAt = (x, y, z) => {
+            if (y !== waterLayer) {
+                waterHeights.fill(0);
+                waterLayer = y;
+            }
+            const index = x + z * cornerStride;
+            return waterHeights[index] ||= WaterSystem.cornerHeight(blockAt, x, y, z);
+        };
+
         const sampleLight = (channel, lx, y, lz, outsideY) => {
             if (y < 0 || y >= WORLD_HEIGHT) return outsideY;
             const xOffset = lx < 0 ? -1 : lx >= CS ? 1 : 0;
@@ -955,12 +966,7 @@ class World {
                 return neighborRender === currentRender && faceNaBordaDaCelula(shape, dir);
             }
             if (currentRender === 'liquid') {
-                if (nType === 0) return false;
-                if (neighborRender !== 'liquid') return true;
-                if (dir[1] !== 0) return true;
-                const currentHeight = WaterSystem.surfaceHeightFor(currentType, blockAt(lx, y + 1, lz));
-                const neighborHeight = WaterSystem.surfaceHeightFor(nType, blockAt(nx, ny + 1, nz));
-                return currentHeight <= neighborHeight + 0.0001;
+                return neighborRender === 'liquid' || (nType !== 0 && BLOCKS[nType]?.opaque !== false);
             }
             // Folhas recortadas não devem apagar a face do tronco: ela precisa aparecer nos vãos da textura.
             if (neighborRender === 'cutout') {
@@ -1039,8 +1045,6 @@ class World {
                     if (block.render === 'instanced') continue;
                     const tiles = block.tiles;
                     const renderMode = block.render;
-                    const aboveType = y + 1 < WORLD_HEIGHT ? data[lx + lz * CS + (y + 1) * CS2] : 0;
-                    const blockTop = renderMode === 'liquid' ? WaterSystem.surfaceHeightFor(t, aboveType) : 1;
                     const wx = chunk.cx * CS + lx, wz = chunk.cz * CS + lz;
                     // A cama desenha forma própria em qualquer direção, então
                     // ela lê `facing` mesmo sem ter face frontal.
@@ -1102,12 +1106,8 @@ class World {
                         let cornerIndex = 0;
                         for (const c of f.corners) {
                             let py = y + (shape ? shape.min[1] + c.pos[1] * (shape.max[1] - shape.min[1]) : c.pos[1]);
-                            if (renderMode === 'liquid') {
-                                if (c.pos[1] === 1) py = y + blockTop;
-                                else if (f.kind === 'side' && BLOCKS[neighborType]?.render === 'liquid') {
-                                    const neighborAbove = blockAt(neighborX, neighborY + 1, neighborZ);
-                                    py = y + WaterSystem.surfaceHeightFor(neighborType, neighborAbove);
-                                }
+                            if (renderMode === 'liquid' && c.pos[1] === 1) {
+                                py = y + waterCornerAt(lx + c.pos[0], y, lz + c.pos[2]);
                             }
                             const vertex = vertexCount + cornerIndex++;
                             const p = vertex * 3, uv = vertex * 2;
@@ -1262,7 +1262,10 @@ class World {
                 for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
                     if (dx === 0 && dz === 0) continue;
                     const neighbor = this.getChunk(c.cx + dx, c.cz + dz);
-                    if (neighbor) this.lightDirty.add(neighbor);
+                    if (neighbor) {
+                        this.lightDirty.add(neighbor);
+                        this.dirty.add(neighbor);
+                    }
                 }
             }
         }
@@ -1651,7 +1654,7 @@ function waterImmersionAt(world, x, y, z, halfHeight) {
     const bx = Math.floor(x), by = Math.floor(y - halfHeight + 0.001), bz = Math.floor(z);
     const type = world.getBlock(bx, by, bz);
     if (!WaterSystem.isBlock(type)) return 0;
-    const surface = by + WaterSystem.surfaceHeightFor(type, world.getBlock(bx, by + 1, bz));
+    const surface = by + WaterSystem.surfaceAt((ix, iy, iz) => world.getBlock(ix, iy, iz), x, by, z);
     return Math.max(0, Math.min(1, (surface - (y - halfHeight)) / (halfHeight * 2)));
 }
 
