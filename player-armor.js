@@ -13,6 +13,11 @@ import { previewGoldChest } from './player-armor-gold-peitoral.js';
 import { previewGoldLeggings } from './player-armor-gold-calca.js';
 import { previewGoldBoots } from './player-armor-gold-botas.js';
 import { addGoldArmorDetails } from './player-armor-gold-details.js';
+import { previewDiamondHelmet } from './player-armor-diamond-capacete.js';
+import { previewDiamondChest } from './player-armor-diamond-peitoral.js';
+import { previewDiamondLeggings } from './player-armor-diamond-calca.js';
+import { previewDiamondBoots } from './player-armor-diamond-botas.js';
+import { addDiamondArmorDetails } from './player-armor-diamond-details.js';
 
 /** Peças visuais separadas e articuladas, inclusive conjuntos mistos. */
 export function createPlayerArmor(THREE, model, unit) {
@@ -29,11 +34,16 @@ export function createPlayerArmor(THREE, model, unit) {
         previewGoldLeggings(THREE, model, unit), previewGoldBoots(THREE, model, unit, 2)];
     addGoldArmorDetails(THREE, unit, { helmet: gold[0], chest: gold[1], leggings: gold[2], boots: gold[3] });
     gold.forEach(piece => piece.setVisible(false));
-    const groups = [copper, iron, gold];
+    const diamond = [previewDiamondHelmet(THREE, model, unit), previewDiamondChest(THREE, model, unit),
+        previewDiamondLeggings(THREE, model, unit), previewDiamondBoots(THREE, model, unit, 2)];
+    addDiamondArmorDetails(THREE, unit, { helmet: diamond[0], chest: diamond[1], leggings: diamond[2], boots: diamond[3] });
+    diamond.forEach(piece => piece.setVisible(false));
+    const groups = [copper, iron, gold, diamond];
     const ids = [
         [ID.COPPER_HELMET, ID.COPPER_CHESTPLATE, ID.COPPER_LEGGINGS, ID.COPPER_BOOTS],
         [ID.IRON_HELMET, ID.IRON_CHESTPLATE, ID.IRON_LEGGINGS, ID.IRON_BOOTS],
         [ID.GOLD_HELMET, ID.GOLD_CHESTPLATE, ID.GOLD_LEGGINGS, ID.GOLD_BOOTS],
+        [ID.DIAMOND_HELMET, ID.DIAMOND_CHESTPLATE, ID.DIAMOND_LEGGINGS, ID.DIAMOND_BOOTS],
     ];
     const active = [null, null, null, null];
     function setEquipment(slots = []) {

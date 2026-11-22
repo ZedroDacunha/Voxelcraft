@@ -46,7 +46,7 @@ test('barra usa a opção B, suporta estados e é atualizada nas transições', 
     assert.match(css,/#armor-bar\[hidden\] \{ display: none; \}/);
     for(const cls of ['.armor-stat {','.armor-stat.half {','.armor-stat.empty-stat {'])assert(css.includes(cls));
     assert.match(game,/updateSurvivalIcons\(survivalIcons\.armor, 'armor-stat', points\)/);
-    assert.match(game,/damageAfterArmor\(amount, armorPoints\(armorSlots\), source\)/);
+    assert.match(game,/damageAfterArmor\(amount, armorPoints\(armorSlots\), source, armorToughness\(armorSlots\)\)/);
     assert.ok(game.indexOf('const reducedDamage = damageAfterArmor')<game.indexOf('const brokenArmor = damageEquippedArmor'));
     assert.match(game,/updateSurvivalIcons\(survivalIcons\.hearts, 'heart', Math\.ceil\(health\)\)/);
 });

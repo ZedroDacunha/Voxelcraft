@@ -62,6 +62,7 @@ export const ID = { GRASS: 1, STONE: 2, LOG: 3, DIRT: 4, COBBLE: 5, PLANKS: 6, L
              COPPER_HELMET: 126, COPPER_CHESTPLATE: 127, COPPER_LEGGINGS: 128, COPPER_BOOTS: 129,
              IRON_HELMET: 130, IRON_CHESTPLATE: 131, IRON_LEGGINGS: 132, IRON_BOOTS: 133,
              GOLD_HELMET: 134, GOLD_CHESTPLATE: 135, GOLD_LEGGINGS: 136, GOLD_BOOTS: 137,
+             DIAMOND_HELMET: 138, DIAMOND_CHESTPLATE: 139, DIAMOND_LEGGINGS: 140, DIAMOND_BOOTS: 141,
              ...MEAT_IDS };
 
 /**
@@ -320,6 +321,10 @@ ITEMS[ID.GOLD_HELMET] = { name: 'Capacete de ouro', maxStack: 1, maxDurability: 
 ITEMS[ID.GOLD_CHESTPLATE] = { name: 'Peitoral de ouro', maxStack: 1, maxDurability: 112, armorSlot: 'chest', armorPoints: 5, sprite: {kind:'gold-chestplate', mat:'gold'}, iconTile: nextTile++ };
 ITEMS[ID.GOLD_LEGGINGS] = { name: 'Calça de ouro', maxStack: 1, maxDurability: 105, armorSlot: 'legs', armorPoints: 3, sprite: {kind:'gold-leggings', mat:'gold'}, iconTile: nextTile++ };
 ITEMS[ID.GOLD_BOOTS] = { name: 'Botas de ouro', maxStack: 1, maxDurability: 91, armorSlot: 'feet', armorPoints: 1, sprite: {kind:'gold-boots', mat:'gold'}, iconTile: nextTile++ };
+ITEMS[ID.DIAMOND_HELMET] = { name: 'Capacete de diamante', maxStack: 1, maxDurability: 363, armorSlot: 'helmet', armorPoints: 3, armorToughness: 2, sprite: {kind:'diamond-helmet', mat:'diamond'}, iconTile: nextTile++ };
+ITEMS[ID.DIAMOND_CHESTPLATE] = { name: 'Peitoral de diamante', maxStack: 1, maxDurability: 528, armorSlot: 'chest', armorPoints: 8, armorToughness: 2, sprite: {kind:'diamond-chestplate', mat:'diamond'}, iconTile: nextTile++ };
+ITEMS[ID.DIAMOND_LEGGINGS] = { name: 'Calça de diamante', maxStack: 1, maxDurability: 495, armorSlot: 'legs', armorPoints: 6, armorToughness: 2, sprite: {kind:'diamond-leggings', mat:'diamond'}, iconTile: nextTile++ };
+ITEMS[ID.DIAMOND_BOOTS] = { name: 'Botas de diamante', maxStack: 1, maxDurability: 429, armorSlot: 'feet', armorPoints: 3, armorToughness: 2, sprite: {kind:'diamond-boots', mat:'diamond'}, iconTile: nextTile++ };
 ITEMS[ID.TORCH].sprite = { kind: 'torch', mat: 'wood' };
 
 // O atlas é uma grade fixa, não uma fileira única: com 16 colunas a largura
@@ -434,6 +439,11 @@ defRecipe([[G, G, G], [G, null, G]], ID.GOLD_HELMET);
 defRecipe([[G, null, G], [G, G, G], [G, G, G]], ID.GOLD_CHESTPLATE);
 defRecipe([[G, G, G], [G, null, G], [G, null, G]], ID.GOLD_LEGGINGS);
 defRecipe([[G, null, G], [G, null, G]], ID.GOLD_BOOTS);
+const D = ID.DIAMOND_ORE; // Item de diamante compartilha o ID histórico do minério.
+defRecipe([[D, D, D], [D, null, D]], ID.DIAMOND_HELMET);
+defRecipe([[D, null, D], [D, D, D], [D, D, D]], ID.DIAMOND_CHESTPLATE);
+defRecipe([[D, D, D], [D, null, D], [D, null, D]], ID.DIAMOND_LEGGINGS);
+defRecipe([[D, null, D], [D, null, D]], ID.DIAMOND_BOOTS);
 
 // Quatro fardos da mesma cor viram o bloco daquela cor. Sem mistura: lã cinza
 // não entra na receita da branca.

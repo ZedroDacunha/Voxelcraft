@@ -11,7 +11,7 @@ import { Inventory } from './inventory-model.js';
 import { armorClick, canEquipArmor } from './inventory-armor.js';
 import { CREATIVE, SURVIVAL, parseGameMode, creativeItems, creativeStack, flightTap } from './world-creative.js';
 import { damageEquippedArmor } from './world-armor-durability.js';
-import { armorPoints, damageAfterArmor } from './world-armor-protection.js';
+import { armorPoints, armorToughness, damageAfterArmor } from './world-armor-protection.js';
 import { createPlayerArmor } from './player-armor.js';
 import { craftConsume, invCollectSame, invFillRecipe, invLeftClick, invQuickMove, invQuickMoveToCraft, invRightClick, invTouchRightClick, invSwapHotbar, stackable } from './inventory-logic.js';
 import { stackHtml, updateSlotElement } from './inventory-view.js';
@@ -4062,7 +4062,7 @@ function takeDamage(amount, source = 'generic') {
     if (dead || amount <= 0 || (isCreative() && source !== 'kill')) return;
     if (invuln > 0 && source !== 'starve' && source !== 'drown') return;
     // A peça que quebra ainda protege contra o golpe que a quebrou.
-    const reducedDamage = damageAfterArmor(amount, armorPoints(armorSlots), source);
+    const reducedDamage = damageAfterArmor(amount, armorPoints(armorSlots), source, armorToughness(armorSlots));
     const brokenArmor = damageEquippedArmor(armorSlots, amount, source);
     if (brokenArmor.length) {
         playerArmor?.setEquipment(armorSlots);
