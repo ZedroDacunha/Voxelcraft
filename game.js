@@ -61,6 +61,9 @@ import { DAWN_TIME, bedRespawnPoint, canSleepAt, sleepPhaseAt } from './world-sl
 import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld } from './player-physics.js';
 import { canJumpFrom, createJumpState, updateJumpWindow } from './player-jump.js';
 import { createPlayerModel, PLAYER_MODEL_COLORS } from './player-model.js';
+import { createZombieModel } from './world-zombie-model.js';
+import { createZombieTest } from './world-zombie-test.js';
+import { createZombiePopulation, zombieSpawnAllowed, zombieFullBlockSupport } from './world-zombie-spawn.js';
 import { PLAYER_MODEL_HEIGHT } from './player-model.js';
 import { advanceSwim, createSwimState, swimFirstPersonPose, swimPose } from './player-swim-animation.js';
 import { advanceLocomotion, applyGroundPose, createLocomotion, groundPose, rigLocomotion } from './player-locomotion.js';
@@ -2018,7 +2021,9 @@ function strikeCreature({ tap = false } = {}) {
     const agora = performance.now() * 0.001;
     const bichoNaMira = Boolean(
         creatureInReach(sheepSystem.entities, camera.position, creatureAim, aim)
-        || creatureInReach(creatureSystem.entities, camera.position, creatureAim, aim),
+        || creatureInReach(creatureSystem.entities, camera.position, creatureAim, aim)
+        || creatureInReach(zombiePopulation?.entities.map(z => z.state), camera.position, creatureAim,
+            { maxDistance: currentHit ? currentHit.dist : Infinity }),
     );
     if (bichoNaMira && !attackReady(lastAttackAt, agora)) return true;
     // Tesoura na mão: o clique **tosquia** a ovelha em vez de bater. Sem ovelha
@@ -2038,6 +2043,19 @@ function strikeCreature({ tap = false } = {}) {
             haptic('punch');
             return true;
         }
+    }
+    // Zumbi experimental usa a mesma cadência e mira, sem atravessar blocos.
+    const zombieTarget = creatureInReach(zombiePopulation?.entities.map(z => z.state), camera.position, creatureAim,
+        { maxDistance: currentHit ? currentHit.dist : Infinity });
+    if (zombieTarget) {
+        const zombie = zombiePopulation.entities.find(z => z.state === zombieTarget);
+        const hit = zombie.hit(1, player.pos);
+        if (!hit) return true;
+        lastAttackAt = agora;
+        mobHitPuff(hit.entity, hit.killed ? 12 : 6);
+        audio.play('mob-hit', { gainScale: .85, rate: hit.killed ? .78 : 1 });
+        startPunch(handAnim); resetMining(); haptic('punch');
+        return true;
     }
     // Golpe na ovelha: tira um de vida, pisca o corpo, empurra e ela corre para
     // longe levando o bando. O quarto golpe derruba (o `onDeath` solta a lã e a
@@ -3323,6 +3341,7 @@ function updateWaterfall(dt) {
 // =====================================================================
 // 6. ESTADO GERAL
 // =====================================================================
+let zombiePopulation = null;
 let camera, swimCamera, thirdCamera, playerModel, playerArmor, playerHeldItem, scene, renderer, controls, world, creatureSystem, sheepSystem, tallGrassMaterial, tallGrassMaterials = [];
 let cameraView = 'first';
 const thirdDirection = new THREE.Vector3();
@@ -5085,6 +5104,70 @@ async function init() {
     }
     camera.position.set(player.pos.x, player.pos.y + player.eye, player.pos.z);
     
+    // Zumbis locais: população pequena enquanto a malha detalhada é avaliada.
+    // Multiplayer ainda não compartilha entidades hostis, portanto fica desativado nele.
+    if (!online) {
+        const canOccupy = (x, y, z) => {
+            for (const dx of [-0.3, 0.3]) for (const dz of [-0.3, 0.3]) {
+                if (!world.getChunk(floorDiv(Math.floor(x + dx), CHUNK_SIZE), floorDiv(Math.floor(z + dz), CHUNK_SIZE))) return false;
+            }
+            return !collidesInWorld(world, x, y, z, 1.8, 0.3);
+        };
+        const canStand = (x, y, z) => {
+            for (const dx of [-0.29, 0.29]) for (const dz of [-0.29, 0.29]) {
+                const bx = Math.floor(x + dx), bz = Math.floor(z + dz), by = Math.floor(y - 0.05);
+                if (!world.getChunk(floorDiv(bx, CHUNK_SIZE), floorDiv(bz, CHUNK_SIZE))) return false;
+                const id = world.getBlock(bx, by, bz);
+                if (!zombieFullBlockSupport(id, BLOCKS)) return false;
+            }
+            return canOccupy(x, y, z);
+        };
+        zombiePopulation = createZombiePopulation({
+            createZombie: position => {
+                const model = createZombieModel(THREE);
+                scene.add(model.root);
+                let zombie;
+                zombie = createZombieTest({ model, position, canStand, canOccupy,
+                    onHit: damage => takeDamage(damage, 'mob'),
+                    onDeathComplete: () => zombiePopulation.remove(zombie) });
+                zombie.model = model;
+                return zombie;
+            },
+            removeZombie: zombie => { scene.remove(zombie.model.root); zombie.model.dispose(); },
+            spawnCandidate: ({ x, z, player: p, day, random }) => {
+                const bx = Math.floor(x), bz = Math.floor(z);
+                const chunk = world.getChunk(floorDiv(bx, CHUNK_SIZE), floorDiv(bz, CHUNK_SIZE));
+                if (!chunk || world.lightDirty.has(chunk)) return null;
+                // Amostra várias alturas perto do jogador e a superfície, permitindo cavernas.
+                const heights = [world.generator.heightAt(bx, bz) + 1];
+                for (let i = 0; i < 12; i++) heights.push(Math.floor(p.y) + Math.floor(random() * 33) - 16);
+                for (const y of heights) {
+                    if (y < 1 || y + 2 >= WORLD_HEIGHT) continue;
+                    const block = world.getBlock(bx, y, bz), above = world.getBlock(bx, y + 1, bz);
+                    if (WaterSystem.isBlock(block) || WaterSystem.isBlock(above)) continue;
+                    const index = idx(bx - chunk.cx * CHUNK_SIZE, y, bz - chunk.cz * CHUNK_SIZE);
+                    const safe = canStand(x, y, z);
+                    if (zombieSpawnAllowed({ distance: Math.hypot(x-p.x, y-p.y, z-p.z),
+                        blockLight: chunk.blockLight[index], skyLight: chunk.skyLight[index], day, safe, lightReady: true })) return { x, y, z };
+                }
+                return null;
+            },
+        });
+        // URL especial continua permitindo um exemplar perto para inspeção.
+        if (urlParams.get('zumbiTeste') === '1') {
+            let position = null;
+            for (const [dx, dz] of [[0,-4],[4,0],[-4,0],[0,4],[3,-3],[-3,-3],[3,3],[-3,3]]) {
+                for (const dy of [0, 1, -1, 2, -2]) {
+                    const p = { x: Math.floor(player.pos.x + dx) + .5, y: Math.floor(player.pos.y) + dy, z: Math.floor(player.pos.z + dz) + .5 };
+                    if (canStand(p.x, p.y, p.z)) { position = p; break; }
+                }
+                if (position) break;
+            }
+            if (position) zombiePopulation.add(position);
+            else console.warn('Zumbi de teste: não há chão seguro próximo ao jogador.');
+        }
+    }
+
     initGameplayAssets();
     updateSky();
 
@@ -5751,6 +5834,23 @@ function animate() {
         // agachado) faz o bando parar e encarar.
         sheepSystem.update(dt, { pos: player.pos, vel: player.vel, crouching: isCrouching }, true,
             { day: worldSky.day });
+        if (zombiePopulation) {
+            zombiePopulation.update(dt, player.pos, worldSky.day, { spawn: urlParams.get('zumbiTeste') !== '1' });
+            for (const zombie of [...zombiePopulation.entities]) {
+                const origin = new THREE.Vector3(zombie.state.x, zombie.state.y + 1.55, zombie.state.z);
+                const target = new THREE.Vector3(player.pos.x, player.pos.y + player.eye, player.pos.z);
+                const direction = target.clone().sub(origin), distance = direction.length();
+                const visible = distance <= 16 && (distance < 0.001 || !raycastVoxels(origin,
+                    direction.multiplyScalar(1 / distance), Math.max(0, distance - 0.01), {
+                        getBlock: (x, y, z) => world.getBlock(x, y, z),
+                        isIgnoredBlock: (type, x, y, z) => !world.isSolidForPhysics(x, y, z, type),
+                    }));
+                zombie.update(dt, { x: target.x, y: target.y, z: target.z,
+                    hasLineOfSight: visible, creative: isCreative(), dead,
+                    box: { min: { x: player.pos.x - PLAYER_RADIUS, y: player.pos.y, z: player.pos.z - PLAYER_RADIUS },
+                        max: { x: player.pos.x + PLAYER_RADIUS, y: player.pos.y + player.height, z: player.pos.z + PLAYER_RADIUS } } });
+            }
+        }
         updateSurvival(dt);
         updateItemEntities(dt);
         breakParticles.update(dt);
