@@ -1,5 +1,3 @@
-import { hash2 } from './world-math.js';
-
 const GRID_W = 21;
 const GRID_H = 55;
 // Grade base da espada (paleta de ferro). Cores metálicas são remapeadas por material.
