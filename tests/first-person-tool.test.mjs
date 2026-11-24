@@ -31,9 +31,11 @@ test('a pose de primeira pessoa não altera a terceira', () => {
 
 test('a pose se aplica só às ferramentas e mantém a animação do braço', () => {
     const source = readFileSync(new URL('../game.js', import.meta.url), 'utf8');
-    assert.match(source, /HELD_TOOL_KINDS = new Set\(\['pickaxe', 'axe', 'shovel', 'shears'\]\)/);
+    assert.match(source, /HELD_TOOL_KINDS = new Set\(\['pickaxe', 'axe', 'shovel', 'shears', 'sword'\]\)/);
     assert.match(source, /if \(HELD_TOOL_KINDS\.has\(item\.sprite\.kind\)\) heldMesh\.position\.set\(\.\.\.FIRST_TOOL_POSE\.grip\)/);
     assert.match(source, /if \(HELD_TOOL_KINDS\.has\(heldToolKind\)\) \{\s*applyFirstPersonToolPose\(heldAnchor\)/);
+    assert.match(source, /heldMesh = heldGeoCache\[key\]\.clone\(\);\s*heldAnchor\.add\(heldMesh\)/,
+        'a espada 3D usa a própria origem no cabo sem receber o deslocamento do sprite');
     assert.match(source, /advanceHandAnimation\(handAnim, dt/);
 });
 

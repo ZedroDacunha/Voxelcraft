@@ -28,7 +28,8 @@ export function createPlayerHeldItem(THREE, rightArm) {
             pivot.name = 'toolPose';
             pivot.rotation.set(0, THIRD_TOOL_POSE.yaw, THIRD_TOOL_POSE.roll, 'YXZ');
             pivot.scale.setScalar(THIRD_TOOL_POSE.scale);
-            copy.position.set(THIRD_TOOL_GRIP.x, THIRD_TOOL_GRIP.y, 0);
+            if (copy.userData.isSwordModel) copy.position.set(0, 0, 0);
+            else copy.position.set(THIRD_TOOL_GRIP.x, THIRD_TOOL_GRIP.y, 0);
             copy.rotation.set(0, 0, 0);
             copy.scale.set(1, 1, 1);
             pivot.add(copy);
