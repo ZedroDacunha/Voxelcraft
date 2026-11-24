@@ -1841,7 +1841,9 @@ function updateItemEntities(dt) {
             }
         }
 
-        e.mesh.position.set(e.pos.x, e.pos.y + 0.05 + Math.sin(e.age * 3 + e.phase) * 0.04, e.pos.z);
+        const item = ITEMS[e.id];
+        const dropHalfH = itemRenderMode(item) === 'sprite' ? (ITEM_SIZE * 1.6) / 2 : ITEM_SIZE / 2;
+        e.mesh.position.set(e.pos.x, e.pos.y - half + dropHalfH + Math.sin(e.age * 3 + e.phase) * 0.04, e.pos.z);
         e.mesh.rotation.y = e.age * 1.5 + e.phase;
     }
 }
