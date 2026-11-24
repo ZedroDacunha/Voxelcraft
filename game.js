@@ -80,6 +80,7 @@ import { configureWindSway, updateWindSway, windDirectionFor, windStep, windTarg
 import { advanceHandAnimation, countStrikes, createHandAnimation, handSwingAmount, startPunch } from './world-hand-animation.js';
 import { pickaxeMiningPose } from './world-pickaxe-animation.js';
 import { FIRST_TOOL_POSE, applyFirstPersonToolPose } from './world-first-person-tool.js';
+import { createSwordModel } from './world-sword-model.js';
 import { STEP_MAX_MOVED, stepDistanceThisFrame, stepPitch, stepSoundFor } from './world-step-sounds.js';
 import { advanceGait, createGait, gaitPose } from './world-gait.js';
 import { materialSoundName } from './world-block-materials.js';
@@ -2233,6 +2234,14 @@ function refreshHeldItem() {
     if (itemRenderMode(item) === 'sprite') {
         if (HELD_TOOL_KINDS.has(item.sprite.kind)) {
             applyFirstPersonToolPose(heldAnchor);
+        }
+        if (item.sprite.kind === 'sword') {
+            const key = 'sword3d:' + item.sprite.mat;
+            if (!heldGeoCache[key]) heldGeoCache[key] = createSwordModel(THREE, item.sprite.mat);
+            heldMesh = heldGeoCache[key].clone();
+            heldMesh.position.set(...FIRST_TOOL_POSE.grip);
+            heldAnchor.add(heldMesh);
+            return;
         }
         const px = 0.034;
         const key = 'spr' + id;

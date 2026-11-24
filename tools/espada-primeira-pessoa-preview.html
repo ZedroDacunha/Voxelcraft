@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Espada · primeira pessoa (preview)</title>
+<style>
+  :root { --bg:#1c241d; --panel:#303a30; --border:#71816e; --text:#ecf2e8; --muted:#c6d1c2; }
+  *{box-sizing:border-box}
+  body{margin:0;font:16px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--text);}
+  .wrap{max-width:1100px;margin:0 auto;padding:20px;}
+  h1{margin:0 0 4px;font-size:26px}
+  p{color:var(--muted);margin:0 0 14px}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  button{background:#3a4a3a;color:var(--text);border:1px solid var(--border);padding:8px 12px;border-radius:8px;cursor:pointer;font:inherit}
+  button.active{background:#5a7a5a;border-color:#a9d7a7}
+  .viewer{width:100%;aspect-ratio:16/9;max-height:72vh;background:#141a14;border:1px solid var(--border);border-radius:10px;overflow:hidden;position:relative}
+  .viewer canvas{display:block;width:100%!important;height:100%!important}
+  .hint{position:absolute;left:10px;bottom:10px;font-size:12px;color:#cfe0cf;background:rgba(20,26,20,.72);padding:4px 8px;border-radius:999px;border:1px solid rgba(113,129,110,.45)}
+  .note{margin-top:12px;font-size:13px;color:#aab8aa}
+  code{background:#253025;padding:1px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Espada · primeira pessoa</h1>
+  <p>Preview aproximado da espada equipada na mão em primeira pessoa, usando a pose de ferramenta do jogo (<code>FIRST_TOOL_POSE</code>) e o sprite 16×16 da espada.</p>
+  <div class="bar" id="bar"></div>
+  <div class="viewer" id="viewer"><div class="hint">Arraste para olhar ao redor</div></div>
+  <div class="note">Observação: é uma simulação visual para inspeção rápida. A câmera/braço são simplificados; no jogo real a animação de balanço, mineração e posicionamento final podem variar levemente.</div>
+</div>
+<script type="module">
+import * as THREE from '../vendor/three/three.module.js';
+
+const ESPADA_GRADE = [
+  '..............O.',
+  '.............O4O',
+  '............O43O',
+  '...........O434O',
+  '..........O434O.',
+  '.........O434O..',
+  '........O434O...',
+  '.......O434O....',
+  '......O434O.....',
+  '.....O4O2O......',
+  '....O11bca......',
+  '...O11Obda......',
+  '....OO.bca......',
+  '......bda.......',
+  '.....bca........',
+  '.....aa.........',
+];
+
+const CABO = { a:[86,62,34], b:[123,91,51], c:[151,116,67], d:[202,166,106] };
+const PALETAS = {
+  wood:    {label:'Madeira',  O:[86,62,34],   1:[123,91,51],  2:[151,116,67],  3:[175,140,88],  4:[202,166,106]},
+  stone:   {label:'Pedra',    O:[58,56,52],   1:[82,81,78],   2:[126,124,119], 3:[140,138,132], 4:[163,160,153]},
+  copper:  {label:'Cobre',    O:[70,38,24],   1:[122,62,38],  2:[190,112,66],  3:[208,146,96],  4:[232,178,130]},
+  iron:    {label:'Ferro',    O:[40,45,53],   1:[66,72,82],   2:[186,194,203], 3:[206,214,222], 4:[238,243,248]},
+  gold:    {label:'Ouro',     O:[78,50,12],   1:[152,98,16],  2:[232,166,28],  3:[242,198,72],  4:[255,238,128]},
+  diamond: {label:'Diamante', O:[12,56,56],   1:[16,98,96],   2:[34,188,174],  3:[48,212,196],  4:[92,240,220]},
+};
+
+const FIRST_TOOL_POSE = {
+  position: [0, 0.02, -0.59],
+  rotation: [10 * Math.PI / 180, -65 * Math.PI / 180, 50 * Math.PI / 180],
+  scale: 0.85,
+  grip: [0.187, 0.204, 0],
+};
+
+function makeSwordTexture(mat) {
+  const pal = { ...CABO, ...PALETAS[mat] };
+  const c = document.createElement('canvas');
+  c.width = 16; c.height = 16;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,16,16);
+  for (let y=0;y<16;y++) for (let x=0;x<16;x++) {
+    const ch = ESPADA_GRADE[y][x];
+    if (ch === '.') continue;
+    const rgb = pal[ch];
+    if (!rgb) continue;
+    ctx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+    ctx.fillRect(x,y,1,1);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+const container = document.getElementById('viewer');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x141a14);
+const camera = new THREE.PerspectiveCamera(70, 16/9, 0.01, 20);
+camera.position.set(0, 0, 0);
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+container.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xf0f4ee, 0x303830, 1.0));
+const key = new THREE.DirectionalLight(0xffffff, 1.2); key.position.set(2,3,2); scene.add(key);
+const fill = new THREE.DirectionalLight(0xcfe0ff, 0.35); fill.position.set(-3,1,-2); scene.add(fill);
+
+// Simple arm/hand approximation in first person
+const armGroup = new THREE.Group();
+// position roughly like a right arm in first person
+armGroup.position.set(0.42, -0.42, -0.55);
+armGroup.rotation.set(-0.15, -0.15, 0.05);
+scene.add(armGroup);
+
+const skinMat = new THREE.MeshStandardMaterial({color:0xc99a74, roughness:0.85});
+const sleeveMat = new THREE.MeshStandardMaterial({color:0x4e7a3f, roughness:0.9});
+const arm = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.7), sleeveMat);
+arm.position.set(0, 0, -0.1);
+armGroup.add(arm);
+const hand = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.18, 0.18), skinMat);
+hand.position.set(0, -0.02, -0.48);
+armGroup.add(hand);
+
+// Tool anchor
+const toolAnchor = new THREE.Group();
+toolAnchor.position.set(...FIRST_TOOL_POSE.position);
+toolAnchor.rotation.set(...FIRST_TOOL_POSE.rotation);
+toolAnchor.scale.setScalar(FIRST_TOOL_POSE.scale);
+// anchor at hand
+toolAnchor.position.add(new THREE.Vector3(0, -0.02, -0.48));
+armGroup.add(toolAnchor);
+
+const planeGeo = new THREE.PlaneGeometry(1, 1);
+let swordMesh = null;
+
+function setMaterial(mat) {
+  if (swordMesh) { toolAnchor.remove(swordMesh); swordMesh.material.map.dispose(); swordMesh.material.dispose(); }
+  const tex = makeSwordTexture(mat);
+  const mat3 = new THREE.MeshStandardMaterial({ map: tex, transparent: true, alphaTest: 0.5, roughness: 0.6, metalness: 0.2 });
+  swordMesh = new THREE.Mesh(planeGeo, mat3);
+  // grip offset like FIRST_TOOL_POSE.grip
+  swordMesh.position.set(FIRST_TOOL_POSE.grip[0], FIRST_TOOL_POSE.grip[1], FIRST_TOOL_POSE.grip[2]);
+  toolAnchor.add(swordMesh);
+  document.querySelectorAll('.bar button').forEach(b => b.classList.toggle('active', b.dataset.mat === mat));
+}
+
+const bar = document.getElementById('bar');
+for (const [k,v] of Object.entries(PALETAS)) {
+  const btn = document.createElement('button');
+  btn.textContent = v.label;
+  btn.dataset.mat = k;
+  btn.onclick = () => setMaterial(k);
+  bar.appendChild(btn);
+}
+setMaterial('iron');
+
+// Simple look drag
+let dragging=false, lx=0, ly=0, yaw=0, pitch=0;
+container.addEventListener('pointerdown', e=>{dragging=true;lx=e.clientX;ly=e.clientY;container.setPointerCapture(e.pointerId);});
+container.addEventListener('pointermove', e=>{if(!dragging) return; const dx=e.clientX-lx, dy=e.clientY-ly; lx=e.clientX; ly=e.clientY; yaw-=dx*0.003; pitch-=dy*0.003; pitch=Math.max(-0.7,Math.min(0.7,pitch)); camera.rotation.set(pitch,yaw,0,'YXZ');});
+container.addEventListener('pointerup', ()=>dragging=false);
+container.addEventListener('pointercancel', ()=>dragging=false);
+
+function resize(){
+  const w=container.clientWidth, h=container.clientHeight||w*9/16;
+  renderer.setSize(w,h,false);
+  camera.aspect=w/h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize); resize();
+
+function animate(){ requestAnimationFrame(animate); renderer.render(scene,camera); }
+animate();
+</script>
+</body>
+</html>

@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Espada 3D · primeira pessoa</title>
+<style>
+  :root { --bg:#1c241d; --panel:#303a30; --border:#71816e; --text:#ecf2e8; --muted:#c6d1c2; }
+  *{box-sizing:border-box}
+  body{margin:0;font:16px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--text);}
+  .wrap{max-width:1100px;margin:0 auto;padding:20px;}
+  h1{margin:0 0 4px;font-size:26px}
+  p{color:var(--muted);margin:0 0 14px}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  button{background:#3a4a3a;color:var(--text);border:1px solid var(--border);padding:8px 12px;border-radius:8px;cursor:pointer;font:inherit}
+  button.active{background:#5a7a5a;border-color:#a9d7a7}
+  .viewer{width:100%;aspect-ratio:16/9;max-height:72vh;background:#141a14;border:1px solid var(--border);border-radius:10px;overflow:hidden;position:relative}
+  .viewer canvas{display:block;width:100%!important;height:100%!important}
+  .hint{position:absolute;left:10px;bottom:10px;font-size:12px;color:#cfe0cf;background:rgba(20,26,20,.72);padding:4px 8px;border-radius:999px;border:1px solid rgba(113,129,110,.45)}
+  .note{margin-top:12px;font-size:13px;color:#aab8aa}
+  code{background:#253025;padding:1px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Espada 3D · primeira pessoa</h1>
+  <p>Preview de como ficaria o modelo 3D voxel (opção D refinada) equipado na mão em primeira pessoa. A pose usa a base do <code>FIRST_TOOL_POSE</code> do jogo, adaptada para o modelo 3D.</p>
+  <div class="bar" id="bar"></div>
+  <div class="viewer" id="viewer"><div class="hint">Arraste para olhar ao redor</div></div>
+  <div class="note">Simulação visual para inspeção. No jogo real a integração exigiria trocar o sprite plano por malha 3D no sistema de mão/held item.</div>
+</div>
+<script>
+window.addEventListener('error', e => { const p=document.createElement('pre'); p.style.cssText='color:#ff8080;position:fixed;top:0;left:0;right:0;background:#200;padding:10px;z-index:99;white-space:pre-wrap'; p.textContent=e.message+'\\n'+(e.filename||'')+':'+(e.lineno||''); document.body.appendChild(p); });
+window.addEventListener('unhandledrejection', e => { const p=document.createElement('pre'); p.style.cssText='color:#ff8080;position:fixed;top:40px;left:0;right:0;background:#200;padding:10px;z-index:99;white-space:pre-wrap'; p.textContent=String(e.reason); document.body.appendChild(p); });
+</script>
+<script type="module">
+import * as THREE from '../vendor/three/three.module.js';
+
+const GRID_W = 21;
+const GRID_H = 55;
+const IRON_GRID = [
+[null,null,null,null,null,null,null,null,null,"#273038","#273038","#273038",null,null,null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,null,"#273038","#273038","#273038","#273038","#273038",null,null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,null,"#273038","#273038","#273038","#273038","#273038",null,null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#273038","#273038","#d7e0dd","#273038","#273038","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#273038","#d7e0dd","#d7e0dd","#9ba8ad","#273038","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,"#273038","#273038","#273038","#d7e0dd","#d7e0dd","#9ba8ad","#273038","#273038","#273038",null,null,null,null,null,null],
+[null,null,null,null,null,null,"#273038","#273038","#d7e0dd","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#273038","#d7e0dd","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#273038","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#d7e0dd","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#f1f3e9","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#f1f3e9","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#f1f3e9","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#f1f3e9","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#f1f3e9","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#f1f3e9","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#f1f3e9","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#f1f3e9","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#f1f3e9","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#f1f3e9","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#f1f3e9","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#f1f3e9","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#f1f3e9","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#f1f3e9","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#f1f3e9","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#f1f3e9","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#f1f3e9","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#f1f3e9","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#f1f3e9","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#f1f3e9","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#f1f3e9","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#f1f3e9","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#d7e0dd","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#d7e0dd","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#d7e0dd","#d7e0dd","#d7e0dd","#d7e0dd","#9ba8ad","#9ba8ad","#9ba8ad","#273038","#273038",null,null,null,null,null],
+["#273038","#78868c","#78868c","#d7e0dd","#d7e0dd","#d7e0dd","#d7e0dd","#d7e0dd","#d7e0dd","#d7e0dd","#d7e0dd","#d7e0dd","#d7e0dd","#d7e0dd","#d7e0dd","#d7e0dd","#d7e0dd","#d7e0dd","#78868c","#78868c","#273038"],
+["#273038","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#273038"],
+["#273038","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#78868c","#273038"],
+["#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038"],
+["#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038"],
+[null,null,null,null,null,null,null,"#273038","#79583d","#a87b50","#a87b50","#79583d","#48372b","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#79583d","#a87b50","#a87b50","#79583d","#48372b","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#79583d","#a87b50","#a87b50","#79583d","#48372b","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#79583d","#a87b50","#a87b50","#79583d","#48372b","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#79583d","#a87b50","#a87b50","#79583d","#48372b","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#79583d","#a87b50","#a87b50","#79583d","#48372b","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#79583d","#a87b50","#a87b50","#79583d","#48372b","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#79583d","#a87b50","#a87b50","#79583d","#48372b","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#79583d","#a87b50","#a87b50","#79583d","#48372b","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#79583d","#a87b50","#a87b50","#79583d","#48372b","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#79583d","#a87b50","#a87b50","#79583d","#48372b","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#79583d","#79583d","#79583d","#79583d","#79583d","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,"#273038","#48372b","#48372b","#48372b","#48372b","#48372b","#48372b","#48372b","#273038",null,null,null,null,null,null],
+[null,null,null,null,null,null,"#273038","#48372b","#48372b","#48372b","#48372b","#48372b","#48372b","#48372b","#273038",null,null,null,null,null,null],
+[null,null,null,null,null,null,"#273038","#273038","#79583d","#79583d","#79583d","#79583d","#79583d","#273038","#273038",null,null,null,null,null,null],
+[null,null,null,null,null,null,"#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038",null,null,null,null,null,null],
+];
+
+const MATERIALS = {
+  iron:    {label:'Ferro',    dark:'#56616a', mid:'#9ba8ad', light:'#d7e0dd', bright:'#f1f3e9', steel:'#78868c'},
+  copper:  {label:'Cobre',    dark:'#7a3e26', mid:'#be7042', light:'#d09260', bright:'#e8b282', steel:'#a85a38'},
+  gold:    {label:'Ouro',     dark:'#986210', mid:'#e8a61c', light:'#f2c648', bright:'#ffee80', steel:'#b88418'},
+  diamond: {label:'Diamante', dark:'#106260', mid:'#22bcae', light:'#30d4c4', bright:'#5cf0dc', steel:'#1a9c92'},
+  wood:    {label:'Madeira',  dark:'#6b4a2d', mid:'#96704a', light:'#b48c60', bright:'#d4b07c', steel:'#7e5838'},
+  stone:   {label:'Pedra',    dark:'#52514e', mid:'#7e7c77', light:'#a3a098', bright:'#c4c0b8', steel:'#686662'},
+};
+
+const OUTLINE = '#273038';
+const WOOD = '#79583d', WOODDARK='#48372b', WOODLIGHT='#a87b50';
+
+function remapGrid(matKey){
+  const m = MATERIALS[matKey];
+  const map = {
+    '#78868c': m.steel,
+    '#9ba8ad': m.mid,
+    '#d7e0dd': m.light,
+    '#f1f3e9': m.bright,
+    '#56616a': m.dark,
+  };
+  return IRON_GRID.map(row => row.map(cell => cell ? (map[cell] || cell) : null));
+}
+
+function color(hex) { return new THREE.Color(hex); }
+
+function eachPixel(GRID, fn) {
+  for (let y = 0; y < GRID_H; y++) for (let x = 0; x < GRID_W; x++) {
+    const hex = GRID[y][x]; if (hex) fn(x, y, hex);
+  }
+}
+function pos3(x,y,z=0,scale=1){ return [(x-(GRID_W-1)/2)*scale, ((GRID_H-1)/2-y)*scale, z*scale]; }
+
+function buildVoxelVolume(GRID, pal){
+  const g = new THREE.Group();
+  const textureCache = new Map();
+  const PALETTE = { ...pal, outline: OUTLINE, wood: WOOD, wooddark: WOODDARK, woodlight: WOODLIGHT };
+
+  function makeProceduralTexture(hex, kind) {
+    const key = hex + ':' + kind;
+    if (textureCache.has(key)) return textureCache.get(key);
+    const size = 32;
+    const c = document.createElement('canvas'); c.width = c.height = size;
+    const ctx = c.getContext('2d');
+    const base = color(hex);
+    const r = Math.round(base.r*255), gv = Math.round(base.g*255), b = Math.round(base.b*255);
+    ctx.fillStyle = `rgb(${r},${gv},${b})`; ctx.fillRect(0,0,size,size);
+    const img = ctx.getImageData(0,0,size,size); const d = img.data;
+    let seed = parseInt(hex.slice(1),16)||1;
+    const rnd = () => { seed = (seed*16807)%2147483647; return (seed-1)/2147483646; };
+    for (let y=0;y<size;y++) for (let x=0;x<size;x++) {
+      const i=(y*size+x)*4; let n=(rnd()-0.5);
+      if (kind==='wood') { const grain=Math.sin((y+rnd()*2)*0.9)*0.08+Math.sin((y*0.35+x*0.08))*0.04; n=grain+n*0.06; }
+      else if (kind==='metal') { n=Math.sin(y*1.2)*0.018+(rnd()-0.5)*0.05; }
+      else { n=n*0.04; }
+      const f=1+n;
+      d[i]=Math.max(0,Math.min(255,Math.round(d[i]*f)));
+      d[i+1]=Math.max(0,Math.min(255,Math.round(d[i+1]*f)));
+      d[i+2]=Math.max(0,Math.min(255,Math.round(d[i+2]*f)));
+    }
+    ctx.putImageData(img,0,0);
+    if (kind==='wood') {
+      ctx.globalAlpha=0.08; for(let y=2;y<size;y+=4+Math.floor(rnd()*3)){ctx.fillStyle='#000';ctx.fillRect(0,y,size,1);} 
+      ctx.globalAlpha=0.05; for(let y=1;y<size;y+=7+Math.floor(rnd()*4)){ctx.fillStyle='#fff';ctx.fillRect(0,y,size,1);} ctx.globalAlpha=1;
+    }
+    if (kind==='metal') {
+      ctx.globalAlpha=0.05; for(let y=0;y<size;y+=3){ctx.fillStyle=(y%6===0)?'#ffffff':'#000000';ctx.fillRect(0,y,size,1);} ctx.globalAlpha=1;
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
+    if ('colorSpace' in tex && THREE.SRGBColorSpace!==undefined) tex.colorSpace = THREE.SRGBColorSpace;
+    else if ('encoding' in tex && THREE.sRGBEncoding!==undefined) tex.encoding = THREE.sRGBEncoding;
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    textureCache.set(key, tex); return tex;
+  }
+
+  function materialKind(hex){
+    if (hex===PALETTE.wood||hex===PALETTE.wooddark||hex===PALETTE.woodlight) return 'wood';
+    if (hex===PALETTE.outline) return 'outline';
+    return 'metal';
+  }
+  function makeMaterial(hex){
+    const kind = materialKind(hex);
+    const tex = makeProceduralTexture(hex, kind);
+    if (kind==='wood') return new THREE.MeshStandardMaterial({map:tex,color:0xffffff,roughness:0.82,metalness:0.03,flatShading:true});
+    if (kind==='outline') return new THREE.MeshStandardMaterial({map:tex,color:0xffffff,roughness:0.95,metalness:0.02,flatShading:true});
+    const isBright=(hex===PALETTE.bright||hex===PALETTE.light);
+    const isDarkMetal=(hex===PALETTE.dark||hex===PALETTE.steel);
+    return new THREE.MeshStandardMaterial({map:tex,color:0xffffff,roughness:isBright?0.18:(isDarkMetal?0.38:0.28),metalness:isBright?0.85:(isDarkMetal?0.55:0.72),flatShading:true,emissive:isBright?new THREE.Color(hex):new THREE.Color(0x000000),emissiveIntensity:isBright?0.08:0});
+  }
+
+  const rowInfo = [];
+  for (let y=0;y<GRID_H;y++){ let minX=99,maxX=-1; for(let x=0;x<GRID_W;x++){ if(GRID[y][x]){minX=Math.min(minX,x);maxX=Math.max(maxX,x);} } rowInfo[y]={minX,maxX,mid:(minX+maxX)/2,hw:(maxX-minX+1)/2}; }
+  function depthFor(x,y,hex){
+    const info=rowInfo[y]; const mid=info?info.mid:(GRID_W-1)/2; const hw=info?info.hw:1;
+    const dist=Math.abs(x-mid)/Math.max(1,hw); const edgeFall=Math.pow(1-Math.min(1,dist),1.6);
+    if (y>=34&&y<=38){ const guardTaper=0.65+0.35*Math.pow(1-Math.min(1,Math.abs(x-mid)/10),1.2); const guardFace=2.2+0.9*guardTaper; return hex===PALETTE.outline?guardFace-0.25:guardFace; }
+    if (y>=39&&y<=50){ const grip=1.2+1.2*edgeFall; return hex===PALETTE.outline?Math.max(0.9,grip-0.2):grip; }
+    if (y>=51){ const pommel=1.4+1.4*edgeFall; return hex===PALETTE.outline?Math.max(1.0,pommel-0.2):pommel; }
+    const tipTaper=Math.min(1,(y+1)/8); const ridge=(0.75+2.1*edgeFall)*(0.55+0.45*tipTaper);
+    if (hex===PALETTE.outline) return Math.max(0.55,ridge-0.25);
+    if (hex===PALETTE.bright) return ridge+0.12;
+    return ridge;
+  }
+
+  const edgeMat = new THREE.LineBasicMaterial({ color: 0x1a2228, transparent: true, opacity: 0.22 });
+  eachPixel(GRID, (x,y,hex)=>{
+    const d = depthFor(x,y,hex);
+    const geo = new THREE.BoxGeometry(1,1,d);
+    const m = new THREE.Mesh(geo, makeMaterial(hex));
+    const jitter = ((x*37 + y*17 + parseInt(hex.slice(1,3),16)) % 100) / 100;
+    m.material = m.material.clone();
+    m.material.color.setRGB(1+(jitter-0.5)*0.05, 1+(jitter-0.5)*0.05, 1+(jitter-0.5)*0.05);
+    const [px,py]=pos3(x,y,0,1); m.position.set(px,py,0);
+    g.add(m);
+    const line = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat);
+    line.position.copy(m.position); g.add(line);
+  });
+  const s = 0.085;
+  g.scale.setScalar(s);
+  return g;
+}
+
+// --- Scene ---
+const container = document.getElementById('viewer');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x141a14);
+const camera = new THREE.PerspectiveCamera(70, 16/9, 0.01, 30);
+camera.position.set(0,0,0);
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+container.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xf0f4ee, 0x303830, 0.95));
+const key = new THREE.DirectionalLight(0xfff6e8, 1.35); key.position.set(5,7,6); scene.add(key);
+const fill = new THREE.DirectionalLight(0xcfe0ff, 0.5); fill.position.set(-6,2,-4); scene.add(fill);
+const rim = new THREE.DirectionalLight(0xffffff, 0.55); rim.position.set(-3,4,-7); scene.add(rim);
+
+// First person arm
+// Hand pivot como no jogo (âncora em primeira pessoa)
+const handPivot = new THREE.Group();
+scene.add(handPivot);
+
+// Braço visual simples (apenas referência, separado da âncora da ferramenta)
+const armGroup = new THREE.Group();
+armGroup.position.set(0.42, -0.42, -0.55);
+armGroup.rotation.set(-0.15, -0.15, 0.05);
+handPivot.add(armGroup);
+const sleeveMat = new THREE.MeshStandardMaterial({color:0x4e7a3f, roughness:0.9});
+const skinMat = new THREE.MeshStandardMaterial({color:0xc99a74, roughness:0.85});
+const arm = new THREE.Mesh(new THREE.BoxGeometry(0.22,0.22,0.7), sleeveMat); arm.position.set(0,0,-0.1); armGroup.add(arm);
+const hand = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.18,0.18), skinMat); hand.position.set(0,-0.02,-0.48); armGroup.add(hand);
+
+// Tool anchor - mesma pose das ferramentas do jogo (filho do handPivot, como no jogo)
+const FIRST_TOOL_POSE = {
+  position: [0, 0.02, -0.59],
+  rotation: [10 * Math.PI / 180, -65 * Math.PI / 180, 50 * Math.PI / 180],
+  scale: 0.85,
+  grip: [0.187, 0.204, 0],
+};
+const toolAnchor = new THREE.Group();
+toolAnchor.position.set(...FIRST_TOOL_POSE.position);
+toolAnchor.rotation.set(...FIRST_TOOL_POSE.rotation);
+toolAnchor.scale.setScalar(FIRST_TOOL_POSE.scale);
+handPivot.add(toolAnchor);
+
+let current = null;
+function setMaterial(matKey){
+  if (current) { toolAnchor.remove(current); current.traverse(o=>{ if(o.geometry) o.geometry.dispose(); if(o.material){ if(o.material.map) o.material.map.dispose(); o.material.dispose(); } }); }
+  const grid = remapGrid(matKey);
+  const sword = buildVoxelVolume(grid, MATERIALS[matKey]);
+  // Mesmo enquadramento das ferramentas 2D: ancora no grip e escala para caber no espaço 1x1 da ferramenta.
+  // buildVoxelVolume já aplica escala interna 0.085 (55 linhas => ~4.675u). Queremos ~1u de altura.
+  const s = 0.085 * (1 / 4.675);
+  sword.scale.setScalar(s);
+  sword.rotation.set(0, 0, 0);
+  // Posiciona no grip; ajuste fino para o cabo ficar na mão.
+  sword.position.set(
+    FIRST_TOOL_POSE.grip[0],
+    FIRST_TOOL_POSE.grip[1] + 0.12,
+    FIRST_TOOL_POSE.grip[2]
+  );
+  toolAnchor.add(sword);
+  current = sword;
+  document.querySelectorAll('.bar button').forEach(b=>b.classList.toggle('active', b.dataset.mat===matKey));
+}
+
+const bar = document.getElementById('bar');
+for (const [k,v] of Object.entries(MATERIALS)){
+  const btn=document.createElement('button'); btn.textContent=v.label; btn.dataset.mat=k; btn.onclick=()=>setMaterial(k); bar.appendChild(btn);
+}
+setMaterial('iron');
+
+// Look drag
+let dragging=false,lx=0,ly=0,yaw=0,pitch=0;
+container.addEventListener('pointerdown', e=>{dragging=true;lx=e.clientX;ly=e.clientY;container.setPointerCapture(e.pointerId);});
+container.addEventListener('pointermove', e=>{if(!dragging) return; const dx=e.clientX-lx, dy=e.clientY-ly; lx=e.clientX; ly=e.clientY; yaw-=dx*0.003; pitch-=dy*0.003; pitch=Math.max(-0.7,Math.min(0.7,pitch)); camera.rotation.set(pitch,yaw,0,'YXZ');});
+container.addEventListener('pointerup', ()=>dragging=false);
+container.addEventListener('pointercancel', ()=>dragging=false);
+
+function resize(){ const w=container.clientWidth, h=container.clientHeight||w*9/16; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+window.addEventListener('resize', resize); resize();
+(function animate(){ requestAnimationFrame(animate); renderer.render(scene,camera); })();
+</script>
+</body>
+</html>
