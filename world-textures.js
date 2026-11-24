@@ -895,6 +895,14 @@ export function createTextureTools(THREE) {
         if (kind === 'sword') {
             const arteDaEspada = createSwordSpritePixels(mat);
             if (arteDaEspada) return (spriteCache[key] = arteDaEspada);
+            // Fallback: desenha uma espada simples caso a arte de grade falhe.
+            const hc = HEAD_COLORS[mat] || HEAD_COLORS.iron;
+            const edge = [38, 30, 24];
+            const sc = { h: [120, 78, 38], m: [98, 62, 28], d: [72, 45, 20] };
+            for (let i = 0; i < 10; i++) { put(13 - i, 2 + i, i === 0 ? hc.l : i < 3 ? hc.m : hc.d); put(12 - i, 2 + i, hc.l); }
+            for (let y = 11; y <= 14; y++) for (let x = 2 + (y - 11); x <= 4 + (y - 11); x++) put(x, y, sc.m);
+            put(2, 11, edge); put(3, 11, edge); put(4, 11, edge); put(5, 11, edge);
+            return (spriteCache[key] = g);
         }
 
         if (kind === 'axe') {

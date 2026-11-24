@@ -191,8 +191,8 @@ export function createSwordModel(THREE, matKey = 'iron') {
     g.add(line);
   }
 
-  // Normaliza para altura ~1 unidade no espaço de ferramenta, depois ancora no cabo.
-  const s = 0.085 * (1 / 4.675);
+  // Tamanho similar às outras ferramentas sprite (16px * 0.034 = 0.544u).
+  const s = (16 * 0.034) / GRID_H;
   g.scale.setScalar(s);
   const handleRow = 44, handleCol = 10;
   const handleLocalX = (handleCol - (GRID_W - 1) / 2) * s;
