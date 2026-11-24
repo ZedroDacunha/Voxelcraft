@@ -575,6 +575,7 @@ export function createCreatureSystemClass({
             const golpe = this.takeHit(target, {
                 at,
                 from: origin,
+                damage: options.damage ?? 1,
                 onHurt: entity => this.scare(entity, at, origin),
                 // O jogo solta o pó luminoso na hora (com o corpo ainda no chão).
                 onDeath: morte => onDeath(morte.entity),

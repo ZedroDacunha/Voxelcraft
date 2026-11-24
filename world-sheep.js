@@ -1314,6 +1314,7 @@ export function createSheepSystemClass({
             const golpe = this.takeHit(target, {
                 at,
                 from: origin,
+                damage: options.damage ?? 1,
                 flash: SHEEP_HURT_FLASH,
                 cooldown: SHEEP_HIT_COOLDOWN,
                 knockback: SHEEP_KNOCKBACK,
