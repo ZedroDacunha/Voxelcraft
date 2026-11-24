@@ -71,3 +71,17 @@ test('ferramentas giram em torno do cabo, acompanham o braço e não mudam a mal
     assert.equal(held.anchor.getObjectByName('toolPose'), undefined, 'outros itens mantêm a pose antiga');
     geometry.dispose(); material.dispose();
 });
+
+test('o cabo da espada 3D permanece no pivô da mão durante o golpe', () => {
+    const arm = new THREE.Group();
+    const held = createPlayerHeldItem(THREE, arm);
+    const sword = new THREE.Group();
+    sword.userData.isSwordModel = true;
+    held.update(1, sword, null, true, true);
+    const copy = held.anchor.getObjectByName('toolPose').children[0];
+    for (const pitch of [0, -0.8, 0.4]) {
+        arm.rotation.x = pitch;
+        const grip = copy.getWorldPosition(new THREE.Vector3());
+        assert.ok(grip.distanceTo(held.anchor.getWorldPosition(new THREE.Vector3())) < 1e-9);
+    }
+});

@@ -2240,8 +2240,8 @@ function refreshHeldItem() {
         if (item.sprite.kind === 'sword') {
             const key = 'sword3d:' + item.sprite.mat;
             if (!heldGeoCache[key]) heldGeoCache[key] = createSwordModel(THREE, item.sprite.mat);
+            // O modelo 3D já tem a origem no meio do cabo.
             heldMesh = heldGeoCache[key].clone();
-            heldMesh.position.set(...FIRST_TOOL_POSE.grip);
             heldAnchor.add(heldMesh);
             return;
         }
