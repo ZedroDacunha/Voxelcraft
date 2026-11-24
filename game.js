@@ -80,6 +80,7 @@ import { configureWindSway, updateWindSway, windDirectionFor, windStep, windTarg
 import { advanceHandAnimation, countStrikes, createHandAnimation, handSwingAmount, startPunch } from './world-hand-animation.js';
 import { pickaxeMiningPose } from './world-pickaxe-animation.js';
 import { FIRST_TOOL_POSE, applyFirstPersonToolPose } from './world-first-person-tool.js';
+import { createSwordSwing, beginSwordSwing, swordPose, applyFirstPersonSwordPose, applyThirdPersonSwordPose } from './player-sword-animation.js';
 import { createSwordModel } from './world-sword-model.js';
 import { STEP_MAX_MOVED, stepDistanceThisFrame, stepPitch, stepSoundFor } from './world-step-sounds.js';
 import { advanceGait, createGait, gaitPose } from './world-gait.js';
@@ -2030,6 +2031,7 @@ function strikeCreature({ tap = false } = {}) {
     );
     if (bichoNaMira && !attackReady(lastAttackAt, agora)) return true;
     const heldItem = ITEMS[inventory.slots[selectedSlot]?.id];
+    if (heldItem?.tool?.type === 'sword') beginSwordSwing(swordSwing, inventory.slots[selectedSlot].id, agora);
     const hitDamage = heldItem?.tool?.damage ?? 1;
     // Tesoura na mão: o clique **tosquia** a ovelha em vez de bater. Sem ovelha
     // com lã na mira, o clique segue o caminho normal (o golpe, ou minerar).
@@ -2173,6 +2175,8 @@ let handScene, handCamera, handPivot, heldAnchor, handAmbient;
 let heldMesh = null, heldFlameMesh = null, heldTorchLight = null, heldId = -1;
 let handSleeve = null, handBlock = null;
 const handAnim = createHandAnimation();
+const swordSwing = createSwordSwing();
+let heldSwordPose = null;
 const heldGeoCache = {};
 
 function createHand() {
@@ -2210,6 +2214,7 @@ function refreshHeldItem() {
     const id = s ? s.id : 0;
     if (id === heldId) return;
     heldId = id;
+    if (swordSwing.itemId !== id) swordSwing.itemId = null;
     handAnim.sw = 0;
     if (heldMesh) { heldAnchor.remove(heldMesh); heldMesh = null; }
     if (heldFlameMesh) { heldAnchor.remove(heldFlameMesh); heldFlameMesh = null; }
@@ -2297,6 +2302,9 @@ function updateHand(dt) {
     advanceHandAnimation(handAnim, dt, { mining: miningNow });
     if (miningNow) playMiningHits(countStrikes(phaseBefore, handAnim.phase));
     const { swing, dip } = handSwingAmount(handAnim);
+    const hasSword = item?.tool?.type === 'sword';
+    const armSwing = hasSword ? 0 : swing;
+    heldSwordPose = hasSword ? swordPose(swordSwing, performance.now() * .001) : null;
     const pickaxe = pickaxeMiningPose(item?.tool?.type, handAnim);
     const heldToolKind = ITEMS[heldId]?.sprite?.kind;
     if (HELD_TOOL_KINDS.has(heldToolKind)) {
@@ -2315,10 +2323,11 @@ function updateHand(dt) {
     const ba = gaitNow.amplitude * swim.walkWeight;
     handPivot.position.set(
         HAND_BASE.x + gaitNow.handX * 0.012 * ba + swim.handX - 0.22 * ea,
-        HAND_BASE.y + gaitNow.handY * 0.010 * ba + swim.handY - dip - 0.05 * swing + 0.20 * ea + wob + 0.07 * pickaxe.lift - 0.04 * pickaxe.strike,
-        HAND_BASE.z + swim.handZ - 0.12 * swing + 0.08 * ea);
+        HAND_BASE.y + gaitNow.handY * 0.010 * ba + swim.handY - dip - 0.05 * armSwing + 0.20 * ea + wob + 0.07 * pickaxe.lift - 0.04 * pickaxe.strike,
+        HAND_BASE.z + swim.handZ - 0.12 * armSwing + 0.08 * ea);
     handPivot.rotation.set(
-        0.35 - 0.9 * swing + 0.35 * ea + gaitNow.handX * 0.02 * ba + swim.handPitch + 0.5 * pickaxe.lift - 0.2 * pickaxe.strike, 0.25 - 0.3 * ea, 0);
+        0.35 - 0.9 * armSwing + 0.35 * ea + gaitNow.handX * 0.02 * ba + swim.handPitch + 0.5 * pickaxe.lift - 0.2 * pickaxe.strike, 0.25 - 0.3 * ea, 0);
+    if (heldSwordPose) applyFirstPersonSwordPose(handPivot, heldAnchor, heldSwordPose);
     handPivot.scale.setScalar(1);
 }
 
@@ -3710,6 +3719,7 @@ function resetInputFlags() {
     jumpHeld = swimStrokeLocked = isSprinting = wantToCrouch = false;
     leftHeld = false;
     mouseLeftHeld = false;
+    swordSwing.itemId = null;
     touchBreakPointerId = null;
     touchStick.pointerId = null;
     touchStick.x = touchStick.y = 0;
@@ -5456,7 +5466,14 @@ async function init() {
 
     document.addEventListener('mousedown', (event) => {
         if (!playing() || inventoryOpen || chat.open) return;
-        if (event.button === 0) { mouseLeftHeld = true; syncAttackHeld(); return; }
+        if (event.button === 0) {
+            mouseLeftHeld = true;
+            syncAttackHeld();
+            // Também mostra o corte se o clique no ar começar e acabar entre quadros.
+            const id = inventory.slots[selectedSlot]?.id;
+            if (!sleep.active && ITEMS[id]?.tool?.type === 'sword') beginSwordSwing(swordSwing, id, performance.now() * .001);
+            return;
+        }
         if (event.button !== 2) return;
         useHeldItem({ sneaking: event.shiftKey || wantToCrouch });
     });
@@ -5743,7 +5760,7 @@ function updateThirdPerson() {
     const yaw = look.yaw + Math.PI;
     const gaitNow = gaitPose(gait);
     const ground = groundPose(locomotion, gaitNow.phase, gaitNow.amplitude);
-    const pose = swimPose(swimState, { yaw, height: player.height, punch: handSwingAmount(handAnim).swing });
+    const pose = swimPose(swimState, { yaw, height: player.height, punch: heldSwordPose ? 0 : handSwingAmount(handAnim).swing });
     // Rotação visual em torno do meio do corpo; posição física continua intacta.
     playerModel.root.position.set(player.pos.x + pose.offsetX, player.pos.y + pose.offsetY, player.pos.z + pose.offsetZ);
     playerModel.root.rotation.set(pose.tilt, yaw, 0, 'YXZ');
@@ -5754,6 +5771,10 @@ function updateThirdPerson() {
     const pickaxe = pickaxeMiningPose(ITEMS[heldId]?.tool?.type, handAnim);
     playerModel.rightArm.rotation.x = pose.rightArm - 0.65 * pickaxe.lift + 0.4 * pickaxe.strike;
     applyGroundPose(playerModel, locomotionRig, ground, 1 - swimState.blend);
+    playerModel.rightArm.rotation.y = 0;
+    playerModel.rightArm.rotation.z = 0;
+    locomotionRig.elbows[1].rotation.z = 0;
+    if (heldSwordPose) applyThirdPersonSwordPose(playerModel, locomotionRig, heldSwordPose, 1 - swimState.blend);
     playerArmor.sync();
     camera.getWorldDirection(thirdDirection).multiplyScalar(cameraOffsetSign(cameraView));
     const hit = raycastVoxels(camera.position, thirdDirection, THIRD_PERSON_DISTANCE, {

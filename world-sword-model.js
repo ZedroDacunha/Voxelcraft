@@ -189,8 +189,8 @@ export function createSwordModel(THREE, matKey = 'iron') {
     g.add(line);
   }
 
-  // Altura equivalente a 18 pixels de ferramenta, com a origem no cabo.
-  const s = (18 * 0.034) / GRID_H;
+  // Altura equivalente a 23 pixels de ferramenta, com a origem no cabo.
+  const s = (23 * 0.034) / GRID_H;
   g.scale.setScalar(s);
   const handleRow = 44, handleCol = 10;
   const handleLocalX = (handleCol - (GRID_W - 1) / 2) * s;
