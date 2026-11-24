@@ -1,5 +1,3 @@
-import { hash2 } from './world-math.js';
-
 const GRID_W = 21;
 const GRID_H = 55;
 // Grade base da espada (paleta de ferro). Cores metálicas são remapeadas por material.
@@ -191,8 +189,8 @@ export function createSwordModel(THREE, matKey = 'iron') {
     g.add(line);
   }
 
-  // Tamanho similar às outras ferramentas sprite (16px * 0.034 = 0.544u).
-  const s = (16 * 0.034) / GRID_H;
+  // Altura equivalente a 18 pixels de ferramenta, com a origem no cabo.
+  const s = (18 * 0.034) / GRID_H;
   g.scale.setScalar(s);
   const handleRow = 44, handleCol = 10;
   const handleLocalX = (handleCol - (GRID_W - 1) / 2) * s;
