@@ -63,6 +63,7 @@ export const ID = { GRASS: 1, STONE: 2, LOG: 3, DIRT: 4, COBBLE: 5, PLANKS: 6, L
              IRON_HELMET: 130, IRON_CHESTPLATE: 131, IRON_LEGGINGS: 132, IRON_BOOTS: 133,
              GOLD_HELMET: 134, GOLD_CHESTPLATE: 135, GOLD_LEGGINGS: 136, GOLD_BOOTS: 137,
              DIAMOND_HELMET: 138, DIAMOND_CHESTPLATE: 139, DIAMOND_LEGGINGS: 140, DIAMOND_BOOTS: 141,
+             WOODEN_SWORD: 142, STONE_SWORD: 143, COPPER_SWORD: 144, IRON_SWORD: 145, GOLD_SWORD: 146, DIAMOND_SWORD: 147,
              ...MEAT_IDS };
 
 /**
@@ -291,6 +292,28 @@ for (const m of toolMaterials) {
     });
 }
 
+const SWORD_DEFS = [
+    { id: ID.WOODEN_SWORD,  mat: 'wood',    label: 'de Madeira',  durability: 59,   damage: 4 },
+    { id: ID.STONE_SWORD,   mat: 'stone',   label: 'de Pedra',    durability: 131,  damage: 5 },
+    { id: ID.COPPER_SWORD,  mat: 'copper',  label: 'de Cobre',    durability: 190,  damage: 5 },
+    { id: ID.IRON_SWORD,    mat: 'iron',    label: 'de Ferro',    durability: 250,  damage: 6 },
+    { id: ID.GOLD_SWORD,    mat: 'gold',    label: 'de Ouro',     durability: 32,   damage: 4 },
+    { id: ID.DIAMOND_SWORD, mat: 'diamond', label: 'de Diamante', durability: 1561, damage: 7 },
+];
+for (const s of SWORD_DEFS) {
+    ITEMS[s.id] = {
+        name: `Espada ${s.label}`,
+        maxStack: 1,
+        maxDurability: s.durability,
+        tool: { type: 'sword', tier: 0, speed: 1, damage: s.damage },
+        sprite: { kind: 'sword', mat: s.mat },
+        iconTile: nextTile++,
+    };
+    // Permite receitas por material.
+    const m = toolMaterials.find(tm => tm.key === s.mat);
+    if (m) m.id_sword = s.id;
+}
+
 ITEMS[ID.APPLE]    = { name: 'Maçã', maxStack: 64, food: { hunger: 4, sat: 2.4 }, sprite: { kind: 'apple', mat: 'food' }, iconTile: nextTile++ };
 ITEMS[ID.CHARCOAL] = { name: 'Carvão vegetal', maxStack: 64, sprite: { kind: 'charcoal', mat: 'coal' }, iconTile: nextTile++ };
 // As carnes — crua e assada, uma dupla por bicho, na ordem da tabela de
@@ -411,6 +434,7 @@ for (const m of toolMaterials) {
     defRecipe([[M, M, M], [null, S, null], [null, S, null]], m.id_pickaxe);
     defRecipe([[M, M], [M, S], [null, S]], m.id_axe);
     defRecipe([[M], [S], [S]], m.id_shovel);
+    defRecipe([[M], [M], [S]], m.id_sword);
 }
 defRecipe([[ID.PLANKS, ID.PLANKS], [ID.PLANKS, ID.PLANKS]], ID.CRAFTING_TABLE);
 defRecipe([[ID.COBBLE, ID.COBBLE, ID.COBBLE], [ID.COBBLE, null, ID.COBBLE], [ID.COBBLE, ID.COBBLE, ID.COBBLE]], ID.FURNACE);

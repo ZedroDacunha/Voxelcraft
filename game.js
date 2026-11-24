@@ -224,7 +224,7 @@ const HAND_BASE = { x: 0.42, y: -0.50, z: -0.25 };
 const HELD_TOOL_ROT = [0.3, -0.55, 0.0];
 const HELD_BLOCK_ROT = [0.25, 0.7, 0.0];
 const HELD_BLOCK_POS = [0.03, 0.07, -0.04];
-const HELD_TOOL_KINDS = new Set(['pickaxe', 'axe', 'shovel', 'shears']);
+const HELD_TOOL_KINDS = new Set(['pickaxe', 'axe', 'shovel', 'shears', 'sword']);
 
 // =====================================================================
 // 2. SISTEMA DE ÁGUA (catálogo em world-catalog.js)
@@ -2026,9 +2026,11 @@ function strikeCreature({ tap = false } = {}) {
             { maxDistance: currentHit ? currentHit.dist : Infinity }),
     );
     if (bichoNaMira && !attackReady(lastAttackAt, agora)) return true;
+    const heldItem = ITEMS[inventory.slots[selectedSlot]?.id];
+    const hitDamage = heldItem?.tool?.damage ?? 1;
     // Tesoura na mão: o clique **tosquia** a ovelha em vez de bater. Sem ovelha
     // com lã na mira, o clique segue o caminho normal (o golpe, ou minerar).
-    if (ITEMS[inventory.slots[selectedSlot]?.id]?.tool?.type === 'shears') {
+    if (heldItem?.tool?.type === 'shears') {
         const shorn = sheepSystem.shearAt(camera.position, creatureAim, aim);
         if (shorn) {
             const woolId = ID[SHEEP_WOOL_ITEMS[shorn.coat]];
@@ -2049,20 +2051,21 @@ function strikeCreature({ tap = false } = {}) {
         { maxDistance: currentHit ? currentHit.dist : Infinity });
     if (zombieTarget) {
         const zombie = zombiePopulation.entities.find(z => z.state === zombieTarget);
-        const hit = zombie.hit(1, player.pos);
+        const hit = zombie.hit(hitDamage, player.pos);
         if (!hit) return true;
         lastAttackAt = agora;
+        if (heldItem?.tool?.type === 'sword') damageTool(selectedSlot, 1);
         mobHitPuff(hit.entity, hit.killed ? 12 : 6);
         audio.play('mob-hit', { gainScale: .85, rate: hit.killed ? .78 : 1 });
         startPunch(handAnim); resetMining(); haptic('punch');
         return true;
     }
-    // Golpe na ovelha: tira um de vida, pisca o corpo, empurra e ela corre para
-    // longe levando o bando. O quarto golpe derruba (o `onDeath` solta a lã e a
-    // carne).
-    const golpe = sheepSystem.hitAt(camera.position, creatureAim, aim);
+    // Golpe na ovelha: tira vida, pisca o corpo, empurra e ela corre para
+    // longe levando o bando. O `onDeath` solta a lã e a carne.
+    const golpe = sheepSystem.hitAt(camera.position, creatureAim, { ...aim, damage: hitDamage });
     if (golpe) {
         lastAttackAt = agora;
+        if (heldItem?.tool?.type === 'sword') damageTool(selectedSlot, 1);
         mobHitPuff(golpe.entity, golpe.killed ? 12 : 6);
         audio.play('mob-hit', { gainScale: 0.85, rate: golpe.killed ? 0.78 : 1 });
         if (!golpe.killed) {
@@ -2077,9 +2080,10 @@ function strikeCreature({ tap = false } = {}) {
     if (!creatureInReach(creatureSystem.entities, camera.position, creatureAim, aim)) return false;
     // Só rouba o quadro da mineração quando o golpe realmente acontece; no
     // cooldown, minerar continua normalmente.
-    const mofim = creatureSystem.hitFrom(camera.position, creatureAim, aim);
+    const mofim = creatureSystem.hitFrom(camera.position, creatureAim, { ...aim, damage: hitDamage });
     if (!mofim) return false;
     lastAttackAt = agora;
+    if (heldItem?.tool?.type === 'sword') damageTool(selectedSlot, 1);
     // Impacto do golpe: lascas na cor do pó dele e o baque que faltava no som.
     mobHitPuff(mofim.entity, mofim.killed ? 12 : 6);
     audio.play('mob-hit', { gainScale: 0.85, rate: mofim.killed ? 0.78 : 1 });

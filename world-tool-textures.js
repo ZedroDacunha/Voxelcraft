@@ -220,6 +220,35 @@ export const MACHADO_PALETAS = PICARETA_PALETAS;
 /** A pá também: uma paleta de material para a família toda. */
 export const PA_PALETAS = PICARETA_PALETAS;
 
+/**
+ * A **espada** — 16×16, mesmo alfabeto das outras ferramentas.
+ *
+ * Lâmina reta e estreita na diagonal, guarda curta horizontal na leitura do
+ * pixel, cabo de madeira e pomo. Mantém a silhueta da Espada A escolhida nos
+ * estudos de ícone, adaptada para a grade 16×16 das ferramentas em mão.
+ */
+export const ESPADA_GRADE = Object.freeze([
+    '..............O.',
+    '.............O4O',
+    '............O43O',
+    '...........O434O',
+    '..........O434O.',
+    '.........O434O..',
+    '........O434O...',
+    '.......O434O....',
+    '......O434O.....',
+    '.....O4O2O......',
+    '....O11bca......',
+    '...O11Obda......',
+    '....OO.bca......',
+    '......bda.......',
+    '.....bca........',
+    '.....aa.........',
+]);
+
+/** A espada usa a mesma paleta de material da picareta. */
+export const ESPADA_PALETAS = PICARETA_PALETAS;
+
 /** A paleta completa de um material (material + cabo + couro + acento), ou `null`. */
 function paletaCompleta(paletas, material) {
     const cores = paletas[material];
@@ -283,4 +312,20 @@ export function shovelPaletteFor(material) {
 export function createShovelSpritePixels(material) {
     const paleta = paletaCompleta(PA_PALETAS, material);
     return paleta ? pintar(PA_GRADE, paleta) : null;
+}
+
+/** A grade da espada, ou `null`. */
+export function swordGradeFor(material) {
+    return ESPADA_PALETAS[material] ? ESPADA_GRADE : null;
+}
+
+/** A paleta da espada de um material, ou `null`. */
+export function swordPaletteFor(material) {
+    return ESPADA_PALETAS[material] ?? null;
+}
+
+/** Pixels da espada (16×16), ou `null` se o material não tem arte. */
+export function createSwordSpritePixels(material) {
+    const paleta = paletaCompleta(ESPADA_PALETAS, material);
+    return paleta ? pintar(ESPADA_GRADE, paleta) : null;
 }

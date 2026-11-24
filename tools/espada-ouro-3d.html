@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Espada A — exemplos em 3D</title>
+<style>
+  :root { --bg:#1c241d; --card:#303a30; --card2:#273027; --border:#71816e; --text:#ecf2e8; --muted:#c6d1c2; --accent:#a9d7a7; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:24px; font:16px/1.5 system-ui, -apple-system, Segoe UI, sans-serif; background:var(--bg); color:var(--text); }
+  h1 { margin:0 0 4px; font-size:28px; }
+  .lead { margin:0 0 20px; color:var(--muted); max-width:900px; }
+  .ref { display:flex; gap:16px; align-items:center; background:var(--card2); border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:20px; max-width:900px; }
+  .ref img { width:96px; height:96px; image-rendering:pixelated; background:#1d251f; border-radius:6px; border:1px solid #556655; flex:0 0 auto; }
+  .ref p { margin:0; color:var(--muted); font-size:14px; }
+  .ref strong { color:var(--text); }
+  .grid { display:grid; grid-template-columns:1fr; gap:16px; max-width:860px; margin:0 auto; }
+  article { background:var(--card); border:1px solid var(--border); border-radius:10px; overflow:hidden; display:flex; flex-direction:column; }
+  .viewer { width:100%; aspect-ratio:1/1; background:#141a14; position:relative; cursor:grab; }
+  .viewer:active { cursor:grabbing; }
+  .viewer canvas { display:block; width:100% !important; height:100% !important; }
+  .label { position:absolute; left:10px; bottom:10px; font-size:12px; color:#cfe0cf; background:rgba(20,26,20,.72); padding:4px 8px; border-radius:999px; pointer-events:none; border:1px solid rgba(113,129,110,.45); }
+  .info { padding:14px 16px 16px; }
+  .info h2 { margin:0 0 2px; font-size:20px; }
+  .info .tag { display:inline-block; font-size:12px; color:#dce8dc; background:#415041; border:1px solid #688068; padding:2px 8px; border-radius:999px; margin-bottom:8px; }
+  .info p { margin:0; color:var(--muted); font-size:14px; }
+  footer { margin-top:20px; color:#aab8aa; font-size:13px; max-width:900px; }
+  code { background:#253025; padding:1px 5px; border-radius:4px; font-size:.95em; }
+</style>
+</head>
+<body>
+  <h1>Espada de Ouro · modelo 3D (Voxel com volume)</h1>
+  <p class="lead">Modelo 3D da espada de ouro (opção A escolhida), mesmo padrão da espada de ferro (opção D refinada): voxel com volume, mais realista nos materiais e na forma, mantendo o quadriculado. Arraste para girar, use a roda do mouse/pinça para aproximar.</p>
+
+  <div class="ref">
+    <img src="espada-ouro-icone-a.png" alt="Ícone da Espada de Ouro A, referência">
+    <p><strong>Referência:</strong> ícone da Espada de Ouro A (escolhida). Paleta: contorno <code>#273038</code>, aço <code>#b88418</code>, lâmina <code>#f2c648/#e8a61c</code>, brilho <code>#ffee80</code>, cabo <code>#79583d/#a87b50/#48372b</code>. Estudo visual, não implementado no jogo.</p>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <footer>Feito como estudo visual em <code>tools/espada-3d-exemplos.html</code>. Os modelos são gerados proceduralmente a partir da grade de pixels do ícone.</footer>
+
+<script type="module">
+import * as THREE from '../vendor/three/three.module.js';
+
+// Pixel grid da Espada A (pré-rotação), extraída do ícone original.
+// null = transparente; string = cor hex.
+const GRID_W = 21;
+const GRID_H = 55;
+const GRID = [
+[null,null,null,null,null,null,null,null,null,"#273038","#273038","#273038",null,null,null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,null,"#273038","#273038","#273038","#273038","#273038",null,null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,null,"#273038","#273038","#273038","#273038","#273038",null,null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#273038","#273038","#f2c648","#273038","#273038","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#273038","#f2c648","#f2c648","#e8a61c","#273038","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,"#273038","#273038","#273038","#f2c648","#f2c648","#e8a61c","#273038","#273038","#273038",null,null,null,null,null,null],
+[null,null,null,null,null,null,"#273038","#273038","#f2c648","#f2c648","#f2c648","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#273038","#f2c648","#f2c648","#f2c648","#e8a61c","#e8a61c","#273038","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#f2c648","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#ffee80","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#ffee80","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#ffee80","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#ffee80","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#ffee80","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#ffee80","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#ffee80","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#ffee80","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#ffee80","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#ffee80","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#ffee80","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#ffee80","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#ffee80","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#ffee80","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#ffee80","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#ffee80","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#ffee80","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#ffee80","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#ffee80","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#ffee80","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#ffee80","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#ffee80","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#f2c648","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#f2c648","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+[null,null,null,null,null,"#273038","#273038","#f2c648","#f2c648","#f2c648","#f2c648","#e8a61c","#e8a61c","#e8a61c","#273038","#273038",null,null,null,null,null],
+["#273038","#b88418","#b88418","#f2c648","#f2c648","#f2c648","#f2c648","#f2c648","#f2c648","#f2c648","#f2c648","#f2c648","#f2c648","#f2c648","#f2c648","#f2c648","#f2c648","#f2c648","#b88418","#b88418","#273038"],
+["#273038","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#273038"],
+["#273038","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#b88418","#273038"],
+["#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038"],
+["#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038"],
+[null,null,null,null,null,null,null,"#273038","#79583d","#a87b50","#a87b50","#79583d","#48372b","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#79583d","#a87b50","#a87b50","#79583d","#48372b","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#79583d","#a87b50","#a87b50","#79583d","#48372b","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#79583d","#a87b50","#a87b50","#79583d","#48372b","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#79583d","#a87b50","#a87b50","#79583d","#48372b","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#79583d","#a87b50","#a87b50","#79583d","#48372b","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#79583d","#a87b50","#a87b50","#79583d","#48372b","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#79583d","#a87b50","#a87b50","#79583d","#48372b","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#79583d","#a87b50","#a87b50","#79583d","#48372b","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#79583d","#a87b50","#a87b50","#79583d","#48372b","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#79583d","#a87b50","#a87b50","#79583d","#48372b","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,null,"#273038","#79583d","#79583d","#79583d","#79583d","#79583d","#273038",null,null,null,null,null,null,null],
+[null,null,null,null,null,null,"#273038","#48372b","#48372b","#48372b","#48372b","#48372b","#48372b","#48372b","#273038",null,null,null,null,null,null],
+[null,null,null,null,null,null,"#273038","#48372b","#48372b","#48372b","#48372b","#48372b","#48372b","#48372b","#273038",null,null,null,null,null,null],
+[null,null,null,null,null,null,"#273038","#273038","#79583d","#79583d","#79583d","#79583d","#79583d","#273038","#273038",null,null,null,null,null,null],
+[null,null,null,null,null,null,"#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038","#273038",null,null,null,null,null,null],
+];
+
+const PALETTE = {
+  outline:'#273038', dark:'#986210', mid:'#e8a61c', light:'#f2c648', bright:'#ffee80',
+  steel:'#b88418', wood:'#79583d', wooddark:'#48372b', woodlight:'#a87b50'
+};
+
+function color(hex) { return new THREE.Color(hex); }
+function darken(hex, f) { const c = color(hex); c.multiplyScalar(f); return c; }
+
+function eachPixel(fn) {
+  for (let y = 0; y < GRID_H; y++) {
+    for (let x = 0; x < GRID_W; x++) {
+      const hex = GRID[y][x];
+      if (hex) fn(x, y, hex);
+    }
+  }
+}
+// Map grid coords to centered 3D coords. y=0 is tip (top), so invert Y.
+function pos3(x, y, z=0, scale=1) {
+  return [(x - (GRID_W-1)/2) * scale, ((GRID_H-1)/2 - y) * scale, z * scale];
+}
+
+function makeMat(hex, opts={}) {
+  return new THREE.MeshStandardMaterial({
+    color: color(hex),
+    roughness: opts.roughness ?? 0.55,
+    metalness: opts.metalness ?? (hex === PALETTE.bright || hex === PALETTE.light || hex === PALETTE.mid || hex === PALETTE.steel || hex === PALETTE.dark ? 0.35 : 0.05),
+    flatShading: opts.flatShading ?? false,
+  });
+}
+
+function addLights(scene) {
+  scene.add(new THREE.HemisphereLight(0xf0f4ee, 0x2a332a, 0.85));
+  const key = new THREE.DirectionalLight(0xfff6e8, 1.35); key.position.set(5, 7, 6); scene.add(key);
+  const fill = new THREE.DirectionalLight(0xcfe0ff, 0.5); fill.position.set(-6, 2, -4); scene.add(fill);
+  const rim = new THREE.DirectionalLight(0xffffff, 0.55); rim.position.set(-3, 4, -7); scene.add(rim);
+  const under = new THREE.DirectionalLight(0x889988, 0.18); under.position.set(0, -5, 2); scene.add(under);
+}
+
+// Simple orbit control (no external dependency)
+function attachOrbit(canvas, camera, target, state) {
+  let dragging=false, lastX=0, lastY=0, theta=0.7, phi=1.05, radius=5.2;
+  const minPhi=0.25, maxPhi=Math.PI-0.25, minR=2.5, maxR=10;
+  function updateCam() {
+    phi = Math.max(minPhi, Math.min(maxPhi, phi));
+    radius = Math.max(minR, Math.min(maxR, radius));
+    camera.position.set(
+      target.x + radius * Math.sin(phi) * Math.sin(theta),
+      target.y + radius * Math.cos(phi),
+      target.z + radius * Math.sin(phi) * Math.cos(theta)
+    );
+    camera.lookAt(target);
+  }
+  updateCam();
+  canvas.addEventListener('pointerdown', e => { dragging=true; lastX=e.clientX; lastY=e.clientY; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const dx=e.clientX-lastX, dy=e.clientY-lastY; lastX=e.clientX; lastY=e.clientY;
+    theta -= dx*0.008;
+    phi -= dy*0.008;
+    state.auto=false;
+    updateCam();
+  });
+  canvas.addEventListener('pointerup', ()=>dragging=false);
+  canvas.addEventListener('pointercancel', ()=>dragging=false);
+  canvas.addEventListener('wheel', e => { e.preventDefault(); radius += e.deltaY*0.004; state.auto=false; updateCam(); }, {passive:false});
+  state.updateCam = updateCam;
+  state.spin = (dt) => { if (state.auto) { theta += dt*0.35; updateCam(); } };
+}
+
+function addEdgeLines(group, geom, colorHex, threshold=15) {
+  const edges = new THREE.EdgesGeometry(geom, threshold);
+  const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: colorHex, transparent:true, opacity:0.35 }));
+  line.position.copy(group.children[group.children.length-1].position);
+  return line;
+}
+
+// 1) Voxel fiel: um cubo por pixel, profundidade uniforme.
+function buildVoxelFiel() {
+  const g = new THREE.Group();
+  const geo = new THREE.BoxGeometry(1,1,1);
+  const mats = new Map();
+  const getMat = (hex) => { if(!mats.has(hex)) mats.set(hex, makeMat(hex,{roughness:0.7,metalness: hex===PALETTE.wood||hex===PALETTE.wooddark||hex===PALETTE.woodlight?0.03:0.25, flatShading:true})); return mats.get(hex); };
+  eachPixel((x,y,hex) => {
+    const m = new THREE.Mesh(geo, getMat(hex));
+    const [px,py,pz] = pos3(x,y,0,1);
+    m.position.set(px,py,pz);
+    g.add(m);
+  });
+  // subtle outline edges on the whole group via a merged-like approach is expensive; skip, rely on pixel borders.
+  const s = 0.085;
+  g.scale.setScalar(s);
+  return g;
+}
+
+// 2) Pixel extrudado: pixels extrudados com mais profundidade e lados escurecidos.
+function buildPixelExtrudado() {
+  const g = new THREE.Group();
+  const depth = 2.2;
+  const geo = new THREE.BoxGeometry(1,1,depth);
+  const mats = new Map();
+  const getMat = (hex) => {
+    if (mats.has(hex)) return mats.get(hex);
+    const isMetal = [PALETTE.bright,PALETTE.light,PALETTE.mid,PALETTE.steel,PALETTE.dark].includes(hex);
+    const base = color(hex);
+    const side = darken(hex, 0.72);
+    // BoxGeometry material order: +X,-X,+Y,-Y,+Z,-Z
+    const matFront = new THREE.MeshStandardMaterial({color:base, roughness:isMetal?0.35:0.6, metalness:isMetal?0.45:0.05});
+    const matSide  = new THREE.MeshStandardMaterial({color:side, roughness:isMetal?0.45:0.7, metalness:isMetal?0.3:0.04});
+    const arr = [matSide,matSide,matSide,matSide,matFront,matFront];
+    mats.set(hex, arr);
+    return arr;
+  };
+  eachPixel((x,y,hex) => {
+    const m = new THREE.Mesh(geo, getMat(hex));
+    const [px,py] = pos3(x,y,0,1);
+    m.position.set(px,py,0);
+    g.add(m);
+  });
+  // add a thin dark edge frame around silhouette for readability
+  const edgeMat = new THREE.LineBasicMaterial({color:0x11181d, transparent:true, opacity:0.18});
+  // Outer silhouette edges: add line segments for boundary pixels (cheap enough at this size)
+  const occupied = new Set();
+  eachPixel((x,y)=>occupied.add(x+','+y));
+  const linePts = [];
+  const d=depth/2;
+  function addLine(a,b){ linePts.push(a.x,a.y,a.z,b.x,b.y,b.z); }
+  eachPixel((x,y,hex)=>{
+    if(hex===PALETTE.outline) return; // outline already defines edges
+    const [cx,cy] = pos3(x,y,0,1);
+    const hw=0.5, hh=0.5;
+    const neighbors = [[1,0],[ -1,0],[0,1],[0,-1]];
+    for(const [dx,dy] of neighbors){
+      if(!occupied.has((x+dx)+','+(y+dy))){
+        // add edge at that face border on front
+        if(dx===1) addLine(new THREE.Vector3(cx+hw,cy-hh,d), new THREE.Vector3(cx+hw,cy+hh,d));
+        if(dx===-1) addLine(new THREE.Vector3(cx-hw,cy-hh,d), new THREE.Vector3(cx-hw,cy+hh,d));
+        if(dy===1) addLine(new THREE.Vector3(cx-hw,cy-hh,d), new THREE.Vector3(cx+hw,cy-hh,d));
+        if(dy===-1) addLine(new THREE.Vector3(cx-hw,cy+hh,d), new THREE.Vector3(cx+hw,cy+hh,d));
+      }
+    }
+  });
+  if(linePts.length){
+    const lg = new THREE.BufferGeometry();
+    lg.setAttribute('position', new THREE.Float32BufferAttribute(linePts,3));
+    g.add(new THREE.LineSegments(lg, edgeMat));
+  }
+  const s = 0.085;
+  g.scale.setScalar(s);
+  return g;
+}
+
+// 3) Low-poly suave: formas simplificadas, sombreamento suave, mesma paleta.
+function buildLowPolySuave() {
+  const g = new THREE.Group();
+  const mat = (hex, opts={}) => new THREE.MeshStandardMaterial({
+    color: color(hex), roughness: opts.roughness ?? 0.4, metalness: opts.metalness ?? 0.45, flatShading: !!opts.flat
+  });
+  const matWood = (hex) => new THREE.MeshStandardMaterial({color:color(hex), roughness:0.75, metalness:0.03, flatShading:false});
+  const matWoodFlat = (hex) => new THREE.MeshStandardMaterial({color:color(hex), roughness:0.8, metalness:0.03, flatShading:true});
+
+  // Helper to add mesh
+  function add(geo, material, px, py, pz=0, rx=0,ry=0,rz=0, sx=1,sy=1,sz=1) {
+    const m = new THREE.Mesh(geo, material);
+    m.position.set(px,py,pz);
+    m.rotation.set(rx,ry,rz);
+    m.scale.set(sx,sy,sz);
+    g.add(m);
+    return m;
+  }
+
+  // Scale reference: grid pixel = 1 unit in grid space. We'll build in grid units then scale group.
+  const cx = (GRID_W-1)/2; // 10
+  const cy = (GRID_H-1)/2; // 27
+  const Y = (gy) => (cy - gy); // grid y -> 3D y
+  const X = (gx) => (gx - cx);
+
+  // Blade - tapered diamond-ish profile. Build as custom shape extruded.
+  // Blade runs from y=0 (tip) to y=33 (base). Width narrows at tip.
+  const bladeShape = new THREE.Shape();
+  // Define half-width profile along y (grid coords)
+  const profile = []; // [gy, halfWidth]
+  for (let gy=0; gy<=33; gy++) {
+    let minX=99,maxX=-1;
+    for(let gx=0;gx<GRID_W;gx++){ const h=GRID[gy][gx]; if(h && h!==PALETTE.outline && h!==PALETTE.steel && h!==PALETTE.wood && h!==PALETTE.wooddark && h!==PALETTE.woodlight){ minX=Math.min(minX,gx); maxX=Math.max(maxX,gx); } }
+    if(maxX>=minX) profile.push([gy, (maxX-minX+1)/2]);
+  }
+  // Build blade as a custom BufferGeometry: a thin box with beveled edge (low poly)
+  // Simpler: two sloped planes forming a ridge. We'll make a blade mesh from vertices.
+  function makeBlade() {
+    const verts = []; const norms = []; const idx = [];
+    const depthCenter = 0.9; // half-depth at ridge
+    const depthEdge = 0.12;
+    // sample profile points
+    const pts = [];
+    for (let gy=0; gy<=33; gy++) {
+      let minX=99,maxX=-1;
+      for(let gx=0;gx<GRID_W;gx++){ const h=GRID[gy][gx]; if(h && h!==PALETTE.outline){ minX=Math.min(minX,gx); maxX=Math.max(maxX,gx); } }
+      if(maxX>=minX) pts.push({gy, minX, maxX, hw:(maxX-minX+1)/2, mid:(minX+maxX)/2});
+    }
+    // build quad strip: for each segment create front/back faces with ridge
+    // We'll use simple boxes stacked as an approximation? No, better a proper shape.
+    // Alternative: use ShapeGeometry extruded via ExtrudeGeometry for the silhouette, then scale Z.
+    const sh = new THREE.Shape();
+    const topPt = pts[0];
+    sh.moveTo(X(topPt.mid), Y(topPt.gy));
+    // right edge down
+    for (const p of pts) sh.lineTo(X(p.maxX+0.5), Y(p.gy));
+    // bottom right to bottom left
+    const bot = pts[pts.length-1];
+    sh.lineTo(X(bot.maxX+0.5), Y(bot.gy-0.5));
+    sh.lineTo(X(bot.minX-0.5), Y(bot.gy-0.5));
+    // left edge up
+    for (let i=pts.length-1;i>=0;i--) { const p=pts[i]; sh.lineTo(X(p.minX-0.5), Y(p.gy)); }
+    sh.closePath();
+    const extrude = new THREE.ExtrudeGeometry(sh, { depth: 1.4, bevelEnabled:true, bevelThickness:0.35, bevelSize:0.25, bevelSegments:2 });
+    extrude.translate(0,0,-0.7);
+    return extrude;
+  }
+  const bladeGeo = makeBlade();
+  add(bladeGeo, mat(PALETTE.mid, {roughness:0.28, metalness:0.7}), 0,0,0);
+
+  // Bright edge highlight strip along left side of blade
+  const highlightGeo = new THREE.BoxGeometry(0.7, 26, 0.5);
+  add(highlightGeo, mat(PALETTE.bright, {roughness:0.15, metalness:0.85}), X(8.2), Y(19), 0.55);
+
+  // Fuller/guard
+  const guardGeo = new THREE.BoxGeometry(21, 4.5, 2.4);
+  add(guardGeo, mat(PALETTE.steel, {roughness:0.35, metalness:0.6, flat:true}), X(10), Y(36), 0);
+  // guard top highlight
+  add(new THREE.BoxGeometry(19, 0.6, 2.5), mat(PALETTE.light, {roughness:0.25, metalness:0.7}), X(10), Y(34.7), 0);
+
+  // Handle
+  add(new THREE.CylinderGeometry(2.2, 2.2, 12, 8), matWood(PALETTE.wood), X(10), Y(45), 0);
+  add(new THREE.BoxGeometry(1.3, 12, 2.5), matWood(PALETTE.woodlight), X(9.3), Y(45), 0.6);
+  add(new THREE.BoxGeometry(0.8, 12, 2.3), matWood(PALETTE.wooddark), X(11.6), Y(45), 0.5);
+
+  // Pommel
+  add(new THREE.CylinderGeometry(2.8, 2.5, 3.5, 8), matWood(PALETTE.wooddark), X(10), Y(52.5), 0);
+  add(new THREE.CylinderGeometry(3.2, 3.2, 1.2, 8), mat(PALETTE.outline, {roughness:0.7, metalness:0.1, flat:true}), X(10), Y(54.3), 0);
+
+  // Subtle outline as dark wireframe-ish edges? Skip for clean look.
+  const s = 0.085;
+  g.scale.setScalar(s);
+  return g;
+}
+
+// 4) Voxel com volume: blocos por pixel, mas com profundidade variável para dar volume.
+function buildVoxelVolume() {
+  const g = new THREE.Group();
+  const textureCache = new Map();
+
+  function makeProceduralTexture(hex, kind) {
+    const key = hex + ':' + kind;
+    if (textureCache.has(key)) return textureCache.get(key);
+    const size = 32;
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const ctx = c.getContext('2d');
+    const base = color(hex);
+    const r = Math.round(base.r * 255), gv = Math.round(base.g * 255), b = Math.round(base.b * 255);
+    ctx.fillStyle = `rgb(${r},${gv},${b})`;
+    ctx.fillRect(0, 0, size, size);
+    const img = ctx.getImageData(0, 0, size, size);
+    const d = img.data;
+    // Seeded-ish pseudo-random from hex for stable look
+    let seed = parseInt(hex.slice(1), 16) || 1;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const i = (y * size + x) * 4;
+        let n = (rnd() - 0.5);
+        if (kind === 'wood') {
+          // grain: horizontal streaks + fine noise
+          const grain = Math.sin((y + rnd() * 2) * 0.9) * 0.08 + Math.sin((y * 0.35 + x * 0.08)) * 0.04;
+          n = grain + n * 0.06;
+        } else if (kind === 'metal') {
+          // brushed metal: subtle horizontal sheen + fine noise
+          const brush = Math.sin(y * 1.2) * 0.018 + (rnd() - 0.5) * 0.05;
+          n = brush;
+        } else { // outline/dark
+          n = n * 0.04;
+        }
+        const factor = 1 + n;
+        d[i]     = Math.max(0, Math.min(255, Math.round(d[i] * factor)));
+        d[i + 1] = Math.max(0, Math.min(255, Math.round(d[i + 1] * factor)));
+        d[i + 2] = Math.max(0, Math.min(255, Math.round(d[i + 2] * factor)));
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+
+    // extra wood grain lines
+    if (kind === 'wood') {
+      ctx.globalAlpha = 0.08;
+      for (let y = 2; y < size; y += 4 + Math.floor(rnd() * 3)) {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, y, size, 1);
+      }
+      ctx.globalAlpha = 0.05;
+      for (let y = 1; y < size; y += 7 + Math.floor(rnd() * 4)) {
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, y, size, 1);
+      }
+      ctx.globalAlpha = 1;
+    }
+    // metal subtle highlight streaks
+    if (kind === 'metal') {
+      ctx.globalAlpha = 0.05;
+      for (let y = 0; y < size; y += 3) {
+        ctx.fillStyle = (y % 6 === 0) ? '#ffffff' : '#000000';
+        ctx.fillRect(0, y, size, 1);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    if ('colorSpace' in tex && THREE.SRGBColorSpace !== undefined) tex.colorSpace = THREE.SRGBColorSpace;
+    else if ('encoding' in tex && THREE.sRGBEncoding !== undefined) tex.encoding = THREE.sRGBEncoding;
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    textureCache.set(key, tex);
+    return tex;
+  }
+
+  function materialKind(hex) {
+    if (hex === PALETTE.wood || hex === PALETTE.wooddark || hex === PALETTE.woodlight) return 'wood';
+    if (hex === PALETTE.outline) return 'outline';
+    return 'metal';
+  }
+
+  function makeMaterial(hex) {
+    const kind = materialKind(hex);
+    const tex = makeProceduralTexture(hex, kind);
+    if (kind === 'wood') {
+      return new THREE.MeshStandardMaterial({
+        map: tex, color: 0xffffff, roughness: 0.82, metalness: 0.03, flatShading: true,
+      });
+    }
+    if (kind === 'outline') {
+      return new THREE.MeshStandardMaterial({
+        map: tex, color: 0xffffff, roughness: 0.95, metalness: 0.02, flatShading: true,
+      });
+    }
+    // metal: blade/guard - brighter parts shinier
+    const isBright = (hex === PALETTE.bright || hex === PALETTE.light);
+    const isDarkMetal = (hex === PALETTE.dark || hex === PALETTE.steel);
+    return new THREE.MeshStandardMaterial({
+      map: tex,
+      color: 0xffffff,
+      roughness: isBright ? 0.18 : (isDarkMetal ? 0.38 : 0.28),
+      metalness: isBright ? 0.85 : (isDarkMetal ? 0.55 : 0.72),
+      flatShading: true,
+      emissive: isBright ? new THREE.Color(hex) : new THREE.Color(0x000000),
+      emissiveIntensity: isBright ? 0.08 : 0,
+    });
+  }
+
+  // Precompute blade width per row for ridge calculation
+  const rowInfo = [];
+  for (let y=0;y<GRID_H;y++){
+    let minX=99,maxX=-1;
+    for(let x=0;x<GRID_W;x++){ if(GRID[y][x]){minX=Math.min(minX,x);maxX=Math.max(maxX,x);} }
+    rowInfo[y] = {minX,maxX, mid:(minX+maxX)/2, hw:(maxX-minX+1)/2};
+  }
+
+  function depthFor(x,y,hex){
+    const info = rowInfo[y];
+    const mid = info ? info.mid : (GRID_W-1)/2;
+    const hw = info ? info.hw : 1;
+    const dist = Math.abs(x - mid) / Math.max(1, hw);
+    const edgeFall = Math.pow(1 - Math.min(1, dist), 1.6);
+
+    // Guard: espessa no centro, levemente afunada nas pontas
+    if (y >= 34 && y <= 38) {
+      const guardTaper = 0.65 + 0.35 * Math.pow(1 - Math.min(1, Math.abs(x - mid) / 10), 1.2);
+      const guardFace = 2.2 + 0.9 * guardTaper;
+      return hex === PALETTE.outline ? guardFace - 0.25 : guardFace;
+    }
+    // Cabo: arredondado em seção
+    if (y >= 39 && y <= 50) {
+      const grip = 1.2 + 1.2 * edgeFall;
+      return hex === PALETTE.outline ? Math.max(0.9, grip - 0.2) : grip;
+    }
+    // Pomo: mais encorpado e arredondado
+    if (y >= 51) {
+      const pommel = 1.4 + 1.4 * edgeFall;
+      return hex === PALETTE.outline ? Math.max(1.0, pommel - 0.2) : pommel;
+    }
+
+    // Lâmina: seção lenticular, mais fina na ponta e nas bordas
+    const tipTaper = Math.min(1, (y + 1) / 8); // afina na ponta
+    const ridge = (0.75 + 2.1 * edgeFall) * (0.55 + 0.45 * tipTaper);
+    if (hex === PALETTE.outline) return Math.max(0.55, ridge - 0.25);
+    // brilho central levemente mais alto
+    if (hex === PALETTE.bright) return ridge + 0.12;
+    return ridge;
+  }
+
+  const edgeMat = new THREE.LineBasicMaterial({ color: 0x1a2228, transparent: true, opacity: 0.22 });
+  eachPixel((x,y,hex) => {
+    const d = depthFor(x,y,hex);
+    const geo = new THREE.BoxGeometry(1,1,d);
+    const m = new THREE.Mesh(geo, makeMaterial(hex));
+    // small per-block variation to avoid flat repetition
+    const jitter = ((x * 37 + y * 17 + parseInt(hex.slice(1,3),16)) % 100) / 100;
+    m.material = m.material.clone();
+    m.material.color.setRGB(1 + (jitter - 0.5) * 0.05, 1 + (jitter - 0.5) * 0.05, 1 + (jitter - 0.5) * 0.05);
+    const [px,py] = pos3(x,y,0,1);
+    m.position.set(px,py,0);
+    g.add(m);
+
+    // bordas sutis para manter o quadriculado visível
+    const eg = new THREE.EdgesGeometry(geo);
+    const line = new THREE.LineSegments(eg, edgeMat);
+    line.position.copy(m.position);
+    g.add(line);
+  });
+
+  const s = 0.085;
+  g.scale.setScalar(s);
+  return g;
+}
+
+const EXAMPLES = [
+  {
+    id:'voxel-volume',
+    name:'Espada de Ouro A · Voxel com volume',
+    tag:'Realista, mantendo o quadriculado',
+    desc:'Cada pixel vira um bloco, preservando o quadriculado do ícone. O volume foi refinado: lâmina com seção lenticular (crista central e bordas mais finas), guarda com presença metálica, cabo com grão de madeira e pomo mais encorpado. Materiais e luz reforçam a leitura realista sem perder o estilo voxel.',
+    build: buildVoxelVolume,
+    cameraZ: 5.2,
+  },
+];
+
+const grid = document.getElementById('grid');
+const viewers = [];
+
+for (const ex of EXAMPLES) {
+  const card = document.createElement('article');
+  card.innerHTML = `
+    <div class="viewer" id="viewer-${ex.id}"><div class="label">Arraste para girar</div></div>
+    <div class="info">
+      <div class="tag">${ex.tag}</div>
+      <h2>${ex.name}</h2>
+      <p>${ex.desc}</p>
+    </div>`;
+  grid.appendChild(card);
+
+  const container = card.querySelector('.viewer');
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x141a14);
+
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+  camera.position.set(2.8, 2.2, ex.cameraZ);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  container.appendChild(renderer.domElement);
+
+  addLights(scene);
+
+  const root = new THREE.Group();
+  const model = ex.build();
+  // Center model
+  const box = new THREE.Box3().setFromObject(model);
+  const center = box.getCenter(new THREE.Vector3());
+  model.position.sub(center);
+  // Slight tilt for nicer initial view
+  root.add(model);
+  root.rotation.y = -0.55;
+  root.rotation.x = 0.18;
+  scene.add(root);
+
+  // Ground shadow hint
+  const floor = new THREE.Mesh(
+    new THREE.CircleGeometry(2.3, 48),
+    new THREE.MeshBasicMaterial({ color: 0x0e130e, transparent:true, opacity:0.55 })
+  );
+  floor.rotation.x = -Math.PI/2;
+  floor.position.y = -box.getSize(new THREE.Vector3()).y * 0.52;
+  scene.add(floor);
+
+  const state = { auto: true };
+  attachOrbit(renderer.domElement, camera, new THREE.Vector3(0,0,0), state);
+
+  viewers.push({ container, renderer, camera, scene, root, state });
+}
+
+function resize() {
+  for (const v of viewers) {
+    const w = v.container.clientWidth;
+    const h = v.container.clientHeight || w;
+    v.renderer.setSize(w, h, false);
+    v.camera.aspect = w / h;
+    v.camera.updateProjectionMatrix();
+  }
+}
+window.addEventListener('resize', resize);
+resize();
+
+let last = performance.now();
+function animate(now) {
+  requestAnimationFrame(animate);
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  for (const v of viewers) {
+    v.state.spin(dt);
+    v.renderer.render(v.scene, v.camera);
+  }
+}
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>

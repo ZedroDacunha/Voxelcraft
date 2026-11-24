@@ -13,6 +13,7 @@ import {
     createPickaxeSpritePixels,
     createShearsSpritePixels,
     createShovelSpritePixels,
+    createSwordSpritePixels,
 } from './world-tool-textures.js';
 
 /**
@@ -889,6 +890,11 @@ export function createTextureTools(THREE) {
                 if (color) put(x, y, color);
             }
             return (spriteCache[key] = g);
+        }
+
+        if (kind === 'sword') {
+            const arteDaEspada = createSwordSpritePixels(mat);
+            if (arteDaEspada) return (spriteCache[key] = arteDaEspada);
         }
 
         if (kind === 'axe') {
