@@ -19,6 +19,8 @@ export function createPlayerHeldItem(THREE, rightArm) {
         if (id === lastId) return;
         lastId = id;
         anchor.clear();
+        // O cabo 3D atravessa a palma, que gira junto com o antebraço.
+        anchor.position.z = mesh?.userData.isSwordModel ? 0.04 : 0.18;
         if (!id || !mesh) return;
         const copy = mesh.clone();
         if (isTool) {
@@ -28,7 +30,10 @@ export function createPlayerHeldItem(THREE, rightArm) {
             pivot.name = 'toolPose';
             pivot.rotation.set(0, THIRD_TOOL_POSE.yaw, THIRD_TOOL_POSE.roll, 'YXZ');
             pivot.scale.setScalar(THIRD_TOOL_POSE.scale);
-            if (copy.userData.isSwordModel) copy.position.set(0, 0, 0);
+            if (copy.userData.isSwordModel) {
+                pivot.rotation.set(2.02, -.24, -.14);
+                copy.position.set(0, 0, 0);
+            }
             else copy.position.set(THIRD_TOOL_GRIP.x, THIRD_TOOL_GRIP.y, 0);
             copy.rotation.set(0, 0, 0);
             copy.scale.set(1, 1, 1);
