@@ -119,7 +119,7 @@ import {
 } from './world-touch-positions.js';
 import { renderAspect, renderTarget, resolutionLabel, resolutionSize } from './world-render-resolution.js';
 import { rightClickIntent } from './world-interaction-rules.js';
-import { loadGameSettings, onGameSettingsChange } from './world-game-settings.js';
+import { applyUiScale, loadGameSettings, onGameSettingsChange } from './world-game-settings.js';
 import { advanceStarvation, deathTitle, HUNGER_WARNINGS, hungerStage } from './world-survival-rules.js';
 import {
     BlockFacingStore, DEFAULT_BLOCK_FACING, facingTowardPlayer, isFrontFace, isHorizontalFacing,
@@ -3940,6 +3940,8 @@ function applyGameSettings(settings, { quiet = false } = {}) {
     GAME_SETTINGS.sensitivity = settings.sensitivity;
     GAME_SETTINGS.fov = settings.fov;
     GAME_SETTINGS.volume = settings.volume;
+    GAME_SETTINGS.uiScale = settings.uiScale;
+    applyUiScale(settings);
     // Toque: lado e tamanho dos controles valem na hora, inclusive com o dedo
     // já no joystick (o raio é lido a cada movimento).
     applyTouchLayout(settings);

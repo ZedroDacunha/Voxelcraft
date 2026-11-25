@@ -22,6 +22,7 @@ export const GRAPHICS_OPTION_CONTROLS = [
     { key: 'resolution', button: 'opt-resolution', output: 'opt-resolution-value', label: 'Resolução' },
     { key: 'fov', button: 'opt-fov', output: 'opt-fov-value', label: 'Campo de visão' },
     { key: 'renderDistance', button: 'opt-render-distance', output: 'opt-render-distance-value', label: 'Distância de render' },
+    { key: 'uiScale', button: 'opt-ui-scale', output: 'opt-ui-scale-value', label: 'Escala da interface' },
 ];
 
 export const CONTROL_OPTION_CONTROLS = [

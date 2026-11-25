@@ -557,9 +557,11 @@ test('bindUiSounds sem documento devolve um dispose seguro', () => {
 
 test('o menu cria o áudio com o volume salvo e a tela de opções aplica na hora', () => {
     const menu = readFileSync(new URL('../world-menu.js', import.meta.url), 'utf8');
-    assert.match(menu, /getSharedAudio\(\{ volume: loadGameSettings\(\)\.volume \}\)/);
+    assert.match(menu, /loadGameSettings\(\)/);
+    assert.match(menu, /getSharedAudio\(\{ volume: gameSettings\.volume \}\)/);
     assert.match(menu, /bindUiSounds\(uiAudio, document\)/);
-    assert.match(menu, /onChange: settings => uiAudio\.setVolume\(settings\.volume\)/);
+    assert.match(menu, /uiAudio\.setVolume\(settings\.volume\)/);
+    assert.match(menu, /applyUiScale\(settings\)/);
 
     const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
     assert.match(html, /id="opt-volume"/);
