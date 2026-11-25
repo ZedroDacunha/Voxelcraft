@@ -31,7 +31,10 @@ export function createPlayerHeldItem(THREE, rightArm) {
             pivot.rotation.set(0, THIRD_TOOL_POSE.yaw, THIRD_TOOL_POSE.roll, 'YXZ');
             pivot.scale.setScalar(THIRD_TOOL_POSE.scale);
             if (copy.userData.isSwordModel) {
-                pivot.rotation.set(2.02, -.24, -.14);
+                // No modelo do corpo, +Z é a frente. O punho compensa a flexão
+                // do cotovelo para manter a lâmina projetada além da mão.
+                pivot.rotation.set(2.70, -.12, -.20, 'YXZ');
+                pivot.rotateY(.90); // Apresenta a face da lâmina de lado durante o corte.
                 copy.position.set(0, 0, 0);
             }
             else copy.position.set(THIRD_TOOL_GRIP.x, THIRD_TOOL_GRIP.y, 0);
