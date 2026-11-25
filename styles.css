@@ -413,7 +413,11 @@
         width: min(90vw, 860px, calc(46vh * 5.3658)); margin: 0 0 clamp(24px, 4.5vh, 44px);
         filter: drop-shadow(4px 6px 0 rgba(0, 0, 0, .4)); }
     .title-logo-art { display: block; width: 100%; height: auto; overflow: visible; }
-    .title-screen-actions { display: grid; gap: 8px; width: min(360px, calc(100vw - 40px)); }
+    .title-screen-actions { display: grid; gap: 10px; width: min(380px, calc(100vw - 40px)); padding: 14px 14px 12px;
+        background: linear-gradient(180deg, rgba(0,0,0,.12), rgba(0,0,0,.22));
+        border: 1px solid rgba(255,255,255,.08); box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+    #btn-open-worlds.classic-btn { min-height: 40px; font-size: 17px; letter-spacing: .01em; }
+    #title-screen .classic-btn-wide { min-height: 36px; }
     /* --- Botões (base clássica compartilhada) ----------------------------- */
     .classic-btn,
     .world-action,
@@ -496,10 +500,12 @@
         font-size: 15px;
     }
 
-    .title-screen-secondary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 5px; }
-    .title-screen-secondary .classic-btn { min-height: 32px; font-size: 14px; }
-    .quit-hint { margin: 0; padding: 6px 9px; color: white; background: #111b; text-align: center; font: 12px monospace; text-shadow: 1px 1px #000; }
-    .title-screen-footer { align-items: flex-end; font-size: 10px; letter-spacing: .03em; }
+    .title-screen-secondary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 4px; }
+    .title-screen-secondary .classic-btn { min-height: 32px; font-size: 14px; padding-inline: 10px; }
+    #title-screen .quit-hint { margin: 2px 0 0; padding: 7px 10px; color: #f4f4f4; background: rgba(0,0,0,.35);
+        border: 1px solid rgba(255,255,255,.08); text-align: center; font: 12px/1.35 monospace; text-shadow: 1px 1px #000; }
+    .title-screen-footer { align-items: flex-end; gap: 12px; font-size: 10px; letter-spacing: .04em; opacity: .92; }
+    .title-screen-footer span { padding: 2px 0; }
     .world-menu-back { margin-bottom: 26px; }
     /* --- Diálogos: opções (mesma família visual, overlay no jogo) --------- */
     .world-dialog, .options-dialog { border-radius: 0; }
@@ -739,12 +745,18 @@
         .title-screen-footer span:last-child { display: none; }
         .title-screen-logo { margin-bottom: 34px; }
         .world-menu-card { padding: 22px 16px; }
+        .title-screen-actions { width: min(380px, calc(100vw - 24px)); padding: 12px; gap: 8px; }
+        .title-screen-secondary { grid-template-columns: 1fr; }
+        .title-screen-secondary .classic-btn { min-height: 34px; }
     }
     @media (max-height: 540px) {
         #title-screen { padding-block: 10px; }
         .title-screen-logo { margin-bottom: 14px; width: min(76vw, 560px, calc(28vh * 5.3658)); }
         .title-screen-actions { gap: 5px; width: min(320px, calc(100vw - 40px)); }
         .classic-btn-wide { min-height: 32px; }
+        #title-screen .title-screen-actions { padding: 8px 10px; }
+        #title-screen .title-screen-secondary { gap: 6px; margin-top: 2px; }
+        #btn-open-worlds.classic-btn { min-height: 34px; font-size: 16px; }
     }
 
     @media (max-width: 560px) {
