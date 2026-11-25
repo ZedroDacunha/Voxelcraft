@@ -223,6 +223,14 @@ createOptionsView(document.getElementById('options-dialog'), {
 document.getElementById('btn-open-options').addEventListener('click', () => {
     document.getElementById('options-dialog').showModal();
 });
+
+const aboutDialog = document.getElementById('about-dialog');
+document.getElementById('btn-open-about').addEventListener('click', () => {
+    aboutDialog.showModal();
+});
+document.getElementById('about-close').addEventListener('click', () => {
+    aboutDialog.close();
+});
 document.getElementById('btn-quit-game').addEventListener('click', () => {
     document.getElementById('quit-hint').hidden = false;
 });

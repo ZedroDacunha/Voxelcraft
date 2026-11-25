@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="Voxel">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
-<link rel="stylesheet" href="styles.css?v=8636cf5df7">
+<link rel="stylesheet" href="styles.css?v=9d70e6d74e">
 <link rel="stylesheet" href="inventory.css?v=a3c52e382b">
 <!-- importmap:start (gerado por tools/stamp-importmap.mjs; não editar à mão) -->
 <script type="importmap">
@@ -122,7 +122,7 @@
     "./world-list-view.js": "./world-list-view.js?v=9ec40da58c",
     "./world-math.js": "./world-math.js?v=ce4a6d9232",
     "./world-meats.js": "./world-meats.js?v=fa6e21fd92",
-    "./world-menu.js": "./world-menu.js?v=dbac63c1a5",
+    "./world-menu.js": "./world-menu.js?v=440917fdbb",
     "./world-mesh-buffers.js": "./world-mesh-buffers.js?v=ceba787639",
     "./world-mineral-blocks.js": "./world-mineral-blocks.js?v=4c39bc041e",
     "./world-mineral-textures.js": "./world-mineral-textures.js?v=8bb1ae7527",
@@ -303,6 +303,7 @@
             <button class="classic-btn classic-btn-wide" id="online-open">Jogar online</button>
             <div class="title-screen-secondary">
                 <button class="classic-btn" id="btn-open-options">Opções...</button>
+                <button class="classic-btn" id="btn-open-about">Sobre...</button>
                 <button class="classic-btn" id="btn-quit-game">Sair do jogo</button>
             </div>
             <button class="classic-btn classic-btn-wide" id="btn-install" type="button" hidden>Instalar app</button>
@@ -336,6 +337,19 @@
     <h2 id="online-ended-title">Partida encerrada</h2>
     <p>A conexão com o anfitrião foi encerrada.</p>
     <button class="classic-btn" id="online-leave">Voltar ao menu</button>
+</dialog>
+<dialog class="world-dialog" id="about-dialog" aria-labelledby="about-title">
+    <h2 id="about-title">Sobre o Voxelcraft</h2>
+    <p>Uma aventura em blocos em primeira pessoa, feita para jogar direto no navegador.</p>
+    <div class="about-content">
+        <p><strong>Controles básicos</strong></p>
+        <p>WASD para mover, mouse para olhar, botão esquerdo para quebrar, botão direito para colocar/usar, E para inventário, Esc para pausar.</p>
+        <p><strong>Créditos</strong></p>
+        <p>Voxelcraft é um projeto experimental de jogo voxel na web. Feito com JavaScript e Three.js.</p>
+    </div>
+    <div class="world-dialog-actions">
+        <button class="classic-btn" id="about-close">Fechar</button>
+    </div>
 </dialog>
 <section id="world-menu" aria-labelledby="world-menu-title" hidden>
     <section class="world-menu-card">
@@ -662,6 +676,6 @@
         <button class="classic-btn touch-edit-btn" type="button" id="btn-touch-positions-done">Pronto</button>
     </div>
 </div>
-<script type="module" src="world-menu.js?v=dbac63c1a5"></script>
+<script type="module" src="world-menu.js?v=440917fdbb"></script>
 </body>
 </html>
