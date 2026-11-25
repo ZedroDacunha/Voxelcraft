@@ -60,11 +60,21 @@
     #world-menu { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 20px; overflow-y: auto;
         color: #f4f7fb; background: radial-gradient(ellipse at 50% 20%, #263b50 0%, #121923 55%, #0b1017 100%); }
     #world-menu[hidden] { display: none; }
-    .world-menu-card { width: min(720px, 100%); box-sizing: border-box; padding: clamp(22px, 5vw, 42px); border: 1px solid #52667c;
-        border-radius: 16px; background: rgba(18, 26, 36, .94); box-shadow: 0 24px 80px rgba(0,0,0,.5); }
-    .world-menu-eyebrow { margin: 0 0 8px; color: #8bd36b; font: bold 12px monospace; letter-spacing: .18em; }
-    #world-menu-title { margin: 0; font-size: clamp(30px, 6vw, 46px); }
-    .world-menu-subtitle { margin: 8px 0 24px; color: #b8c4d2; }
+    .world-menu-card {
+        width: min(720px, 100%);
+        box-sizing: border-box;
+        padding: clamp(22px, 5vw, 42px);
+        border: 2px solid #171717;
+        border-radius: 0;
+        background: rgba(23, 26, 30, .94);
+        box-shadow:
+            inset 2px 2px 0 #ffffff1a,
+            inset -2px -2px 0 #00000055,
+            0 18px 50px rgba(0, 0, 0, .65);
+    }
+    .world-menu-eyebrow { margin: 0 0 8px; color: #d6d0a4; font: bold 12px monospace; letter-spacing: .18em; }
+    #world-menu-title { margin: 0; font-size: clamp(30px, 6vw, 46px); text-shadow: 2px 2px 0 #0008; }
+    .world-menu-subtitle { margin: 8px 0 24px; color: #d4d8dc; }
     .world-list { display: grid; gap: 10px; max-height: min(48vh, 430px); overflow-y: auto; padding: 2px; }
     .world-list-toolbar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; margin: 0 0 12px; }
     #world-list-toolbar[hidden] { display: none; }
@@ -461,9 +471,6 @@
     .quit-hint { margin: 0; padding: 6px 9px; color: white; background: #111b; text-align: center; font: 12px monospace; text-shadow: 1px 1px #000; }
     .title-screen-footer { align-items: flex-end; font-size: 10px; letter-spacing: .03em; }
     .world-menu-back { margin-bottom: 26px; }
-    .world-menu-card { border: 2px solid #282820; border-radius: 0; background: rgba(23, 25, 22, .9); box-shadow: 4px 5px 0 #0008; }
-    .world-menu-eyebrow { color: #d6d0a4; }
-    .world-menu-subtitle { color: #d0d0d0; }
     /* --- Diálogos: opções (mesma família visual, overlay no jogo) --------- */
     .world-dialog, .options-dialog { border-radius: 0; }
     .options-dialog {
