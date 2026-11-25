@@ -305,8 +305,8 @@ test('as lascas do golpe usam a cor do bicho e um punhado pequeno', () => {
 test('game.js bate nos dois bichos com som, lascas e o item da morte', () => {
     const source = readFileSync(new URL('../game.js', import.meta.url), 'utf8');
 
-    assert.match(source, /const golpe = sheepSystem\.hitAt\(camera\.position, creatureAim, aim\)/);
-    assert.match(source, /const mofim = creatureSystem\.hitFrom\(camera\.position, creatureAim, aim\)/);
+    assert.match(source, /const golpe = sheepSystem\.hitAt\(camera\.position, creatureAim, \{ \.\.\.aim, damage: hitDamage \}\)/);
+    assert.match(source, /const mofim = creatureSystem\.hitFrom\(camera\.position, creatureAim, \{ \.\.\.aim, damage: hitDamage \}\)/);
     assert.match(source, /audio\.play\('mob-hit'/, 'o baque do golpe');
     assert.match(source, /mobHitPuff\(golpe\.entity, golpe\.killed \? 12 : 6\)/, 'lascas na ovelha');
     assert.match(source, /mobHitPuff\(mofim\.entity, mofim\.killed \? 12 : 6\)/, 'lascas no Mofim');

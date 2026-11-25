@@ -1,3 +1,5 @@
+import { SWORD_MATERIALS } from './world-sword-model.js';
+
 // Arte das FERRAMENTAS: picareta, machado e pá.
 //
 // Módulo puro (sem DOM, sem THREE): devolve os pixels do ícone para o
@@ -220,34 +222,40 @@ export const MACHADO_PALETAS = PICARETA_PALETAS;
 /** A pá também: uma paleta de material para a família toda. */
 export const PA_PALETAS = PICARETA_PALETAS;
 
-/**
- * A **espada** — 16×16, mesmo alfabeto das outras ferramentas.
- *
- * Lâmina reta e estreita na diagonal, guarda curta horizontal na leitura do
- * pixel, cabo de madeira e pomo. Mantém a silhueta da Espada A escolhida nos
- * estudos de ícone, adaptada para a grade 16×16 das ferramentas em mão.
- */
+/** Silhueta aprovada da espada de ferro, comum a todos os materiais. */
 export const ESPADA_GRADE = Object.freeze([
     '..............O.',
-    '.............O4O',
-    '............O43O',
-    '...........O434O',
-    '..........O434O.',
-    '.........O434O..',
-    '........O434O...',
-    '.......O434O....',
-    '......O434O.....',
-    '.....O4O2O......',
-    '....O11bca......',
-    '...O11Obda......',
-    '....OO.bca......',
-    '......bda.......',
-    '.....bca........',
-    '.....aa.........',
+    '.............O3O',
+    '............O42O',
+    '...........O43O.',
+    '..........O432O.',
+    '.........O432O..',
+    '........O432O...',
+    '...OO..O432O....',
+    '...O1OO332O.....',
+    '....O31O2O......',
+    '....Ob31O.......',
+    '...ObcO31O......',
+    '..Obca.OO1......',
+    '.Oaca...OO......',
+    '.OabO...........',
+    '..OO............',
 ]);
 
-/** A espada usa a mesma paleta de material da picareta. */
-export const ESPADA_PALETAS = PICARETA_PALETAS;
+function rgbDoHex(hex) {
+    return [1, 3, 5].map(inicio => parseInt(hex.slice(inicio, inicio + 2), 16));
+}
+
+export const ESPADA_PALETAS = Object.freeze(Object.fromEntries(
+    Object.entries(SWORD_MATERIALS).map(([material, tons]) => [material, {
+        O: [39, 48, 56],
+        1: rgbDoHex(tons.steel),
+        2: rgbDoHex(tons.mid),
+        3: rgbDoHex(tons.light),
+        4: rgbDoHex(tons.bright),
+        a: [72, 55, 43], b: [121, 88, 61], c: [168, 123, 80],
+    }]),
+));
 
 /** A paleta completa de um material (material + cabo + couro + acento), ou `null`. */
 function paletaCompleta(paletas, material) {
@@ -326,6 +334,6 @@ export function swordPaletteFor(material) {
 
 /** Pixels da espada (16×16), ou `null` se o material não tem arte. */
 export function createSwordSpritePixels(material) {
-    const paleta = paletaCompleta(ESPADA_PALETAS, material);
+    const paleta = swordPaletteFor(material);
     return paleta ? pintar(ESPADA_GRADE, paleta) : null;
 }

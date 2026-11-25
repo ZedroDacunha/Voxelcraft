@@ -1,5 +1,3 @@
-import { hash2 } from './world-math.js';
-
 const GRID_W = 21;
 const GRID_H = 55;
 // Grade base da espada (paleta de ferro). Cores metálicas são remapeadas por material.
@@ -191,8 +189,8 @@ export function createSwordModel(THREE, matKey = 'iron') {
     g.add(line);
   }
 
-  // Tamanho similar às outras ferramentas sprite (16px * 0.034 = 0.544u).
-  const s = (16 * 0.034) / GRID_H;
+  // Altura equivalente a 23 pixels de ferramenta, com a origem no cabo.
+  const s = (23 * 0.034) / GRID_H;
   g.scale.setScalar(s);
   const handleRow = 44, handleCol = 10;
   const handleLocalX = (handleCol - (GRID_W - 1) / 2) * s;
@@ -201,6 +199,8 @@ export function createSwordModel(THREE, matKey = 'iron') {
 
   // Wrapper: permite que o chamador posicione no grip sem perder o offset do cabo.
   const root = new THREE.Group();
+  // O cabo dos sprites segue a diagonal (+X,+Y); a grade 3D foi desenhada na vertical.
+  root.rotation.z = -Math.PI / 4;
   root.add(g);
   root.userData.isSwordModel = true;
   return root;
