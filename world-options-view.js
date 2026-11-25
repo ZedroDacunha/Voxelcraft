@@ -135,6 +135,8 @@ export function createOptionsView(dialog = document.getElementById('options-dial
     const canEditPositions = () => document.body.classList.contains('touch-mode');
 
     let screen = 'main';
+    let bindings = loadInputBindings();
+    let capturingAction = null;
 
     function showScreen(next = 'main', { focus = true } = {}) {
         const target = grids.get(next) ? next : 'main';
@@ -346,9 +348,6 @@ export function createOptionsView(dialog = document.getElementById('options-dial
     });
 
     // --- Teclado (rebind) ---------------------------------------------------
-    let bindings = loadInputBindings();
-    let capturingAction = null;
-
     const keybindButton = (actionId) => dialog.querySelector(`#opt-bind-${actionId}`);
     const keybindValue = (actionId) => dialog.querySelector(`#opt-bind-${actionId}-value`);
 
