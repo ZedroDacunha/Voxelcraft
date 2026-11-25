@@ -19,8 +19,6 @@ export function createPlayerHeldItem(THREE, rightArm) {
         if (id === lastId) return;
         lastId = id;
         anchor.clear();
-        // O cabo 3D atravessa a palma, que gira junto com o antebraço.
-        anchor.position.z = mesh?.userData.isSwordModel ? 0.04 : 0.18;
         if (!id || !mesh) return;
         const copy = mesh.clone();
         if (isTool) {
@@ -31,14 +29,12 @@ export function createPlayerHeldItem(THREE, rightArm) {
             pivot.rotation.set(0, THIRD_TOOL_POSE.yaw, THIRD_TOOL_POSE.roll, 'YXZ');
             pivot.scale.setScalar(THIRD_TOOL_POSE.scale);
             if (copy.userData.isSwordModel) {
-                // No modelo do corpo, +Z é a frente. O punho compensa a flexão
-                // do cotovelo para manter a lâmina projetada além da mão.
-                pivot.rotation.set(2.70, -.12, -.20, 'YXZ');
-                pivot.rotateY(.90); // Apresenta a face da lâmina de lado durante o corte.
+                // A origem da espada já está no cabo. Sua rotação local alinha a grade ao sprite.
                 copy.position.set(0, 0, 0);
+            } else {
+                copy.position.set(THIRD_TOOL_GRIP.x, THIRD_TOOL_GRIP.y, 0);
+                copy.rotation.set(0, 0, 0);
             }
-            else copy.position.set(THIRD_TOOL_GRIP.x, THIRD_TOOL_GRIP.y, 0);
-            copy.rotation.set(0, 0, 0);
             copy.scale.set(1, 1, 1);
             pivot.add(copy);
             anchor.add(pivot);
