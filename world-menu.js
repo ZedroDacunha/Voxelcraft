@@ -5,7 +5,7 @@ import { createWorldSaveOptions } from './world-save-options.js';
 import { createWorldListView, formatWorldActivity } from './world-list-view.js';
 import { createOptionsView } from './world-options-view.js';
 import { bindUiSounds, getSharedAudio } from './world-audio.js';
-import { loadGameSettings } from './world-game-settings.js';
+import { applyUiScale, loadGameSettings } from './world-game-settings.js';
 import { registerServiceWorker, isStandalone } from './world-pwa.js';
 import { INSTALL_UNAVAILABLE_HINT, createInstallPrompt } from './world-install-prompt.js';
 
@@ -214,14 +214,27 @@ document.getElementById('btn-back-title').addEventListener('click', () => {
 });
 // Sons da interface: síntese em WebAudio (sem arquivos), cobrindo menu,
 // diálogos e inventário por delegação no documento.
-const uiAudio = getSharedAudio({ volume: loadGameSettings().volume });
+const gameSettings = loadGameSettings();
+applyUiScale(gameSettings);
+const uiAudio = getSharedAudio({ volume: gameSettings.volume });
 bindUiSounds(uiAudio, document);
 
 createOptionsView(document.getElementById('options-dialog'), {
-    onChange: settings => uiAudio.setVolume(settings.volume),
+    onChange: settings => {
+        uiAudio.setVolume(settings.volume);
+        applyUiScale(settings);
+    },
 });
 document.getElementById('btn-open-options').addEventListener('click', () => {
     document.getElementById('options-dialog').showModal();
+});
+
+const aboutDialog = document.getElementById('about-dialog');
+document.getElementById('btn-open-about').addEventListener('click', () => {
+    aboutDialog.showModal();
+});
+document.getElementById('about-close').addEventListener('click', () => {
+    aboutDialog.close();
 });
 document.getElementById('btn-quit-game').addEventListener('click', () => {
     document.getElementById('quit-hint').hidden = false;

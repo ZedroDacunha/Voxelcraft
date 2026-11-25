@@ -40,7 +40,7 @@ test('as duas entradas alternam a vista e a câmera frontal mantém a mira ocult
     const { readFileSync } = await import('node:fs');
     const game = readFileSync(new URL('../game.js', import.meta.url), 'utf8');
     const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
-    assert.match(game, /case 'KeyV': if \(!event\.repeat\) toggleThirdPerson\(\)/);
+    assert.match(game, /if \(code === bindingCode\('toggleThirdPerson'\)\) \{ if \(!event\.repeat\) toggleThirdPerson\(\); return; \}/);
     assert.match(game, /id === 'camera'\) toggleThirdPerson\(\)/);
     assert.match(game, /fingerAimDirection\(\{[\s\S]*?viewCamera: third \? thirdCamera : camera/);
     assert.match(game, /cameraView === 'front'\) thirdCamera\.quaternion\.multiply\(frontCameraTurn\)/);

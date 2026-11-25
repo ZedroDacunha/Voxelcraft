@@ -76,7 +76,7 @@ test('chaves desconhecidas não vazam para as preferências', () => {
 test('save grava na chave certa e load devolve o mesmo', () => {
     const storage = fakeStorage();
     const settings = {
-        sensitivity: 1.5, fov: 90, renderDistance: 2, volume: 0.35, graphics: '0.5',
+        sensitivity: 1.5, fov: 90, renderDistance: 2, uiScale: 'auto', volume: 0.35, graphics: '0.5',
         touchAimMode: 'finger', touchLayout: 'left', touchButtonSize: 1.2, touchVibration: 'off',
         touchSensitivity: 1.1, resolution: '1280x720',
     };

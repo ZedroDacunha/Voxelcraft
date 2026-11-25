@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="Voxel">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
-<link rel="stylesheet" href="styles.css?v=8636cf5df7">
+<link rel="stylesheet" href="styles.css?v=91ccd62e80">
 <link rel="stylesheet" href="inventory.css?v=a3c52e382b">
 <!-- importmap:start (gerado por tools/stamp-importmap.mjs; não editar à mão) -->
 <script type="importmap">
@@ -22,7 +22,7 @@
     "./asset-versions.js": "./asset-versions.js?v=d42b8dc6ff",
     "./game-pause-menu.js": "./game-pause-menu.js?v=f625baba0f",
     "./game-pointer-lock.js": "./game-pointer-lock.js?v=cf53899b88",
-    "./game.js": "./game.js?v=1f39fabd80",
+    "./game.js": "./game.js?v=403c490141",
     "./inventory-a11y.js": "./inventory-a11y.js?v=1bbf8184b5",
     "./inventory-armor.js": "./inventory-armor.js?v=19964c655c",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
@@ -106,12 +106,13 @@
     "./world-furnace-rules.js": "./world-furnace-rules.js?v=195bb6a8fc",
     "./world-furnace-sounds.js": "./world-furnace-sounds.js?v=a844b58f3c",
     "./world-gait.js": "./world-gait.js?v=59f38aef73",
-    "./world-game-settings.js": "./world-game-settings.js?v=962f8311fb",
+    "./world-game-settings.js": "./world-game-settings.js?v=0f972aa1fd",
     "./world-gold-armor-icons.js": "./world-gold-armor-icons.js?v=51c6342989",
     "./world-graphics-quality.js": "./world-graphics-quality.js?v=1aafc939df",
     "./world-grid.js": "./world-grid.js?v=be11481d71",
     "./world-hand-animation.js": "./world-hand-animation.js?v=5db4d45ae7",
     "./world-haptics.js": "./world-haptics.js?v=c6f2e6888c",
+    "./world-input-bindings.js": "./world-input-bindings.js?v=3e10d701da",
     "./world-install-prompt.js": "./world-install-prompt.js?v=bedfbf7894",
     "./world-instanced-manager.js": "./world-instanced-manager.js?v=65840e2b5d",
     "./world-interaction-rules.js": "./world-interaction-rules.js?v=e524a0904f",
@@ -122,7 +123,7 @@
     "./world-list-view.js": "./world-list-view.js?v=9ec40da58c",
     "./world-math.js": "./world-math.js?v=ce4a6d9232",
     "./world-meats.js": "./world-meats.js?v=fa6e21fd92",
-    "./world-menu.js": "./world-menu.js?v=dbac63c1a5",
+    "./world-menu.js": "./world-menu.js?v=09b5d4c041",
     "./world-mesh-buffers.js": "./world-mesh-buffers.js?v=ceba787639",
     "./world-mineral-blocks.js": "./world-mineral-blocks.js?v=4c39bc041e",
     "./world-mineral-textures.js": "./world-mineral-textures.js?v=8bb1ae7527",
@@ -130,7 +131,7 @@
     "./world-mob-hit.js": "./world-mob-hit.js?v=1b2a522b2a",
     "./world-online-menu.js": "./world-online-menu.js?v=89e4a3af28",
     "./world-online.js": "./world-online.js?v=3e9f33771e",
-    "./world-options-view.js": "./world-options-view.js?v=915ec33da6",
+    "./world-options-view.js": "./world-options-view.js?v=bdc3fd68a7",
     "./world-ore-generation.js": "./world-ore-generation.js?v=7fe35588d3",
     "./world-performance-samples.js": "./world-performance-samples.js?v=65fe75cba2",
     "./world-pickaxe-animation.js": "./world-pickaxe-animation.js?v=ec9089044a",
@@ -303,6 +304,7 @@
             <button class="classic-btn classic-btn-wide" id="online-open">Jogar online</button>
             <div class="title-screen-secondary">
                 <button class="classic-btn" id="btn-open-options">Opções...</button>
+                <button class="classic-btn" id="btn-open-about">Sobre...</button>
                 <button class="classic-btn" id="btn-quit-game">Sair do jogo</button>
             </div>
             <button class="classic-btn classic-btn-wide" id="btn-install" type="button" hidden>Instalar app</button>
@@ -336,6 +338,19 @@
     <h2 id="online-ended-title">Partida encerrada</h2>
     <p>A conexão com o anfitrião foi encerrada.</p>
     <button class="classic-btn" id="online-leave">Voltar ao menu</button>
+</dialog>
+<dialog class="world-dialog" id="about-dialog" aria-labelledby="about-title">
+    <h2 id="about-title">Sobre o Voxelcraft</h2>
+    <p>Uma aventura em blocos em primeira pessoa, feita para jogar direto no navegador.</p>
+    <div class="about-content">
+        <p><strong>Controles básicos</strong></p>
+        <p>WASD para mover, mouse para olhar, botão esquerdo para quebrar, botão direito para colocar/usar, E para inventário, Esc para pausar.</p>
+        <p><strong>Créditos</strong></p>
+        <p>Voxelcraft é um projeto experimental de jogo voxel na web. Feito com JavaScript e Three.js.</p>
+    </div>
+    <div class="world-dialog-actions">
+        <button class="classic-btn" id="about-close">Fechar</button>
+    </div>
 </dialog>
 <section id="world-menu" aria-labelledby="world-menu-title" hidden>
     <section class="world-menu-card">
@@ -395,6 +410,10 @@
                 <span class="option-track" aria-hidden="true"><span class="option-knob"></span></span>
                 <span class="option-text"><span class="option-name">Distância de render</span>: <span class="option-value" id="opt-render-distance-value">4 chunks</span></span>
             </button>
+            <button type="button" class="classic-btn option-btn option-slider" id="opt-ui-scale" aria-label="Escala da interface">
+                <span class="option-track" aria-hidden="true"><span class="option-knob"></span></span>
+                <span class="option-text"><span class="option-name">Escala da interface</span>: <span class="option-value" id="opt-ui-scale-value">Automática</span></span>
+            </button>
         </div>
 
         <div class="options-grid" id="options-controls-grid" hidden>
@@ -404,6 +423,9 @@
             </button>
             <button type="button" class="classic-btn option-btn" id="opt-touch-open" aria-label="Controles de toque" aria-expanded="false" aria-controls="options-touch-grid">
                 <span class="option-text"><span class="option-name">Controles de toque</span>: <span class="option-summary" id="opt-touch-summary">Destro · 100%</span></span>
+            </button>
+            <button type="button" class="classic-btn option-btn" id="opt-open-keybinds" aria-label="Teclado" aria-expanded="false" aria-controls="options-keybinds-grid">
+                <span class="option-text"><span class="option-name">Teclado</span></span>
             </button>
         </div>
 
@@ -428,6 +450,22 @@
             <button type="button" class="classic-btn option-btn" id="opt-touch-edit" aria-label="Editar posições">
                 <span class="option-text"><span class="option-name">Editar posições</span></span>
             </button>
+        </div>
+
+        <div class="options-grid" id="options-keybinds-grid" hidden>
+            <button type="button" class="classic-btn option-btn keybind-btn" id="opt-bind-forward" aria-label="Andar para frente"><span class="option-text"><span class="option-name">Andar para frente</span>: <span class="option-value" id="opt-bind-forward-value">W</span></span></button>
+            <button type="button" class="classic-btn option-btn keybind-btn" id="opt-bind-back" aria-label="Andar para trás"><span class="option-text"><span class="option-name">Andar para trás</span>: <span class="option-value" id="opt-bind-back-value">S</span></span></button>
+            <button type="button" class="classic-btn option-btn keybind-btn" id="opt-bind-left" aria-label="Andar para esquerda"><span class="option-text"><span class="option-name">Andar para esquerda</span>: <span class="option-value" id="opt-bind-left-value">A</span></span></button>
+            <button type="button" class="classic-btn option-btn keybind-btn" id="opt-bind-right" aria-label="Andar para direita"><span class="option-text"><span class="option-name">Andar para direita</span>: <span class="option-value" id="opt-bind-right-value">D</span></span></button>
+            <button type="button" class="classic-btn option-btn keybind-btn" id="opt-bind-jump" aria-label="Pular / Nadar"><span class="option-text"><span class="option-name">Pular / Nadar</span>: <span class="option-value" id="opt-bind-jump-value">Espaço</span></span></button>
+            <button type="button" class="classic-btn option-btn keybind-btn" id="opt-bind-sprint" aria-label="Correr"><span class="option-text"><span class="option-name">Correr</span>: <span class="option-value" id="opt-bind-sprint-value">Shift Esq</span></span></button>
+            <button type="button" class="classic-btn option-btn keybind-btn" id="opt-bind-crouch" aria-label="Agachar / Mergulhar"><span class="option-text"><span class="option-name">Agachar / Mergulhar</span>: <span class="option-value" id="opt-bind-crouch-value">C</span></span></button>
+            <button type="button" class="classic-btn option-btn keybind-btn" id="opt-bind-inventory" aria-label="Inventário"><span class="option-text"><span class="option-name">Inventário</span>: <span class="option-value" id="opt-bind-inventory-value">E</span></span></button>
+            <button type="button" class="classic-btn option-btn keybind-btn" id="opt-bind-drop" aria-label="Largar item"><span class="option-text"><span class="option-name">Largar item</span>: <span class="option-value" id="opt-bind-drop-value">Q</span></span></button>
+            <button type="button" class="classic-btn option-btn keybind-btn" id="opt-bind-chat" aria-label="Chat"><span class="option-text"><span class="option-name">Chat</span>: <span class="option-value" id="opt-bind-chat-value">T</span></span></button>
+            <button type="button" class="classic-btn option-btn keybind-btn" id="opt-bind-command" aria-label="Comando"><span class="option-text"><span class="option-name">Comando</span>: <span class="option-value" id="opt-bind-command-value">/</span></span></button>
+            <button type="button" class="classic-btn option-btn keybind-btn" id="opt-bind-toggleThirdPerson" aria-label="Terceira pessoa"><span class="option-text"><span class="option-name">Terceira pessoa</span>: <span class="option-value" id="opt-bind-toggleThirdPerson-value">V</span></span></button>
+            <button type="button" class="classic-btn option-btn" id="opt-bind-reset" aria-label="Restaurar padrões"><span class="option-text"><span class="option-name">Restaurar padrões</span></span></button>
         </div>
 
         <details class="options-controls">
@@ -662,6 +700,6 @@
         <button class="classic-btn touch-edit-btn" type="button" id="btn-touch-positions-done">Pronto</button>
     </div>
 </div>
-<script type="module" src="world-menu.js?v=dbac63c1a5"></script>
+<script type="module" src="world-menu.js?v=09b5d4c041"></script>
 </body>
 </html>

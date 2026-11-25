@@ -141,7 +141,8 @@ test('a sub-tela escondida não aparece por cima da grade', () => {
 
 test('o resumo do botão não é confundido com o valor de uma barra', () => {
     // "um .option-value por linha" é o que o teste do menu de pausa confere
-    const values = (dialog.match(/class="option-value"/g) ?? []).length;
+    const keybindValues = (dialog.match(/id="opt-bind-[^"]*-value"/g) ?? []).length;
+    const values = (dialog.match(/class="option-value"/g) ?? []).length - keybindValues;
     const rows = OPTION_CONTROLS.length;
     assert.equal(values, rows, 'o resumo usa .option-summary, não .option-value');
 });

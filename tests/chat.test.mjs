@@ -406,8 +406,8 @@ test('a tabela de comandos serve para o /help e para a pré-seleção com Tab', 
 
 test('a tecla T e a barra abrem o chat; Esc fecha; Enter envia', () => {
     const game = read('game.js');
-    assert.match(game, /case 'KeyT': if \(!event\.repeat\) \{ event\.preventDefault\(\); openChat\(\); \} break;/);
-    assert.match(game, /case 'Slash': if \(!event\.repeat\) \{ event\.preventDefault\(\); openChat\(COMMAND_PREFIX\); \} break;/);
+    assert.match(game, /if \(code === bindingCode\('chat'\)\) \{ if \(!event\.repeat\) \{ event\.preventDefault\(\); openChat\(\); \} return; \}/);
+    assert.match(game, /if \(code === bindingCode\('command'\)\) \{ if \(!event\.repeat\) \{ event\.preventDefault\(\); openChat\(COMMAND_PREFIX\); \} return; \}/);
     assert.match(game, /if \(event\.key === 'Escape'\) \{\s*event\.preventDefault\(\);\s*closeChat\(\);/);
     assert.match(game, /if \(event\.key === 'Enter'\) \{\s*event\.preventDefault\(\);\s*restoreTouchFullscreen\(\);\s*submitChat\(\);/);
     assert.match(game, /chatInput\.value = chat\.recall\(event\.key === 'ArrowUp' \? -1 : 1\);/);

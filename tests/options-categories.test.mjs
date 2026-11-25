@@ -69,7 +69,7 @@ test('cada categoria tem a própria grade, escondida até ser aberta', () => {
 
 test('as linhas de valor ficam na categoria certa', () => {
     assert.deepEqual(AUDIO_OPTION_CONTROLS.map(row => row.key), ['volume']);
-    assert.deepEqual(GRAPHICS_OPTION_CONTROLS.map(row => row.key), ['graphics', 'resolution', 'fov', 'renderDistance']);
+    assert.deepEqual(GRAPHICS_OPTION_CONTROLS.map(row => row.key), ['graphics', 'resolution', 'fov', 'renderDistance', 'uiScale']);
     assert.deepEqual(CONTROL_OPTION_CONTROLS.map(row => row.key), ['sensitivity']);
     assert.deepEqual(TOUCH_OPTION_CONTROLS.map(row => row.key),
         ['touchAimMode', 'touchSensitivity', 'touchLayout', 'touchButtonSize', 'touchVibration']);
@@ -97,8 +97,12 @@ test('o toque mora dentro de Controles, um nível abaixo', () => {
 });
 
 test('só as linhas de valor mostram valor; o resumo é do botão de toque', () => {
-    assert.equal((dialog.match(/class="option-value"/g) ?? []).length, OPTION_CONTROLS.length,
+    const keybindGrid = gridBlock('options-keybinds-grid');
+    const keybindValueCount = (keybindGrid.match(/class="option-value"/g) ?? []).length;
+    const dialogValueCount = (dialog.match(/class="option-value"/g) ?? []).length;
+    assert.equal(dialogValueCount - keybindValueCount, OPTION_CONTROLS.length,
         'um valor por linha de barra/lista');
+    assert.ok(keybindValueCount > 0, 'teclas rebindáveis também mostram valor');
     assert.equal((dialog.match(/class="option-summary"/g) ?? []).length, 1,
         'só o botão de toque resume');
     // barra = campo de faixa ou lista com `slider` (a resolução é uma escada)
@@ -131,7 +135,7 @@ test('Voltar sobe um nível e devolve o foco ao botão que abriu', () => {
 
 test('fechar e reabrir sempre volta para a lista de categorias', () => {
     assert.match(view, /dialog\.addEventListener\('close', \(\) => \{[\s\S]{0,500}?hideResolutionConfirm\(\);[\s\S]{0,300}?showScreen\('main', \{ focus: false \}\);/);
-    assert.match(view, /refresh: \(\) => \{\n {12}hideResolutionConfirm\(\);\n {12}current = loadGameSettings\(\);\n {12}render\(current\);\n {12}showScreen\('main', \{ focus: false \}\);/);
+    assert.match(view, /refresh: \(\) => \{[\s\S]*?hideResolutionConfirm\(\);[\s\S]*?current = loadGameSettings\(\);[\s\S]*?render\(current\);[\s\S]*?showScreen\('main', \{ focus: false \}\);/);
     // sem roubar o foco de quem estava atrás do diálogo
     assert.doesNotMatch(view, /close', \(\) => \{[\s\S]{0,300}?\.focus\?\.\(\)/);
 });

@@ -19,6 +19,16 @@ export const GAME_SETTING_FIELDS = Object.freeze({
         min: 2, max: 6, step: 1, default: 4,
         format: value => `${Math.round(value)} chunks`,
     }),
+    uiScale: Object.freeze({
+        choices: Object.freeze(['auto', '0.8', '0.9', '1.0', '1.1', '1.2', '1.3', '1.4', '1.5']),
+        slider: true,
+        labels: Object.freeze({
+            auto: 'Automática', '0.8': '80%', '0.9': '90%', '1.0': '100%',
+            '1.1': '110%', '1.2': '120%', '1.3': '130%', '1.4': '140%', '1.5': '150%',
+        }),
+        default: 'auto',
+        format: value => GAME_SETTING_FIELDS.uiScale.labels[value] ?? 'Automática',
+    }),
     volume: Object.freeze({
         min: 0, max: 1, step: 0.05, default: 0.7,
         format: value => (value <= 0 ? 'mudo' : `${Math.round(value * 100)}%`),
@@ -227,5 +237,19 @@ export function notifyGameSettingsChange(settings) {
         } catch {
             // uma tela quebrada não pode travar a mudança de volume
         }
+    }
+}
+
+/** Aplica a escala de UI. 'auto' remove override e mantém o CSS responsivo. */
+export function applyUiScale(settings, root = typeof document !== 'undefined' ? document.documentElement : null) {
+    if (!root?.style) return;
+    const value = settings?.uiScale ?? DEFAULT_GAME_SETTINGS.uiScale;
+    if (value === 'auto') {
+        root.style.removeProperty('--ui-scale');
+        return;
+    }
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 0) {
+        root.style.setProperty('--ui-scale', String(numeric));
     }
 }
