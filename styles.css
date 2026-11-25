@@ -33,25 +33,52 @@
     body.camera-front #crosshair { display: none; }
     /* Menu de pausa: um cartão no padrão de botões clássico do jogo (sem raio,
        borda 2px) em vez do texto solto que existia antes. */
-    .pause-card { box-sizing: border-box; width: min(26em, 100%); display: grid; gap: .6em; padding: 1.1em 1em;
-        border: 2px solid #171717; background: rgba(24, 24, 24, .82);
-        box-shadow: inset 2px 2px 0 #ffffff1f, inset -2px -2px 0 #0006, 0 14px 44px #000a; }
-    .pause-card h1 { margin: 0 0 .15em; font-size: 1.55em; line-height: 1.2; text-shadow: 2px 2px 0 #0009; }
-    .pause-actions { display: grid; gap: .45em; }
+    .pause-card {
+        box-sizing: border-box;
+        width: min(26em, 100%);
+        display: grid;
+        gap: .7em;
+        padding: 1.2em 1.1em;
+        border: 2px solid #171717;
+        background: rgba(20, 23, 28, .84);
+        box-shadow:
+            inset 2px 2px 0 #ffffff1a,
+            inset -2px -2px 0 #00000055,
+            0 18px 50px rgba(0, 0, 0, .65);
+    }
+    .pause-card h1 { margin: 0 0 .1em; font-size: 1.55em; line-height: 1.2; color: #fff; text-shadow: 2px 2px 0 #0008; }
+    .pause-actions { display: grid; gap: .5em; }
     /* Os botões seguem o tamanho do menu (em), não o do HUD. */
     .pause-card .classic-btn, .options-dialog .classic-btn { font-size: 1em; min-height: 2.2em; padding: .35em 1em; }
-    .pause-controls { text-align: left; font-size: .82em; line-height: 1.55; color: #d8d8d8; }
-    .pause-controls summary { padding: .3em 0; color: #fff; cursor: pointer; }
+    .pause-controls {
+        text-align: left;
+        font-size: .82em;
+        line-height: 1.55;
+        color: #d4d8dc;
+        border-top: 1px solid #3a3f45;
+        padding-top: .5em;
+    }
+    .pause-controls summary { padding: .25em 0; color: #f0f0f0; cursor: pointer; }
     .pause-controls p { margin: .45em 0; }
     .pause-controls kbd, .options-controls kbd { padding: 1px 4px; border: 1px solid #747474; background: #343434; color: #fff; font: .9em monospace; }
-    #menu-touch-hint { margin: 0; font-size: .82em; line-height: 1.45; color: #cfcfcf; }
+    #menu-touch-hint { margin: 0; font-size: .82em; line-height: 1.45; color: #c8ced4; }
     #world-loading { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: rgba(5, 9, 16, 0.94); color: #fff; text-align: center; }
     #world-loading[hidden] { display: none; }
-    .world-loading-card { width: min(420px, calc(100vw - 48px)); padding: 28px; background: rgba(26, 34, 48, 0.95); border: 2px solid #52637b; border-radius: 8px; box-shadow: 0 12px 40px rgba(0,0,0,.45); }
-    #world-loading-title { margin: 0 0 18px; font: bold 22px monospace; }
-    .world-loading-track { height: 16px; overflow: hidden; background: #10151c; border: 1px solid #718096; border-radius: 4px; }
+    .world-loading-card {
+        width: min(420px, calc(100vw - 48px));
+        padding: 28px;
+        background: rgba(23, 26, 30, .94);
+        border: 2px solid #171717;
+        border-radius: 0;
+        box-shadow:
+            inset 2px 2px 0 #ffffff1a,
+            inset -2px -2px 0 #00000055,
+            0 18px 50px rgba(0, 0, 0, .65);
+    }
+    #world-loading-title { margin: 0 0 18px; font: bold 22px/1.2 Arial, sans-serif; text-shadow: 2px 2px 0 #0008; }
+    .world-loading-track { height: 16px; overflow: hidden; background: #12161b; border: 2px solid #3a3f45; border-radius: 0; box-shadow: inset 1px 1px 3px #0007; }
     #world-loading-fill { width: 0; height: 100%; background: linear-gradient(90deg, #4c9d61, #8bd36b); transition: width .12s linear; }
-    #world-loading-detail { margin: 12px 0 0; color: #cbd5e1; font: 13px monospace; }
+    #world-loading-detail { margin: 12px 0 0; color: #d4d8dc; font: 13px/1.4 monospace; }
     .btn { padding: 10px 20px; font-size: 16px; background: #55aa55; border: none; color: white; cursor: pointer; border-radius: 4px; }
     .btn:hover { background: #66cc66; }
     .btn-secondary { margin-top: 10px; background: #46566e; }
