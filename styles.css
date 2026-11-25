@@ -217,6 +217,8 @@
         .world-card-actions { justify-content: flex-start; }
         .world-list-toolbar { grid-template-columns: 1fr auto; }
         .world-search-label { grid-column: 1 / -1; }
+        .world-dialog-actions { justify-content: stretch; }
+        .world-dialog-actions > button { flex: 1 1 auto; }
     }
 
     #hud-bottom { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; z-index: 5; pointer-events: none; max-width: calc(100vw - 16px); }
