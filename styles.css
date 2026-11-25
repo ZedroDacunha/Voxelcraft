@@ -80,10 +80,6 @@
     .world-card p { margin: 0; color: #aebccc; font: 12px/1.5 monospace; }
     .world-card .world-recovery-status { margin-top: 5px; color: #f0d56f; }
     .world-card-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
-    .world-action { padding: 8px 11px; border: 1px solid #65768a; border-radius: 6px; color: #fff; background: #3c4e62; cursor: pointer; }
-    .world-action:hover { background: #526981; }
-    .world-action.play { border-color: #70b65e; background: #3d7847; }
-    .world-action.delete { border-color: #8c5151; background: #633838; }
     .world-create { display: block; margin: 18px 0 0 auto; }
     .world-menu-error { margin: 14px 0 0; color: #ff9c9c; }
     .world-menu-error.is-success { color: #b7e59d; }
@@ -345,16 +341,88 @@
         filter: drop-shadow(4px 6px 0 rgba(0, 0, 0, .4)); }
     .title-logo-art { display: block; width: 100%; height: auto; overflow: visible; }
     .title-screen-actions { display: grid; gap: 8px; width: min(360px, calc(100vw - 40px)); }
-    .classic-btn { position: relative; min-height: 34px; box-sizing: border-box; padding: 6px 16px; border: 2px solid #171717; border-radius: 0;
-        color: #fff; background: linear-gradient(#858585 0%, #777 47%, #696969 50%, #777 100%);
+    /* --- Botões (base clássica compartilhada) ----------------------------- */
+    .classic-btn,
+    .world-action,
+    .world-create {
+        position: relative;
+        box-sizing: border-box;
+        border: 2px solid #171717;
+        border-radius: 0;
+        color: #fff;
+        background: linear-gradient(#858585 0%, #777 47%, #696969 50%, #777 100%);
         box-shadow: inset 2px 2px 0 #ffffff4d, inset -2px -2px 0 #0004, 2px 3px 0 #0008;
-        font: 15px/1.1 Arial, sans-serif; text-align: center; text-shadow: 1px 2px 0 #292929; cursor: pointer;
-        transition: background-color 80ms linear, filter 80ms linear; }
-    .classic-btn:hover:not(:disabled), .classic-btn:focus-visible { border-color: #fff; background: linear-gradient(#a0a0a0 0%, #909090 47%, #828282 50%, #929292 100%); outline: none; }
-    .classic-btn:active:not(:disabled) { background: linear-gradient(#626262, #777); box-shadow: inset 2px 2px 2px #0008; transform: translateY(1px); }
-    .classic-btn:focus-visible { outline: 1px solid #fff; outline-offset: 1px; }
-    .classic-btn:disabled { color: #b9b9b9; cursor: not-allowed; text-shadow: 1px 1px 0 #333; }
+        font-family: Arial, sans-serif;
+        text-align: center;
+        text-shadow: 1px 2px 0 #292929;
+        cursor: pointer;
+        transition: filter 80ms linear, transform 80ms linear;
+    }
+    .classic-btn {
+        min-height: 34px;
+        padding: 6px 16px;
+        font-size: 15px;
+        line-height: 1.1;
+    }
+    .classic-btn:hover:not(:disabled),
+    .classic-btn:focus-visible,
+    .world-action:hover:not(:disabled),
+    .world-action:focus-visible,
+    .world-create:hover:not(:disabled),
+    .world-create:focus-visible {
+        border-color: #fff;
+        background: linear-gradient(#a0a0a0 0%, #909090 47%, #828282 50%, #929292 100%);
+        outline: none;
+    }
+    .classic-btn:active:not(:disabled),
+    .world-action:active:not(:disabled),
+    .world-create:active:not(:disabled) {
+        background: linear-gradient(#626262, #777);
+        box-shadow: inset 2px 2px 2px #0008;
+        transform: translateY(1px);
+    }
+    .classic-btn:focus-visible,
+    .world-action:focus-visible,
+    .world-create:focus-visible {
+        outline: 1px solid #fff;
+        outline-offset: 1px;
+    }
+    .classic-btn:disabled,
+    .world-action:disabled,
+    .world-create:disabled {
+        color: #b9b9b9;
+        cursor: not-allowed;
+        text-shadow: 1px 1px 0 #333;
+        filter: saturate(.65);
+    }
     .classic-btn-wide { width: 100%; }
+
+    .world-action {
+        padding: 8px 11px;
+        font-size: 13px;
+        line-height: 1.2;
+        background: linear-gradient(#7b7b7b 0%, #6d6d6d 47%, #616161 50%, #6d6d6d 100%);
+    }
+    .world-action.play {
+        border-color: #171717;
+        background: linear-gradient(#858585 0%, #777 47%, #696969 50%, #777 100%);
+    }
+    .world-action.delete {
+        background: linear-gradient(#8a6767 0%, #7a5858 47%, #6d4d4d 50%, #7a5858 100%);
+    }
+    .world-action.delete:hover:not(:disabled),
+    .world-action.delete:focus-visible {
+        background: linear-gradient(#9d7575 0%, #8b6565 47%, #7c5757 50%, #8b6565 100%);
+    }
+
+    .world-create {
+        display: block;
+        margin: 18px 0 0 auto;
+        min-height: 34px;
+        padding: 8px 16px;
+        font-size: 15px;
+    }
+
     .title-screen-secondary { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 5px; }
     .title-screen-secondary .classic-btn { min-height: 32px; font-size: 14px; }
     .quit-hint { margin: 0; padding: 6px 9px; color: white; background: #111b; text-align: center; font: 12px monospace; text-shadow: 1px 1px #000; }
@@ -365,13 +433,6 @@
     .world-menu-subtitle { color: #d0d0d0; }
     .world-card { border-radius: 0; border-color: #4c4c43; background: #30332edb; }
     .world-empty { border-radius: 0; }
-    .world-create { border: 2px solid #171717; border-radius: 0; background: linear-gradient(#858585 0%, #777 47%, #696969 50%, #777 100%);
-        box-shadow: inset 2px 2px 0 #ffffff4d, inset -2px -2px 0 #0004, 2px 3px 0 #0008; text-shadow: 1px 2px 0 #292929; }
-    .world-create:hover { border-color: #fff; background: linear-gradient(#a0a0a0 0%, #909090 47%, #828282 50%, #929292 100%); }
-    .world-action { border-radius: 0; background: linear-gradient(#777, #555); box-shadow: inset 2px 2px 0 #ffffff38, inset -2px -2px 0 #0004, 1px 2px 0 #0008; }
-    .world-action:hover { border-color: #fff; background: linear-gradient(#999, #666); }
-    .world-action.play { border-color: #171717; background: linear-gradient(#858585 0%, #777 47%, #696969 50%, #777 100%); }
-    .world-action.play:hover { border-color: #fff; background: linear-gradient(#a0a0a0 0%, #909090 47%, #828282 50%, #929292 100%); }
     .world-dialog, .options-dialog { border-radius: 0; }
     /* A tela de opções, como a do Minecraft: larga, centrada, translúcida em
        cima do mundo borrado, com o título em cima e o "Concluído" embaixo. */
