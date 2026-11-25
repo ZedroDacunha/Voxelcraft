@@ -722,12 +722,38 @@ export function createTextureTools(THREE) {
         if (kind === 'charcoal') return (spriteCache[key] = createCoalItemSpritePixels('vegetal'));
 
         if (kind === 'apple') {
+            const applePixels = [
+                '................',
+                '.......b........',
+                '......bgg.......',
+                '.......bG.......',
+                '.....oRRRo......',
+                '....oRRRRRo.....',
+                '...oRRhHRRRo....',
+                '...oRhHHRRRo....',
+                '...oRRRRRRRo....',
+                '...oRRRRRRdo....',
+                '...oRRRRRddo....',
+                '....oRRRddo.....',
+                '.....oRRdo......',
+                '......ooo.......',
+                '................',
+                '................',
+            ];
+            const appleColors = {
+                o: [120, 20, 24],   // contorno escuro
+                R: [210, 45, 48],   // vermelho
+                h: [245, 120, 110], // brilho claro
+                H: [255, 170, 160], // brilho forte
+                d: [155, 28, 32],   // sombra
+                b: [110, 72, 32],   // cabo
+                g: [86, 170, 58],   // folha
+                G: [62, 130, 44],   // folha sombra
+            };
             for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-                const dx = (x - 7.5) / 4.5, dy = (y - 9.5) / 4.5;
-                if (dx * dx + dy * dy <= 1)
-                    put(x, y, ((x === 6 && y === 7) || (x === 5 && y === 8)) ? [240, 110, 100] : (dx + dy > 0.9 ? [150, 25, 30] : [205, 40, 45]));
+                const color = appleColors[applePixels[y][x]];
+                if (color) put(x, y, color);
             }
-            put(8, 4, [110, 70, 30]); put(8, 5, [110, 70, 30]); put(9, 4, [60, 150, 50]); put(10, 4, [60, 150, 50]);
             return (spriteCache[key] = g);
         }
 
