@@ -34,41 +34,30 @@ test('a palavra é uma só, como no logo clássico', () => {
     assert.doesNotMatch(logo, /title-word-\d/, 'não há segunda palavra (SANDBOX saiu)');
 });
 
-test('a palavra é uma laje: contorno, fundo claro, massa escura e face', () => {
-    // Contorno grosso da laje inteira e contorno fino da face.
-    assert.equal(uses(/stroke="#151413"/).length, 2, 'dois contornos');
-    // Faixa clara da face inferior da laje.
-    assert.equal(uses(/fill="#bcbab4"/).length, 1, 'um fundo claro');
-    // Massa escura empilhada até virar sólida.
-    const massa = uses(/fill="#333230"/);
-    assert.ok(massa.length >= 8, `a massa escura é empilhada em vários passos (achei ${massa.length})`);
-    for (const tag of massa) {
-        assert.match(tag, /transform="translate\([\d.]+ [\d.]+\)"/, 'cada passo anda na diagonal');
-    }
-    // Face em três tons de pedra, mais o véu de luz/sombra por cima.
-    assert.equal(uses(/href="#title-word-t1"/).length, 1);
-    assert.equal(uses(/href="#title-word-t2"/).length, 1);
-    assert.equal(uses(/href="#title-word-t3"/).length, 1);
-    assert.equal(uses(/fill="url\(#title-shade\)"/).length, 1);
+test('o letreiro tem contornos frontal e traseiro e faces de profundidade', () => {
+    const fundo = uses(/href="#title-word"/).find(tag => tag.includes('scale('));
+    assert.ok(fundo?.includes('translate('), 'a extrusão recua e desce');
+    assert.match(fundo, /stroke=/);
+    const paredes = logo.match(/<g stroke="#25272a"[^>]*>([\s\S]*?)<\/g>/)?.[1] ?? '';
+    const tons = [...paredes.matchAll(/<path fill="(#[\da-f]{6})"/g)].map(m => m[1]);
+    assert.ok(new Set(tons).size >= 3, 'base e laterais recebem luz diferente');
+    assert.equal(uses(/fill="url\(#title-stone\)"/).length, 1);
 });
 
-test('a pedra é um mosaico de blocos, não uma cor chapada', () => {
-    for (const [id, cor] of [['t1', '#dcdad5'], ['t2', '#cbc9c4'], ['t3', '#a3a19c']]) {
-        const m = logo.match(new RegExp(`<path id="title-word-${id}"[^>]*>`));
-        assert.ok(m, `a camada ${id} existe`);
-        assert.match(m[0], new RegExp(`fill="${cor}"`), `a camada ${id} tem o tom ${cor}`);
-        // Cada tom é feito de muitos retângulos de 7 unidades (o tamanho da célula),
-        // fundidos na vertical — daí a altura variável.
-        const blocos = (m[0].match(/h7v\d+h-7z/g) ?? []).length;
-        assert.ok(blocos > 20, `a camada ${id} tem blocos suficientes (achei ${blocos})`);
-    }
+test('textura e fissuras ficam dentro das letras', () => {
+    assert.match(logo, /<clipPath id="title-inside"><use href="#title-word" clip-rule="evenodd"/);
+    const detalhes = logo.slice(logo.indexOf('<g clip-path="url(#title-inside)">'));
+    assert.match(logo, /<pattern id="title-grain"[^>]*patternUnits="userSpaceOnUse"/);
+    assert.match(detalhes, /fill="url\(#title-grain\)"/);
+    assert.match(detalhes, /stroke="#666867"/);
 });
 
-test('a sombra da face escurece de cima para baixo', () => {
-    const grad = logo.slice(logo.indexOf('<linearGradient id="title-shade"'), logo.indexOf('</linearGradient>'));
-    assert.match(grad, /x2="0" y2="1"/, 'gradiente vertical');
-    assert.match(grad, /stop-opacity="\.30"/, 'topo iluminado');
-    assert.match(grad, /stop-opacity="\.26"/, 'base na sombra');
+test('a iluminação da pedra escurece de cima para baixo', () => {
+    const grad = logo.match(/<linearGradient id="title-stone"[^>]*>([\s\S]*?)<\/linearGradient>/)?.[0] ?? '';
+    assert.match(grad, /x2="0" y2="1"/);
+    const tons = [...grad.matchAll(/stop-color="#([\da-f]{6})"/g)].map(m =>
+        m[1].match(/../g).reduce((soma, canal) => soma + parseInt(canal, 16), 0));
+    assert.ok(tons.length >= 2 && tons.every((tom, i) => i === 0 || tom < tons[i - 1]));
 });
 
 test('o splash e o texto em fonte do sistema saíram do título', () => {
