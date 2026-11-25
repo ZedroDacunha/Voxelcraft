@@ -246,8 +246,34 @@ export const ESPADA_GRADE = Object.freeze([
     '.....aa.........',
 ]);
 
-/** A espada usa a mesma paleta de material da picareta. */
-export const ESPADA_PALETAS = PICARETA_PALETAS;
+/** Ícone de ferro baseado no modelo equipado, com ponta chanfrada e guarda transversal. */
+const ESPADA_FERRO_GRADE = Object.freeze([
+    '..............O.',
+    '.............O3O',
+    '............O42O',
+    '...........O43O.',
+    '..........O432O.',
+    '.........O432O..',
+    '........O432O...',
+    '...OO..O432O....',
+    '...O1OO332O.....',
+    '....O31O2O......',
+    '....Ob31O.......',
+    '...ObcO31O......',
+    '..Obca.OO1......',
+    '.Oaca...OO......',
+    '.OabO...........',
+    '..OO............',
+]);
+
+export const ESPADA_PALETAS = Object.freeze({
+    ...PICARETA_PALETAS,
+    iron: {
+        O: [39, 48, 56], 1: [120, 134, 140], 2: [155, 168, 173],
+        3: [215, 224, 221], 4: [241, 243, 233],
+        a: [72, 55, 43], b: [121, 88, 61], c: [168, 123, 80],
+    },
+});
 
 /** A paleta completa de um material (material + cabo + couro + acento), ou `null`. */
 function paletaCompleta(paletas, material) {
@@ -316,6 +342,7 @@ export function createShovelSpritePixels(material) {
 
 /** A grade da espada, ou `null`. */
 export function swordGradeFor(material) {
+    if (material === 'iron') return ESPADA_FERRO_GRADE;
     return ESPADA_PALETAS[material] ? ESPADA_GRADE : null;
 }
 
@@ -327,5 +354,5 @@ export function swordPaletteFor(material) {
 /** Pixels da espada (16×16), ou `null` se o material não tem arte. */
 export function createSwordSpritePixels(material) {
     const paleta = paletaCompleta(ESPADA_PALETAS, material);
-    return paleta ? pintar(ESPADA_GRADE, paleta) : null;
+    return paleta ? pintar(swordGradeFor(material), paleta) : null;
 }
