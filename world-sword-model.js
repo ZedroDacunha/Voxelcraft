@@ -199,6 +199,8 @@ export function createSwordModel(THREE, matKey = 'iron') {
 
   // Wrapper: permite que o chamador posicione no grip sem perder o offset do cabo.
   const root = new THREE.Group();
+  // O cabo dos sprites segue a diagonal (+X,+Y); a grade 3D foi desenhada na vertical.
+  root.rotation.z = -Math.PI / 4;
   root.add(g);
   root.userData.isSwordModel = true;
   return root;

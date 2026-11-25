@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from '../vendor/three/three.module.js';
+import { createSwordModel } from '../world-sword-model.js';
 import { createPlayerModel } from '../player-model.js';
 import { createPlayerHeldItem } from '../player-held-item.js';
 import { applyGroundPose, groundPose, rigLocomotion } from '../player-locomotion.js';
@@ -33,37 +34,60 @@ test('o ponto de apoio permanece dentro da mão nas duas direções do corte', (
             arm.position.set(.42, -.5, -.25);
             arm.rotation.set(.35, .25, 0);
             applyFirstPersonToolPose(anchor);
+            anchor.updateWorldMatrix(true, false);
+            const toolPose = anchor.matrixWorld.clone();
             applyFirstPersonSwordPose(arm, anchor, swordPose(state, start + ATTACK_COOLDOWN * i / 30));
-            const blade = new THREE.Vector3(0, 1, 0).applyQuaternion(anchor.getWorldQuaternion(new THREE.Quaternion()));
-            assert.ok(blade.z < -.25, 'a ponta se afasta da câmera durante todo o golpe');
+            anchor.updateWorldMatrix(true, false);
+            if (i === 0 || i === 30) assert.ok(anchor.matrixWorld.elements.every((value, k) => Math.abs(value - toolPose.elements[k]) < 1e-9));
+            if (i === 15) assert.ok(anchor.matrixWorld.elements[14] < toolPose.elements[14] - .05);
             assert.ok(fist.containsPoint(arm.worldToLocal(anchor.getWorldPosition(new THREE.Vector3()))));
         }
     }
 });
 
 
-test('na corrida, a ponta segue à frente da mão no corte e no revés', () => {
+test('a espada equipada segue o cabo diagonal da ferramenta e retorna à mesma passada', t => {
+    const context = { fillRect() {}, putImageData() {}, getImageData: () => ({ data: new Uint8ClampedArray(32 * 32 * 4) }) };
+    const previousDocument = globalThis.document;
+    globalThis.document = { createElement: () => ({ getContext: () => context }) };
+    t.after(() => {
+        if (previousDocument === undefined) delete globalThis.document;
+        else globalThis.document = previousDocument;
+    });
+    const sword = createSwordModel(THREE);
+    const diagonal = new THREE.Vector3(1, 1, 0).normalize();
+    const axis = new THREE.Vector3(0, 1, 0);
+    assert.ok(axis.clone().applyQuaternion(sword.quaternion).distanceTo(diagonal) < 1e-9);
+
     const model = createPlayerModel(THREE);
     const held = createPlayerHeldItem(THREE, model.rightArm);
     const rig = rigLocomotion(THREE, model);
-    const sword = new THREE.Group();
-    sword.userData.isSwordModel = true;
-    held.update(1, sword, null, true, true);
-    const blade = held.anchor.getObjectByName('toolPose').children[0];
     const swing = createSwordSwing();
     for (const foot of [0, 1]) {
         const start = foot * ATTACK_COOLDOWN;
         beginSwordSwing(swing, 1, start);
-        for (let i = 0; i <= 60; i++) {
-            const t = i / 60;
+        for (const phase of [0, .5, 1]) {
             model.root.rotation.set(0, 0, 0, 'YXZ');
-            model.rightArm.rotation.set(0, 0, 0);
             model.leftArm.rotation.set(0, 0, 0);
-            applyGroundPose(model, rig, groundPose({ foot, run: 1 }, t * 2 * Math.PI, 1));
-            applyThirdPersonSwordPose(model, rig, swordPose(swing, start + t * ATTACK_COOLDOWN), 1);
-            const tip = blade.localToWorld(new THREE.Vector3(0, 1, 0));
-            const grip = blade.getWorldPosition(new THREE.Vector3());
-            assert.ok(tip.z > grip.z + .20, 'a lâmina avança no sentido do olhar (+Z)');
+            model.rightArm.rotation.set(0, 0, 0);
+            rig.elbows[1].rotation.z = 0;
+            applyGroundPose(model, rig, groundPose({ foot, run: 1 }, phase * 2 * Math.PI, 1));
+            held.update(2, new THREE.Group(), null, true, true);
+            const pivot = held.anchor.getObjectByName('toolPose');
+            const hand = pivot.getWorldPosition(new THREE.Vector3());
+            const toolAxis = diagonal.clone().applyQuaternion(pivot.getWorldQuaternion(new THREE.Quaternion()));
+
+            held.update(1, sword, null, true, true);
+            applyThirdPersonSwordPose(model, rig, swordPose(swing, start + phase * ATTACK_COOLDOWN), 1);
+            const blade = held.anchor.getObjectByName('toolPose').children[0];
+            const swordAxis = axis.clone().applyQuaternion(blade.getWorldQuaternion(new THREE.Quaternion()));
+            assert.ok(blade.getWorldPosition(new THREE.Vector3()).distanceTo(held.anchor.getWorldPosition(new THREE.Vector3())) < 1e-9);
+            if (phase === .5) {
+                assert.ok(swordAxis.distanceTo(toolAxis) > .1, 'o corte sai da pose base');
+            } else {
+                assert.ok(swordAxis.distanceTo(toolAxis) < 1e-9);
+                assert.ok(blade.getWorldPosition(new THREE.Vector3()).distanceTo(hand) < 1e-9);
+            }
         }
     }
     model.dispose();
