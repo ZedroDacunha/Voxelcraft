@@ -3,6 +3,10 @@ import {
     notifyGameSettingsChange, saveGameSettings, settingFraction, settingFromFraction,
     stepSetting,
 } from './world-game-settings.js';
+import {
+    BINDING_ACTIONS, DEFAULT_INPUT_BINDINGS, findBindingConflicts,
+    formatBindingCode, loadInputBindings, saveInputBindings,
+} from './world-input-bindings.js';
 import { TOUCH_EDIT_EVENT, TOUCH_RESET_EVENT, resetTouchPositions } from './world-touch-positions.js';
 import { resolutionSize } from './world-render-resolution.js';
 
@@ -54,6 +58,7 @@ export const OPTION_SCREENS = [
     { key: 'graphics', grid: 'options-graphics-grid', title: 'Gráficos', open: 'opt-open-graphics', parent: 'main', controls: GRAPHICS_OPTION_CONTROLS },
     { key: 'controls', grid: 'options-controls-grid', title: 'Controles', open: 'opt-open-controls', parent: 'main', controls: CONTROL_OPTION_CONTROLS, keys: true },
     { key: 'touch', grid: 'options-touch-grid', title: 'Controles de toque', open: 'opt-touch-open', parent: 'controls', controls: TOUCH_OPTION_CONTROLS },
+    { key: 'keybinds', grid: 'options-keybinds-grid', title: 'Teclado', open: 'opt-open-keybinds', parent: 'controls' },
 ];
 
 // Confirmação da resolução: escolher uma resolução fixa muda o que o jogo
@@ -146,6 +151,8 @@ export function createOptionsView(dialog = document.getElementById('options-dial
         // a pergunta da resolução pertence à categoria Gráficos: sair de lá é
         // decisão do jogador, então a escolha fica e o painel sai da frente
         if (target !== 'graphics') hideResolutionConfirm();
+        if (target !== 'keybinds' && capturingAction) stopCapture();
+        if (target === 'keybinds') renderKeybinds();
         for (const [key, opener] of openers) opener?.setAttribute('aria-expanded', String(target === key));
         if (!focus) return;
         // foco: a primeira linha da categoria aberta não deixa o teclado num
@@ -323,6 +330,7 @@ export function createOptionsView(dialog = document.getElementById('options-dial
         // fechar a janela é decisão do jogador: mantém a resolução e some com a
         // pergunta (nada de reverter pelas costas de quem já saiu da tela)
         hideResolutionConfirm();
+        if (capturingAction) stopCapture();
         // o aviso da linha de status é da sessão da janela: não fica para a próxima
         const status = dialog.querySelector('#options-status');
         if (status) status.textContent = '';
@@ -337,6 +345,94 @@ export function createOptionsView(dialog = document.getElementById('options-dial
         document.dispatchEvent(new CustomEvent(TOUCH_EDIT_EVENT));
     });
 
+    // --- Teclado (rebind) ---------------------------------------------------
+    let bindings = loadInputBindings();
+    let capturingAction = null;
+
+    const keybindButton = (actionId) => dialog.querySelector(`#opt-bind-${actionId}`);
+    const keybindValue = (actionId) => dialog.querySelector(`#opt-bind-${actionId}-value`);
+
+    const optionsStatus = dialog.querySelector('#options-status');
+    function renderKeybinds() {
+        for (const action of BINDING_ACTIONS) {
+            const button = keybindButton(action.id);
+            const value = keybindValue(action.id);
+            const code = bindings[action.id];
+            const text = formatBindingCode(code);
+            const isCapturing = capturingAction === action.id;
+            if (value) value.textContent = isCapturing ? '> ... <' : text;
+            if (button) {
+                button.classList.toggle('is-capturing', isCapturing);
+                button.setAttribute('aria-pressed', isCapturing ? 'true' : 'false');
+                button.setAttribute('aria-label', isCapturing
+                    ? `${action.label}: pressione uma tecla`
+                    : `${action.label}: ${text}`);
+            }
+        }
+        if (optionsStatus) {
+            if (capturingAction) {
+                const action = BINDING_ACTIONS.find((a) => a.id === capturingAction);
+                optionsStatus.textContent = action
+                    ? `Pressione uma tecla para "${action.label}" (Esc para cancelar).`
+                    : 'Pressione uma tecla (Esc para cancelar).';
+            } else if (optionsStatus.textContent.startsWith('Pressione uma tecla')) {
+                optionsStatus.textContent = '';
+            }
+        }
+    }
+
+    function stopCapture() {
+        capturingAction = null;
+        renderKeybinds();
+    }
+
+    function startCapture(actionId) {
+        capturingAction = actionId;
+        renderKeybinds();
+        keybindButton(actionId)?.focus?.();
+    }
+
+    for (const action of BINDING_ACTIONS) {
+        keybindButton(action.id)?.addEventListener('click', () => {
+            if (capturingAction === action.id) { stopCapture(); return; }
+            startCapture(action.id);
+        });
+    }
+
+    dialog.querySelector('#opt-bind-reset')?.addEventListener('click', () => {
+        bindings = saveInputBindings(DEFAULT_INPUT_BINDINGS);
+        stopCapture();
+        document.dispatchEvent(new CustomEvent('voxel-bindings-change', { detail: { ...bindings } }));
+    });
+
+    dialog.addEventListener('keydown', (event) => {
+        if (!capturingAction) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.code === 'Escape') {
+            stopCapture();
+            return;
+        }
+        const code = event.code;
+        if (!code) return;
+        // Troca simples: se outra ação já usa a tecla, ela recebe a tecla antiga.
+        const conflicts = findBindingConflicts(bindings, capturingAction, code);
+        const next = { ...bindings, [capturingAction]: code };
+        for (const conflictId of conflicts) next[conflictId] = bindings[capturingAction];
+        bindings = saveInputBindings(next);
+        capturingAction = null;
+        renderKeybinds();
+        document.dispatchEvent(new CustomEvent('voxel-bindings-change', { detail: { ...bindings } }));
+    });
+
+    dialog.addEventListener('cancel', (event) => {
+        if (!capturingAction) return;
+        event.preventDefault();
+        stopCapture();
+    });
+
+    renderKeybinds();
+
     dialog.querySelector('#btn-options-reset')?.addEventListener('click', () => {
         hideResolutionConfirm();
         current = saveGameSettings(DEFAULT_GAME_SETTINGS);
@@ -347,6 +443,9 @@ export function createOptionsView(dialog = document.getElementById('options-dial
         // aviso deixa o jogo reaplicar na hora (se estiver aberto).
         resetTouchPositions();
         document.dispatchEvent(new CustomEvent(TOUCH_RESET_EVENT));
+        bindings = saveInputBindings(DEFAULT_INPUT_BINDINGS);
+        stopCapture();
+        document.dispatchEvent(new CustomEvent('voxel-bindings-change', { detail: { ...bindings } }));
     });
 
     return {
@@ -355,7 +454,10 @@ export function createOptionsView(dialog = document.getElementById('options-dial
         refresh: () => {
             hideResolutionConfirm();
             current = loadGameSettings();
+            bindings = loadInputBindings();
             render(current);
+            renderKeybinds();
+            stopCapture();
             showScreen('main', { focus: false });
             return { ...current };
         },

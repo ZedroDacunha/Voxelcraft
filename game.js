@@ -120,6 +120,7 @@ import {
 import { renderAspect, renderTarget, resolutionLabel, resolutionSize } from './world-render-resolution.js';
 import { rightClickIntent } from './world-interaction-rules.js';
 import { applyUiScale, loadGameSettings, onGameSettingsChange } from './world-game-settings.js';
+import { DEFAULT_INPUT_BINDINGS, loadInputBindings, onInputBindingsChange } from './world-input-bindings.js';
 import { advanceStarvation, deathTitle, HUNGER_WARNINGS, hungerStage } from './world-survival-rules.js';
 import {
     BlockFacingStore, DEFAULT_BLOCK_FACING, facingTowardPlayer, isFrontFace, isHorizontalFacing,
@@ -3781,6 +3782,14 @@ const LIE_PITCH = 1.15;
 
 let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
 let jumpHeld = false, swimStrokeLocked = false, isSprinting = false, wantToCrouch = false, isCrouching = false;
+let inputBindings = loadInputBindings();
+const bindingCode = (action) => inputBindings[action] || DEFAULT_INPUT_BINDINGS[action];
+onInputBindingsChange((next) => {
+    inputBindings = next;
+    // Evita tecla presa quando o bind muda no meio do jogo.
+    moveForward = moveBackward = moveLeft = moveRight = false;
+    jumpHeld = false; swimStrokeLocked = false; isSprinting = false; wantToCrouch = false;
+});
 
 const player = {
     pos: new THREE.Vector3(),
@@ -5345,42 +5354,41 @@ async function init() {
         if (chat.open) return;
         if (inventoryOpen) { handleInventoryKey(event); return; }
         if (!controls.isLocked) return;
-        switch (event.code) {
-            case 'KeyW': moveForward = true; break;
-            case 'KeyA': moveLeft = true; break;
-            case 'KeyS': moveBackward = true; break;
-            case 'KeyD': moveRight = true; break;
-            case 'Space': if (!event.repeat) pressJump(); jumpHeld = true; break;
-            case 'KeyQ': dropSelectedItem(); break;
-            case 'KeyV': if (!event.repeat) toggleThirdPerson(); break;
-            case 'KeyE': if (!event.repeat) openInventory(null, { focusFirst: true }); break;
-            // T abre o chat vazio; a barra abre já com o `/`, para comando.
-            case 'KeyT': if (!event.repeat) { event.preventDefault(); openChat(); } break;
-            case 'Slash': if (!event.repeat) { event.preventDefault(); openChat(COMMAND_PREFIX); } break;
-            case 'ShiftLeft': case 'ShiftRight': isSprinting = true; break;
-            case 'KeyC': wantToCrouch = true; break;
-            case 'F4': event.preventDefault(); cycleQuality(); break;
-            case 'F3':
-                event.preventDefault();
-                setDebugVisible(!debugVisible);
-                break;
+        const code = event.code;
+        if (code === bindingCode('forward')) { moveForward = true; return; }
+        if (code === bindingCode('left')) { moveLeft = true; return; }
+        if (code === bindingCode('back')) { moveBackward = true; return; }
+        if (code === bindingCode('right')) { moveRight = true; return; }
+        if (code === bindingCode('jump')) { if (!event.repeat) pressJump(); jumpHeld = true; return; }
+        if (code === bindingCode('drop')) { dropSelectedItem(); return; }
+        if (code === bindingCode('toggleThirdPerson')) { if (!event.repeat) toggleThirdPerson(); return; }
+        if (code === bindingCode('inventory')) { if (!event.repeat) openInventory(null, { focusFirst: true }); return; }
+        // T abre o chat vazio; a barra abre já com o `/`, para comando.
+        if (code === bindingCode('chat')) { if (!event.repeat) { event.preventDefault(); openChat(); } return; }
+        if (code === bindingCode('command')) { if (!event.repeat) { event.preventDefault(); openChat(COMMAND_PREFIX); } return; }
+        if (code === bindingCode('sprint') || ((bindingCode('sprint') === 'ShiftLeft' || bindingCode('sprint') === 'ShiftRight') && (code === 'ShiftLeft' || code === 'ShiftRight'))) { isSprinting = true; return; }
+        if (code === bindingCode('crouch')) { wantToCrouch = true; return; }
+        if (code === 'F4') { event.preventDefault(); cycleQuality(); return; }
+        if (code === 'F3') {
+            event.preventDefault();
+            setDebugVisible(!debugVisible);
+            return;
         }
-        if (event.code.startsWith('Digit')) {
+        if (code.startsWith('Digit')) {
             const num = parseInt(event.key);
             if (num >= 1 && num <= 9) selectSlot(num - 1);
         }
     });
 
     document.addEventListener('keyup', (event) => {
-        switch (event.code) {
-            case 'KeyW': moveForward = false; break;
-            case 'KeyA': moveLeft = false; break;
-            case 'KeyS': moveBackward = false; break;
-            case 'KeyD': moveRight = false; break;
-            case 'Space': jumpHeld = false; swimStrokeLocked = false; break;
-            case 'ShiftLeft': case 'ShiftRight': isSprinting = false; break;
-            case 'KeyC': wantToCrouch = false; break;
-        }
+        const code = event.code;
+        if (code === bindingCode('forward')) { moveForward = false; return; }
+        if (code === bindingCode('left')) { moveLeft = false; return; }
+        if (code === bindingCode('back')) { moveBackward = false; return; }
+        if (code === bindingCode('right')) { moveRight = false; return; }
+        if (code === bindingCode('jump')) { jumpHeld = false; swimStrokeLocked = false; return; }
+        if (code === bindingCode('sprint') || ((bindingCode('sprint') === 'ShiftLeft' || bindingCode('sprint') === 'ShiftRight') && (code === 'ShiftLeft' || code === 'ShiftRight'))) { isSprinting = false; return; }
+        if (code === bindingCode('crouch')) { wantToCrouch = false; return; }
     });
 
     document.addEventListener('wheel', (event) => {

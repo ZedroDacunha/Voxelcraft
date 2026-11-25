@@ -109,3 +109,11 @@ export function findBindingConflicts(bindings, actionId, code) {
         .filter(action => action.id !== actionId && bindings[action.id] === code)
         .map(action => action.id);
 }
+
+export const INPUT_BINDINGS_EVENT = 'voxel-bindings-change';
+
+export function onInputBindingsChange(handler) {
+    const listener = (event) => handler(event?.detail ? { ...event.detail } : loadInputBindings());
+    document.addEventListener(INPUT_BINDINGS_EVENT, listener);
+    return () => document.removeEventListener(INPUT_BINDINGS_EVENT, listener);
+}
