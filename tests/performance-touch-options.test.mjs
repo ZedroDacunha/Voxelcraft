@@ -11,7 +11,7 @@ test('opção no menu gráfico começa oculta até carregar o jogo', () => {
 test('F3 e opção compartilham estado, acessibilidade e reinício', () => {
     const src = read('game.js');
     assert.match(src, /debugOption\?\.addEventListener\('click', \(\) => setDebugVisible\(!debugVisible\)\)/);
-    assert.match(src, /case 'F3':[\s\S]*?setDebugVisible\(!debugVisible\)/);
+    assert.match(src, /if \(code === 'F3'\) \{[\s\S]*?setDebugVisible\(!debugVisible\)/);
     assert.match(src, /setAttribute\('aria-pressed', String\(visible\)\)/);
     assert.match(src, /debugFrameSamples\.reset\(\)/);
 });

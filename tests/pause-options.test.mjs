@@ -81,7 +81,8 @@ test('opções de faixa são barras: trilho, cursor e valor no meio', () => {
     assert.equal((dialog.match(/class="classic-btn option-btn option-slider"/g) ?? []).length, sliders.length);
     assert.equal((dialog.match(/class="option-track"/g) ?? []).length, sliders.length, 'um trilho por barra');
     assert.equal((dialog.match(/class="option-knob"/g) ?? []).length, sliders.length, 'um cursor por barra');
-    assert.equal((dialog.match(/class="option-value"/g) ?? []).length, ALL_CONTROLS.length, 'toda opção mostra o valor');
+    const keybindValues = (dialog.match(/id="opt-bind-[^"]*-value"/g) ?? []).length;
+    assert.equal((dialog.match(/class="option-value"/g) ?? []).length - keybindValues, ALL_CONTROLS.length, 'toda opção mostra o valor');
 
     // o trilho é desenho, não conteúdo: fica fora do leitor de tela
     for (const track of dialog.match(/<span class="option-track"[^>]*>/g) ?? []) {
