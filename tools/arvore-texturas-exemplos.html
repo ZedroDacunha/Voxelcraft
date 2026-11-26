@@ -141,6 +141,17 @@
   @media (max-width: 860px) {
     .grid { grid-template-columns: 1fr; }
   }
+  .bark-preview .swatches { grid-template-columns: 1fr; }
+  .bark-preview .swatch:not(:first-child) { display: none; }
+  .bark-preview .swatch:first-child canvas { width: 128px; height: 128px; }
+  .bark-end-preview .swatch:first-child { display: none; }
+  .bark-end-preview .swatch:nth-child(2) { display: flex; }
+  .bark-end-preview .swatch:nth-child(2) canvas { width: 128px; height: 128px; }
+  .bark-review-preview .swatches { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bark-review-preview .swatch:first-child { display: flex; }
+  .bark-review-preview .swatch:first-child canvas,
+  .bark-review-preview .swatch:nth-child(2) canvas { width: 80px; height: 80px; }
+  @media (max-width: 450px) { .bark-review-preview .swatches { grid-template-columns: 1fr; } }
   article {
     background: var(--card);
     border: 1px solid var(--border);
@@ -338,6 +349,15 @@ import { TREE_TEXTURE_EXAMPLES, createCurrentTreeTextures } from '../tools/propo
 
 const query = new URLSearchParams(location.search);
 const leafStage = query.get('folhas');
+const barkStage = query.get('tronco');
+const barkColorMode = barkStage === '2';
+const barkReviewMode = barkStage === '4';
+const barkEndMode = ['3', '4'].includes(barkStage);
+const barkDetailMode = ['1', '2', '3', '4'].includes(barkStage);
+const barkDetailModule = barkDetailMode ? await import('../tools/proposta-detalhes-tronco.js') : null;
+const barkColorModule = barkColorMode || barkEndMode ? await import('../tools/proposta-cores-tronco.js') : null;
+const barkEndModule = barkEndMode ? await import('../tools/proposta-topo-tronco.js') : null;
+const barkReviewModule = barkReviewMode ? await import('../tools/proposta-revisao-tronco.js') : null;
 const fallingLeafStage = query.get('folhas-caindo');
 const fallingLeafMode = ['1', '2', '3', '4', '5', '6', '7', '8'].includes(fallingLeafStage);
 const naturalRefinementMode = fallingLeafStage === '4';
@@ -370,9 +390,16 @@ const openingExamples = leafOpeningMode || leafReviewMode
   : null;
 // As prévias de formato e revisão conservam a folhagem anterior para comparação.
 const previousReference = leafStage === '1' || leafReviewMode;
-const currentTextures = leafOpeningMode ? colorExamples[0] : leafColorMode ? shapeExamples[0]
+const currentTextures = barkReviewMode || barkStage === '1' ? barkDetailModule.createPreviousTrunkTextures()
+  : barkEndMode ? barkColorModule.BARK_COLOR_EXAMPLES[0]
+  : barkColorMode ? barkDetailModule.BARK_DETAIL_EXAMPLES[0]
+  : leafOpeningMode ? colorExamples[0] : leafColorMode ? shapeExamples[0]
   : previousReference ? BALANCED_TREE_TEXTURES : createCurrentTreeTextures();
-const examples = fallingEmissionMode
+const examples = barkReviewMode ? barkReviewModule.TREE_TRUNK_REVIEW
+  : barkEndMode ? barkEndModule.TRUNK_TOP_EXAMPLES
+  : barkColorMode ? barkColorModule.BARK_COLOR_EXAMPLES
+  : barkDetailMode ? barkDetailModule.BARK_DETAIL_EXAMPLES
+  : fallingEmissionMode
   ? (fallingSmoothLandingMode ? [fallingSmoothLandingModule.LONG_LANDING] : fallingLandingMode ? fallingLandingModule.LANDING_STYLES : fallingWindMode ? fallingWindModule.WIND_LEAF_SCENARIOS : fallingEmissionModule.FALLING_LEAF_EMISSION_STYLES).map(style => ({ ...currentTextures, ...fallingMotionModule.FALLING_LEAF_MOTIONS[3], ...naturalRefinementModule.NATURAL_LEAF_REFINEMENTS[1], ...style, recommended: !!style.recommended }))
   : naturalRefinementMode
   ? naturalRefinementModule.NATURAL_LEAF_REFINEMENTS.map(texture => ({ ...currentTextures, ...fallingMotionModule.FALLING_LEAF_MOTIONS[3], ...texture, recommended: !!texture.recommended }))
@@ -387,6 +414,61 @@ const examples = fallingEmissionMode
       { ...currentTextures, badge: 'Referência · Anterior', tag: 'Antes da alteração', title: 'Folhas anteriores', description: 'A folhagem anterior, na mesma árvore e iluminação para comparação.' },
     ]
   : leafOpeningMode ? openingExamples : leafColorMode ? colorExamples : leafShapeMode ? shapeExamples : TREE_TEXTURE_EXAMPLES;
+
+if (barkDetailMode) {
+  document.body.classList.add('bark-preview');
+  document.title = 'Voxelcraft — Detalhes do tronco';
+  document.querySelector('.kicker').textContent = 'Árvores · Tronco · Parte 1 · Detalhes da casca';
+  document.querySelector('h1').textContent = 'Detalhes para a casca do tronco';
+  document.querySelector('.lead').innerHTML = 'Compare quatro maneiras de enriquecer a <strong>casca lateral atual</strong>, mantendo as cores gerais, o topo e a folhagem. Primeiro escolhemos os detalhes; cor e intensidade podem ser refinadas depois.';
+  document.querySelector('.ref-copy').innerHTML = '<strong>Referência: tronco anterior.</strong> Aproxime ou arraste as cenas para comparar. O botão de comparação alterna todas as propostas com a casca anterior no mesmo ângulo; a malha 2×2 mostra a repetição da textura.';
+  document.querySelector('footer').textContent = 'Estudos de casca em 32×32. A opção fibras delicadas foi aplicada ao jogo junto com o topo escolhido.';
+  document.querySelector('#ref-wood + span').innerHTML = 'Casca<br>anterior';
+  document.querySelector('#ref-end + span').innerHTML = 'Topo<br>anterior';
+  document.querySelector('#btn-compare').textContent = '👁️ Casca anterior: OFF';
+  document.querySelector('#btn-spin').classList.remove('active');
+  document.querySelector('#btn-spin').textContent = 'Giro: OFF';
+  const close = document.createElement('button');
+  close.id = 'scene-bark'; close.type = 'button'; close.textContent = '🔎 Tronco de perto';
+  close.classList.add('active');
+  document.querySelector('#scene-tree').classList.remove('active');
+  document.querySelector('#scene-under').after(close);
+  if (barkColorMode) {
+    document.title = 'Voxelcraft — Cores do tronco';
+    document.querySelector('.kicker').textContent = 'Árvores · Tronco · Parte 2 · Cor e contraste';
+    document.querySelector('h1').textContent = 'Cores para as fibras delicadas';
+    document.querySelector('.lead').innerHTML = 'As quatro opções mantêm a <strong>mesma casca com fibras delicadas escolhida</strong>. Compare apenas o tom e o contraste; o topo e as folhas permanecem iguais aos do jogo.';
+    document.querySelector('.ref-copy').innerHTML = '<strong>Referência: fibras delicadas com o castanho original.</strong> Compare as árvores no mesmo ângulo ou use a malha 2×2 para observar a repetição da textura.';
+    document.querySelector('#ref-wood + span').innerHTML = 'Fibras<br>originais';
+    document.querySelector('#btn-compare').textContent = '👁️ Fibras originais: OFF';
+    document.querySelector('footer').textContent = 'Estudo visual em 32×32; o castanho natural foi escolhido e aplicado ao jogo.';
+  }
+  if (barkEndMode) {
+    document.body.classList.add('bark-end-preview');
+    document.title = 'Voxelcraft — Topo do tronco';
+    document.querySelector('.kicker').textContent = 'Árvores · Tronco · Parte 3 · Topo e anéis';
+    document.querySelector('h1').textContent = 'Detalhes para o topo cortado';
+    document.querySelector('.lead').innerHTML = 'A casca mantém as <strong>fibras delicadas e o castanho natural</strong> escolhidos. Compare o topo anterior com três opções para os anéis e veios; as folhas permanecem iguais.';
+    document.querySelector('.ref-copy').innerHTML = '<strong>Referência: topo anterior e casca escolhida.</strong> O bloco cortado mostra os anéis de perto; alterne para a árvore inteira ou use o botão para comparar com o topo anterior.';
+    document.querySelector('#ref-wood + span').innerHTML = 'Casca<br>escolhida';
+    document.querySelector('#btn-compare').textContent = '👁️ Topo anterior: OFF';
+    document.querySelector('footer').textContent = 'Estudo visual em 32×32; a opção veios discretos foi aplicada ao jogo.';
+    close.textContent = '🔎 Corte de perto';
+  }
+  if (barkReviewMode) {
+    document.body.classList.add('bark-review-preview');
+    document.title = 'Voxelcraft — Revisão do tronco';
+    document.querySelector('.kicker').textContent = 'Árvores · Tronco · Revisão das escolhas';
+    document.querySelector('h1').textContent = 'O tronco implementado na árvore';
+    document.querySelector('.lead').innerHTML = 'Compare <strong>fibras delicadas, castanho natural e veios discretos</strong> implementados com o tronco anterior. A folhagem é a mesma nas duas cenas.';
+    document.querySelector('.ref-copy').innerHTML = '<strong>Referência: casca e topo anteriores.</strong> Use a árvore inteira para observar o conjunto ou o corte de perto para ver os veios. As cenas giram juntas; o botão alterna para o tronco anterior no mesmo ângulo.';
+    document.querySelector('#ref-wood + span').innerHTML = 'Casca<br>anterior';
+    document.querySelector('#btn-compare').textContent = '👁️ Tronco anterior: OFF';
+    document.querySelector('footer').textContent = 'As escolhas foram aplicadas ao jogo; esta prévia conserva a comparação com o tronco anterior.';
+    close.classList.remove('active');
+    document.querySelector('#scene-tree').classList.add('active');
+  }
+}
 
 if (fallingLeafMode) {
   document.title = 'Voxelcraft — Folhas caindo: parte 1';
@@ -723,6 +805,14 @@ function buildVoxelDataset(mode) {
     return map;
   }
 
+  if (mode === 'end') {
+    for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) {
+      put(x, -1, z, 'dirt'); put(x, 0, z, 'grass');
+    }
+    put(0, 1, 0, 'log');
+    return map;
+  }
+
   // Ilha 5×5 com grama e terra aprovadas (`world-ground-textures.js`)
   for (let x = -2; x <= 2; x++) {
     for (let z = -2; z <= 2; z++) {
@@ -746,7 +836,7 @@ function buildVoxelDataset(mode) {
     }
   }
   // Toco recém-cortado no canto frontal da ilha para exibir `WOOD_END` junto à árvore!
-  if (mode === 'tree' && !fallingLandingMode) {
+  if (mode === 'tree' && !fallingLandingMode && (!barkDetailMode || barkEndMode)) {
     put(2, 1, 2, 'log');
   }
   return map;
@@ -857,6 +947,8 @@ const SCENE_PRESETS = {
   tree:   { target: [0, 2.75, 0], yaw: 0.68, pitch: 0.22, dist: 12.4 },
   review: { target: [0, 2.75, 0], yaw: 0.68, pitch: 0.22, dist: 14.0 },
   motion: { target: [0, 2.25, 0.5], yaw: 0.68, pitch: 0.10, dist: 7.8 },
+  bark:   { target: [0, 2.1, 0], yaw: 0.68, pitch: 0.08, dist: 5.9 },
+  end:    { target: [0, 1.6, 0], yaw: 0.68, pitch: 0.72, dist: 4.1 },
   landing: { target: [0, 1.75, 0], yaw: 0.68, pitch: 0.38, dist: 8.4 },
   blocks: { target: [-0.15, 1.25, -0.15], yaw: 0.66, pitch: 0.34, dist: 5.6 },
   under:  { target: [0, 3.45, 0], yaw: 0.55, pitch: -0.50, dist: 4.3 },
@@ -887,16 +979,16 @@ const LIGHT_PRESETS = {
   },
 };
 
-let currentSceneMode = 'tree';
+let currentSceneMode = barkEndMode && !barkReviewMode ? 'end' : 'tree';
 let currentLightMode = 'day';
-let autoSpin = !(leafReviewMode || fallingLeafMode);
+let autoSpin = !(leafReviewMode || fallingLeafMode || barkDetailMode);
 let compareCurrent = false;
 let tiledSwatches = false;
 let leafSize = fallingMotionMode ? 0.25 : 0.38;
 let leafMotionRunning = true;
 let leafMotionTime = fallingEmissionMode ? 12 : 0;
 
-const initialPreset = fallingLandingMode ? SCENE_PRESETS.landing : fallingMotionMode ? SCENE_PRESETS.motion : leafReviewMode || fallingLeafMode ? SCENE_PRESETS.review : SCENE_PRESETS.tree;
+const initialPreset = barkReviewMode ? SCENE_PRESETS.review : barkEndMode ? SCENE_PRESETS.end : barkDetailMode ? SCENE_PRESETS.bark : fallingLandingMode ? SCENE_PRESETS.landing : fallingMotionMode ? SCENE_PRESETS.motion : leafReviewMode || fallingLeafMode ? SCENE_PRESETS.review : SCENE_PRESETS.tree;
 const camState = { ...initialPreset, target: [...initialPreset.target] };
 const cards = [];
 const gridEl = document.getElementById('grid');
@@ -949,6 +1041,11 @@ for (const ex of examples) {
     swatches.innerHTML = `<div class="swatch"><canvas class="sw-drop" width="12" height="12" style="width:${swatchSize}px;height:${swatchSize}px;background:#708eaf"></canvas><div class="swatch-meta"><strong>Folha ampliada</strong>Pixel art 12×12<br>Fundo azul mostra a transparência</div></div>`;
     paintFallingLeaf(article.querySelector('.sw-drop'), ex);
   }
+  if (barkDetailMode) article.querySelector('.sw-wood + .swatch-meta').innerHTML = '<strong>Casca ampliada</strong>Pixel art 32×32<br>Laterais do tronco';
+  if (barkEndMode) article.querySelector('.sw-end + .swatch-meta').innerHTML = '<strong>Topo ampliado</strong>Pixel art 32×32<br>Anéis do corte';
+  if (barkColorMode) article.querySelector('.compare-pill').textContent = 'Mostrando: fibras originais';
+  if (barkEndMode) article.querySelector('.compare-pill').textContent = barkReviewMode ? 'Mostrando: tronco anterior' : 'Mostrando: topo anterior';
+  else if (barkDetailMode && !barkColorMode) article.querySelector('.compare-pill').textContent = 'Mostrando: casca anterior';
   if (fallingTextureMode) article.querySelector('.compare-pill').textContent = naturalRefinementMode ? 'Mostrando: natural anterior' : 'Mostrando: textura anterior';
   else if (leafOpeningMode) article.querySelector('.compare-pill').textContent = 'Mostrando: recortes da parte 2';
   else if (leafColorMode) article.querySelector('.compare-pill').textContent = 'Mostrando: formato 1 original';
@@ -1147,7 +1244,7 @@ window.addEventListener('resize', resizeAll);
 function bindSceneBtn(id, mode, presetName = mode) {
   document.getElementById(id).addEventListener('click', () => {
     currentSceneMode = mode;
-    for (const bid of ['scene-tree', 'scene-blocks', 'scene-under', 'scene-close', 'scene-far']) {
+    for (const bid of ['scene-tree', 'scene-blocks', 'scene-under', 'scene-close', 'scene-far', 'scene-bark']) {
       document.getElementById(bid)?.classList.toggle('active', bid === id);
     }
     const preset = SCENE_PRESETS[presetName];
@@ -1161,6 +1258,7 @@ function bindSceneBtn(id, mode, presetName = mode) {
 bindSceneBtn('scene-tree', 'tree', leafReviewMode || fallingLeafMode ? 'review' : 'tree');
 bindSceneBtn('scene-blocks', 'blocks');
 bindSceneBtn('scene-under', 'under');
+if (barkDetailMode) bindSceneBtn('scene-bark', barkEndMode ? 'end' : 'tree', barkEndMode ? 'end' : 'bark');
 if (leafReviewMode || fallingLeafMode) bindSceneBtn('scene-close', 'tree', fallingLandingMode ? 'landing' : fallingMotionMode ? 'motion' : 'close');
 if (leafReviewMode) bindSceneBtn('scene-far', 'tree', 'far');
 if (fallingLeafMode) {
@@ -1221,8 +1319,9 @@ btnCompare.addEventListener('click', () => {
     }
     return;
   }
-  btnCompare.textContent = leafOpeningMode
-    ? `👁️ Comparar com parte 2: ${compareCurrent ? 'ON' : 'OFF'}`
+  btnCompare.textContent = barkDetailMode
+    ? `👁️ ${barkReviewMode ? 'Tronco anterior' : barkEndMode ? 'Topo anterior' : barkColorMode ? 'Fibras originais' : 'Casca anterior'}: ${compareCurrent ? 'ON' : 'OFF'}`
+    : leafOpeningMode ? `👁️ Comparar com parte 2: ${compareCurrent ? 'ON' : 'OFF'}`
     : leafColorMode ? `👁️ Comparar com formato 1: ${compareCurrent ? 'ON' : 'OFF'}`
       : previousReference ? `👁️ Comparar com folhas anteriores: ${compareCurrent ? 'ON' : 'OFF'}`
         : `👁️ Alternar p/ Atual do Jogo: ${compareCurrent ? 'ON' : 'OFF'}`;

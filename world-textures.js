@@ -1,5 +1,5 @@
 import { soilPixel, grassTopPixel, grassSidePixel } from './world-ground-textures.js';
-import { BALANCED_TREE_TEXTURES } from './world-tree-textures.js';
+import { trunkBarkPixel, trunkEndPixel } from './world-trunk-textures.js';
 import { leafPixel } from './world-leaf-textures.js';
 import { hash2, mulberry32 } from './world-math.js';
 import { copperArmorSprite } from './world-copper-armor-icons.js';
@@ -114,9 +114,9 @@ export function createTilePixelSource() {
                 return cobblePixel(x, y, alt);
             }
             case TILE.WOOD:
-                return BALANCED_TREE_TEXTURES.wood(x, y);
+                return trunkBarkPixel(x, y);
             case TILE.WOOD_END:
-                return BALANCED_TREE_TEXTURES.woodEnd(x, y);
+                return trunkEndPixel(x, y);
             case TILE.LEAVES:
                 return leafPixel(x, y, alt);
             case TILE.PLANKS: {
