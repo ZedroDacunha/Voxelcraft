@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voxelcraft — Animação de Comer (Parte 3: Pose em 3ª Pessoa)</title>
+  <style>
+    :root {
+      --bg: #0f1318;
+      --panel: #171d26;
+      --border: #2a3444;
+      --accent: #f3c34f;
+      --green: #69d84f;
+      --text: #eef3fa;
+      --muted: #9aa7ba;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 18px 20px 26px;
+      background: radial-gradient(circle at 50% 0%, #1d2634 0%, var(--bg) 68%);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+    header {
+      max-width: 1140px;
+      margin: 0 auto 14px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .step-badge {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      background: rgba(105, 216, 79, 0.16);
+      color: #9bf084;
+      border: 1px solid rgba(105, 216, 79, 0.42);
+      margin-bottom: 5px;
+    }
+    h1 {
+      margin: 0 0 3px;
+      font-size: 1.24rem;
+      color: var(--accent);
+    }
+    .sub {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.87rem;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 7px;
+      background: rgba(23, 29, 38, 0.92);
+      border: 1px solid var(--border);
+      padding: 8px 11px;
+      border-radius: 11px;
+    }
+    .divider {
+      width: 1px;
+      height: 22px;
+      background: #2c384a;
+      margin: 0 2px;
+    }
+    button {
+      background: #222b38;
+      color: var(--text);
+      border: 1px solid #354357;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 0.81rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.14s ease;
+    }
+    button:hover { background: #2c3748; border-color: #506584; }
+    button.active {
+      background: #2f2818;
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    button.primary {
+      background: linear-gradient(180deg, #438c30, #2f6b21);
+      border-color: #69d84f;
+      color: #fff;
+    }
+    button.primary:hover { filter: brightness(1.08); }
+
+    .timeline-bar {
+      max-width: 1140px;
+      margin: 0 auto 14px;
+      background: rgba(23, 29, 38, 0.9);
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      padding: 9px 14px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+    }
+    .timeline-bar label {
+      font-size: 0.81rem;
+      color: var(--muted);
+      font-weight: 600;
+      min-width: 126px;
+    }
+    .timeline-bar input[type="range"] {
+      flex: 1;
+      min-width: 180px;
+      accent-color: var(--green);
+      cursor: pointer;
+    }
+    .stage-pills {
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+    .pill {
+      font-size: 0.73rem;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #1d2532;
+      border: 1px solid #2e3b4e;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .pill.on {
+      background: rgba(105, 216, 79, 0.18);
+      border-color: var(--green);
+      color: #b7f7a5;
+    }
+
+    .compare-grid {
+      max-width: 1140px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    @media (max-width: 820px) {
+      .compare-grid { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: linear-gradient(180deg, var(--panel) 0%, #11161d 100%);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      box-shadow: 0 10px 26px rgba(0, 0, 0, 0.36);
+    }
+    .card.featured {
+      border-color: rgba(105, 216, 79, 0.78);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(105, 216, 79, 0.25);
+    }
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: #263142;
+      color: #c5d3e8;
+    }
+    .card.featured .badge {
+      background: rgba(105, 216, 79, 0.2);
+      color: #9bf084;
+      border: 1px solid rgba(105, 216, 79, 0.48);
+    }
+    .card-title { font-weight: 700; font-size: 1.0rem; }
+    .viewport {
+      position: relative;
+      width: 100%;
+      height: 360px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid #253142;
+      background: #5b8fc9;
+      cursor: grab;
+      user-select: none;
+    }
+    .viewport:active { cursor: grabbing; }
+    .viewport canvas { width: 100%; height: 100%; display: block; }
+    .orbit-hint {
+      position: absolute;
+      top: 9px;
+      right: 10px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.71rem;
+      color: #dbe8f8;
+      background: rgba(12, 17, 24, 0.56);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      pointer-events: none;
+    }
+    .eat-hud {
+      position: absolute;
+      left: 50%;
+      bottom: 11px;
+      transform: translateX(-50%);
+      background: rgba(12, 16, 22, 0.74);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 999px;
+      padding: 4px 11px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.74rem;
+      color: #e9f0fa;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .bar-bg {
+      width: 78px;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.16);
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #f3c34f, #69d84f);
+    }
+    .desc {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.44;
+    }
+    .desc strong { color: #e2ebf7; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <span class="step-badge">Parte 4 de 4 · Integrado no Jogo + Som Crocante</span>
+      <h1>Animação de Comer — Completa (Pose 3ª Pessoa + Mordidas 3D + Som)</h1>
+      <p class="sub">Mesma fase de <strong>1.54s</strong> na 1ª e 3ª pessoa, com <strong>som crocante WebAudio</strong> em cada mordida e integrada ao <code>game.js</code>.</p>
+    </div>
+    <div class="controls">
+      <button id="btnBiteOnce" class="primary">▶ Morder 1x (1.54s)</button>
+      <button id="btnLoop" class="active">↻ Loop</button>
+      <button id="btnSound" class="active">🔊 Som</button>
+      <span class="divider"></span>
+      <button id="btnIdle" class="active">🧍 Parado</button>
+      <button id="btnWalk">🚶 Andando</button>
+      <span class="divider"></span>
+      <button class="cam-btn active" data-cam="front34">Frente 3/4</button>
+      <button class="cam-btn" data-cam="side">Perfil</button>
+      <button class="cam-btn" data-cam="front">Frente</button>
+      <button class="cam-btn" data-cam="back">Costas</button>
+    </div>
+  </header>
+
+  <div class="timeline-bar">
+    <label id="progressLabel">Progresso: 0%</label>
+    <input id="scrubSlider" type="range" min="0" max="1000" value="0" />
+    <div class="stage-pills">
+      <span class="pill on" data-pill="0">Intacta</span>
+      <span class="pill" data-pill="1">1ª Mordida</span>
+      <span class="pill" data-pill="2">2ª Mordida</span>
+      <span class="pill" data-pill="3">3ª · Miolo</span>
+      <span class="pill" data-pill="4">4ª · Consumida</span>
+    </div>
+  </div>
+
+  <main class="compare-grid">
+    <section class="card">
+      <div class="card-head">
+        <span class="card-title">Antes · Sem Pose em 3ª Pessoa</span>
+        <span class="badge">Referência Atual</span>
+      </div>
+      <div class="viewport" id="vp-before">
+        <span class="orbit-hint">Arraste p/ girar 360°</span>
+        <div class="eat-hud">
+          <span id="label-before">Comendo...</span>
+          <div class="bar-bg"><div class="bar-fill" id="bar-before"></div></div>
+        </div>
+      </div>
+      <p class="desc">
+        Comportamento atual antes da melhoria: mesmo enquanto come, o braço direito permanece solto ao lado da cintura sem levar o alimento até a boca.
+      </p>
+    </section>
+
+    <section class="card featured">
+      <div class="card-head">
+        <span class="card-title">★ Parte 3 · Comer em 3ª Pessoa Articulado</span>
+        <span class="badge">Nova Pose · 1.54s</span>
+      </div>
+      <div class="viewport" id="vp-after">
+        <span class="orbit-hint">Arraste p/ girar 360°</span>
+        <div class="eat-hud">
+          <span id="label-after">Intacta</span>
+          <div class="bar-bg"><div class="bar-fill" id="bar-after"></div></div>
+        </div>
+      </div>
+      <p class="desc">
+        <strong>Ombro + cotovelo em dobradiça limpa</strong> levam a maçã aos lábios sem estourar a manga, com <strong>aceno da cabeça</strong> a cada mordida, <strong>giro no punho</strong>, <strong>mordidas 3D</strong>, <strong>farelos</strong> e mesclagem natural com a caminhada.
+      </p>
+    </section>
+  </main>
+
+  <script type="module">
+    import * as THREE from '../vendor/three/three.module.js';
+    import { createPlayerModel } from '../player-model.js';
+    import { createLocomotion, advanceLocomotion, groundPose, rigLocomotion, applyGroundPose } from '../player-locomotion.js';
+    import { createPlayerHeldItem } from '../player-held-item.js';
+    import { createProgressiveAppleModel, setAppleBiteStage } from '../world-apple-model.js';
+    import { createAudioSystem } from '../world-audio.js';
+    import {
+      EAT_DURATION,
+      sampleEatAnimation,
+      eatBitePitch,
+      applyThirdPersonAppleGrip,
+      applyThirdPersonEatPose,
+      createAppleCrumbSystem,
+    } from '../player-eat-animation.js';
+
+    const previewAudio = createAudioSystem();
+    let soundEnabled = true;
+    const btnSound = document.getElementById('btnSound');
+    btnSound.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      previewAudio.setMuted(!soundEnabled);
+      if (soundEnabled) previewAudio.unlock();
+      btnSound.classList.toggle('active', soundEnabled);
+      btnSound.textContent = soundEnabled ? '🔊 Som' : '🔇 Mudo';
+    });
+    document.addEventListener('pointerdown', () => { if (soundEnabled) previewAudio.unlock(); }, { passive: true });
+
+    const STAGE_LABELS = ['Intacta', '1ª Mordida', '2ª Mordida', '3ª · Miolo', '4ª · Consumida'];
+
+    const CAM_PRESETS = {
+      front34: { yaw:  0.48, pitch: 0.14, dist: 2.42, targetY: 1.18 },
+      side:    { yaw:  1.38, pitch: 0.10, dist: 2.32, targetY: 1.24 },
+      front:   { yaw: -0.28, pitch: 0.12, dist: 2.42, targetY: 1.18 },
+      back:    { yaw:  2.75, pitch: 0.18, dist: 2.55, targetY: 1.18 },
+    };
+    const orbit = { ...CAM_PRESETS.front34 };
+
+    function makeGrassBackdrop() {
+      const group = new THREE.Group();
+      const topMat = new THREE.MeshLambertMaterial({ color: 0x62a944 });
+      const topAltMat = new THREE.MeshLambertMaterial({ color: 0x589c3c });
+      const dirtMat = new THREE.MeshLambertMaterial({ color: 0x7b5638 });
+      const tileGeo = new THREE.BoxGeometry(1, 0.18, 1);
+      const subGeo = new THREE.BoxGeometry(1, 0.5, 1);
+
+      for (let gx = -3; gx <= 3; gx++) {
+        for (let gz = -3; gz <= 3; gz++) {
+          const top = new THREE.Mesh(tileGeo, ((gx + gz) & 1) === 0 ? topMat : topAltMat);
+          top.position.set(gx, -0.09, gz);
+          group.add(top);
+          const sub = new THREE.Mesh(subGeo, dirtMat);
+          sub.position.set(gx, -0.43, gz);
+          group.add(sub);
+        }
+      }
+      return group;
+    }
+
+    function createThirdPersonCard({ mountId, barId, labelId, enableEatPose }) {
+      const mount = document.getElementById(mountId);
+      const bar = document.getElementById(barId);
+      const label = document.getElementById(labelId);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      mount.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x6ea4dc);
+      scene.fog = new THREE.Fog(0x6ea4dc, 5.5, 13.5);
+
+      scene.add(new THREE.AmbientLight(0xffffff, 0.74));
+      const sun = new THREE.DirectionalLight(0xfff5e0, 0.96);
+      sun.position.set(2.8, 4.8, 3.4);
+      scene.add(sun);
+      const fill = new THREE.DirectionalLight(0xbfd9ff, 0.34);
+      fill.position.set(-2.8, 2.2, -2.0);
+      scene.add(fill);
+
+      const ground = makeGrassBackdrop();
+      scene.add(ground);
+
+      // Sombra suave no chão sob o aventureiro
+      const shadow = new THREE.Mesh(
+        new THREE.CircleGeometry(0.36, 20),
+        new THREE.MeshBasicMaterial({ color: 0x1e3514, transparent: true, opacity: 0.34 }),
+      );
+      shadow.rotation.x = -Math.PI / 2;
+      shadow.position.y = 0.004;
+      scene.add(shadow);
+
+      const camera = new THREE.PerspectiveCamera(36, 1, 0.08, 30);
+
+      const model = createPlayerModel(THREE);
+      const held = createPlayerHeldItem(THREE, model.rightArm);
+      const rig = rigLocomotion(THREE, model);
+      const loco = createLocomotion();
+      scene.add(model.root);
+
+      const appleRoot = createProgressiveAppleModel(THREE);
+      held.anchor.add(appleRoot);
+      applyThirdPersonAppleGrip(appleRoot);
+
+      const crumbs = enableEatPose
+        ? createAppleCrumbSystem(THREE, scene, { sizeMin: 0.015, sizeSpan: 0.009, gravity: -3.2, spread: 1.25 })
+        : null;
+
+      let lastStage = 0;
+      let walkPhase = 0;
+      const mouthWorld = new THREE.Vector3();
+      const appleWorld = new THREE.Vector3();
+      const crumbOrigin = new THREE.Vector3();
+
+      function resize() {
+        const w = mount.clientWidth || 420;
+        const h = mount.clientHeight || 360;
+        renderer.setSize(w, h, false);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      }
+      resize();
+
+      function resetRig() {
+        for (const part of [
+          model.root, model.head, model.torso,
+          model.leftArm, model.rightArm, model.leftLeg, model.rightLeg,
+          rig.elbows[0], rig.elbows[1],
+        ]) {
+          part.rotation.set(0, 0, 0);
+        }
+        model.root.position.set(0, 0, 0);
+      }
+
+      function render(nowSec, dt, eatProgress, isWalking) {
+        resetRig();
+
+        if (isWalking) {
+          const prevSteps = Math.floor(walkPhase / Math.PI);
+          walkPhase += dt * 7.6;
+          const nextSteps = Math.floor(walkPhase / Math.PI);
+          advanceLocomotion(loco, nextSteps - prevSteps, false, dt);
+          const pose = groundPose(loco, walkPhase % Math.PI, 0.82);
+          applyGroundPose(model, rig, pose, 1);
+          // Desliza os blocos do chão para trás dando sensação clara de caminhada
+          ground.position.z = -((nowSec * 1.35) % 2);
+        } else {
+          advanceLocomotion(loco, 0, false, dt);
+          applyGroundPose(model, rig, groundPose(loco, 0, 0), 1);
+          model.rightArm.rotation.x = -0.06 + Math.sin(nowSec * 1.9) * 0.025;
+          model.leftArm.rotation.x = 0.04 - Math.sin(nowSec * 1.9) * 0.025;
+          model.head.rotation.y = Math.sin(nowSec * 1.1) * 0.03;
+          ground.position.z = 0;
+        }
+
+        const eat = sampleEatAnimation(eatProgress);
+
+        if (!enableEatPose) {
+          setAppleBiteStage(appleRoot, 0);
+          applyThirdPersonAppleGrip(appleRoot);
+          label.textContent = eat.active ? 'Sem pose (atual)' : 'Pronto';
+        } else {
+          if (!eat.active || eat.p < 0.03) {
+            lastStage = 0;
+          }
+          setAppleBiteStage(appleRoot, eat.stage);
+          applyThirdPersonEatPose(model, rig, appleRoot, eat);
+
+          if (eat.stage > lastStage && eat.active && crumbs) {
+            model.root.updateMatrixWorld(true);
+            const mouthObj = model.head.getObjectByName('mouth') || model.head;
+            mouthObj.getWorldPosition(mouthWorld);
+            appleRoot.getWorldPosition(appleWorld);
+            crumbOrigin.copy(mouthWorld).lerp(appleWorld, 0.58);
+            for (let s = lastStage + 1; s <= eat.stage; s++) {
+              crumbs.burst(crumbOrigin, s, 1);
+              if (soundEnabled) previewAudio.play('eat-crunch', { rate: eatBitePitch(s) });
+            }
+            if (eat.stage === 4 && lastStage < 4 && soundEnabled) {
+              setTimeout(() => { if (soundEnabled) previewAudio.play('eat-swallow'); }, 110);
+            }
+            lastStage = eat.stage;
+          }
+          label.textContent = eat.active ? STAGE_LABELS[eat.stage] : 'Pronto';
+        }
+
+        if (crumbs) crumbs.update(dt);
+
+        const cp = Math.cos(orbit.pitch);
+        camera.position.set(
+          Math.sin(orbit.yaw) * cp * orbit.dist,
+          orbit.targetY + Math.sin(orbit.pitch) * orbit.dist,
+          Math.cos(orbit.yaw) * cp * orbit.dist,
+        );
+        camera.lookAt(0, orbit.targetY, 0.06);
+
+        bar.style.width = `${Math.round((eat.active ? eat.p : 0) * 100)}%`;
+        renderer.render(scene, camera);
+        return eat;
+      }
+
+      // Arrastar com mouse / toque para orbitar as duas cenas juntas
+      let dragging = false;
+      let prevX = 0;
+      let prevY = 0;
+      mount.addEventListener('pointerdown', (e) => {
+        dragging = true;
+        prevX = e.clientX;
+        prevY = e.clientY;
+        mount.setPointerCapture(e.pointerId);
+        document.querySelectorAll('.cam-btn').forEach(b => b.classList.remove('active'));
+      });
+      mount.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        const dx = e.clientX - prevX;
+        const dy = e.clientY - prevY;
+        prevX = e.clientX;
+        prevY = e.clientY;
+        orbit.yaw -= dx * 0.009;
+        orbit.pitch = Math.max(-0.25, Math.min(0.68, orbit.pitch + dy * 0.007));
+      });
+      const stopDrag = () => { dragging = false; };
+      mount.addEventListener('pointerup', stopDrag);
+      mount.addEventListener('pointercancel', stopDrag);
+
+      return { resize, render, resetCrumbs: () => crumbs && crumbs.clear() };
+    }
+
+    const cards = [
+      createThirdPersonCard({
+        mountId: 'vp-before',
+        barId: 'bar-before',
+        labelId: 'label-before',
+        enableEatPose: false,
+      }),
+      createThirdPersonCard({
+        mountId: 'vp-after',
+        barId: 'bar-after',
+        labelId: 'label-after',
+        enableEatPose: true,
+      }),
+    ];
+
+    window.addEventListener('resize', () => cards.forEach(c => c.resize()));
+
+    let mode = 'loop'; // 'loop' | 'once' | 'scrub'
+    let isWalking = false;
+    let timer = 0;
+    const LOOP_REST = 0.56;
+
+    const btnOnce = document.getElementById('btnBiteOnce');
+    const btnLoop = document.getElementById('btnLoop');
+    const btnIdle = document.getElementById('btnIdle');
+    const btnWalk = document.getElementById('btnWalk');
+    const scrubSlider = document.getElementById('scrubSlider');
+    const progressLabel = document.getElementById('progressLabel');
+    const pills = [...document.querySelectorAll('[data-pill]')];
+
+    function setActivePlayBtn(active) {
+      [btnOnce, btnLoop].forEach(b => b.classList.toggle('active', b === active));
+    }
+
+    btnOnce.addEventListener('click', () => {
+      mode = 'once';
+      timer = 0.001;
+      cards.forEach(c => c.resetCrumbs());
+      setActivePlayBtn(btnOnce);
+    });
+
+    btnLoop.addEventListener('click', () => {
+      mode = 'loop';
+      timer = 0;
+      cards.forEach(c => c.resetCrumbs());
+      setActivePlayBtn(btnLoop);
+    });
+
+    btnIdle.addEventListener('click', () => {
+      isWalking = false;
+      btnIdle.classList.add('active');
+      btnWalk.classList.remove('active');
+    });
+
+    btnWalk.addEventListener('click', () => {
+      isWalking = true;
+      btnWalk.classList.add('active');
+      btnIdle.classList.remove('active');
+    });
+
+    document.querySelectorAll('.cam-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const preset = CAM_PRESETS[btn.dataset.cam];
+        if (!preset) return;
+        Object.assign(orbit, preset);
+        document.querySelectorAll('.cam-btn').forEach(b => b.classList.toggle('active', b === btn));
+      });
+    });
+
+    scrubSlider.addEventListener('input', () => {
+      mode = 'scrub';
+      setActivePlayBtn(null);
+    });
+
+    let lastNow = performance.now();
+    function tick(now) {
+      const dt = Math.min(0.05, (now - lastNow) / 1000);
+      lastNow = now;
+      const nowSec = now / 1000;
+
+      let progress = 0;
+      if (mode === 'scrub') {
+        progress = Number(scrubSlider.value) / 1000;
+      } else if (mode === 'once') {
+        if (timer > 0) {
+          timer += dt;
+          if (timer >= EAT_DURATION) {
+            timer = 0;
+            progress = 0;
+          } else {
+            progress = timer / EAT_DURATION;
+          }
+        }
+        scrubSlider.value = String(Math.round(progress * 1000));
+      } else {
+        timer = (timer + dt) % (EAT_DURATION + LOOP_REST);
+        progress = timer < EAT_DURATION ? timer / EAT_DURATION : 0;
+        scrubSlider.value = String(Math.round(progress * 1000));
+      }
+
+      let eatState = null;
+      for (const c of cards) {
+        eatState = c.render(nowSec, dt, progress, isWalking);
+      }
+
+      const activeStage = eatState && eatState.active ? eatState.stage : 0;
+      progressLabel.textContent = `Progresso: ${Math.round(progress * 100)}%`;
+      pills.forEach(p => p.classList.toggle('on', Number(p.dataset.pill) === activeStage));
+
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>

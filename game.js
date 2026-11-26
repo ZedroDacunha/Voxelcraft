@@ -82,6 +82,17 @@ import { pickaxeMiningPose } from './world-pickaxe-animation.js';
 import { FIRST_TOOL_POSE, applyFirstPersonToolPose } from './world-first-person-tool.js';
 import { createSwordSwing, beginSwordSwing, swordPose, applyFirstPersonSwordPose, applyThirdPersonSwordPose } from './player-sword-animation.js';
 import { createSwordModel } from './world-sword-model.js';
+import { DROP_APPLE_SCALE, createAppleModel, createProgressiveAppleModel, setAppleBiteStage } from './world-apple-model.js';
+import {
+    EAT_DURATION,
+    sampleEatAnimation,
+    eatBitePitch,
+    applyFirstPersonAppleGrip,
+    applyFirstPersonEatPose,
+    applyThirdPersonAppleGrip,
+    applyThirdPersonEatPose,
+    createAppleCrumbSystem,
+} from './player-eat-animation.js';
 import { STEP_MAX_MOVED, stepDistanceThisFrame, stepPitch, stepSoundFor } from './world-step-sounds.js';
 import { advanceGait, createGait, gaitPose } from './world-gait.js';
 import { materialSoundName } from './world-block-materials.js';
@@ -216,7 +227,7 @@ const WATER_LEVEL = 26; // Nível base do mar
 
 // Sobrevivência
 const SPRINT_MIN_HUNGER = 7;
-const EAT_TIME = 1.6;
+const EAT_TIME = EAT_DURATION;
 const INVULN_TIME = 0.5;
 
 // Dia, Noite e Nuvens
@@ -1762,12 +1773,18 @@ function spawnItemEntity(id, count, pos, vel, delay = 0.5, damage = 0, opts = {}
             }
         }
     }
-    const block = ITEMS[id].block != null ? BLOCKS[ITEMS[id].block] : null;
-    const mat = itemRenderMode(ITEMS[id]) === 'sprite' ? spriteMaterial :
-        (block?.render === 'instanced' ? tallGrassMaterial :
-            (block?.render === 'cutout' ? world.cutoutMaterial :
-                (block?.render === 'liquid' ? world.water.material : world.material)));
-    const mesh = new THREE.Mesh(getItemGeometry(id), mat);
+    let mesh;
+    if (ITEMS[id].sprite?.kind === 'apple') {
+        mesh = createAppleModel(THREE);
+        mesh.scale.setScalar(DROP_APPLE_SCALE);
+    } else {
+        const block = ITEMS[id].block != null ? BLOCKS[ITEMS[id].block] : null;
+        const mat = itemRenderMode(ITEMS[id]) === 'sprite' ? spriteMaterial :
+            (block?.render === 'instanced' ? tallGrassMaterial :
+                (block?.render === 'cutout' ? world.cutoutMaterial :
+                    (block?.render === 'liquid' ? world.water.material : world.material)));
+        mesh = new THREE.Mesh(getItemGeometry(id), mat);
+    }
     mesh.position.copy(pos);
     scene.add(mesh);
     itemEntities.push({ id, count, damage, pos: pos.clone(), vel: vel.clone(), mesh, age: opts.age || 0, ttl: opts.ttl || 300, delay, onGround: false, phase: Math.random() * 6.28 });
@@ -1844,7 +1861,9 @@ function updateItemEntities(dt) {
         }
 
         const item = ITEMS[e.id];
-        const dropHalfH = itemRenderMode(item) === 'sprite' ? (ITEM_SIZE * 1.6) / 2 : ITEM_SIZE / 2;
+        const dropHalfH = item.sprite?.kind === 'apple'
+            ? DROP_APPLE_SCALE / 2
+            : itemRenderMode(item) === 'sprite' ? (ITEM_SIZE * 1.6) / 2 : ITEM_SIZE / 2;
         e.mesh.position.set(e.pos.x, e.pos.y - half + dropHalfH + Math.sin(e.age * 3 + e.phase) * 0.04, e.pos.z);
         e.mesh.rotation.y = e.age * 1.5 + e.phase;
     }
@@ -2178,6 +2197,12 @@ let handSleeve = null, handBlock = null;
 const handAnim = createHandAnimation();
 const swordSwing = createSwordSwing();
 let heldSwordPose = null;
+let currentEatPose = sampleEatAnimation(0);
+let firstPersonCrumbs = null;
+let thirdPersonCrumbs = null;
+const _fpCrumbOrigin = new THREE.Vector3();
+const _tpMouthWorld = new THREE.Vector3();
+const _tpAppleWorld = new THREE.Vector3();
 const heldGeoCache = {};
 
 function createHand() {
@@ -2208,6 +2233,12 @@ function createHand() {
     handPivot.add(handSleeve, handBlock, heldAnchor);
     handScene.add(handCamera);
     handCamera.add(handPivot);
+    firstPersonCrumbs = createAppleCrumbSystem(THREE, handCamera, {
+        sizeMin: 0.011,
+        sizeSpan: 0.006,
+        gravity: -2.35,
+        spread: 1,
+    });
 }
 
 function refreshHeldItem() {
@@ -2248,6 +2279,12 @@ function refreshHeldItem() {
             if (!heldGeoCache[key]) heldGeoCache[key] = createSwordModel(THREE, item.sprite.mat);
             // O modelo 3D já tem a origem no meio do cabo.
             heldMesh = heldGeoCache[key].clone();
+            heldAnchor.add(heldMesh);
+            return;
+        }
+        if (item.sprite.kind === 'apple') {
+            heldMesh = createProgressiveAppleModel(THREE);
+            applyFirstPersonAppleGrip(heldMesh);
             heldAnchor.add(heldMesh);
             return;
         }
@@ -2312,9 +2349,9 @@ function updateHand(dt) {
         applyFirstPersonToolPose(heldAnchor);
     }
 
-    handAnim.eat += ((eat.active ? 1 : 0) - handAnim.eat) * Math.min(1, 10 * dt);
-    const ea = handAnim.eat;
-    const wob = Math.sin(performance.now() / 1000 * 22) * 0.015 * ea;
+    currentEatPose = eat.active ? sampleEatAnimation(eat.progress) : sampleEatAnimation(0);
+    handAnim.eat = currentEatPose.lift;
+    const armSwingWhileEating = armSwing * (1 - 0.85 * currentEatPose.lift);
 
     // O braço lê a **mesma fase** do som e da câmera: no passo ele desce junto
     // com o corpo e vai e vem de lado no mesmo compasso. Antes era um cronômetro
@@ -2323,12 +2360,30 @@ function updateHand(dt) {
     const swim = swimFirstPersonPose(swimState);
     const ba = gaitNow.amplitude * swim.walkWeight;
     handPivot.position.set(
-        HAND_BASE.x + gaitNow.handX * 0.012 * ba + swim.handX - 0.22 * ea,
-        HAND_BASE.y + gaitNow.handY * 0.010 * ba + swim.handY - dip - 0.05 * armSwing + 0.20 * ea + wob + 0.07 * pickaxe.lift - 0.04 * pickaxe.strike,
-        HAND_BASE.z + swim.handZ - 0.12 * armSwing + 0.08 * ea);
+        HAND_BASE.x + gaitNow.handX * 0.012 * ba + swim.handX,
+        HAND_BASE.y + gaitNow.handY * 0.010 * ba + swim.handY - dip - 0.05 * armSwingWhileEating + 0.07 * pickaxe.lift - 0.04 * pickaxe.strike,
+        HAND_BASE.z + swim.handZ - 0.12 * armSwingWhileEating);
     handPivot.rotation.set(
-        0.35 - 0.9 * armSwing + 0.35 * ea + gaitNow.handX * 0.02 * ba + swim.handPitch + 0.5 * pickaxe.lift - 0.2 * pickaxe.strike, 0.25 - 0.3 * ea, 0);
+        0.35 - 0.9 * armSwingWhileEating + gaitNow.handX * 0.02 * ba + swim.handPitch + 0.5 * pickaxe.lift - 0.2 * pickaxe.strike,
+        0.25,
+        0);
     if (heldSwordPose) applyFirstPersonSwordPose(handPivot, heldAnchor, heldSwordPose);
+    setAppleBiteStage(heldMesh, currentEatPose.stage);
+    applyFirstPersonEatPose(handPivot, heldMesh, currentEatPose);
+    if (firstPersonCrumbs) {
+        if (cameraView === 'first' && pendingAppleCrumbBites.length > 0 && heldMesh) {
+            handCamera.updateMatrixWorld(true);
+            heldMesh.getWorldPosition(_fpCrumbOrigin);
+            handCamera.worldToLocal(_fpCrumbOrigin);
+            _fpCrumbOrigin.y += 0.02;
+            _fpCrumbOrigin.z += 0.035;
+            for (const biteNum of pendingAppleCrumbBites) {
+                firstPersonCrumbs.burst(_fpCrumbOrigin, biteNum, 1);
+            }
+            pendingAppleCrumbBites.length = 0;
+        }
+        firstPersonCrumbs.update(dt);
+    }
     handPivot.scale.setScalar(1);
 }
 
@@ -3827,7 +3882,8 @@ let breath = MAX_BREATH, breathTimer = 0;
 let regenTimer = 0, starveTimer = 0, invuln = 0, hurtFlash = 0;
 let dead = false;
 let hungerStageShown = 'ok';
-const eat = { active: false, progress: 0, slot: -1, id: 0 };
+const eat = { active: false, progress: 0, slot: -1, id: 0, lastStage: 0 };
+const pendingAppleCrumbBites = [];
 const hurtEl = document.getElementById('hurt');
 const deathEl = document.getElementById('death');
 
@@ -4206,7 +4262,21 @@ function die(source = 'generic') {
     saveGame(true, true);
 }
 
-function cancelEating() { eat.active = false; eat.progress = 0; }
+function cancelEating() {
+    eat.active = false;
+    eat.progress = 0;
+    eat.lastStage = 0;
+    pendingAppleCrumbBites.length = 0;
+    if (heldMesh?.userData?.isAppleModel) {
+        setAppleBiteStage(heldMesh, 0);
+        applyFirstPersonAppleGrip(heldMesh);
+    }
+    const tpHeld = playerHeldItem?.anchor?.children?.[0];
+    if (tpHeld?.userData?.isAppleModel) {
+        setAppleBiteStage(tpHeld, 0);
+        applyThirdPersonAppleGrip(tpHeld);
+    }
+}
 
 function updateEating(dt) {
     if (!eat.active) return;
@@ -4214,7 +4284,17 @@ function updateEating(dt) {
     const food = st && ITEMS[st.id].food;
     if (!food || selectedSlot !== eat.slot || st.id !== eat.id || hunger >= MAX_HUNGER) { cancelEating(); return; }
     eat.progress += dt / EAT_TIME;
+    const isApple = ITEMS[eat.id]?.sprite?.kind === 'apple';
+    const sample = sampleEatAnimation(Math.min(0.9999, eat.progress));
+    if (sample.stage > eat.lastStage) {
+        for (let s = eat.lastStage + 1; s <= sample.stage; s++) {
+            audio.play(isApple ? 'eat-crunch' : 'eat-chew', { rate: eatBitePitch(s) });
+            if (isApple) pendingAppleCrumbBites.push(s);
+        }
+        eat.lastStage = sample.stage;
+    }
     if (eat.progress >= 1) {
+        audio.play('eat-swallow', { rate: 0.98 + Math.random() * 0.06 });
         hunger = Math.min(MAX_HUNGER, hunger + food.hunger);
         saturation = Math.min(hunger, saturation + food.sat);
         inventory.removeOne(selectedSlot);
@@ -5032,6 +5112,12 @@ async function init() {
     locomotionRig = rigLocomotion(THREE, playerModel);
     playerModel.root.visible = false;
     scene.add(playerModel.root);
+    thirdPersonCrumbs = createAppleCrumbSystem(THREE, scene, {
+        sizeMin: 0.015,
+        sizeSpan: 0.009,
+        gravity: -3.2,
+        spread: 1.25,
+    });
 
     createHand();
     worldSky.create(scene);
@@ -5422,7 +5508,14 @@ async function init() {
         // Comer funciona mirando para qualquer lugar (inclusive um bloco).
         if (intent === 'eat') {
             if (isCreative()) return;
-            if (hunger < MAX_HUNGER) { eat.active = true; eat.progress = 0; eat.slot = selectedSlot; eat.id = held.id; }
+            if (hunger < MAX_HUNGER) {
+                eat.active = true;
+                eat.progress = 0;
+                eat.lastStage = 0;
+                eat.slot = selectedSlot;
+                eat.id = held.id;
+                pendingAppleCrumbBites.length = 0;
+            }
             else showToast('Você não está com fome');
             return;
         }
@@ -5785,6 +5878,20 @@ function updateThirdPerson() {
     playerModel.rightArm.rotation.z = 0;
     locomotionRig.elbows[1].rotation.z = 0;
     if (heldSwordPose) applyThirdPersonSwordPose(playerModel, locomotionRig, heldSwordPose, 1 - swimState.blend);
+    const tpHeldMesh = playerHeldItem.anchor.children[0] ?? null;
+    setAppleBiteStage(tpHeldMesh, currentEatPose.stage);
+    applyThirdPersonEatPose(playerModel, locomotionRig, tpHeldMesh, currentEatPose, 1 - swimState.blend);
+    if (pendingAppleCrumbBites.length > 0 && thirdPersonCrumbs && tpHeldMesh) {
+        playerModel.root.updateMatrixWorld(true);
+        const mouthObj = playerModel.head.getObjectByName('mouth') || playerModel.head;
+        mouthObj.getWorldPosition(_tpMouthWorld);
+        tpHeldMesh.getWorldPosition(_tpAppleWorld);
+        _tpMouthWorld.lerp(_tpAppleWorld, 0.58);
+        for (const biteNum of pendingAppleCrumbBites) {
+            thirdPersonCrumbs.burst(_tpMouthWorld, biteNum, 1);
+        }
+        pendingAppleCrumbBites.length = 0;
+    }
     playerArmor.sync();
     camera.getWorldDirection(thirdDirection).multiplyScalar(cameraOffsetSign(cameraView));
     const hit = raycastVoxels(camera.position, thirdDirection, THIRD_PERSON_DISTANCE, {
@@ -5900,6 +6007,7 @@ function animate() {
         updateSurvival(dt);
         updateItemEntities(dt);
         breakParticles.update(dt);
+        if (thirdPersonCrumbs) thirdPersonCrumbs.update(dt);
     }
     // A dormida anda mesmo com o jogador parado: ela é quem mexe na câmera.
     if (sleep.active) updateSleep(dt);
@@ -5967,11 +6075,12 @@ function animate() {
     if (online) updateOnlinePlay(now, dt);
     const thirdViewActive = updateThirdPerson();
     let visualCamera = camera;
-    if (!thirdViewActive && !sleep.active && swimState.blend > 0) {
+    if (!thirdViewActive && !sleep.active && (swimState.blend > 0 || currentEatPose.camNod > 0)) {
         // Só a imagem balança. A câmera original continua nos olhos e é usada
         // por mira, alcance, interação e controles; sem rotação do horizonte.
         swimCamera.copy(camera, false);
-        swimCamera.position.y += swimFirstPersonPose(swimState).cameraY;
+        if (swimState.blend > 0) swimCamera.position.y += swimFirstPersonPose(swimState).cameraY;
+        if (currentEatPose.camNod > 0) swimCamera.rotateX(-currentEatPose.camNod);
         swimCamera.updateMatrixWorld();
         visualCamera = swimCamera;
     }

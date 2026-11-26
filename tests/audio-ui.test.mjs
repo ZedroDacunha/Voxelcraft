@@ -157,6 +157,7 @@ test('todas as receitas são válidas e os nomes de arquivo são previsíveis', 
         'shear',
         'door-open', 'door-close',
         'place-grass', 'place-dirt', 'place-stone', 'place-wood', 'place-sand',
+        'eat-crunch', 'eat-chew', 'eat-swallow',
     ]);
     for (const name of SOUND_NAMES) {
         const recipe = SOUND_RECIPES[name];
