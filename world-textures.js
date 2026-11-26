@@ -1,3 +1,4 @@
+import { soilPixel, grassTopPixel, grassSidePixel } from './world-ground-textures.js';
 import { hash2, mulberry32 } from './world-math.js';
 import { copperArmorSprite } from './world-copper-armor-icons.js';
 import { ironArmorSprite } from './world-iron-armor-icons.js';
@@ -82,12 +83,6 @@ export function createTilePixelSource() {
         [TILE.BED_TOP_BLACK]: [58, 58, 62], [TILE.BED_SIDE_BLACK]: [58, 58, 62],
     };
     const BED_PILLOW_TINT = [238, 236, 230];
-    const grassEdges = [0, 1].map(variant => Array.from({ length: TILE_PX }, (_, x) =>
-        4 + Math.floor(hash2(x, variant, 2024) * 4)));
-    const grassRoots = [0, 1].map(variant => Array.from({ length: TILE_PX }, (_, x) => {
-        const rootChance = hash2(Math.floor(x / 2), 0, 2781 + variant * 91);
-        return rootChance > 0.7 ? 1 + Math.floor(hash2(x, variant, 991) * 3) : 0;
-    }));
     const variantBase = {
         [TILE.GRASS_TOP_ALT]: TILE.GRASS_TOP, [TILE.GRASS_SIDE_ALT]: TILE.GRASS_SIDE,
         [TILE.DIRT_ALT]: TILE.DIRT, [TILE.STONE_ALT]: TILE.STONE, [TILE.LEAVES_ALT]: TILE.LEAVES,
@@ -101,44 +96,14 @@ export function createTilePixelSource() {
             noiseSample++;
             return (value * 2 - 1) * radius;
         };
-        const soilPixel = (px, py) => {
-            const patch = hash2(Math.floor(px / 4), Math.floor(py / 4), 431 + alt * 73);
-            const fleck = hash2(Math.floor(px / 2), Math.floor(py / 2), 8101 + alt * 109);
-            let color = patch < 0.18 ? [103, 70, 46] : patch > 0.81 ? [151, 105, 68] : [128, 87, 56];
-            if (fleck > 0.975) color = [194, 144, 96];
-            else if (fleck > 0.84) color = [166, 113, 73];
-            else if (fleck < 0.08) color = [88, 61, 42];
-            else if (fleck < 0.11) color = [129, 123, 108];
-            const fine = (hash2(px, py, 2203 + alt * 137) - 0.5) * 10;
-            return color.map(channel => channel + fine);
-        };
-        const grassPixel = (px, py, muted = false) => {
-            const patch = hash2(Math.floor(px / 4), Math.floor(py / 3), 2909 + alt * 131);
-            const clump = hash2(Math.floor(px / 2), Math.floor(py / 2), 6343 + alt * 157);
-            const fleck = hash2(px, py, 511 + alt * 191);
-            let color = patch < 0.16 ? [68, 112, 45] : patch > 0.84 ? [105, 148, 60] : [86, 133, 53];
-            if (clump > 0.91) color = [116, 157, 65];
-            else if (clump < 0.08) color = [61, 103, 42];
-            if (fleck > 0.985) color = [127, 166, 74];
-            else if (fleck < 0.015) color = [53, 91, 38];
-            const grain = (hash2(px, py, 927 + alt * 233) - 0.5) * 8;
-            color = color.map(channel => channel + grain);
-            return muted ? color.map(channel => channel * 0.78) : color;
-        };
         if (isMineralOreTile(tile)) return createMineralOrePixel(tile, x, y, stonePixel);
         switch (tile) {
-            case TILE.GRASS_TOP: {
-                return grassPixel(x, y);
-            }
-            case TILE.DIRT: {
-                return soilPixel(x, y);
-            }
-            case TILE.GRASS_SIDE: {
-                const edge = grassEdges[alt][x];
-                if (y < edge) return grassPixel(x, y);
-                if (grassRoots[alt][x] > 0 && y - edge < grassRoots[alt][x]) return grassPixel(x, y, true);
-                return soilPixel(x, y);
-            }
+            case TILE.GRASS_TOP:
+                return grassTopPixel(x, y, alt);
+            case TILE.DIRT:
+                return soilPixel(x, y, alt);
+            case TILE.GRASS_SIDE:
+                return grassSidePixel(x, y, alt);
             case TILE.STONE: {
                 // A mesma pedra que serve de fundo para todo minério.
                 return stonePixel(x, y, alt);
