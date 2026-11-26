@@ -5,6 +5,20 @@ import { applyThirdPersonAppleGrip, applyThirdPersonMuttonGrip } from './player-
 
 export const THIRD_TOOL_POSE = Object.freeze({ yaw: -Math.PI / 2, roll: -55 * Math.PI / 180, scale: 0.85 });
 export const THIRD_TOOL_GRIP = Object.freeze({ x: 0.187, y: 0.204 });
+export const THIRD_HELD_ARM_POSE = Object.freeze({ shoulderX: -0.28, elbowX: -0.36, swingDamp: 0.45 });
+
+/** Mantém o braço direito meio levantado à frente quando há um item na mão nas visões externas
+ * (3ª pessoa costas/frente e prévia do inventário), sem alterar a 1ª pessoa.
+ */
+export function applyThirdPersonHeldArmPose(model, rig, hasHeldItem, ground = null, weight = 1) {
+    if (!hasHeldItem || weight <= 0) return;
+    const armSwing = ground ? ground.arm : 0;
+    const elbowRun = ground ? ground.elbowRight : 0;
+    model.rightArm.rotation.x += (-armSwing * (1 - THIRD_HELD_ARM_POSE.swingDamp) + THIRD_HELD_ARM_POSE.shoulderX) * weight;
+    if (rig?.elbows?.[1]) {
+        rig.elbows[1].rotation.x = (THIRD_HELD_ARM_POSE.elbowX + 0.55 * elbowRun) * weight;
+    }
+}
 
 /** Item visual da terceira pessoa. As malhas compartilham geometria e material
  * com a mão em primeira pessoa; só os objetos e transformações são independentes.

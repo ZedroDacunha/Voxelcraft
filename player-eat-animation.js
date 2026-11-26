@@ -12,8 +12,8 @@ export const FIRST_PERSON_APPLE_GRIP = {
 };
 
 export const THIRD_PERSON_APPLE_GRIP = {
-    pos: [-0.01, -0.04, 0.02],
-    rot: [-0.22, -0.25, 0.06],
+    pos: [-0.01, -0.03, 0.02],
+    rot: [0.38, -0.25, 0.06],
     scale: 0.27,
 };
 

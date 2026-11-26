@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from '../vendor/three/three.module.js';
 import { createPlayerModel } from '../player-model.js';
-import { createPlayerHeldItem } from '../player-held-item.js';
+import { createPlayerHeldItem, THIRD_HELD_ARM_POSE, applyThirdPersonHeldArmPose } from '../player-held-item.js';
+import { createLocomotion, groundPose, rigLocomotion, applyGroundPose } from '../player-locomotion.js';
 
 test('item acompanha braço e compartilha recursos sem alterar primeira pessoa', () => {
     const model = createPlayerModel(THREE);
@@ -85,3 +86,33 @@ test('o cabo da espada 3D permanece no pivô da mão durante o golpe', () => {
         assert.ok(grip.distanceTo(held.anchor.getWorldPosition(new THREE.Vector3())) < 1e-9);
     }
 });
+
+test('braço em 3ª pessoa fica meio levantado ao segurar item e repousa reto com a mão vazia', () => {
+    const model = createPlayerModel(THREE);
+    const rig = rigLocomotion(THREE, model);
+    const loco = createLocomotion();
+
+    // Mão vazia: braço reto para baixo em repouso
+    const idle = groundPose(loco, 0, 0);
+    applyGroundPose(model, rig, idle, 1);
+    applyThirdPersonHeldArmPose(model, rig, false, idle, 1);
+    assert.ok(Math.abs(model.rightArm.rotation.x) < 1e-12);
+    assert.ok(Math.abs(rig.elbows[1].rotation.x) < 1e-12);
+
+    // Com item na mão em repouso: ombro e cotovelo meio levantados à frente
+    applyGroundPose(model, rig, idle, 1);
+    applyThirdPersonHeldArmPose(model, rig, true, idle, 1);
+    assert.ok(Math.abs(model.rightArm.rotation.x - THIRD_HELD_ARM_POSE.shoulderX) < 1e-9);
+    assert.ok(Math.abs(rig.elbows[1].rotation.x - THIRD_HELD_ARM_POSE.elbowX) < 1e-9);
+
+    // Caminhando com item: amortece o balanço traseiro mantendo o braço à frente
+    model.rightArm.rotation.set(0, 0, 0);
+    const backSwing = groundPose(loco, 0.16, 1); // pico de arm positivo (para trás)
+    applyGroundPose(model, rig, backSwing, 1);
+    applyThirdPersonHeldArmPose(model, rig, true, backSwing, 1);
+    assert.ok(model.rightArm.rotation.x < 0, `braço permanece à frente na caminhada: ${model.rightArm.rotation.x}`);
+    assert.ok(rig.elbows[1].rotation.x < -0.35, `cotovelo continua flexionado: ${rig.elbows[1].rotation.x}`);
+
+    model.dispose();
+});
+

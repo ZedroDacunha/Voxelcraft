@@ -319,7 +319,7 @@
     import * as THREE from '../vendor/three/three.module.js';
     import { createPlayerModel } from '../player-model.js';
     import { createLocomotion, advanceLocomotion, groundPose, rigLocomotion, applyGroundPose } from '../player-locomotion.js';
-    import { createPlayerHeldItem } from '../player-held-item.js';
+    import { createPlayerHeldItem, applyThirdPersonHeldArmPose } from '../player-held-item.js';
     import { createProgressiveAppleModel, setAppleBiteStage } from '../world-apple-model.js';
     import { createAudioSystem } from '../world-audio.js';
     import {
@@ -460,12 +460,15 @@
           advanceLocomotion(loco, nextSteps - prevSteps, false, dt);
           const pose = groundPose(loco, walkPhase % Math.PI, 0.82);
           applyGroundPose(model, rig, pose, 1);
+          applyThirdPersonHeldArmPose(model, rig, true, pose, 1);
           // Desliza os blocos do chão para trás dando sensação clara de caminhada
           ground.position.z = -((nowSec * 1.35) % 2);
         } else {
           advanceLocomotion(loco, 0, false, dt);
-          applyGroundPose(model, rig, groundPose(loco, 0, 0), 1);
-          model.rightArm.rotation.x = -0.06 + Math.sin(nowSec * 1.9) * 0.025;
+          const pose = groundPose(loco, 0, 0);
+          applyGroundPose(model, rig, pose, 1);
+          applyThirdPersonHeldArmPose(model, rig, true, pose, 1);
+          model.rightArm.rotation.x += Math.sin(nowSec * 1.9) * 0.025;
           model.leftArm.rotation.x = 0.04 - Math.sin(nowSec * 1.9) * 0.025;
           model.head.rotation.y = Math.sin(nowSec * 1.1) * 0.03;
           ground.position.z = 0;
