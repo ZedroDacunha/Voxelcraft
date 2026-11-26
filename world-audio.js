@@ -190,6 +190,19 @@ export const SOUND_RECIPES = Object.freeze({
         kind: 'noise', cut: 2500, cutTo: 2000, q: 0.4, attack: 0.004, duration: 0.08, gain: 0.10,
         thump: Object.freeze({ from: 180, to: 120, duration: 0.05, gain: 0.05 }),
     }),
+    // Comer: mordida crocante e estalada na casca/polpa da maçã, mastigação
+    // macia para carnes, e o engolir discreto ao terminar o alimento.
+    'eat-crunch': Object.freeze({
+        kind: 'noise', cut: 4200, cutTo: 1150, q: 1.9, attack: 0.001, duration: 0.085, gain: 0.16,
+        thump: Object.freeze({ from: 310, to: 145, duration: 0.055, gain: 0.075 }),
+    }),
+    'eat-chew': Object.freeze({
+        kind: 'noise', cut: 1350, cutTo: 520, q: 1.1, attack: 0.004, duration: 0.095, gain: 0.13,
+        thump: Object.freeze({ from: 195, to: 105, duration: 0.065, gain: 0.065 }),
+    }),
+    'eat-swallow': Object.freeze({
+        wave: 'triangle', from: 260, to: 135, attack: 0.008, duration: 0.095, gain: 0.09,
+    }),
 });
 
 export const SOUND_NAMES = Object.freeze(Object.keys(SOUND_RECIPES));

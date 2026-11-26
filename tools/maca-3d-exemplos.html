@@ -1,0 +1,955 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Maçã 3D — texturas contínuas no modelo C2</title>
+<style>
+  :root {
+    --bg:#1c241d; --card:#2d372d; --card2:#242d24; --border:#6c7d69;
+    --text:#ecf2e8; --muted:#c6d1c2; --accent:#a9d7a7; --accentBg:#3d563d;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:20px 24px 32px; font:15px/1.5 system-ui, -apple-system, Segoe UI, sans-serif; background:var(--bg); color:var(--text); }
+  header { max-width:1180px; margin:0 auto 14px; }
+  h1 { margin:0 0 4px; font-size:26px; }
+  .lead { margin:0 0 12px; color:var(--muted); max-width:980px; }
+  .toolbar {
+    display:flex; flex-wrap:wrap; gap:8px; align-items:center;
+    background:var(--card2); border:1px solid var(--border); border-radius:10px;
+    padding:10px 12px; max-width:1180px; margin:0 auto 18px;
+  }
+  .toolbar .group-label { font-size:13px; color:var(--muted); margin-right:2px; font-weight:600; }
+  button {
+    background:#364436; color:var(--text); border:1px solid var(--border);
+    padding:7px 12px; border-radius:8px; cursor:pointer; font:600 13px/1.2 inherit;
+    transition:background .15s, border-color .15s;
+  }
+  button:hover { background:#445644; }
+  button.active { background:var(--accentBg); border-color:var(--accent); color:#fff; box-shadow:0 0 0 1px rgba(169,215,167,.3); }
+  .sep { width:1px; height:24px; background:rgba(113,129,110,.45); margin:0 4px; }
+  .ref-mini { margin-left:auto; display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); }
+  .ref-mini canvas { width:32px; height:32px; image-rendering:pixelated; background:#192019; border:1px solid #556655; border-radius:5px; }
+  .grid {
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(330px, 1fr));
+    gap:16px; max-width:1180px; margin:0 auto;
+  }
+  article {
+    background:var(--card); border:1px solid var(--border); border-radius:10px;
+    overflow:hidden; display:flex; flex-direction:column;
+  }
+  article.recommended { border-color:var(--accent); box-shadow:0 0 0 1px rgba(169,215,167,.32); }
+  .viewer { width:100%; aspect-ratio:4/3; background:#141a14; position:relative; cursor:grab; touch-action:none; }
+  .viewer:active { cursor:grabbing; }
+  .viewer canvas { display:block; width:100% !important; height:100% !important; }
+  .badge-float {
+    position:absolute; left:10px; top:10px; font-size:11px; font-weight:700;
+    color:#e6f2e6; background:rgba(20,26,20,.82); padding:3px 9px; border-radius:999px;
+    border:1px solid rgba(169,215,167,.48); pointer-events:none;
+  }
+  .hint {
+    position:absolute; left:10px; bottom:10px; font-size:11.5px; color:#cfe0cf;
+    background:rgba(20,26,20,.72); padding:3px 8px; border-radius:999px;
+    border:1px solid rgba(113,129,110,.4); pointer-events:none;
+  }
+  .info { padding:13px 15px 15px; }
+  .info .tag {
+    display:inline-block; font-size:11.5px; color:#dce8dc; background:#3d4c3d;
+    border:1px solid #647b64; padding:2px 8px; border-radius:999px; margin-bottom:6px;
+  }
+  .info h2 { margin:0 0 4px; font-size:18px; }
+  .info p { margin:0; color:var(--muted); font-size:13.5px; }
+  footer { max-width:1180px; margin:18px auto 0; color:#aab8aa; font-size:13px; }
+  code { background:#253025; padding:1px 5px; border-radius:4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Refino C2 · ajuste fino da textura contínua</h1>
+  <p class="lead">Mantivemos <strong>100% da geometria do Refino C2</strong> (ombros largos, base afunilada, covinha funda, cabinho em 2 gomos e folha arqueada em 3 plaquinhas) e trocamos a pintura matemática por <strong>mapas desenhados à mão no mesmo estilo limpo da C Base</strong>, alinhados numa grade global 12×12×12 sem esticar pixels e sem costura nos degraus.</p>
+</header>
+
+<div class="toolbar">
+  <span class="group-label">Cena:</span>
+  <button id="mode-drop" class="active" type="button">Dropada no chão</button>
+  <button id="mode-hand" type="button">Na mão · 1ª pessoa</button>
+  <button id="mode-third" type="button">Na mão · 3ª pessoa</button>
+  <button id="mode-studio" type="button">Estúdio 360°</button>
+  <div class="sep"></div>
+  <button id="btn-eat" type="button">Simular comendo: OFF</button>
+  <button id="btn-spin" class="active" type="button">Giro automático: ON</button>
+  <div class="ref-mini">
+    <canvas id="ref-icon" width="16" height="16" aria-label="Ícone 2D de referência"></canvas>
+    <span>Ícone 16×16<br>aprovado</span>
+  </div>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<footer>
+  Estudo interativo em <code>tools/maca-3d-exemplos.html</code>. Arraste qualquer cartão para girar a câmera e use a roda do mouse para aproximar.
+</footer>
+
+<script>
+window.addEventListener('error', e => {
+  const p = document.createElement('pre');
+  p.style.cssText = 'color:#ff9b9b;position:fixed;bottom:0;left:0;right:0;background:#2a0808;padding:10px;z-index:99;margin:0;font-size:12px;white-space:pre-wrap';
+  p.textContent = e.message + '\n' + (e.filename || '') + ':' + (e.lineno || '');
+  document.body.appendChild(p);
+});
+</script>
+
+<script type="module">
+import * as THREE from '../vendor/three/three.module.js';
+import { createTextureTools } from '../world-textures.js';
+import { createPlayerModel } from '../player-model.js';
+
+const PAL = {
+  O: '#60101a', // contorno / fundo covinha
+  s: '#881422', // sombra funda rubi-vinho
+  '1': '#ac1c27', // meia-sombra
+  '2': '#d02a2c', // corpo vermelho maçã vivo
+  '3': '#ea4c3a', // luz escarlate quente
+  h: '#f68062', // meio-brilho
+  '4': '#fdc2a6', // brilho especular
+  stemD: '#623c1a',
+  stemL: '#865626',
+  leafD: '#265e22',
+  leafM: '#428e34',
+  leafL: '#70be4e',
+};
+
+const texTools = createTextureTools(THREE);
+const iconPixels = texTools.spritePixels('apple', 'food');
+{
+  const c = document.getElementById('ref-icon');
+  if (c) {
+    const ctx = c.getContext('2d');
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const rgb = iconPixels[y][x];
+      if (!rgb) continue;
+      ctx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+}
+
+const noiseCache = new Map();
+function makeNoiseTex(hex, variance = 10, seed = 7) {
+  const key = `${hex}:${variance}:${seed}`;
+  if (noiseCache.has(key)) return noiseCache.get(key);
+  const size = 16;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = size;
+  const ctx = cv.getContext('2d');
+  const col = new THREE.Color(hex);
+  const br = Math.round(col.r * 255), bg = Math.round(col.g * 255), bb = Math.round(col.b * 255);
+  let s = seed + br * 31 + bg * 17 + bb * 13;
+  const rnd = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const d = Math.round((rnd() - 0.5) * variance);
+    ctx.fillStyle = `rgb(${Math.max(0, Math.min(255, br + d))},${Math.max(0, Math.min(255, bg + d))},${Math.max(0, Math.min(255, bb + d))})`;
+    ctx.fillRect(x, y, 1, 1);
+  }
+  const tex = new THREE.CanvasTexture(cv);
+  tex.magFilter = tex.minFilter = THREE.NearestFilter;
+  if ('colorSpace' in tex && THREE.SRGBColorSpace !== undefined) tex.colorSpace = THREE.SRGBColorSpace;
+  noiseCache.set(key, tex);
+  return tex;
+}
+
+function paintCanvasMat(w, h, painter, roughness = 0.44) {
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const ctx = cv.getContext('2d');
+  painter(ctx, w, h);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.magFilter = tex.minFilter = THREE.NearestFilter;
+  if ('colorSpace' in tex && THREE.SRGBColorSpace !== undefined) tex.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.MeshStandardMaterial({ map: tex, roughness, metalness: 0.03 });
+}
+
+// ============================================================================
+// Mapas 12×12 desenhados à mão (estilo limpo da C Base, contínuos nos 360°!)
+// ============================================================================
+const SKIN_T1 = {
+  // Frente (+Z): reflexo oval h4h/h43 idêntico à C Base, corpo vermelho vivo e sombra curva
+  front: [
+    '333322222211',
+    '33hh32222211',
+    '3h4h32222111',
+    '3h432222211s',
+    '23h3222211ss',
+    '223222211sss',
+    '12222211ssss',
+    '1122211sssss',
+    '112211ssssss',
+    '1111ssssssss',
+    's1ssssssssss',
+    'ssssssssssss',
+  ],
+  // Lateral esquerda (-X): trás -> frente; coluna 11 casa linha a linha com coluna 0 da frente!
+  left: [
+    '222223333333',
+    '222222333333',
+    '222222333333',
+    '222222233333',
+    '222222223322',
+    '122222222222',
+    '112222222111',
+    '111222211111',
+    's11111111111',
+    'ss1111111111',
+    'ssssssssss1s',
+    'ssssssssssss',
+  ],
+  // Lateral direita (+X): frente -> trás; coluna 0 casa linha a linha com coluna 11 da frente!
+  right: [
+    '112222221111',
+    '112222211111',
+    '1122221111ss',
+    's11221111sss',
+    'ss111111ssss',
+    'sss111ssssss',
+    'ssssssssssss',
+    'ssssssssssss',
+    'ssssssssssss',
+    'ssssssssssss',
+    'ssssssssssss',
+    'ssssssssssss',
+  ],
+  // Costas (-Z): esq -> dir; coluna 0 casa com trás da esq e coluna 11 casa com trás da dir!
+  back: [
+    '222222211111',
+    '222222211111',
+    '2222221111ss',
+    '222221111sss',
+    '22221111ssss',
+    '122111ssssss',
+    '1111ssssssss',
+    '11ssssssssss',
+    'ssssssssssss',
+    'ssssssssssss',
+    'ssssssssssss',
+    'ssssssssssss',
+  ],
+  // Topo (+Y): linhas trás -> frente, colunas esq -> dir; miolo 4..7 é a covinha funda!
+  top: [
+    '222222211111',
+    '222222211111',
+    '222222221111',
+    '223221122111',
+    '2333sOOOs221',
+    '3333OOOO1221',
+    '333hOOOO2221',
+    '33hhsOOs2221',
+    '33hh32222211',
+    '33hh32222211',
+    '333332222211',
+    '333322222211',
+  ],
+  deepBase: false,
+};
+
+// T2: Reflexo um pouco mais encorpado e luz quente subindo até a coroa
+const SKIN_T2 = {
+  ...SKIN_T1,
+  front: [
+    '33hh32322211',
+    '3h4h33222211',
+    '344h32222211',
+    '3h433222211s',
+    '33h3222211ss',
+    '233222221sss',
+    '22222211ssss',
+    '1222211sssss',
+    '112211ssssss',
+    '1111ssssssss',
+    's1ssssssssss',
+    'ssssssssssss',
+  ],
+  left: [
+    '222233333333',
+    '222223333333',
+    '222223333333',
+    '222222333333',
+    '222222233333',
+    '122222223322',
+    '112222222222',
+    '111222221111',
+    's11122111111',
+    'ss1111111111',
+    'ssssssssss1s',
+    'ssssssssssss',
+  ],
+  top: [
+    '222222211111',
+    '222222211111',
+    '223322222111',
+    '233321132211',
+    '333hsOOOs221',
+    '33hhOOOO2221',
+    '33hhOOOO3221',
+    '3h4hsOOs3221',
+    '3h4h33222211',
+    '33hh33222211',
+    '33hh32322211',
+    '33hh32322211',
+  ],
+  deepBase: false,
+};
+
+// T3: Mesma frente limpa da T1, mas com sombra mais profunda em vinho (#60101a) na base inferior
+const SKIN_T3 = {
+  ...SKIN_T1,
+  front: [
+    '333322222211',
+    '33hh32222211',
+    '3h4h3222211s',
+    '3h43222211ss',
+    '23h322211sss',
+    '22322211ssss',
+    '1222211ssssO',
+    '112211ssssOO',
+    '11111ssssOOO',
+    's11sssssOOOO',
+    'sssssssOOOOO',
+    'ssOOOOOOOOOO',
+  ],
+  left: [
+    '222223333333',
+    '222222333333',
+    '222222333333',
+    '222222233333',
+    '122222223322',
+    '112222222222',
+    's11222221111',
+    'ss1122111111',
+    'sss111111111',
+    'sssss11111ss',
+    'Osssssssssss',
+    'OOssssssssss',
+  ],
+  right: [
+    '112222211111',
+    '1122221111ss',
+    's11221111sss',
+    'ss11111sssss',
+    'sss11sssssss',
+    'sssssssssssO',
+    'OsssssssssOO',
+    'OOsssssssOOO',
+    'OOOsssssOOOO',
+    'OOOOOOOOOOOO',
+    'OOOOOOOOOOOO',
+    'OOOOOOOOOOOO',
+  ],
+  back: [
+    '222222111111',
+    '2222221111ss',
+    '222221111sss',
+    '2222111sssss',
+    '122111ssssss',
+    '1111sssssssO',
+    's11sssssssOO',
+    'sssssssssOOO',
+    'ssssssssOOOO',
+    'sssssssOOOOO',
+    'OOOOssOOOOOO',
+    'OOOOOOOOOOOO',
+  ],
+  deepBase: true,
+};
+
+function sampleContinuousSkin(skin, wx, wy, wz, face) {
+  // Grade global única de 12×12×12 cobrindo exatamente o volume [-3.27..+3.27, -3.42..+3.35, -3.27..+3.27]:
+  // qualquer caixa ou degrau lê exatamente a mesma grade espacial, sem esticar nem desalinhar pixels!
+  const ix = Math.max(0, Math.min(11, Math.floor(((wx + 3.27) / 6.54) * 12)));
+  const iy = Math.max(0, Math.min(11, Math.floor(((3.35 - wy) / 6.77) * 12)));
+  const iz = Math.max(0, Math.min(11, Math.floor(((wz + 3.27) / 6.54) * 12)));
+
+  if (face === '+Y' && wy < 2.85 && Math.abs(wx) < 1.0 && Math.abs(wz) < 1.0) {
+    return PAL[Math.hypot(wx, wz) < 0.58 ? 'O' : 's'];
+  }
+  if (face === '-Y') {
+    if (wy < -3.3 && Math.hypot(wx, wz) < 0.85) return PAL.O;
+    return skin.deepBase ? PAL.O : PAL.s;
+  }
+  if (face === '+Y') return PAL[skin.top[iz][ix]];
+
+  if (wz >= Math.abs(wx)) return PAL[skin.front[iy][ix]];
+  if (wz <= -Math.abs(wx)) return PAL[skin.back[iy][ix]];
+  if (wx < 0) return PAL[skin.left[iy][iz]];
+  return PAL[skin.right[iy][11 - iz]];
+}
+
+/**
+ * Pinta cada uma das 6 faces de uma caixa do C2 em alta precisão com NearestFilter,
+ * amostrando a grade global 12×12×12 para zero distorção e continuidade perfeita entre caixas.
+ */
+function makeC2SkinBox(sx, sy, sz, cx, cy, cz, skin, roughness = 0.44) {
+  const RES = 8; // 8 sub-amostras por unidade garantem bordas de pixel perfeitamente alinhadas entre caixas
+  const rx = Math.max(4, Math.round(sx * RES));
+  const ry = Math.max(4, Math.round(sy * RES));
+  const rz = Math.max(4, Math.round(sz * RES));
+
+  const specs = [
+    { w: rz, h: ry, f: '+X', pt: (u, v) => [cx + sx / 2, cy + sy / 2 - (v + 0.5) * (sy / ry), cz + sz / 2 - (u + 0.5) * (sz / rz)] },
+    { w: rz, h: ry, f: '-X', pt: (u, v) => [cx - sx / 2, cy + sy / 2 - (v + 0.5) * (sy / ry), cz - sz / 2 + (u + 0.5) * (sz / rz)] },
+    { w: rx, h: rz, f: '+Y', pt: (u, v) => [cx - sx / 2 + (u + 0.5) * (sx / rx), cy + sy / 2, cz - sz / 2 + (v + 0.5) * (sz / rz)] },
+    { w: rx, h: rz, f: '-Y', pt: (u, v) => [cx - sx / 2 + (u + 0.5) * (sx / rx), cy - sy / 2, cz + sz / 2 - (v + 0.5) * (sz / rz)] },
+    { w: rx, h: ry, f: '+Z', pt: (u, v) => [cx - sx / 2 + (u + 0.5) * (sx / rx), cy + sy / 2 - (v + 0.5) * (sy / ry), cz + sz / 2] },
+    { w: rx, h: ry, f: '-Z', pt: (u, v) => [cx + sx / 2 - (u + 0.5) * (sx / rx), cy + sy / 2 - (v + 0.5) * (sy / ry), cz - sz / 2] },
+  ];
+
+  const mats = specs.map(sp => paintCanvasMat(sp.w, sp.h, (ctx, w, h) => {
+    for (let v = 0; v < h; v++) {
+      for (let u = 0; u < w; u++) {
+        const [wx, wy, wz] = sp.pt(u, v);
+        ctx.fillStyle = sampleContinuousSkin(skin, wx, wy, wz, sp.f);
+        ctx.fillRect(u, v, 1, 1);
+      }
+    }
+  }, roughness));
+
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mats);
+  mesh.position.set(cx, cy, cz);
+  return mesh;
+}
+
+function makeStemSegment(sx, sy, sz, cx, cy, cz, rotZ) {
+  const mats = [0, 1, 2, 3, 4, 5].map(fi => paintCanvasMat(4, 6, (ctx, w, h) => {
+    for (let v = 0; v < h; v++) for (let u = 0; u < w; u++) {
+      const lit = fi === 2 || (v < 3 && fi !== 3 && u < 3);
+      ctx.fillStyle = lit ? PAL.stemL : PAL.stemD;
+      ctx.fillRect(u, v, 1, 1);
+    }
+  }, 0.84));
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mats);
+  mesh.position.set(cx, cy, cz);
+  mesh.rotation.z = rotZ;
+  return mesh;
+}
+
+function normalizeUnitHeight(group) {
+  const box = new THREE.Box3().setFromObject(group);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const wrapper = new THREE.Group();
+  const s = 1 / Math.max(0.001, size.y);
+  group.scale.multiplyScalar(s);
+  group.position.set(-center.x * s, -center.y * s, -center.z * s);
+  wrapper.add(group);
+  return wrapper;
+}
+
+/** Constrói EXATAMENTE a geometria aprovada do Refino C2 com o mapa de textura escolhido. */
+function buildC2WithSkin(skin) {
+  const g = new THREE.Group();
+
+  // EXATAMENTE as dimensões e posições do C2:
+  g.add(makeC2SkinBox(5.5,  3.3,  5.5,   0,     1.05,   0,     skin)); // corpo alto largo
+  g.add(makeC2SkinBox(4.8,  2.2,  4.8,   0,    -1.70,   0,     skin)); // barriga baixa menor
+
+  // 4 bochechas altas
+  g.add(makeC2SkinBox(4.3,  3.6,  0.52,  0,     0.75,   3.01,  skin));
+  g.add(makeC2SkinBox(4.3,  3.6,  0.52,  0,     0.75,  -3.01,  skin));
+  g.add(makeC2SkinBox(0.52, 3.6,  4.3,  -3.01,  0.75,   0,     skin));
+  g.add(makeC2SkinBox(0.52, 3.6,  4.3,   3.01,  0.75,   0,     skin));
+
+  // Coroa de 4 ombros no topo com covinha central funda
+  g.add(makeC2SkinBox(1.35, 0.65, 4.3,  -1.55,  3.025,  0,     skin));
+  g.add(makeC2SkinBox(1.35, 0.65, 4.3,   1.55,  3.025,  0,     skin));
+  g.add(makeC2SkinBox(1.75, 0.65, 1.35,  0,     3.025,  1.48,  skin));
+  g.add(makeC2SkinBox(1.75, 0.65, 1.35,  0,     3.025, -1.48,  skin));
+
+  // Base afunilada
+  g.add(makeC2SkinBox(3.5,  0.62, 3.5,   0,    -3.11,   0,     skin));
+
+  // Cabinho em 2 gomos de madeira (idêntico ao C2)
+  g.add(makeStemSegment(0.78, 1.65, 0.78,  0,    3.45, 0, 0.04));
+  g.add(makeStemSegment(0.72, 1.35, 0.72, -0.18, 4.72, 0, 0.22));
+
+  // Folha arqueada em 3 plaquinhas escalonadas (idêntica ao C2, com pintura pixelada limpa)
+  const leafGroup = new THREE.Group();
+  const petioleMat = new THREE.MeshStandardMaterial({ color: PAL.leafD, roughness: 0.55 });
+  const bladeMat = paintCanvasMat(5, 4, ctx => {
+    const rows = ['lllmm', 'llmmL', 'mmmmL', 'LLLLL'];
+    const m = { l: PAL.leafL, m: PAL.leafM, L: PAL.leafD };
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 5; x++) { ctx.fillStyle = m[rows[y][x]]; ctx.fillRect(x, y, 1, 1); }
+  }, 0.46);
+  const tipMat = new THREE.MeshStandardMaterial({ color: PAL.leafL, roughness: 0.45 });
+
+  const p1 = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.42, 0.95), petioleMat);
+  p1.position.set(0.55, 0.05, 0);
+  const p2 = new THREE.Mesh(new THREE.BoxGeometry(2.05, 0.44, 1.72), bladeMat);
+  p2.position.set(2.0, 0.24, 0.04);
+  const p3 = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.38, 1.02), tipMat);
+  p3.position.set(3.55, 0.14, 0.06);
+  p3.rotation.z = -0.16;
+  leafGroup.add(p1, p2, p3);
+  leafGroup.position.set(0.18, 4.12, 0);
+  leafGroup.rotation.set(0.16, -0.18, 0.32);
+  g.add(leafGroup);
+
+  return normalizeUnitHeight(g);
+}
+
+// C · Base original mantida no 4º cartão só para comparar o estilo da textura lado a lado
+function buildCOriginal() {
+  const g = new THREE.Group();
+  const frontMat = paintCanvasMat(8, 8, ctx => {
+    const rows = ['3hh13221','h4h32221','h432221s','3h32221s','2322211s','122211ss','1121ssss','1sssssss'];
+    const m = { '4': PAL['4'], h: PAL.h, '3': PAL['3'], '2': PAL['2'], '1': PAL['1'], s: PAL.s };
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { ctx.fillStyle = m[rows[y][x]]; ctx.fillRect(x, y, 1, 1); }
+  });
+  const sideLightMat = paintCanvasMat(8, 8, ctx => {
+    const rows = ['33332221','3h332221','3h322221','33222211','2222211s','122211ss','1111ssss','ssssssss'];
+    const m = { h: PAL.h, '3': PAL['3'], '2': PAL['2'], '1': PAL['1'], s: PAL.s };
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { ctx.fillStyle = m[rows[y][x]]; ctx.fillRect(x, y, 1, 1); }
+  });
+  const backDarkMat = paintCanvasMat(8, 8, ctx => {
+    const rows = ['2221111s','2222111s','222111ss','22111sss','1111ssss','11ssssss','ssssssss','ssssssss'];
+    const m = { '2': PAL['2'], '1': PAL['1'], s: PAL.s };
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { ctx.fillStyle = m[rows[y][x]]; ctx.fillRect(x, y, 1, 1); }
+  });
+  const topMat = paintCanvasMat(8, 8, ctx => {
+    const rows = ['33322211','3hh22221','3h2ss221','22ssss21','22ssss11','222ss111','1222111s','111111ss'];
+    const m = { h: PAL.h, '3': PAL['3'], '2': PAL['2'], '1': PAL['1'], s: PAL.O };
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { ctx.fillStyle = m[rows[y][x]]; ctx.fillRect(x, y, 1, 1); }
+  });
+  const bottomMat = new THREE.MeshStandardMaterial({ map: makeNoiseTex(PAL.s, 8, 5), roughness: 0.6 });
+  const coreMats = [backDarkMat, sideLightMat, topMat, bottomMat, frontMat, backDarkMat];
+
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(5.6, 5.8, 5.6), coreMats));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(4.4, 4.6, 6.6), coreMats));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(6.6, 4.6, 4.4), coreMats));
+
+  const lobeMatL = new THREE.MeshStandardMaterial({ map: makeNoiseTex(PAL['3'], 6, 9), roughness: 0.42 });
+  const lobeMatR = new THREE.MeshStandardMaterial({ map: makeNoiseTex(PAL['2'], 6, 11), roughness: 0.46 });
+  for (const [lx, lz, m] of [[-1.45, 0, lobeMatL], [1.45, 0, lobeMatR], [0, 1.45, lobeMatL], [0, -1.45, lobeMatR]]) {
+    const lobe = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.75, 1.9), m);
+    lobe.position.set(lx, 3.05, lz);
+    g.add(lobe);
+  }
+  const baseCap = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.7, 4.0), bottomMat);
+  baseCap.position.set(0, -3.1, 0);
+  g.add(baseCap);
+
+  const stem = new THREE.Mesh(
+    new THREE.BoxGeometry(0.85, 2.6, 0.85),
+    new THREE.MeshStandardMaterial({ map: makeNoiseTex(PAL.stemL, 14, 21), roughness: 0.85 })
+  );
+  stem.position.set(-0.1, 4.0, 0);
+  stem.rotation.z = 0.12;
+  g.add(stem);
+
+  const leafTopMat = paintCanvasMat(6, 4, ctx => {
+    const rows = ['llmmmm', 'lllmmL', 'mmmmmL', 'mLLLLL'];
+    const m = { l: PAL.leafL, m: PAL.leafM, L: PAL.leafD };
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 6; x++) { ctx.fillStyle = m[rows[y][x]]; ctx.fillRect(x, y, 1, 1); }
+  });
+  const leafGroup = new THREE.Group();
+  const leafBlade = new THREE.Mesh(new THREE.BoxGeometry(3.1, 0.48, 1.75), leafTopMat);
+  leafBlade.position.set(1.65, 0.25, 0.1);
+  leafGroup.add(leafBlade);
+  const leafTip = new THREE.Mesh(
+    new THREE.BoxGeometry(1.3, 0.42, 1.1),
+    new THREE.MeshStandardMaterial({ map: makeNoiseTex(PAL.leafL, 8, 3), roughness: 0.55 })
+  );
+  leafTip.position.set(3.2, 0.52, 0.1);
+  leafGroup.add(leafTip);
+  leafGroup.position.set(0.1, 4.15, 0);
+  leafGroup.rotation.set(0.18, -0.2, 0.30);
+  g.add(leafGroup);
+
+  return normalizeUnitHeight(g);
+}
+
+// ============================================================================
+// Cenas de inspeção: Dropada no chão, 1ª pessoa, 3ª pessoa e Estúdio
+// ============================================================================
+function createGrassPedestal() {
+  const group = new THREE.Group();
+  const topTex = makeNoiseTex('#5f9e43', 18, 101);
+  const dirtTex = makeNoiseTex('#7a5536', 18, 202);
+
+  const sideCv = document.createElement('canvas');
+  sideCv.width = sideCv.height = 16;
+  const sctx = sideCv.getContext('2d');
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    const grassLine = 3 + ((x * 7 + 3) % 3 === 0 ? 1 : 0);
+    const base = y < grassLine ? [95, 158, 67] : [122, 85, 54];
+    const n = (((x * 37 + y * 19) % 13) - 6) * 2;
+    sctx.fillStyle = `rgb(${base[0] + n},${base[1] + n},${base[2] + n})`;
+    sctx.fillRect(x, y, 1, 1);
+  }
+  const sideTex = new THREE.CanvasTexture(sideCv);
+  sideTex.magFilter = sideTex.minFilter = THREE.NearestFilter;
+  if ('colorSpace' in sideTex && THREE.SRGBColorSpace !== undefined) sideTex.colorSpace = THREE.SRGBColorSpace;
+
+  const sideMat = new THREE.MeshStandardMaterial({ map: sideTex, roughness: 0.92 });
+  const topMat = new THREE.MeshStandardMaterial({ map: topTex, roughness: 0.90 });
+  const botMat = new THREE.MeshStandardMaterial({ map: dirtTex, roughness: 0.95 });
+
+  const block = new THREE.Mesh(
+    new THREE.BoxGeometry(1.15, 0.55, 1.15),
+    [sideMat, sideMat, topMat, botMat, sideMat, sideMat]
+  );
+  block.position.y = -0.275;
+  group.add(block);
+
+  const shadow = new THREE.Mesh(
+    new THREE.CircleGeometry(0.22, 24),
+    new THREE.MeshBasicMaterial({ color: 0x0d160b, transparent: true, opacity: 0.45 })
+  );
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.position.y = 0.004;
+  group.add(shadow);
+  group.userData.shadow = shadow;
+  return group;
+}
+
+function createFirstPersonRig(appleClone) {
+  const rig = new THREE.Group();
+  const handPivot = new THREE.Group();
+  rig.add(handPivot);
+
+  const sleeve = new THREE.Mesh(
+    new THREE.BoxGeometry(0.16, 0.16, 0.42),
+    new THREE.MeshStandardMaterial({ map: makeNoiseTex('#536b47', 12, 11), roughness: 0.88 })
+  );
+  sleeve.position.set(0, 0, -0.20);
+
+  const hand = new THREE.Mesh(
+    new THREE.BoxGeometry(0.13, 0.13, 0.20),
+    new THREE.MeshStandardMaterial({ map: makeNoiseTex('#d6a67d', 10, 12), roughness: 0.84 })
+  );
+  hand.position.set(0, 0, -0.50);
+
+  const heldAnchor = new THREE.Group();
+  heldAnchor.position.set(-0.02, 0.09, -0.60);
+  appleClone.scale.setScalar(0.28);
+  appleClone.rotation.set(0.12, -0.42, 0.06);
+  heldAnchor.add(appleClone);
+
+  handPivot.add(sleeve, hand, heldAnchor);
+  rig.userData.handPivot = handPivot;
+  rig.userData.heldAnchor = heldAnchor;
+  return rig;
+}
+
+function createThirdPersonRig(appleClone) {
+  const group = new THREE.Group();
+  const player = createPlayerModel(THREE);
+  player.root.position.y = 0;
+  group.add(player.root);
+
+  const heldAnchor = new THREE.Group();
+  heldAnchor.position.set(0, -0.58, 0.20);
+  appleClone.scale.setScalar(0.30);
+  appleClone.rotation.set(0.18, 0.25, 0);
+  heldAnchor.add(appleClone);
+  player.rightArm.add(heldAnchor);
+  player.rightArm.rotation.x = -0.55;
+
+  const floor = new THREE.Mesh(
+    new THREE.CircleGeometry(0.75, 32),
+    new THREE.MeshBasicMaterial({ color: 0x0e150e, transparent: true, opacity: 0.45 })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = 0.002;
+  group.add(floor);
+
+  group.userData.player = player;
+  group.userData.heldAnchor = heldAnchor;
+  return group;
+}
+
+const OPTIONS = [
+  {
+    id: 'c2-t1',
+    badge: 'C2 · Textura 1 ★',
+    tag: 'Igual à C Base, 100% contínua',
+    name: 'C2 · Clássica Contínua',
+    desc: 'Geometria intacta do C2 com a mesma pintura pixelada limpa da C Base, agora alinhada numa grade global 12×12×12: sem esticar pixels, sem duplicar brilho e sem emenda em nenhum degrau.',
+    build: () => buildC2WithSkin(SKIN_T1),
+    recommended: true,
+  },
+  {
+    id: 'c2-t2',
+    badge: 'C2 · Textura 2',
+    tag: 'Reflexo um pouco maior',
+    name: 'C2 · Brilho Mais Quente no Ombro',
+    desc: 'Mesma geometria do C2 e mesma continuidade, com o reflexo lustroso de 3 px abraçando um pouco mais o ombro superior esquerdo e a coroa.',
+    build: () => buildC2WithSkin(SKIN_T2),
+    recommended: false,
+  },
+  {
+    id: 'c2-t3',
+    badge: 'C2 · Textura 3',
+    tag: 'Mais contraste na base',
+    name: 'C2 · Sombra Profunda em Vinho',
+    desc: 'Mesma frente limpa da Textura 1 no modelo C2, puxando a base afunilada e a parte de baixo da sombra para o vinho escuro (#60101a) do ícone 2D.',
+    build: () => buildC2WithSkin(SKIN_T3),
+    recommended: false,
+  },
+  {
+    id: 'c-base',
+    badge: 'Referência',
+    tag: 'C Base (antiga c/ emendas)',
+    name: 'C · Base original (referência)',
+    desc: 'Mantida aqui apenas para você comparar lado a lado que o desenho da pintura na Textura 1 ficou fiel à base, mas sem a repetição nos degraus.',
+    build: buildCOriginal,
+    recommended: false,
+  },
+];
+
+let currentMode = 'drop';
+let eating = false;
+let autoSpin = true;
+
+const gridEl = document.getElementById('grid');
+const cards = [];
+
+for (const opt of OPTIONS) {
+  const article = document.createElement('article');
+  if (opt.recommended) article.classList.add('recommended');
+  article.innerHTML = `
+    <div class="viewer">
+      <div class="badge-float">${opt.badge}</div>
+      <div class="hint">Arraste para girar · Scroll aproxima</div>
+    </div>
+    <div class="info">
+      <span class="tag">${opt.tag}</span>
+      <h2>${opt.name}</h2>
+      <p>${opt.desc}</p>
+    </div>`;
+  gridEl.appendChild(article);
+
+  const viewerEl = article.querySelector('.viewer');
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  if ('outputColorSpace' in renderer && THREE.SRGBColorSpace !== undefined) {
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+  }
+  viewerEl.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const orbitCam = new THREE.PerspectiveCamera(42, 4 / 3, 0.05, 50);
+  const fpCam = new THREE.PerspectiveCamera(68, 4 / 3, 0.02, 50);
+  fpCam.position.set(0, 0, 0);
+
+  scene.add(new THREE.HemisphereLight(0xf6f9f2, 0x2c3829, 0.95));
+  const keyLight = new THREE.DirectionalLight(0xfff5e4, 1.30);
+  keyLight.position.set(4, 7, 5);
+  scene.add(keyLight);
+  const fillLight = new THREE.DirectionalLight(0xcfe2ff, 0.42);
+  fillLight.position.set(-5, 2, -4);
+  scene.add(fillLight);
+
+  const dropGroup = new THREE.Group();
+  const pedestal = createGrassPedestal();
+  dropGroup.add(pedestal);
+  const dropApple = opt.build();
+  dropApple.scale.setScalar(0.42);
+  dropGroup.add(dropApple);
+  scene.add(dropGroup);
+
+  const studioGroup = new THREE.Group();
+  const studioApple = opt.build();
+  studioApple.scale.setScalar(0.88);
+  studioGroup.add(studioApple);
+  const studioFloor = new THREE.Mesh(
+    new THREE.CircleGeometry(0.65, 36),
+    new THREE.MeshBasicMaterial({ color: 0x0c110c, transparent: true, opacity: 0.5 })
+  );
+  studioFloor.rotation.x = -Math.PI / 2;
+  studioFloor.position.y = -0.48;
+  studioGroup.add(studioFloor);
+  scene.add(studioGroup);
+
+  const handGroup = new THREE.Group();
+  const fpRig = createFirstPersonRig(opt.build());
+  handGroup.add(fpRig);
+  const groundPlane = new THREE.Mesh(
+    new THREE.PlaneGeometry(18, 18),
+    new THREE.MeshStandardMaterial({ color: 0x4b7f38, roughness: 0.95 })
+  );
+  groundPlane.rotation.x = -Math.PI / 2;
+  groundPlane.position.y = -1.5;
+  handGroup.add(groundPlane);
+  scene.add(handGroup);
+
+  const thirdGroup = new THREE.Group();
+  const tpRig = createThirdPersonRig(opt.build());
+  thirdGroup.add(tpRig);
+  scene.add(thirdGroup);
+
+  const ctrl = { theta: 0.55, phi: 1.15, radius: 1.75, fpYaw: 0, fpPitch: -0.05 };
+  let dragging = false, lx = 0, ly = 0;
+  renderer.domElement.addEventListener('pointerdown', e => {
+    dragging = true; lx = e.clientX; ly = e.clientY;
+    renderer.domElement.setPointerCapture(e.pointerId);
+  });
+  renderer.domElement.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const dx = e.clientX - lx, dy = e.clientY - ly;
+    lx = e.clientX; ly = e.clientY;
+    if (currentMode === 'hand') {
+      ctrl.fpYaw = Math.max(-0.5, Math.min(0.5, ctrl.fpYaw - dx * 0.004));
+      ctrl.fpPitch = Math.max(-0.45, Math.min(0.45, ctrl.fpPitch - dy * 0.004));
+    } else {
+      ctrl.theta -= dx * 0.009;
+      ctrl.phi = Math.max(0.28, Math.min(Math.PI - 0.28, ctrl.phi - dy * 0.009));
+    }
+  });
+  renderer.domElement.addEventListener('pointerup', () => { dragging = false; });
+  renderer.domElement.addEventListener('pointercancel', () => { dragging = false; });
+  renderer.domElement.addEventListener('wheel', e => {
+    if (currentMode === 'hand') return;
+    e.preventDefault();
+    ctrl.radius = Math.max(0.85, Math.min(4.5, ctrl.radius + e.deltaY * 0.002));
+  }, { passive: false });
+
+  cards.push({
+    viewerEl, renderer, scene, orbitCam, fpCam,
+    dropGroup, dropApple, pedestal,
+    studioGroup, studioApple,
+    handGroup, fpRig,
+    thirdGroup, tpRig,
+    ctrl, eatBlend: 0,
+  });
+}
+
+function applyMode(mode) {
+  currentMode = mode;
+  document.getElementById('mode-drop').classList.toggle('active', mode === 'drop');
+  document.getElementById('mode-hand').classList.toggle('active', mode === 'hand');
+  document.getElementById('mode-third').classList.toggle('active', mode === 'third');
+  document.getElementById('mode-studio').classList.toggle('active', mode === 'studio');
+
+  for (const c of cards) {
+    c.dropGroup.visible = mode === 'drop';
+    c.studioGroup.visible = mode === 'studio';
+    c.handGroup.visible = mode === 'hand';
+    c.thirdGroup.visible = mode === 'third';
+    c.scene.background = new THREE.Color(
+      mode === 'hand' ? 0x7fb2e5 : (mode === 'drop' ? 0x1d291e : (mode === 'third' ? 0x222e24 : 0x141a14))
+    );
+    if (mode === 'drop')   { c.ctrl.radius = 1.72; c.ctrl.phi = 1.12; c.ctrl.theta = -0.52; }
+    if (mode === 'studio') { c.ctrl.radius = 1.88; c.ctrl.phi = 1.20; c.ctrl.theta = -0.52; }
+    if (mode === 'third')  { c.ctrl.radius = 2.35; c.ctrl.phi = 1.22; c.ctrl.theta = 0.55; }
+  }
+}
+applyMode('drop');
+
+document.getElementById('mode-drop').onclick = () => applyMode('drop');
+document.getElementById('mode-hand').onclick = () => applyMode('hand');
+document.getElementById('mode-third').onclick = () => applyMode('third');
+document.getElementById('mode-studio').onclick = () => applyMode('studio');
+
+const btnEat = document.getElementById('btn-eat');
+btnEat.onclick = () => {
+  eating = !eating;
+  btnEat.classList.toggle('active', eating);
+  btnEat.textContent = `Simular comendo: ${eating ? 'ON' : 'OFF'}`;
+  if (eating && currentMode !== 'hand' && currentMode !== 'third') applyMode('hand');
+};
+
+const btnSpin = document.getElementById('btn-spin');
+btnSpin.onclick = () => {
+  autoSpin = !autoSpin;
+  btnSpin.classList.toggle('active', autoSpin);
+  btnSpin.textContent = `Giro automático: ${autoSpin ? 'ON' : 'OFF'}`;
+};
+
+function resize() {
+  for (const c of cards) {
+    const w = c.viewerEl.clientWidth;
+    const h = c.viewerEl.clientHeight || Math.round(w * 0.75);
+    c.renderer.setSize(w, h, false);
+    c.orbitCam.aspect = w / h;
+    c.orbitCam.updateProjectionMatrix();
+    c.fpCam.aspect = w / h;
+    c.fpCam.updateProjectionMatrix();
+  }
+}
+window.addEventListener('resize', resize);
+resize();
+
+let last = performance.now();
+function animate(now) {
+  requestAnimationFrame(animate);
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  const t = now * 0.001;
+
+  for (const c of cards) {
+    c.eatBlend += ((eating ? 1 : 0) - c.eatBlend) * Math.min(1, 10 * dt);
+    const ea = c.eatBlend;
+    const wob = Math.sin(t * 22) * 0.016 * ea;
+
+    if (currentMode === 'drop') {
+      const bob = Math.sin(t * 2.6) * 0.055;
+      c.dropApple.position.y = 0.30 + bob;
+      if (autoSpin) c.dropApple.rotation.y += dt * 1.35;
+      c.pedestal.userData.shadow.scale.setScalar(1 - bob * 1.4);
+
+      const target = new THREE.Vector3(0, 0.16, 0);
+      c.orbitCam.position.set(
+        target.x + c.ctrl.radius * Math.sin(c.ctrl.phi) * Math.sin(c.ctrl.theta),
+        target.y + c.ctrl.radius * Math.cos(c.ctrl.phi),
+        target.z + c.ctrl.radius * Math.sin(c.ctrl.phi) * Math.cos(c.ctrl.theta)
+      );
+      c.orbitCam.lookAt(target);
+      c.renderer.render(c.scene, c.orbitCam);
+    } else if (currentMode === 'studio') {
+      if (autoSpin) c.studioApple.rotation.y += dt * 0.85;
+      const target = new THREE.Vector3(0, 0, 0);
+      c.orbitCam.position.set(
+        c.ctrl.radius * Math.sin(c.ctrl.phi) * Math.sin(c.ctrl.theta),
+        c.ctrl.radius * Math.cos(c.ctrl.phi),
+        c.ctrl.radius * Math.sin(c.ctrl.phi) * Math.cos(c.ctrl.theta)
+      );
+      c.orbitCam.lookAt(target);
+      c.renderer.render(c.scene, c.orbitCam);
+    } else if (currentMode === 'third') {
+      const p = c.tpRig.userData.player;
+      p.rightArm.rotation.x = -0.55 - 0.85 * ea + wob * 2.2;
+      p.rightArm.rotation.z = -0.18 * ea;
+      p.head.rotation.x = 0.18 * ea;
+      if (autoSpin && !eating) c.thirdGroup.rotation.y = Math.sin(t * 0.7) * 0.45;
+      else c.thirdGroup.rotation.y = 0;
+
+      const target = new THREE.Vector3(0, 1.05, 0);
+      c.orbitCam.position.set(
+        target.x + c.ctrl.radius * Math.sin(c.ctrl.phi) * Math.sin(c.ctrl.theta),
+        target.y + c.ctrl.radius * Math.cos(c.ctrl.phi),
+        target.z + c.ctrl.radius * Math.sin(c.ctrl.phi) * Math.cos(c.ctrl.theta)
+      );
+      c.orbitCam.lookAt(target);
+      c.renderer.render(c.scene, c.orbitCam);
+    } else {
+      const idleBob = Math.sin(t * 2.0) * 0.008 * (1 - ea);
+      const hp = c.fpRig.userData.handPivot;
+      hp.position.set(
+        0.38 - 0.22 * ea,
+        -0.34 + 0.20 * ea + wob + idleBob,
+        -0.05 + 0.08 * ea
+      );
+      hp.rotation.set(0.35 + 0.35 * ea, 0.25 - 0.30 * ea, 0);
+      if (autoSpin && !eating) {
+        c.fpRig.userData.heldAnchor.rotation.y = Math.sin(t * 1.1) * 0.35;
+      } else {
+        c.fpRig.userData.heldAnchor.rotation.y = 0;
+      }
+      c.fpCam.rotation.set(c.ctrl.fpPitch, c.ctrl.fpYaw, 0, 'YXZ');
+      c.renderer.render(c.scene, c.fpCam);
+    }
+  }
+}
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
