@@ -296,7 +296,7 @@
 
 <section class="ref-banner" aria-label="Referência da textura atual no jogo">
   <div class="ref-copy">
-    <strong>Referência atual em <code>world-textures.js</code>:</strong> o Exemplo 1 equilibrado foi implementado no jogo; a folhagem poderá ser refinada depois. Arraste qualquer cartão 3D abaixo para girar as 4 árvores sincronizadas (ou use a roda do mouse para aproximar).
+    <strong>Referência atual em <code>world-textures.js</code>:</strong> tronco equilibrado e folhagem oval, verde natural e arejada. Arraste qualquer cartão 3D abaixo para girar as 4 árvores sincronizadas (ou use a roda do mouse para aproximar).
   </div>
   <div class="ref-tiles">
     <div class="ref-tile-item">
@@ -317,7 +317,7 @@
 <div class="grid" id="grid"></div>
 
 <footer>
-  Preview independente em <code>tools/arvore-texturas-exemplos.html</code> (<code>tools/proposta-texturas-arvore.js</code>) — o Exemplo 1 equilibrado está implementado no jogo. As demais propostas permanecem disponíveis para comparação.
+  Preview independente em <code>tools/arvore-texturas-exemplos.html</code> (<code>tools/proposta-texturas-arvore.js</code>) — o tronco equilibrado está implementado; as folhas foram refinadas posteriormente. As propostas originais permanecem disponíveis para comparação.
 </footer>
 
 <script>
@@ -332,9 +332,81 @@ window.addEventListener('error', e => {
 <script type="module">
 import * as THREE from '../vendor/three/three.module.js';
 import { soilPixel, grassTopPixel, grassSidePixel } from '../world-ground-textures.js';
+import { hash2 } from '../world-math.js';
+import { BALANCED_TREE_TEXTURES } from '../world-tree-textures.js';
 import { TREE_TEXTURE_EXAMPLES, createCurrentTreeTextures } from '../tools/proposta-texturas-arvore.js';
 
-const currentTextures = createCurrentTreeTextures();
+const leafStage = new URLSearchParams(location.search).get('folhas');
+const leafShapeMode = ['1', '2', '3', '4'].includes(leafStage);
+const leafColorMode = leafStage === '2';
+const leafOpeningMode = leafStage === '3';
+const leafReviewMode = leafStage === '4';
+const shapeExamples = leafShapeMode
+  ? (await import('../tools/proposta-formatos-folhas.js')).LEAF_SHAPE_EXAMPLES
+  : null;
+const colorExamples = leafColorMode || leafOpeningMode
+  ? (await import('../tools/proposta-cores-folhas.js')).LEAF_COLOR_EXAMPLES
+  : null;
+const openingExamples = leafOpeningMode || leafReviewMode
+  ? (await import('../tools/proposta-aberturas-folhas.js')).LEAF_OPENING_EXAMPLES
+  : null;
+// As prévias de formato e revisão conservam a folhagem anterior para comparação.
+const previousReference = leafStage === '1' || leafReviewMode;
+const currentTextures = leafOpeningMode ? colorExamples[0] : leafColorMode ? shapeExamples[0]
+  : previousReference ? BALANCED_TREE_TEXTURES : createCurrentTreeTextures();
+const examples = leafReviewMode
+  ? [
+      { ...openingExamples[2], badge: 'Implementada · Arejada', tag: 'Oval + verde natural + arejada', title: 'Folhas escolhidas', description: 'As escolhas das três etapas, agora aplicadas ao jogo.', recommended: true },
+      { ...currentTextures, badge: 'Referência · Anterior', tag: 'Antes da alteração', title: 'Folhas anteriores', description: 'A folhagem anterior, na mesma árvore e iluminação para comparação.' },
+    ]
+  : leafOpeningMode ? openingExamples : leafColorMode ? colorExamples : leafShapeMode ? shapeExamples : TREE_TEXTURE_EXAMPLES;
+
+if (leafShapeMode) {
+  document.querySelector('.ref-copy').innerHTML = '<strong>Referência: folhagem anterior à mudança.</strong> Arraste uma árvore para girar todas juntas; use a roda do mouse para aproximar. O botão de comparação mostra a referência no mesmo ângulo.';
+  if (previousReference) {
+    document.querySelector('#ref-leaves + span').innerHTML = 'Folhas<br>anteriores';
+    document.querySelector('#btn-compare').textContent = '👁️ Comparar com folhas anteriores: OFF';
+  }
+  if (leafReviewMode) {
+    document.title = 'Voxelcraft — Parte 4: revisão das folhas';
+    document.querySelector('.kicker').textContent = 'Árvores · Parte 4 de 5 · Revisão na árvore';
+    document.querySelector('h1').textContent = 'Revisão das folhas escolhidas';
+    document.querySelector('.lead').innerHTML = 'Compare as folhas implementadas <strong>oval + verde natural + arejada</strong> com as anteriores. As árvores giram juntas: veja de perto, de longe e por baixo. Esta é uma prévia ilustrativa, não uma captura do jogo; a iluminação pode variar no mundo.';
+    document.querySelector('.ref-copy').innerHTML = '<strong>Referência: folhas anteriores.</strong> Arraste para girar as duas árvores e use a roda para aproximar. O botão de comparação mostra a textura anterior também na versão implementada, no mesmo ângulo.';
+    document.querySelector('footer').textContent = 'O conjunto escolhido foi implementado no jogo; esta página conserva a comparação com a versão anterior.';
+    const close = document.createElement('button');
+    close.id = 'scene-close'; close.type = 'button'; close.textContent = '🔎 Copa de perto';
+    const far = document.createElement('button');
+    far.id = 'scene-far'; far.type = 'button'; far.textContent = '🏞️ À distância';
+    document.querySelector('#scene-under').after(close, far);
+    document.querySelector('#btn-spin').classList.remove('active');
+    document.querySelector('#btn-spin').textContent = 'Giro: OFF';
+  } else if (leafOpeningMode) {
+    document.title = 'Voxelcraft — Parte 3: aberturas das folhas';
+    document.querySelector('.kicker').textContent = 'Árvores · Parte 3 de 5 · Aberturas na folhagem';
+    document.querySelector('h1').textContent = 'Aberturas para as folhas escolhidas';
+    document.querySelector('.lead').innerHTML = 'O <strong>formato oval e o verde natural escolhidos</strong> permanecem iguais. Compare apenas os recortes transparentes: a sobreposição de blocos afeta quanto do céu e do tronco aparece na copa.';
+    document.querySelector('.ref-copy').innerHTML = '<strong>Referência: folhas ovais com o verde natural escolhido.</strong> Arraste uma árvore para girar todas juntas; use a roda para aproximar. O botão de comparação mostra os recortes da parte 2 no mesmo ângulo.';
+    document.querySelector('#ref-leaves + span').innerHTML = 'Folhas<br>escolhidas';
+    document.querySelector('#btn-compare').textContent = '👁️ Comparar com parte 2: OFF';
+    document.querySelector('footer').textContent = 'Estudos de recorte em 32×32; a opção arejada escolhida foi aplicada ao jogo.';
+  } else if (leafColorMode) {
+    document.title = 'Voxelcraft — Parte 2: cores das folhas';
+    document.querySelector('.kicker').textContent = 'Árvores · Parte 2 de 5 · Cor e profundidade';
+    document.querySelector('h1').textContent = 'Cores para as folhas ovais escolhidas';
+    document.querySelector('.lead').innerHTML = 'As quatro propostas mantêm o <strong>formato 1 escolhido</strong>, a distribuição e os mesmos recortes. Compare apenas as cores e o contraste entre sombras e luzes; as aberturas serão estudadas na parte 3. O tronco permanece igual.';
+    document.querySelector('.ref-copy').innerHTML = '<strong>Referência: formato 1 escolhido, com as cores da parte 1.</strong> Arraste uma árvore para girar todas juntas; use a roda para aproximar. O botão de comparação mostra essa referência no mesmo ângulo.';
+    document.querySelector('#ref-leaves + span').innerHTML = 'Folhas<br>escolhidas';
+    document.querySelector('#btn-compare').textContent = '👁️ Comparar com formato 1: OFF';
+    document.querySelector('footer').textContent = 'Estudos de cor em 32×32; o verde natural escolhido foi aplicado ao jogo junto com o formato oval e os recortes arejados.';
+  } else {
+    document.title = 'Voxelcraft — Parte 1: formatos das folhas';
+    document.querySelector('.kicker').textContent = 'Árvores · Parte 1 de 5 · Formato dos tufos';
+    document.querySelector('h1').textContent = 'Quatro formatos para as folhas';
+    document.querySelector('.lead').innerHTML = 'Compare apenas o <strong>formato dos tufos</strong>. As quatro propostas usam a mesma paleta, a mesma distribuição e os recortes da folhagem anterior. O tronco aprovado permanece igual.';
+    document.querySelector('footer').textContent = 'Estudos de formato em 32×32; a opção oval escolhida foi aplicada ao jogo com o verde natural e recortes arejados.';
+  }
+}
 
 // Desenha um tile 32×32 (ou malha 2×2 = 64×64) em um canvas 2D
 function paintSwatchCanvas(canvas, sampleFn, { tiled = false, skyBg = null } = {}) {
@@ -613,7 +685,12 @@ function buildVoxelMeshes(voxels, opaqueMat, cutoutMat) {
 
   for (const [key, kind] of voxels) {
     const [x, y, z] = key.split(',').map(Number);
-    const alt = (x + y + z) & 1;
+    // Na revisão, usa a mesma regra de variantes do mesher, em coordenadas
+    // exemplares de mundo. As demais prévias conservam a malha alternada.
+    const worldY = y + 64;
+    const alt = leafReviewMode
+      ? Number(hash2(x + 32 + worldY * 13, z + 32 - worldY * 7, 404) <= 0.16)
+      : (x + y + z) & 1;
     const curCut = isCutout(kind);
     const dst = curCut ? cutout : opaque;
 
@@ -666,8 +743,11 @@ function buildVoxelMeshes(voxels, opaqueMat, cutoutMat) {
 
 const SCENE_PRESETS = {
   tree:   { target: [0, 2.75, 0], yaw: 0.68, pitch: 0.22, dist: 12.4 },
+  review: { target: [0, 2.75, 0], yaw: 0.68, pitch: 0.22, dist: 14.0 },
   blocks: { target: [-0.15, 1.25, -0.15], yaw: 0.66, pitch: 0.34, dist: 5.6 },
   under:  { target: [0, 3.45, 0], yaw: 0.55, pitch: -0.50, dist: 4.3 },
+  close:  { target: [0, 4.05, 0], yaw: 0.68, pitch: 0.12, dist: 7.0 },
+  far:    { target: [0, 2.75, 0], yaw: 0.68, pitch: 0.22, dist: 18.0 },
 };
 
 const LIGHT_PRESETS = {
@@ -695,15 +775,16 @@ const LIGHT_PRESETS = {
 
 let currentSceneMode = 'tree';
 let currentLightMode = 'day';
-let autoSpin = true;
+let autoSpin = !leafReviewMode;
 let compareCurrent = false;
 let tiledSwatches = false;
 
-const camState = { ...SCENE_PRESETS.tree, target: [...SCENE_PRESETS.tree.target] };
+const initialPreset = leafReviewMode ? SCENE_PRESETS.review : SCENE_PRESETS.tree;
+const camState = { ...initialPreset, target: [...initialPreset.target] };
 const cards = [];
 const gridEl = document.getElementById('grid');
 
-for (const ex of TREE_TEXTURE_EXAMPLES) {
+for (const ex of examples) {
   const article = document.createElement('article');
   if (ex.recommended) article.classList.add('recommended');
   article.innerHTML = `
@@ -733,6 +814,13 @@ for (const ex of TREE_TEXTURE_EXAMPLES) {
     </div>
   `;
   gridEl.appendChild(article);
+  if (leafOpeningMode) article.querySelector('.compare-pill').textContent = 'Mostrando: recortes da parte 2';
+  else if (leafColorMode) article.querySelector('.compare-pill').textContent = 'Mostrando: formato 1 original';
+  else if (previousReference) article.querySelector('.compare-pill').textContent = 'Mostrando: folhas anteriores';
+  if (leafShapeMode) {
+    article.querySelector('.sw-end + .swatch-meta').innerHTML = '<strong>Folhas ALT</strong><code>LEAVES_ALT</code> cutout';
+    article.querySelector('.sw-leaves + .swatch-meta').innerHTML = '<strong>Folhas</strong><code>LEAVES</code> cutout';
+  }
 
   const viewer = article.querySelector('.viewer');
   const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
@@ -813,7 +901,11 @@ function refreshCardSwatches() {
   for (const c of cards) {
     const src = compareCurrent ? currentTextures : c.ex;
     paintSwatchCanvas(c.swWood, (x, y) => src.wood(x, y), { tiled: tiledSwatches });
-    paintSwatchCanvas(c.swEnd, (x, y) => src.woodEnd(x, y), { tiled: tiledSwatches });
+    if (leafShapeMode) {
+      paintSwatchCanvas(c.swEnd, (x, y, alt) => src.leaves(x, y, 1 - alt), { tiled: tiledSwatches, skyBg });
+    } else {
+      paintSwatchCanvas(c.swEnd, (x, y) => src.woodEnd(x, y), { tiled: tiledSwatches });
+    }
     paintSwatchCanvas(c.swLeaves, (x, y, alt) => src.leaves(x, y, alt), { tiled: tiledSwatches, skyBg });
   }
 }
@@ -868,13 +960,13 @@ function resizeAll() {
 window.addEventListener('resize', resizeAll);
 
 // Controles da barra superior
-function bindSceneBtn(id, mode) {
+function bindSceneBtn(id, mode, presetName = mode) {
   document.getElementById(id).addEventListener('click', () => {
     currentSceneMode = mode;
-    for (const bid of ['scene-tree', 'scene-blocks', 'scene-under']) {
-      document.getElementById(bid).classList.toggle('active', bid === id);
+    for (const bid of ['scene-tree', 'scene-blocks', 'scene-under', 'scene-close', 'scene-far']) {
+      document.getElementById(bid)?.classList.toggle('active', bid === id);
     }
-    const preset = SCENE_PRESETS[mode];
+    const preset = SCENE_PRESETS[presetName];
     camState.target = [...preset.target];
     camState.yaw = preset.yaw;
     camState.pitch = preset.pitch;
@@ -882,9 +974,13 @@ function bindSceneBtn(id, mode) {
     rebuildScenes();
   });
 }
-bindSceneBtn('scene-tree', 'tree');
+bindSceneBtn('scene-tree', 'tree', leafReviewMode ? 'review' : 'tree');
 bindSceneBtn('scene-blocks', 'blocks');
 bindSceneBtn('scene-under', 'under');
+if (leafReviewMode) {
+  bindSceneBtn('scene-close', 'tree', 'close');
+  bindSceneBtn('scene-far', 'tree', 'far');
+}
 
 document.getElementById('light-day').addEventListener('click', () => {
   currentLightMode = 'day';
@@ -918,9 +1014,11 @@ const btnCompare = document.getElementById('btn-compare');
 btnCompare.addEventListener('click', () => {
   compareCurrent = !compareCurrent;
   btnCompare.classList.toggle('active', compareCurrent);
-  btnCompare.textContent = compareCurrent
-    ? '👁️ Alternar p/ Atual do Jogo: ON'
-    : '👁️ Alternar p/ Atual do Jogo: OFF';
+  btnCompare.textContent = leafOpeningMode
+    ? `👁️ Comparar com parte 2: ${compareCurrent ? 'ON' : 'OFF'}`
+    : leafColorMode ? `👁️ Comparar com formato 1: ${compareCurrent ? 'ON' : 'OFF'}`
+      : previousReference ? `👁️ Comparar com folhas anteriores: ${compareCurrent ? 'ON' : 'OFF'}`
+        : `👁️ Alternar p/ Atual do Jogo: ${compareCurrent ? 'ON' : 'OFF'}`;
   applyCompareState();
 });
 
