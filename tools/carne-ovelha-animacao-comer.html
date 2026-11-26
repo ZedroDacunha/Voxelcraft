@@ -1,0 +1,1094 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Voxelcraft — Animação de Comer Carne de Ovelha</title>
+  <style>
+    :root {
+      --bg: #11161c;
+      --panel: #19212a;
+      --panel2: #141b23;
+      --border: #324154;
+      --accent: #f2b45a;
+      --accentBg: #4b3417;
+      --green: #72dc58;
+      --greenBg: #294c24;
+      --text: #eef4fa;
+      --muted: #a2b2c4;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 18px 22px 28px;
+      background: radial-gradient(circle at 50% 0%, #202a38 0%, var(--bg) 70%);
+      color: var(--text);
+      font: 14.5px/1.45 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+    header, .toolbar, .stage-wrap, .timeline-bar, footer {
+      max-width: 1040px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    header { margin-bottom: 12px; }
+    .kicker {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      background: rgba(242, 180, 90, 0.16);
+      color: var(--accent);
+      border: 1px solid rgba(242, 180, 90, 0.44);
+      margin-bottom: 5px;
+    }
+    h1 { margin: 0 0 3px; font-size: 23px; }
+    .sub { margin: 0; color: var(--muted); font-size: 14px; }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      align-items: center;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      padding: 9px 12px;
+      margin-bottom: 12px;
+    }
+    .lbl {
+      font-size: 12.5px;
+      color: var(--muted);
+      font-weight: 600;
+      margin-right: 2px;
+    }
+    button {
+      background: #232e3c;
+      color: var(--text);
+      border: 1px solid #394a60;
+      border-radius: 8px;
+      padding: 6px 11px;
+      font: 600 12.8px/1.2 inherit;
+      cursor: pointer;
+      transition: all 0.14s ease;
+    }
+    button:hover { background: #2d3b4d; }
+    button.active {
+      background: var(--greenBg);
+      border-color: var(--green);
+      color: #fff;
+    }
+    button.state-btn.active {
+      background: var(--accentBg);
+      border-color: var(--accent);
+      color: #fff6e8;
+    }
+    button.primary {
+      background: linear-gradient(180deg, #459231, #2e6b20);
+      border-color: var(--green);
+      color: #fff;
+      padding: 7px 14px;
+    }
+    button.primary:hover { filter: brightness(1.08); }
+    .sep {
+      width: 1px;
+      height: 22px;
+      background: #314054;
+      margin: 0 3px;
+    }
+    .gait-group {
+      display: inline-flex;
+      gap: 5px;
+      align-items: center;
+    }
+
+    .stage-wrap {
+      background: var(--panel);
+      border: 1px solid var(--accent);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.38);
+      margin-bottom: 12px;
+    }
+    .viewer {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      max-height: 520px;
+      background: #6da3dc;
+      position: relative;
+      cursor: grab;
+      touch-action: none;
+    }
+    .viewer:active { cursor: grabbing; }
+    .viewer canvas {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
+    }
+    .crosshair {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 14px;
+      height: 14px;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      opacity: 0.82;
+    }
+    .crosshair::before, .crosshair::after {
+      content: '';
+      position: absolute;
+      background: #fff;
+      box-shadow: 0 0 2px rgba(0,0,0,0.65);
+    }
+    .crosshair::before { left: 6px; top: 0; width: 2px; height: 14px; }
+    .crosshair::after  { left: 0; top: 6px; width: 14px; height: 2px; }
+
+    .hud-pill {
+      position: absolute;
+      left: 14px;
+      top: 14px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff7ea;
+      background: rgba(18, 23, 30, 0.84);
+      border: 1px solid rgba(242, 180, 90, 0.55);
+      padding: 4px 11px;
+      border-radius: 999px;
+      pointer-events: none;
+    }
+    .hint {
+      position: absolute;
+      right: 14px;
+      bottom: 14px;
+      font-size: 11.5px;
+      color: #d7e5f5;
+      background: rgba(18, 23, 30, 0.76);
+      border: 1px solid rgba(110, 134, 162, 0.4);
+      padding: 4px 10px;
+      border-radius: 999px;
+      pointer-events: none;
+    }
+
+    .timeline-bar {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      padding: 11px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+    .scrubber-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    input[type="range"] {
+      flex: 1;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .time-readout {
+      font-variant-numeric: tabular-nums;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+      min-width: 118px;
+      text-align: right;
+    }
+    .stages-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+    footer {
+      margin-top: 14px;
+      color: #8fa2b8;
+      font-size: 12.8px;
+    }
+    code { background: #1c2531; padding: 1px 5px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="kicker">Carne de Ovelha · Mordidas Progressivas + Animação 1ª e 3ª Pessoa + Som</span>
+    <h1>Animação de Comer — Carne de Ovelha (Assada &amp; Crua)</h1>
+    <p class="sub">
+      A mão segura firme pelo osso enquanto as <strong>4 mordidas consomem a carne de cima para baixo</strong> (revelando o interior suculento e a costela roída antes de terminar), com migalhas voxel e som de mastigação.
+    </p>
+  </header>
+
+  <div class="toolbar">
+    <button id="btn-eat" class="primary" type="button">▶ Comer Carne</button>
+    <button id="btn-loop" class="active" type="button">Loop: ON</button>
+    <button id="btn-sound" class="active" type="button">🔊 Som: ON</button>
+    <div class="sep"></div>
+    <span class="lbl">Estado:</span>
+    <button id="state-cooked" class="state-btn active" type="button">🔥 Assada</button>
+    <button id="state-raw" class="state-btn" type="button">🥩 Crua</button>
+    <div class="sep"></div>
+    <span class="lbl">Câmera:</span>
+    <button id="cam-first" class="active" type="button">1ª Pessoa</button>
+    <button id="cam-third" type="button">3ª Pessoa</button>
+    <button id="cam-studio" type="button">Estúdio Mordidas</button>
+    <div class="gait-group" id="gait-group" style="display:none;">
+      <div class="sep"></div>
+      <span class="lbl">Movimento:</span>
+      <button data-gait="idle" class="active" type="button">Parado</button>
+      <button data-gait="walk" type="button">Andando</button>
+      <button data-gait="run" type="button">Correndo</button>
+    </div>
+  </div>
+
+  <div class="stage-wrap">
+    <div class="viewer" id="viewer">
+      <div class="crosshair" id="crosshair"></div>
+      <span class="hud-pill" id="hud-pill">Estágio 0 · Inteira</span>
+      <span class="hint" id="hint">Clique em "▶ Comer Carne" para ouvir o áudio · Arraste em 3ª pessoa/Estúdio</span>
+    </div>
+  </div>
+
+  <div class="timeline-bar">
+    <div class="scrubber-row">
+      <span class="lbl">Linha do tempo (1.54s):</span>
+      <input id="scrubber" type="range" min="0" max="1000" value="0" />
+      <span class="time-readout" id="time-readout">0.00s · 0%</span>
+    </div>
+    <div class="stages-row">
+      <span class="lbl">Inspecionar estágio fixo:</span>
+      <button class="stage-btn" data-p="0.00" type="button">Repouso na mão</button>
+      <button class="stage-btn" data-p="0.16" type="button">0 · Inteira (na boca)</button>
+      <button class="stage-btn" data-p="0.34" type="button">1 · 1ª Mordida</button>
+      <button class="stage-btn" data-p="0.52" type="button">2 · 2ª Mordida</button>
+      <button class="stage-btn" data-p="0.72" type="button">3 · Osso Roído</button>
+      <button class="stage-btn" data-p="0.92" type="button">4 · Engolindo</button>
+    </div>
+  </div>
+
+  <footer>
+    Preview interativo em <code>tools/carne-ovelha-animacao-comer.html</code>. Ao clicar em qualquer botão o navegador libera o som procedural (<code>eat-chew</code> + <code>eat-swallow</code>).
+  </footer>
+
+  <script type="module">
+    import * as THREE from '../vendor/three/three.module.js';
+    import { createPlayerModel, PLAYER_MODEL_COLORS } from '../player-model.js';
+    import { rigLocomotion, createLocomotion, advanceLocomotion, groundPose, applyGroundPose } from '../player-locomotion.js';
+    import { createPlayerHeldItem } from '../player-held-item.js';
+    import { createAudioSystem } from '../world-audio.js';
+    import { EAT_DURATION, sampleEatAnimation, eatBitePitch } from '../player-eat-animation.js';
+
+    const audio = createAudioSystem();
+    let soundEnabled = true;
+
+    const PAL_RAW = {
+      O: '#5c1920', s: '#88242c', '1': '#ae3438', '2': '#d04c4a', '3': '#e86e66', '4': '#f8a89c',
+      f: '#e6b8a8', F: '#f8e2d4', Fhi: '#fef4eb',
+      o: '#846e5c', b: '#cebfa8', B: '#f6f1e4', Bhi: '#fefbf4', marrow: '#9c4440',
+      biteHi: '#f89e94', biteMid: '#e05a56', biteDark: '#b6383c', biteRim: '#7e1e24',
+    };
+
+    const PAL_COOKED = {
+      O: '#3d1b0d', s: '#5e2d15', M: '#421d0c', Mhalo: '#763c1c',
+      '1': '#824320', '2': '#a85e2e', '3': '#ce7e3e', '4': '#eca860',
+      f: '#cc9254', F: '#eabe7a', Fhi: '#f7daa4',
+      o: '#6b492b', b: '#b59062', B: '#e0c496', Bhi: '#f2e0be', baste: '#9e5e2e', marrow: '#4f2414',
+      biteHi: '#e4a68a', biteMid: '#c67c62', biteDark: '#a25c44', biteRim: '#663016',
+    };
+
+    const CRUMB_COOKED = ['#e4a68a', '#c67c62', '#ce7e3e', '#a85e2e', '#824320', '#eabe7a'];
+    const CRUMB_RAW    = ['#f89e94', '#e86e66', '#d04c4a', '#ae3438', '#f8e2d4', '#e6b8a8'];
+
+    function paintCanvasMat(w, h, painter, roughness = 0.46) {
+      const cv = document.createElement('canvas');
+      cv.width = w;
+      cv.height = h;
+      const ctx = cv.getContext('2d');
+      painter(ctx, w, h);
+      const tex = new THREE.CanvasTexture(cv);
+      tex.magFilter = tex.minFilter = THREE.NearestFilter;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return new THREE.MeshStandardMaterial({ map: tex, roughness, metalness: 0.03 });
+    }
+
+    const TEX = 0.36;
+    const snap = v => Math.floor(v / TEX) * TEX + TEX * 0.5;
+
+    function sampleBittenFlesh(wxRaw, wyRaw, wzRaw, pal) {
+      const tx = Math.round(wxRaw / 0.28);
+      const ty = Math.round(wyRaw / 0.28);
+      const tz = Math.round(wzRaw / 0.28);
+      if (Math.abs(wzRaw) > 0.72) return pal.biteRim;
+      const g = ((tx * 17 + ty * 31 + tz * 13) & 7);
+      if (Math.abs(wzRaw) < 0.30 && g < 3) return pal.biteHi;
+      return g < 5 ? pal.biteMid : pal.biteDark;
+    }
+
+    function sampleMeat(wxRaw, wyRaw, wzRaw, face, cooked, biteFaces) {
+      const pal = cooked ? PAL_COOKED : PAL_RAW;
+      if (biteFaces && biteFaces.has(face)) {
+        return sampleBittenFlesh(wxRaw, wyRaw, wzRaw, pal);
+      }
+      const wx = snap(wxRaw), wy = snap(wyRaw), wz = snap(wzRaw);
+      const diag = wy - 0.78 * wx;
+      const tx = cooked ? Math.round((wxRaw - TEX * 0.5) / TEX) : Math.round(wx / TEX);
+      const ty = cooked ? Math.round((wyRaw - TEX * 0.5) / TEX) : Math.round(wy / TEX);
+      const tz = cooked ? Math.round((wzRaw - TEX * 0.5) / TEX) : Math.round(wz / TEX);
+      const checker = ((tx * 7 + ty * 13 + tz * 5) & 3);
+      const rTopLoin = Math.hypot((wx + 0.35) / 1.65, (wy + 1.10) / 1.55);
+
+      const fatLine = wy > 0.7 ? 1.42 : 1.56;
+      const inFatCap = wy > -1.35 && diag > fatLine;
+      const inEdge = wy > -1.45 && !inFatCap && diag > (fatLine - 0.34);
+
+      if (inFatCap) {
+        if (face === '+Y' || face === '-X') {
+          if (diag > fatLine + 0.32 && Math.abs(wz) < 0.52) return pal.Fhi;
+          if (Math.abs(wz) > 0.66) return (cooked && checker === 0) ? pal['3'] : pal.f;
+          return pal.F;
+        }
+        if (face === '-Y' || face === '+X') return pal.F;
+        return diag > fatLine + 0.28 ? pal.Fhi : ((cooked && checker === 1) ? pal.f : pal.F);
+      }
+      if (inEdge) {
+        if (face === '+Y' || face === '-X' || face === '+Z' || face === '-Z') {
+          return (cooked && checker === 0) ? pal['3'] : pal.f;
+        }
+      }
+      if (wy > 1.76 && wx > 0.45) {
+        return face === '+Y' ? (cooked ? pal.f : pal.F) : (cooked ? pal.baste : pal.f);
+      }
+
+      if (face === '-Y') return Math.abs(wz) > 0.55 ? pal['2'] : pal['3'];
+      if (face === '+X') {
+        if (wy < -0.60) return checker === 0 ? pal['3'] : pal['2'];
+        if (wy < 0.85) return checker === 0 ? pal['2'] : pal['1'];
+        return pal.s;
+      }
+      if (face === '-X' || face === '+Y') {
+        return wy > 0.9 ? pal.O : pal.s;
+      }
+
+      const isBack = face === '-Z';
+      if (wy > 1.52 && wx < 0.45) return pal.O;
+      if (wy > 1.08 && diag < 1.15) return checker === 0 ? pal['1'] : pal.s;
+
+      if (cooked) {
+        const barA = (tx + ty === -6) && tx >= -4 && tx <= -1;
+        const barB = (tx + ty ===  0) && tx >= -1 && tx <=  2;
+        if (barA || barB) return pal.M;
+        const haloA = (tx + ty === -5) && tx >= -3 && tx <= -1;
+        const haloB = (tx + ty ===  1) && tx >=  0 && tx <=  2;
+        if (haloA || haloB) return pal.Mhalo;
+        if (!isBack && ((tx === -1 && ty === -4) || (tx === 0 && ty === -4) || (tx === -2 && ty === -3))) return pal['4'];
+      } else {
+        if (!isBack && ((tx === -1 && ty === -4) || (tx === 0 && ty === -4) || (tx === -2 && ty === -3))) return pal['4'];
+        const mFront = !isBack && ((tx === -1 && ty === -2) || (tx === 0 && ty === -1) || (tx === 1 && ty === 0) || (tx === -3 && ty === -2) || (tx === -2 && ty === -1));
+        const mBack = isBack && ((tx === -1 && ty === -2) || (tx === 0 && ty === -1) || (tx === 1 && ty === 0));
+        if (mFront || mBack) return pal.f;
+      }
+
+      if (rTopLoin < 0.82) return isBack ? pal['2'] : pal['3'];
+      if (rTopLoin < 1.38 && wy < 0.85) return pal['2'];
+      return wy > 0.65 ? pal.s : pal['1'];
+    }
+
+    function sampleBone(lxRaw, lyFromBase, lzRaw, face, segRole, cooked) {
+      const pal = cooked ? PAL_COOKED : PAL_RAW;
+      const lx = Math.floor(lxRaw / 0.22) * 0.22 + 0.11;
+      const lz = Math.floor(lzRaw / 0.22) * 0.22 + 0.11;
+      if (segRole === 'tip' && face === '+Y') {
+        if (Math.abs(lxRaw) < 0.17 && Math.abs(lzRaw) < 0.17) return pal.marrow;
+        if (Math.abs(lxRaw) < 0.27 && Math.abs(lzRaw) < 0.27) return pal.b;
+        return pal.Bhi;
+      }
+      if (segRole === 'innerTip' && face === '-Y') {
+        return Math.abs(lzRaw) < 0.22 ? pal.Bhi : pal.B;
+      }
+      if (face === '-Y') return pal.b;
+      if (segRole === 'base' && lyFromBase < 0.32) {
+        return lxRaw < 0 ? (cooked ? pal.f : pal.F) : (cooked ? pal.baste : pal.f);
+      }
+      const tipToast = cooked && segRole === 'tip' && lyFromBase > 0.32;
+      if (face === '+X') return lz > -0.12 ? pal.Bhi : pal.B;
+      if (face === '-X') return lz < -0.05 ? pal.o : pal.b;
+      if (lx > 0.08) return tipToast ? pal.B : pal.Bhi;
+      if (lx > -0.14) return tipToast ? pal.b : pal.B;
+      return (segRole === 'base' && lyFromBase < 0.50) ? pal.o : pal.b;
+    }
+
+    const RES = 8;
+    const NORM_S = 1 / 6.29;
+
+    function buildStageGroup(stage, cooked, anchor = 'bone') {
+      const meatRough = cooked ? 0.42 : 0.50;
+      const boneRough = cooked ? 0.42 : 0.38;
+
+      function makeMeatBox(sx, sy, sz, cx, cy, cz, biteFacesArr = null) {
+        const biteFaces = biteFacesArr ? new Set(biteFacesArr) : null;
+        const rx = Math.max(3, Math.round(sx * RES));
+        const ry = Math.max(3, Math.round(sy * RES));
+        const rz = Math.max(3, Math.round(sz * RES));
+        const specs = [
+          { w: rz, h: ry, f: '+X', pt: (u, v) => [cx + sx / 2, cy + sy / 2 - (v + 0.5) * (sy / ry), cz + sz / 2 - (u + 0.5) * (sz / rz)] },
+          { w: rz, h: ry, f: '-X', pt: (u, v) => [cx - sx / 2, cy + sy / 2 - (v + 0.5) * (sy / ry), cz - sz / 2 + (u + 0.5) * (sz / rz)] },
+          { w: rx, h: rz, f: '+Y', pt: (u, v) => [cx - sx / 2 + (u + 0.5) * (sx / rx), cy + sy / 2, cz - sz / 2 + (v + 0.5) * (sz / rz)] },
+          { w: rx, h: rz, f: '-Y', pt: (u, v) => [cx - sx / 2 + (u + 0.5) * (sx / rx), cy - sy / 2, cz + sz / 2 - (v + 0.5) * (sz / rz)] },
+          { w: rx, h: ry, f: '+Z', pt: (u, v) => [cx - sx / 2 + (u + 0.5) * (sx / rx), cy + sy / 2 - (v + 0.5) * (sy / ry), cz + sz / 2] },
+          { w: rx, h: ry, f: '-Z', pt: (u, v) => [cx + sx / 2 - (u + 0.5) * (sx / rx), cy + sy / 2 - (v + 0.5) * (sy / ry), cz - sz / 2] },
+        ];
+        const mats = specs.map(sp =>
+          paintCanvasMat(sp.w, sp.h, (ctx, w, h) => {
+            for (let v = 0; v < h; v++) {
+              for (let u = 0; u < w; u++) {
+                const [wx, wy, wz] = sp.pt(u, v);
+                ctx.fillStyle = sampleMeat(wx, wy, wz, sp.f, cooked, biteFaces);
+                ctx.fillRect(u, v, 1, 1);
+              }
+            }
+          }, (biteFaces && biteFaces.has(sp.f)) ? 0.55 : meatRough)
+        );
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mats);
+        mesh.position.set(cx, cy, cz);
+        return mesh;
+      }
+
+      function makeBoneBox(sx, sy, sz, cx, cy, cz, rotZ, role) {
+        const rx = Math.max(3, Math.round(sx * RES));
+        const ry = Math.max(3, Math.round(sy * RES));
+        const rz = Math.max(3, Math.round(sz * RES));
+        const specs = [
+          { w: rz, h: ry, f: '+X', pt: (u, v) => [sx / 2, sy / 2 - (v + 0.5) * (sy / ry), sz / 2 - (u + 0.5) * (sz / rz)] },
+          { w: rz, h: ry, f: '-X', pt: (u, v) => [-sx / 2, sy / 2 - (v + 0.5) * (sy / ry), -sz / 2 + (u + 0.5) * (sz / rz)] },
+          { w: rx, h: rz, f: '+Y', pt: (u, v) => [-sx / 2 + (u + 0.5) * (sx / rx), sy / 2, -sz / 2 + (v + 0.5) * (sz / rz)] },
+          { w: rx, h: rz, f: '-Y', pt: (u, v) => [-sx / 2 + (u + 0.5) * (sx / rx), -sy / 2, sz / 2 - (v + 0.5) * (sz / rz)] },
+          { w: rx, h: ry, f: '+Z', pt: (u, v) => [-sx / 2 + (u + 0.5) * (sx / rx), sy / 2 - (v + 0.5) * (sy / ry), sz / 2] },
+          { w: rx, h: ry, f: '-Z', pt: (u, v) => [sx / 2 - (u + 0.5) * (sx / rx), sy / 2 - (v + 0.5) * (sy / ry), -sz / 2] },
+        ];
+        const mats = specs.map(sp =>
+          paintCanvasMat(sp.w, sp.h, (ctx, w, h) => {
+            for (let v = 0; v < h; v++) {
+              for (let u = 0; u < w; u++) {
+                const [lx, ly, lz] = sp.pt(u, v);
+                ctx.fillStyle = sampleBone(lx, ly + sy / 2, lz, sp.f, role, cooked);
+                ctx.fillRect(u, v, 1, 1);
+              }
+            }
+          }, boneRough)
+        );
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mats);
+        mesh.position.set(cx, cy, cz);
+        mesh.rotation.z = rotZ;
+        return mesh;
+      }
+
+      const g = new THREE.Group();
+      const outerSlices = [
+        [2.16, 0.42, 1.14, -0.30, -2.52],
+        [3.24, 0.46, 1.28, -0.28, -2.14],
+        [3.96, 0.50, 1.38, -0.24, -1.72],
+        [4.38, 0.54, 1.44, -0.20, -1.26],
+        [4.50, 0.56, 1.46, -0.16, -0.76],
+        [4.36, 0.54, 1.44, -0.08, -0.26],
+        [3.98, 0.52, 1.40,  0.06,  0.22],
+        [3.44, 0.50, 1.36,  0.24,  0.68],
+        [2.80, 0.48, 1.30,  0.46,  1.12],
+        [2.14, 0.46, 1.22,  0.70,  1.52],
+        [1.56, 0.46, 1.12,  0.94,  1.90],
+      ];
+      const midSlices = [
+        [2.64, 0.46, 1.72, -0.26, -2.02],
+        [3.46, 0.54, 1.82, -0.22, -1.56],
+        [3.82, 0.62, 1.86, -0.18, -1.04],
+        [3.74, 0.60, 1.86, -0.10, -0.48],
+        [3.36, 0.54, 1.82,  0.04,  0.04],
+        [2.82, 0.50, 1.76,  0.24,  0.52],
+        [2.18, 0.46, 1.66,  0.48,  0.98],
+        [1.56, 0.42, 1.48,  0.74,  1.40],
+      ];
+      const coreSlices = [
+        [2.44, 0.50, 2.10, -0.22, -1.48],
+        [2.96, 0.64, 2.18, -0.18, -0.96],
+        [2.82, 0.58, 2.18, -0.12, -0.42],
+        [2.26, 0.48, 2.10,  0.02,  0.08],
+        [1.60, 0.40, 1.98,  0.22,  0.48],
+      ];
+
+      if (stage === 0) {
+        for (const s of outerSlices) g.add(makeMeatBox(...s, 0));
+        for (const s of midSlices) g.add(makeMeatBox(...s, 0));
+        for (const s of coreSlices) g.add(makeMeatBox(...s, 0));
+      } else if (stage === 1) {
+        g.add(makeMeatBox(1.18, 0.54, 1.38, -1.80, -1.26, 0, ['-Y', '+X']));
+        g.add(makeMeatBox(1.12, 0.54, 1.38,  1.42, -1.26, 0, ['-Y', '-X']));
+        g.add(makeMeatBox(...outerSlices[4], 0, ['-Y']));
+        for (let i = 5; i <= 10; i++) g.add(makeMeatBox(...outerSlices[i], 0));
+
+        g.add(makeMeatBox(1.05, 0.56, 1.74, -1.55, -0.96, 0, ['-Y', '+X']));
+        g.add(makeMeatBox(0.95, 0.56, 1.74,  1.22, -0.96, 0, ['-Y', '-X']));
+        g.add(makeMeatBox(...midSlices[3], 0, ['-Y']));
+        for (let i = 4; i <= 7; i++) g.add(makeMeatBox(...midSlices[i], 0));
+
+        g.add(makeMeatBox(...coreSlices[2], 0, ['-Y']));
+        for (let i = 3; i <= 4; i++) g.add(makeMeatBox(...coreSlices[i], 0));
+      } else if (stage === 2) {
+        g.add(makeMeatBox(0.96, 0.54, 1.32, -1.46,  0.05, 0, ['-Y', '+X']));
+        g.add(makeMeatBox(0.92, 0.54, 1.32,  1.52,  0.05, 0, ['-Y', '-X']));
+        g.add(makeMeatBox(1.08, 0.50, 1.34, -1.06,  0.48, 0, ['-Y', '+X']));
+        g.add(makeMeatBox(1.04, 0.50, 1.34,  1.38,  0.48, 0, ['-Y', '-X']));
+        g.add(makeMeatBox(...outerSlices[7], 0, ['-Y']));
+        for (let i = 8; i <= 10; i++) g.add(makeMeatBox(...outerSlices[i], 0));
+
+        g.add(makeMeatBox(0.88, 0.48, 1.68, -0.82,  0.48, 0, ['-Y', '+X']));
+        g.add(makeMeatBox(0.84, 0.48, 1.68,  1.16,  0.48, 0, ['-Y', '-X']));
+        g.add(makeMeatBox(...midSlices[6], 0, ['-Y']));
+        g.add(makeMeatBox(...midSlices[7], 0));
+
+        g.add(makeBoneBox(0.62, 0.72, 0.62,  0.42,  0.98, 0, -0.38, 'innerTip'));
+        g.add(makeBoneBox(0.44, 0.68, 0.76,  0.42,  0.98, 0, -0.38, 'innerTip'));
+      } else {
+        g.add(makeMeatBox(0.82, 0.44, 1.18,  0.22,  1.56, 0, ['-Y', '+X']));
+        g.add(makeMeatBox(0.76, 0.44, 1.18,  1.34,  1.56, 0, ['-Y', '-X']));
+        g.add(makeMeatBox(...outerSlices[10], 0, ['-Y']));
+        g.add(makeMeatBox(1.24, 0.38, 1.38,  0.88,  1.76, 0, ['-Y']));
+
+        g.add(makeBoneBox(0.68, 1.02, 0.64,  0.76,  1.52, 0, -0.42, 'shaft'));
+        g.add(makeBoneBox(0.48, 0.98, 0.78,  0.76,  1.52, 0, -0.42, 'shaft'));
+        g.add(makeBoneBox(0.58, 0.78, 0.58,  0.42,  0.88, 0, -0.34, 'innerTip'));
+        g.add(makeBoneBox(0.42, 0.74, 0.72,  0.42,  0.88, 0, -0.34, 'innerTip'));
+      }
+
+      g.add(makeBoneBox(0.76, 1.05, 0.72,  1.18,  2.14, 0, -0.50, 'base'));
+      g.add(makeBoneBox(0.54, 1.00, 0.88,  1.18,  2.14, 0, -0.50, 'base'));
+      g.add(makeBoneBox(0.66, 1.08, 0.66,  1.66,  2.72, 0, -0.62, 'shaft'));
+      g.add(makeBoneBox(0.46, 1.04, 0.82,  1.66,  2.72, 0, -0.62, 'shaft'));
+      g.add(makeBoneBox(0.76, 0.56, 0.74,  2.10,  3.18, 0, -0.70, 'tip'));
+      g.add(makeBoneBox(0.54, 0.54, 0.88,  2.10,  3.18, 0, -0.70, 'tip'));
+
+      g.scale.setScalar(NORM_S);
+      if (anchor === 'bone') {
+        g.position.set(-2.02 * NORM_S, -3.08 * NORM_S, 0);
+      } else {
+        // Centro fixo da peça inteira para que os estágios 0..3 não pulem no Estúdio!
+        g.position.set(-0.07 * NORM_S, -0.41 * NORM_S, 0);
+      }
+
+      const upright = new THREE.Group();
+      upright.add(g);
+      upright.rotation.z = -2.55;
+
+      const root = new THREE.Group();
+      root.add(upright);
+      return root;
+    }
+
+    function createProgressiveMutton(cooked, anchor = 'bone') {
+      const root = new THREE.Group();
+      for (let s = 0; s < 4; s++) {
+        const sg = buildStageGroup(s, cooked, anchor);
+        sg.visible = s === 0;
+        root.add(sg);
+      }
+      return root;
+    }
+
+    function setProgressiveStage(root, stage) {
+      for (let i = 0; i < 4; i++) {
+        root.children[i].visible = stage < 4 && i === stage;
+      }
+    }
+
+    // Sistema de partículas voxel (migalhas de carne assada ou crua)
+    function createMeatCrumbSystem(parent, sizeMin = 0.013, sizeSpan = 0.007, spread = 1.0) {
+      const group = new THREE.Group();
+      parent.add(group);
+      const geo = new THREE.BoxGeometry(1, 1, 1);
+      const matsCooked = CRUMB_COOKED.map(h => new THREE.MeshLambertMaterial({ color: h }));
+      const matsRaw = CRUMB_RAW.map(h => new THREE.MeshLambertMaterial({ color: h }));
+      const active = [];
+
+      function burst(origin, biteNum, cooked, forwardSign = 1) {
+        const mats = cooked ? matsCooked : matsRaw;
+        const count = biteNum === 4 ? 8 : 6;
+        for (let i = 0; i < count; i++) {
+          const mesh = new THREE.Mesh(geo, mats[(i + biteNum * 2) % mats.length]);
+          const baseSize = sizeMin + ((i * 37 + biteNum * 13) % 10) * 0.1 * sizeSpan;
+          mesh.scale.setScalar(baseSize);
+          const ang = ((i / count) - 0.5) * 2.1 + (((i * 19) % 7) - 3) * 0.06;
+          const spd = (0.34 + ((i * 29 + biteNum * 11) % 9) * 0.036) * spread;
+          mesh.position.set(
+            origin.x + Math.sin(ang) * 0.02 * spread,
+            origin.y + ((((i * 17) % 5) - 2) * 0.009) * spread,
+            origin.z + forwardSign * 0.02 * spread
+          );
+          group.add(mesh);
+          active.push({
+            mesh, baseSize, age: 0, life: 0.38 + (i % 4) * 0.04,
+            vx: Math.sin(ang) * spd * 0.95,
+            vy: (0.20 + (i % 3) * 0.08) * spread,
+            vz: forwardSign * (0.14 + (i % 4) * 0.055) * spread,
+            rx: (i % 2 === 0 ? 1 : -1) * 6.5,
+            ry: (i % 3 === 0 ? -1 : 1) * 7.2,
+          });
+        }
+      }
+
+      function update(dt) {
+        for (let i = active.length - 1; i >= 0; i--) {
+          const p = active[i];
+          p.age += dt;
+          if (p.age >= p.life) {
+            group.remove(p.mesh);
+            active.splice(i, 1);
+            continue;
+          }
+          p.vy += -2.4 * dt;
+          p.mesh.position.x += p.vx * dt;
+          p.mesh.position.y += p.vy * dt;
+          p.mesh.position.z += p.vz * dt;
+          p.mesh.rotation.x += p.rx * dt;
+          p.mesh.rotation.y += p.ry * dt;
+          const t = p.age / p.life;
+          const shrink = t > 0.62 ? 1 - (t - 0.62) / 0.38 : 1;
+          p.mesh.scale.setScalar(Math.max(0.001, p.baseSize * shrink));
+        }
+      }
+
+      return { burst, update };
+    }
+
+    function makeGrassStage() {
+      const group = new THREE.Group();
+      const grassTop = new THREE.MeshLambertMaterial({ color: 0x5ea642 });
+      const grassAlt = new THREE.MeshLambertMaterial({ color: 0x55983b });
+      const dirtMat = new THREE.MeshLambertMaterial({ color: 0x775336 });
+      const topGeo = new THREE.BoxGeometry(1, 0.16, 1);
+      const subGeo = new THREE.BoxGeometry(1, 0.44, 1);
+      for (let gx = -2; gx <= 2; gx++) {
+        for (let gz = -2; gz <= 2; gz++) {
+          const t = new THREE.Mesh(topGeo, ((gx + gz) & 1) === 0 ? grassTop : grassAlt);
+          t.position.set(gx, -0.08, gz);
+          group.add(t);
+          const s = new THREE.Mesh(subGeo, dirtMat);
+          s.position.set(gx, -0.38, gz);
+          group.add(s);
+        }
+      }
+      const shadow = new THREE.Mesh(
+        new THREE.CircleGeometry(0.28, 20),
+        new THREE.MeshBasicMaterial({ color: 0x182b12, transparent: true, opacity: 0.36 })
+      );
+      shadow.rotation.x = -Math.PI / 2;
+      shadow.position.y = 0.003;
+      group.add(shadow);
+      return group;
+    }
+
+    const mount = document.getElementById('viewer');
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    mount.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x6da3dc);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.82));
+    const keyLight = new THREE.DirectionalLight(0xfff5e4, 0.94);
+    keyLight.position.set(-2.6, 4.2, 3.6);
+    scene.add(keyLight);
+    const rimLight = new THREE.DirectionalLight(0xc4dcff, 0.34);
+    rimLight.position.set(2.8, 1.8, -2.5);
+    scene.add(rimLight);
+
+    const camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.02, 30);
+
+    // 1) Cena 1ª Pessoa
+    const fpGroup = new THREE.Group();
+    const handPivot = new THREE.Group();
+    const sleeve = new THREE.Mesh(
+      new THREE.BoxGeometry(0.16, 0.16, 0.40),
+      new THREE.MeshLambertMaterial({ color: PLAYER_MODEL_COLORS.tunic })
+    );
+    sleeve.position.z = -0.20;
+    const handBlock = new THREE.Mesh(
+      new THREE.BoxGeometry(0.13, 0.13, 0.20),
+      new THREE.MeshLambertMaterial({ color: 0xd6a67d })
+    );
+    handBlock.position.z = -0.50;
+    const fpAnchor = new THREE.Group();
+    fpAnchor.position.set(0, 0.03, -0.62);
+
+    const fpHolder = new THREE.Group();
+    const fpCooked = createProgressiveMutton(true, 'bone');
+    const fpRaw = createProgressiveMutton(false, 'bone');
+    fpRaw.visible = false;
+    fpHolder.add(fpCooked, fpRaw);
+    fpAnchor.add(fpHolder);
+
+    handPivot.add(sleeve, handBlock, fpAnchor);
+    fpGroup.add(handPivot);
+    scene.add(fpGroup);
+    const fpCrumbs = createMeatCrumbSystem(fpGroup, 0.011, 0.006, 0.85);
+
+    // 2) Cena 3ª Pessoa
+    const tpGroup = new THREE.Group();
+    tpGroup.visible = false;
+    tpGroup.add(makeGrassStage());
+    const playerModel = createPlayerModel(THREE);
+    const playerHeld = createPlayerHeldItem(THREE, playerModel.rightArm);
+    const locoRig = rigLocomotion(THREE, playerModel);
+    const loco = createLocomotion();
+
+    const tpHolder = new THREE.Group();
+    const tpFace = new THREE.Group();
+    const tpCooked = createProgressiveMutton(true, 'bone');
+    const tpRaw = createProgressiveMutton(false, 'bone');
+    tpRaw.visible = false;
+    tpFace.add(tpCooked, tpRaw);
+    tpHolder.add(tpFace);
+    playerHeld.anchor.add(tpHolder);
+    tpGroup.add(playerModel.root);
+    scene.add(tpGroup);
+    const tpCrumbs = createMeatCrumbSystem(tpGroup, 0.019, 0.010, 1.15);
+
+    // 3) Cena Estúdio das Mordidas
+    const studioGroup = new THREE.Group();
+    studioGroup.visible = false;
+    const stCooked = createProgressiveMutton(true, 'center');
+    const stRaw = createProgressiveMutton(false, 'center');
+    stRaw.visible = false;
+    studioGroup.add(stCooked, stRaw);
+    scene.add(studioGroup);
+
+    let isCooked = true;
+    let camMode = 'first'; // 'first' | 'third' | 'studio'
+    let gaitMode = 'idle'; // 'idle' | 'walk' | 'run'
+    let loopEnabled = true;
+    let playing = true;
+    let eatProgress = 0.0;
+    let pauseBetweenLoops = 0.0;
+    let lastSoundStage = 0;
+
+    const orbit = { yaw: 0.72, pitch: 0.16, zoom: 1.0 };
+
+    function resize() {
+      const w = mount.clientWidth || 900;
+      const h = mount.clientHeight || 500;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    let dragging = false, lx = 0, ly = 0;
+    mount.addEventListener('pointerdown', e => {
+      audio.unlock();
+      dragging = true;
+      lx = e.clientX;
+      ly = e.clientY;
+      mount.setPointerCapture(e.pointerId);
+    });
+    mount.addEventListener('pointermove', e => {
+      if (!dragging) return;
+      orbit.yaw -= (e.clientX - lx) * 0.01;
+      orbit.pitch = Math.max(-0.52, Math.min(0.85, orbit.pitch + (e.clientY - ly) * 0.008));
+      lx = e.clientX;
+      ly = e.clientY;
+    });
+    const endDrag = () => { dragging = false; };
+    mount.addEventListener('pointerup', endDrag);
+    mount.addEventListener('pointercancel', endDrag);
+    mount.addEventListener('wheel', e => {
+      e.preventDefault();
+      orbit.zoom = Math.max(0.55, Math.min(1.75, orbit.zoom + e.deltaY * 0.001));
+    }, { passive: false });
+
+    const btnEat = document.getElementById('btn-eat');
+    const btnLoop = document.getElementById('btn-loop');
+    const btnSound = document.getElementById('btn-sound');
+    const btnCooked = document.getElementById('state-cooked');
+    const btnRaw = document.getElementById('state-raw');
+    const scrubber = document.getElementById('scrubber');
+    const timeReadout = document.getElementById('time-readout');
+    const hudPill = document.getElementById('hud-pill');
+    const crosshairEl = document.getElementById('crosshair');
+    const gaitGroupEl = document.getElementById('gait-group');
+
+    btnEat.addEventListener('click', () => {
+      audio.unlock();
+      playing = true;
+      eatProgress = 0.0001;
+      pauseBetweenLoops = 0;
+      lastSoundStage = 0;
+    });
+
+    btnLoop.addEventListener('click', () => {
+      audio.unlock();
+      loopEnabled = !loopEnabled;
+      btnLoop.classList.toggle('active', loopEnabled);
+      btnLoop.textContent = `Loop: ${loopEnabled ? 'ON' : 'OFF'}`;
+      if (loopEnabled && !playing) {
+        playing = true;
+        eatProgress = 0.0001;
+        lastSoundStage = 0;
+      }
+    });
+
+    btnSound.addEventListener('click', () => {
+      audio.unlock();
+      soundEnabled = !soundEnabled;
+      btnSound.classList.toggle('active', soundEnabled);
+      btnSound.textContent = soundEnabled ? '🔊 Som: ON' : '🔇 Som: OFF';
+    });
+
+    function setCooked(val) {
+      isCooked = val;
+      fpCooked.visible = tpCooked.visible = stCooked.visible = val;
+      fpRaw.visible = tpRaw.visible = stRaw.visible = !val;
+      btnCooked.classList.toggle('active', val);
+      btnRaw.classList.toggle('active', !val);
+    }
+    btnCooked.addEventListener('click', () => { audio.unlock(); setCooked(true); });
+    btnRaw.addEventListener('click', () => { audio.unlock(); setCooked(false); });
+
+    const camBtns = {
+      first: document.getElementById('cam-first'),
+      third: document.getElementById('cam-third'),
+      studio: document.getElementById('cam-studio'),
+    };
+    for (const [m, btn] of Object.entries(camBtns)) {
+      btn.addEventListener('click', () => {
+        audio.unlock();
+        camMode = m;
+        Object.values(camBtns).forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        crosshairEl.style.display = m === 'first' ? 'block' : 'none';
+        gaitGroupEl.style.display = m === 'third' ? 'inline-flex' : 'none';
+        if (m === 'studio') { orbit.yaw = -0.38; orbit.pitch = 0.24; }
+        if (m === 'third')  { orbit.yaw = 0.72;  orbit.pitch = 0.16; }
+      });
+    }
+
+    document.querySelectorAll('[data-gait]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        gaitMode = btn.dataset.gait;
+        document.querySelectorAll('[data-gait]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+
+    scrubber.addEventListener('input', () => {
+      playing = false;
+      loopEnabled = false;
+      btnLoop.classList.remove('active');
+      btnLoop.textContent = 'Loop: OFF';
+      eatProgress = Number(scrubber.value) / 1000;
+      lastSoundStage = sampleEatAnimation(eatProgress).stage;
+    });
+
+    document.querySelectorAll('.stage-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        audio.unlock();
+        playing = false;
+        loopEnabled = false;
+        btnLoop.classList.remove('active');
+        btnLoop.textContent = 'Loop: OFF';
+        eatProgress = parseFloat(btn.dataset.p);
+        scrubber.value = Math.round(eatProgress * 1000);
+        lastSoundStage = sampleEatAnimation(eatProgress).stage;
+      });
+    });
+
+    const STAGE_LABELS = [
+      'Estágio 0 · Carne Inteira',
+      'Estágio 1 · 1ª Mordida (Topo)',
+      'Estágio 2 · 2ª Mordida (Meio)',
+      'Estágio 3 · 3ª Mordida (Osso Roído!)',
+      'Estágio 4 · Consumida!',
+    ];
+
+    const _mouthWorld = new THREE.Vector3();
+    const _itemWorld = new THREE.Vector3();
+    let prevNow = performance.now();
+
+    function animate(now) {
+      const dt = Math.min(0.05, (now - prevNow) * 0.001);
+      prevNow = now;
+      const t = now * 0.001;
+
+      if (playing) {
+        if (pauseBetweenLoops > 0) {
+          pauseBetweenLoops -= dt;
+          if (pauseBetweenLoops <= 0) {
+            eatProgress = 0.0001;
+            lastSoundStage = 0;
+          }
+        } else {
+          eatProgress += dt / EAT_DURATION;
+          const checkSample = sampleEatAnimation(Math.min(0.9999, eatProgress));
+          if (checkSample.stage > lastSoundStage) {
+            for (let s = lastSoundStage + 1; s <= checkSample.stage; s++) {
+              if (soundEnabled) {
+                audio.play('eat-chew', { rate: eatBitePitch(s) });
+              }
+              // Dispara migalhas na boca!
+              fpCrumbs.burst(new THREE.Vector3(0.04, -0.18, -0.52), s, isCooked, 1);
+              playerModel.head.getWorldPosition(_mouthWorld);
+              _mouthWorld.y -= 0.08;
+              _mouthWorld.z += 0.22;
+              tpHolder.getWorldPosition(_itemWorld);
+              _mouthWorld.lerp(_itemWorld, 0.45);
+              tpCrumbs.burst(_mouthWorld, s, isCooked, 1);
+            }
+            lastSoundStage = checkSample.stage;
+          }
+          if (eatProgress >= 1) {
+            if (soundEnabled) {
+              audio.play('eat-swallow', { rate: 1.0 });
+            }
+            eatProgress = 0;
+            if (loopEnabled) {
+              pauseBetweenLoops = 0.55;
+            } else {
+              playing = false;
+            }
+          }
+          scrubber.value = Math.round(eatProgress * 1000);
+        }
+      }
+
+      const eat = eatProgress > 0 ? sampleEatAnimation(eatProgress) : sampleEatAnimation(0);
+      const stageNorm = Math.min(3, eat.turnStep) / 3;
+
+      setProgressiveStage(fpCooked, eat.stage);
+      setProgressiveStage(fpRaw, eat.stage);
+      setProgressiveStage(tpCooked, eat.stage);
+      setProgressiveStage(tpRaw, eat.stage);
+      const studioStage = eatProgress > 0 ? Math.min(3, eat.stage) : 0;
+      setProgressiveStage(stCooked, studioStage);
+      setProgressiveStage(stRaw, studioStage);
+
+      hudPill.textContent = eatProgress <= 0
+        ? `${isCooked ? '🔥 Assada' : '🥩 Crua'} · Em repouso na mão`
+        : `${isCooked ? '🔥' : '🥩'} ${STAGE_LABELS[eat.stage]}`;
+      timeReadout.textContent = `${(eatProgress * EAT_DURATION).toFixed(2)}s · ${Math.round(eatProgress * 100)}%`;
+
+      // 1ª Pessoa: sobe até a altura da boca sem tapar a mira (+), compensando a redução da carne rumo ao osso!
+      handPivot.position.set(
+        0.42 - 0.175 * eat.lift - 0.012 * eat.bite,
+        -0.50 - 0.175 * eat.lift + 0.022 * eat.bite - 0.008 * eat.swallow + Math.sin(t * 2.2) * 0.008 * (1 - eat.lift),
+        -0.25 + 0.115 * eat.lift + 0.024 * eat.bite
+      );
+      handPivot.rotation.set(
+        0.35 + 0.02 * eat.lift + 0.08 * eat.bite - 0.02 * eat.swallow,
+        0.25 + 0.08 * eat.lift,
+        0.14 * eat.lift + 0.03 * eat.bite
+      );
+      const fpScale = 0.36 * eat.consumeShrink;
+      fpHolder.visible = fpScale > 0.004;
+      fpHolder.scale.setScalar(Math.max(0.004, fpScale));
+      fpHolder.position.set(
+        -0.015,
+        0.022 + (0.095 * stageNorm) * eat.lift + 0.010 * eat.bite,
+        -0.005 + 0.014 * eat.bite
+      );
+      fpHolder.rotation.set(
+        -0.14 + 0.16 * eat.lift + 0.08 * eat.bite,
+        -0.24 + (0.28 * stageNorm) * eat.lift,
+        0.10 - 0.05 * eat.lift
+      );
+
+      // 3ª Pessoa: aplica locomoção (Parado/Andando/Correndo) + pose de comer segurando pelo osso!
+      const speed = gaitMode === 'run' ? 5.6 : (gaitMode === 'walk' ? 3.2 : 0);
+      advanceLocomotion(loco, dt, { speed, onGround: true, sprinting: gaitMode === 'run', crouching: false });
+      applyGroundPose(playerModel, locoRig, groundPose(loco, dt, speed), 1);
+
+      if (!eat.active) {
+        if (speed === 0) {
+          playerModel.rightArm.rotation.x = -0.28;
+          locoRig.elbows[1].rotation.x = -0.36;
+        }
+        tpHolder.visible = true;
+        tpHolder.scale.setScalar(0.35);
+        tpHolder.position.set(0.03, -0.11, -0.058);
+        tpHolder.rotation.set(1.22, 0.0, -0.20);
+        tpFace.rotation.y = -0.95;
+      } else {
+        const lift = eat.lift;
+        const arm = playerModel.rightArm.rotation;
+        arm.x = arm.x * (1 - 0.90 * lift) + (-0.38 - 0.05 * eat.bite - 0.18 * stageNorm + 0.03 * eat.swallow) * lift;
+        arm.y = arm.y * (1 - lift) + (-0.44 - 0.03 * eat.bite) * lift;
+        arm.z = arm.z * (1 - lift) + (-0.22 - 0.02 * eat.bite) * lift;
+
+        const elbow = locoRig.elbows[1].rotation;
+        elbow.x = elbow.x * (1 - lift) + (-0.84 - 0.08 * eat.bite - 0.38 * stageNorm + 0.04 * eat.swallow) * lift;
+        elbow.y *= 1 - lift;
+        elbow.z *= 1 - lift;
+
+        playerModel.head.rotation.x += (0.10 + 0.09 * eat.bite) * lift + 0.04 * eat.swallow;
+        playerModel.head.rotation.y += (-0.05 + 0.02 * eat.bite) * lift;
+
+        const tpScale = 0.35 * eat.consumeShrink;
+        tpHolder.visible = tpScale > 0.004;
+        tpHolder.scale.setScalar(Math.max(0.004, tpScale));
+        tpHolder.position.set(
+          0.03 * (1 - lift) + 0.01 * lift,
+          -0.11 * (1 - lift) + -0.095 * lift,
+          -0.058
+        );
+        tpHolder.rotation.set(
+          1.22 * (1 - lift) + (1.12 + 0.08 * eat.bite + 0.26 * stageNorm) * lift,
+          0,
+          -0.20 * (1 - lift) + 0.20 * lift
+        );
+        tpFace.rotation.y = -0.95 * (1 - lift) + (-0.60 + 0.32 * stageNorm) * lift;
+      }
+
+      fpCrumbs.update(dt);
+      tpCrumbs.update(dt);
+
+      fpGroup.visible = camMode === 'first';
+      tpGroup.visible = camMode === 'third';
+      studioGroup.visible = camMode === 'studio';
+
+      if (camMode === 'first') {
+        scene.background.setHex(0x6da3dc);
+        camera.fov = 70;
+        camera.position.set(0, 0, 0);
+        camera.rotation.set(-eat.camNod, 0, 0);
+      } else if (camMode === 'third') {
+        scene.background.setHex(0x6da3dc);
+        camera.fov = 38;
+        const dist = 1.85 * orbit.zoom;
+        const cp = Math.cos(orbit.pitch);
+        camera.position.set(
+          0.16 + Math.sin(orbit.yaw) * cp * dist,
+          1.12 + Math.sin(orbit.pitch) * dist,
+          0.12 + Math.cos(orbit.yaw) * cp * dist
+        );
+        camera.lookAt(0.10, 1.12, 0.16);
+      } else {
+        scene.background.setHex(0x141b23);
+        camera.fov = 32;
+        const dist = 2.15 * orbit.zoom;
+        const cp = Math.cos(orbit.pitch);
+        camera.position.set(
+          Math.sin(orbit.yaw) * cp * dist,
+          Math.sin(orbit.pitch) * dist,
+          Math.cos(orbit.yaw) * cp * dist
+        );
+        camera.lookAt(0, 0, 0);
+      }
+
+      camera.updateProjectionMatrix();
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>

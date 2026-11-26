@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Voxelcraft — Estudo de Ícone: Carne de Ovelha (Crua e Assada)</title>
+  <style>
+    :root {
+      --bg: #141918;
+      --card: #1f2725;
+      --card-hi: #242f2b;
+      --border: #3a4944;
+      --accent: #f2be5c;
+      --green: #8ee07a;
+      --text: #eef4f1;
+      --muted: #a6b6b0;
+      --canvas-bg: #18201e;
+    }
+    body.light-canvas {
+      --canvas-bg: #8b8b8b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 22px 22px 34px;
+      font: 15px/1.48 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: radial-gradient(circle at 50% 0%, #222d2a 0%, var(--bg) 70%);
+      color: var(--text);
+    }
+    header {
+      max-width: 1220px;
+      margin: 0 auto 16px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    .kicker {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: rgba(242, 190, 92, 0.14);
+      color: var(--accent);
+      border: 1px solid rgba(242, 190, 92, 0.42);
+      margin-bottom: 6px;
+    }
+    h1 {
+      margin: 0 0 5px;
+      font-size: 1.48rem;
+      color: #fff;
+    }
+    .lead {
+      margin: 0;
+      color: var(--muted);
+      max-width: 780px;
+      font-size: 0.92rem;
+    }
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      background: rgba(31, 39, 37, 0.92);
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      border-radius: 10px;
+    }
+    button {
+      background: #283330;
+      color: var(--text);
+      border: 1px solid #41524d;
+      border-radius: 7px;
+      padding: 6px 11px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.14s ease;
+    }
+    button:hover { background: #32403c; }
+    button.active {
+      background: #362f1e;
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .research-box {
+      max-width: 1220px;
+      margin: 0 auto 18px;
+      padding: 12px 15px;
+      background: rgba(31, 39, 37, 0.72);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--muted);
+      font-size: 0.85rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 10px 18px;
+    }
+    .research-box strong { color: #e8f0ed; }
+
+    .grid {
+      max-width: 1220px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 16px;
+    }
+    article {
+      padding: 15px;
+      background: linear-gradient(180deg, var(--card-hi) 0%, var(--card) 100%);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+    }
+    article.current {
+      border-style: dashed;
+      opacity: 0.94;
+    }
+    article.highlight {
+      border-color: rgba(142, 224, 122, 0.62);
+    }
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    h2 {
+      margin: 0;
+      font-size: 1.06rem;
+      color: #fff;
+    }
+    .tag {
+      font-size: 0.71rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #2b3834;
+      color: #cfe0da;
+      border: 1px solid #455953;
+      white-space: nowrap;
+    }
+    article.highlight .tag {
+      background: rgba(142, 224, 122, 0.16);
+      color: var(--green);
+      border-color: rgba(142, 224, 122, 0.45);
+    }
+    .desc {
+      margin: 0;
+      font-size: 0.84rem;
+      color: var(--muted);
+      min-height: 38px;
+    }
+
+    .pair-zoom {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .zoom-box {
+      background: var(--canvas-bg);
+      border: 1px solid #3f504b;
+      border-radius: 8px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+    }
+    .zoom-label {
+      font-size: 0.74rem;
+      font-weight: 700;
+      color: #d6e3de;
+      letter-spacing: 0.02em;
+    }
+    canvas.big {
+      width: 144px;
+      height: 144px;
+      image-rendering: pixelated;
+      display: block;
+    }
+
+    .hud-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: rgba(17, 22, 21, 0.65);
+      border: 1px solid #2f3d39;
+      flex-wrap: wrap;
+    }
+    .furnace-sim {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .slot {
+      width: 44px;
+      height: 44px;
+      background: rgba(139, 139, 139, 0.28);
+      border: 2px solid rgba(255, 255, 255, 0.28);
+      border-top-color: rgba(0, 0, 0, 0.45);
+      border-left-color: rgba(0, 0, 0, 0.45);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .slot canvas {
+      width: 32px;
+      height: 32px;
+      image-rendering: pixelated;
+    }
+    .slot .cnt {
+      position: absolute;
+      right: 3px;
+      bottom: 1px;
+      font: bold 11px monospace;
+      color: #fff;
+      text-shadow: 1px 1px 0 #000;
+    }
+    .arrow {
+      font-size: 0.85rem;
+      color: var(--accent);
+      font-weight: 700;
+      user-select: none;
+    }
+    .real-sizes {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.74rem;
+      color: var(--muted);
+    }
+    .mini-pair {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 5px;
+      background: var(--canvas-bg);
+      border: 1px solid #3c4c47;
+      border-radius: 5px;
+    }
+    canvas.px16 { width: 16px; height: 16px; image-rendering: pixelated; display: block; }
+    canvas.px32 { width: 32px; height: 32px; image-rendering: pixelated; display: block; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <span class="kicker">Estudo de Ícone 16×16 · Carne de Ovelha</span>
+      <h1>Carne de Ovelha — Referências &amp; 4 Exemplos Autorais (Crua + Assada)</h1>
+      <p class="lead">
+        Todos os exemplos respeitam o contrato do Voxelcraft (<code>GUIA-DE-ARTE.md</code> + <code>world-meats.js</code>):
+        <strong>mesma silhueta exata</strong> entre crua e assada, contorno tingido por material (nunca preto puro), luz vinda do topo-esquerdo e marcas de grelha legíveis a 16 px.
+      </p>
+    </div>
+    <div class="toolbar">
+      <button id="btnGrid">🔍 Grade 16×16</button>
+      <button id="btnBg">🌗 Fundo de Slot Cinza</button>
+    </div>
+  </header>
+
+  <section class="research-box">
+    <div>
+      <strong>1. Anatomia em Jogos (JRPGs &amp; Culinária)</strong><br />
+      O corte mais icônico de cordeiro/ovelha é o <em>carré / costeleta francesa</em> (medalhão redondo + capa de gordura + osso longo da costela), que nunca confunde com bife bovino ou frango.
+    </div>
+    <div>
+      <strong>2. Jogos Survival (Minecraft / Vintage Story)</strong><br />
+      Usam formato alongado em gota/vírgula na diagonal. Nos exemplos, demos espessura 3D real na base e destacamos o osso marfim com contorno próprio para não sumir a 16 px.
+    </div>
+    <div>
+      <strong>3. RPGs Clássicos (Stardew / Terraria / Don't Starve)</strong><br />
+      Apostam em cortes 3/4 encorpados: <em>pernil redondo</em> com anel de gordura subcutânea ou <em>chuleta em T</em> espessa com parede lateral escura e selagem de grelha.
+    </div>
+  </section>
+
+  <main class="grid" id="cardsGrid"></main>
+
+  <script type="module">
+    import { createTextureTools } from '../world-textures.js';
+
+    const fakeTHREE = {
+      CanvasTexture: class { constructor(image) { this.image = image; } },
+      NearestFilter: 1006,
+      ClampToEdgeWrapping: 1001,
+      SRGBColorSpace: 'srgb',
+    };
+    const tools = createTextureTools(fakeTHREE);
+    const atualRaw = tools.spritePixels('mutton', 'meat');
+    const atualCooked = tools.spritePixels('mutton', 'cooked');
+
+    // Paleta Crua (contorno vinho na carne, sépia-marfim no osso, rampa quente no topo-esquerdo e sombra fria na base 3D)
+    const PAL_RAW = {
+      O: [92, 25, 32],
+      o: [122, 102, 86],
+      s: [136, 36, 44],
+      '1': [174, 52, 56],
+      '2': [208, 76, 74],
+      '3': [232, 110, 102],
+      '4': [248, 168, 156],
+      f: [230, 184, 168],
+      F: [248, 226, 212],
+      b: [208, 194, 172],
+      B: [246, 241, 228],
+    };
+
+    // Paleta Assada (crosta Maillard dourada, gordura caramelizada, osso defumado e marcas de grelha escuras; zero cores repetidas com a crua)
+    const PAL_COOKED = {
+      O: [62, 28, 14],
+      o: [94, 66, 40],
+      s: [94, 45, 21],
+      M: [74, 33, 15],
+      '1': [128, 66, 32],
+      '2': [166, 92, 46],
+      '3': [200, 122, 62],
+      '4': [228, 158, 90],
+      f: [208, 162, 108],
+      F: [236, 200, 144],
+      b: [184, 152, 110],
+      B: [224, 200, 160],
+    };
+
+    function buildPair(rawRows, grillCells) {
+      const grillMap = new Map(grillCells.map(([x, y, sym = 'M']) => [`${x},${y}`, sym]));
+      const raw = Array.from({ length: 16 }, (_, y) =>
+        Array.from({ length: 16 }, (_, x) => {
+          const ch = rawRows[y][x];
+          return ch === '.' ? null : PAL_RAW[ch];
+        })
+      );
+      const cooked = Array.from({ length: 16 }, (_, y) =>
+        Array.from({ length: 16 }, (_, x) => {
+          const ch = rawRows[y][x];
+          if (ch === '.') return null;
+          const g = grillMap.get(`${x},${y}`);
+          return PAL_COOKED[g || ch];
+        })
+      );
+      return { raw, cooked };
+    }
+
+    const EXAMPLES = [
+      {
+        id: 'atual',
+        title: 'Atual (no jogo hoje)',
+        tag: 'Referência Atual',
+        cls: 'current',
+        desc: 'Elipse matemática chapada de 2 tons sem lateral 3D, com 7 px soltos de gordura e quadrado branco no canto.',
+        pair: { raw: atualRaw, cooked: atualCooked },
+      },
+      {
+        id: 'op-a',
+        title: 'Opção A · Carré / Costeleta Francesa',
+        tag: 'Corte Clássico de Cordeiro',
+        cls: 'highlight',
+        desc: 'Medalhão suculento com espessura 3D embaixo, capa de gordura cremosa no topo e osso longo da costela raspada na diagonal.',
+        pair: buildPair([
+          '................',
+          '............oo..',
+          '...........oBbo.',
+          '..........oBBbo.',
+          '.........oBBbo..',
+          '....OOOOOoBbo...',
+          '..OOFFFFFfbo....',
+          '.OFF33432fOO....',
+          '.OF33432221O....',
+          '.O3322f2221O....',
+          '.O322f22211O....',
+          '.Os2222111sO....',
+          '..OsssssssO.....',
+          '...OOOOOOO......',
+          '................',
+          '................',
+        ], [
+          [4,8,'M'],[5,8,'1'],[5,9,'M'],[6,9,'1'],[6,10,'M'],
+          [8,8,'M'],[9,8,'1'],[9,9,'M'],[10,9,'1'],
+        ]),
+      },
+      {
+        id: 'op-b',
+        title: 'Opção B · Costela Rústica em Gota',
+        tag: 'Estilo Survival',
+        cls: '',
+        desc: 'Corte alongado ascendente inspirado em survival games, mas com parede 3D inferior, marmoreio interno e ponta de osso marfim nítida.',
+        pair: buildPair([
+          '................',
+          '...........ooo..',
+          '..........oBBbo.',
+          '.........oBBbo..',
+          '........OoFfo...',
+          '......OOFF3fO...',
+          '....OOFF3321O...',
+          '...OFF343221O...',
+          '..OF33432f11O...',
+          '..O3322f221sO...',
+          '..O322f211ssO...',
+          '..Os22111ssO....',
+          '...OssssssO.....',
+          '....OOOOOO......',
+          '................',
+          '................',
+        ], [
+          [4,9,'M'],[5,9,'1'],[5,10,'M'],[6,10,'1'],
+          [7,7,'M'],[8,7,'1'],[8,8,'M'],[9,8,'1'],
+        ]),
+      },
+      {
+        id: 'op-c',
+        title: 'Opção C · Pernil de Ovelha 3/4',
+        tag: 'Estilo RPG Medieval',
+        cls: '',
+        desc: 'Corte transversal gordinho do pernil com anel de gordura subcutânea, tutano central, cilindro 3D sombreado e osso articulado.',
+        pair: buildPair([
+          '................',
+          '...........oo.oo',
+          '..........oBboBo',
+          '..........oBBbo.',
+          '....OOOOO.oBbo..',
+          '..OOFFFFFOobo...',
+          '.OFF3343FFssO...',
+          '.OF334322FssO...',
+          '.OF32Bb22fssO...',
+          '.OF32b221fssO...',
+          '.OFF22211fsO....',
+          '..OfF111ffO.....',
+          '...OsssssO......',
+          '....OOOOO.......',
+          '................',
+          '................',
+        ], [
+          [4,7,'M'],[5,7,'1'],[5,8,'M'],
+          [8,8,'M'],[8,9,'1'],[9,9,'M'],
+        ]),
+      },
+      {
+        id: 'op-d',
+        title: 'Opção D · Chuleta / Lombo em T',
+        tag: 'Corte Alto 3/4',
+        cls: '',
+        desc: 'Posta espessa de sela/lombo vista em 3/4 com osso em T dividindo o filé, brilho úmido no topo e lateral 3D marcada.',
+        pair: buildPair([
+          '................',
+          '................',
+          '................',
+          '...OOOOOOOOO....',
+          '..OFFF33222OO...',
+          '.OFF34BBBB321O..',
+          '.OF3332fB32211O.',
+          '.O33222fBf2211O.',
+          '.O32221b22111sO.',
+          '.Os2211b211ssO..',
+          '..OsssssssssO...',
+          '...OOOOOOOOO....',
+          '................',
+          '................',
+          '................',
+          '................',
+        ], [
+          [4,6,'M'],[5,6,'1'],[5,7,'M'],[6,7,'1'],
+          [10,6,'M'],[11,6,'1'],[11,7,'M'],
+        ]),
+      },
+    ];
+
+    let showGrid = false;
+
+    function drawSprite(canvas, pixels, withGrid = false) {
+      const scale = withGrid ? 9 : 1;
+      canvas.width = 16 * scale;
+      canvas.height = 16 * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (let y = 0; y < 16; y++) {
+        for (let x = 0; x < 16; x++) {
+          const c = pixels[y][x];
+          if (!c) continue;
+          ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+          ctx.fillRect(x * scale, y * scale, scale, scale);
+        }
+      }
+
+      if (withGrid) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 16; i++) {
+          ctx.beginPath();
+          ctx.moveTo(i * scale + 0.5, 0);
+          ctx.lineTo(i * scale + 0.5, 16 * scale);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(0, i * scale + 0.5);
+          ctx.lineTo(16 * scale, i * scale + 0.5);
+          ctx.stroke();
+        }
+      }
+    }
+
+    const gridEl = document.getElementById('cardsGrid');
+    const rendered = [];
+
+    for (const ex of EXAMPLES) {
+      const card = document.createElement('article');
+      if (ex.cls) card.className = ex.cls;
+      card.innerHTML = `
+        <div class="card-top">
+          <h2>${ex.title}</h2>
+          <span class="tag">${ex.tag}</span>
+        </div>
+        <p class="desc">${ex.desc}</p>
+        <div class="pair-zoom">
+          <div class="zoom-box">
+            <span class="zoom-label">Crua (16×16)</span>
+            <canvas class="big" data-role="big-raw"></canvas>
+          </div>
+          <div class="zoom-box">
+            <span class="zoom-label">Assada (16×16)</span>
+            <canvas class="big" data-role="big-cooked"></canvas>
+          </div>
+        </div>
+        <div class="hud-strip">
+          <div class="furnace-sim" title="Simulação na barra de itens / fornalha">
+            <div class="slot"><canvas data-role="slot-raw"></canvas><span class="cnt">64</span></div>
+            <span class="arrow">🔥 ➔</span>
+            <div class="slot"><canvas data-role="slot-cooked"></canvas><span class="cnt">64</span></div>
+          </div>
+          <div class="real-sizes">
+            <span>16px:</span>
+            <div class="mini-pair">
+              <canvas class="px16" data-role="16-raw"></canvas>
+              <canvas class="px16" data-role="16-cooked"></canvas>
+            </div>
+            <span>32px:</span>
+            <div class="mini-pair">
+              <canvas class="px32" data-role="32-raw"></canvas>
+              <canvas class="px32" data-role="32-cooked"></canvas>
+            </div>
+          </div>
+        </div>
+      `;
+      gridEl.appendChild(card);
+
+      const refs = {
+        ex,
+        bigRaw: card.querySelector('[data-role="big-raw"]'),
+        bigCooked: card.querySelector('[data-role="big-cooked"]'),
+        slotRaw: card.querySelector('[data-role="slot-raw"]'),
+        slotCooked: card.querySelector('[data-role="slot-cooked"]'),
+        r16: card.querySelector('[data-role="16-raw"]'),
+        c16: card.querySelector('[data-role="16-cooked"]'),
+        r32: card.querySelector('[data-role="32-raw"]'),
+        c32: card.querySelector('[data-role="32-cooked"]'),
+      };
+      rendered.push(refs);
+    }
+
+    function refreshAll() {
+      for (const r of rendered) {
+        drawSprite(r.bigRaw, r.ex.pair.raw, showGrid);
+        drawSprite(r.bigCooked, r.ex.pair.cooked, showGrid);
+        drawSprite(r.slotRaw, r.ex.pair.raw, false);
+        drawSprite(r.slotCooked, r.ex.pair.cooked, false);
+        drawSprite(r.r16, r.ex.pair.raw, false);
+        drawSprite(r.c16, r.ex.pair.cooked, false);
+        drawSprite(r.r32, r.ex.pair.raw, false);
+        drawSprite(r.c32, r.ex.pair.cooked, false);
+      }
+    }
+    refreshAll();
+
+    const btnGrid = document.getElementById('btnGrid');
+    btnGrid.addEventListener('click', () => {
+      showGrid = !showGrid;
+      btnGrid.classList.toggle('active', showGrid);
+      refreshAll();
+    });
+
+    const btnBg = document.getElementById('btnBg');
+    btnBg.addEventListener('click', () => {
+      const on = document.body.classList.toggle('light-canvas');
+      btnBg.classList.toggle('active', on);
+    });
+  </script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 // A pose da ferramenta toma como referência a transformação handheld clássica:
 // escala 0,85 e ângulo de 55° para alinhar a diagonal do sprite ao cabo.
 // O modelo do jogador usa +Z como frente; YXZ converte esse plano para o lado.
-import { applyThirdPersonAppleGrip } from './player-eat-animation.js';
+import { applyThirdPersonAppleGrip, applyThirdPersonMuttonGrip } from './player-eat-animation.js';
 
 export const THIRD_TOOL_POSE = Object.freeze({ yaw: -Math.PI / 2, roll: -55 * Math.PI / 180, scale: 0.85 });
 export const THIRD_TOOL_GRIP = Object.freeze({ x: 0.187, y: 0.204 });
@@ -25,6 +25,11 @@ export function createPlayerHeldItem(THREE, rightArm) {
         const copy = mesh.clone();
         if (copy.userData?.isAppleModel) {
             applyThirdPersonAppleGrip(copy);
+            anchor.add(copy);
+            return;
+        }
+        if (copy.userData?.isMuttonModel) {
+            applyThirdPersonMuttonGrip(copy);
             anchor.add(copy);
             return;
         }
