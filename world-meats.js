@@ -71,17 +71,89 @@ export const MEAT_SMELTING = Object.freeze(MEATS.map(meat => Object.freeze({
 export const MEAT_SPRITE_CORES = Object.freeze({
     mutton: Object.freeze({
         raw: Object.freeze({
-            carne: Object.freeze([178, 66, 62]),
-            borda: Object.freeze([122, 38, 40]),
-            gordura: Object.freeze([236, 198, 178]),
-            osso: Object.freeze([236, 232, 218]),
+            carne: Object.freeze([208, 76, 74]),
+            borda: Object.freeze([92, 25, 32]),
+            gordura: Object.freeze([248, 226, 212]),
+            osso: Object.freeze([246, 241, 228]),
         }),
         cooked: Object.freeze({
-            carne: Object.freeze([150, 84, 42]),
-            borda: Object.freeze([96, 50, 22]),
-            gordura: Object.freeze([214, 166, 108]),
-            osso: Object.freeze([210, 186, 146]),
-            marca: Object.freeze([66, 34, 14]),
+            carne: Object.freeze([166, 92, 46]),
+            borda: Object.freeze([62, 28, 14]),
+            gordura: Object.freeze([236, 200, 144]),
+            osso: Object.freeze([224, 200, 160]),
+            marca: Object.freeze([74, 33, 15]),
         }),
     }),
 });
+
+/**
+ * Arte 16×16 autoral da Carne de Ovelha (Opção B · Costela Rústica em Gota):
+ * corte alongado ascendente com espessura 3D inferior, capa de gordura dorsal,
+ * marmoreio interno e ponta de costela marfim. A versão assada mantém a mesma
+ * silhueta exata, com crosta dourada de Maillard e duas marcas de grelha.
+ */
+export const MUTTON_SPRITE_GRID = Object.freeze([
+    '................',
+    '...........ooo..',
+    '..........oBBbo.',
+    '.........oBBbo..',
+    '........OoFfo...',
+    '......OOFF3fO...',
+    '....OOFF3321O...',
+    '...OFF343221O...',
+    '..OF33432f11O...',
+    '..O3322f221sO...',
+    '..O322f211ssO...',
+    '..Os22111ssO....',
+    '...OssssssO.....',
+    '....OOOOOO......',
+    '................',
+    '................',
+]);
+
+export const MUTTON_RAW_PALETTE = Object.freeze({
+    O: Object.freeze([92, 25, 32]),
+    o: Object.freeze([122, 102, 86]),
+    s: Object.freeze([136, 36, 44]),
+    '1': Object.freeze([174, 52, 56]),
+    '2': Object.freeze([208, 76, 74]),
+    '3': Object.freeze([232, 110, 102]),
+    '4': Object.freeze([248, 168, 156]),
+    f: Object.freeze([230, 184, 168]),
+    F: Object.freeze([248, 226, 212]),
+    b: Object.freeze([208, 194, 172]),
+    B: Object.freeze([246, 241, 228]),
+});
+
+export const MUTTON_COOKED_PALETTE = Object.freeze({
+    O: Object.freeze([62, 28, 14]),
+    o: Object.freeze([94, 66, 40]),
+    s: Object.freeze([94, 45, 21]),
+    M: Object.freeze([74, 33, 15]),
+    '1': Object.freeze([128, 66, 32]),
+    '2': Object.freeze([166, 92, 46]),
+    '3': Object.freeze([200, 122, 62]),
+    '4': Object.freeze([228, 158, 90]),
+    f: Object.freeze([208, 162, 108]),
+    F: Object.freeze([236, 200, 144]),
+    b: Object.freeze([184, 152, 110]),
+    B: Object.freeze([224, 200, 160]),
+});
+
+const MUTTON_GRILL_MAP = new Map([
+    ['4,9', 'M'], ['5,9', '1'], ['5,10', 'M'], ['6,10', '1'],
+    ['7,7', 'M'], ['8,7', '1'], ['8,8', 'M'], ['9,8', '1'],
+]);
+
+export function createMuttonSpritePixels(cooked = false) {
+    const pal = cooked ? MUTTON_COOKED_PALETTE : MUTTON_RAW_PALETTE;
+    return Array.from({ length: 16 }, (_, y) =>
+        Array.from({ length: 16 }, (_, x) => {
+            const ch = MUTTON_SPRITE_GRID[y][x];
+            if (ch === '.') return null;
+            const sym = cooked ? (MUTTON_GRILL_MAP.get(`${x},${y}`) || ch) : ch;
+            return [...pal[sym]];
+        })
+    );
+}
+

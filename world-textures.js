@@ -6,7 +6,7 @@ import { diamondArmorSprite } from './world-diamond-armor-icons.js';
 import { ATLAS_COLUMNS, ATLAS_ROWS, BLOCKS, ITEMS, TILE, TILE_PX, atlasTileRect } from './world-catalog.js';
 import { createBlockIconPixels, createModelIconPixels } from './world-block-icons.js';
 import { BED_COLORS, bedModelBoxes } from './world-bed.js';
-import { MEAT_SPRITE_CORES } from './world-meats.js';
+import { MEAT_SPRITE_CORES, createMuttonSpritePixels } from './world-meats.js';
 import { createCoalItemSpritePixels, createMineralOrePixel, createMineralSpritePixels, isMineralOreTile } from './world-mineral-textures.js';
 import {
     createAxeSpritePixels,
@@ -830,6 +830,10 @@ export function createTextureTools(THREE) {
             }
             for (const [x, y] of [[5, 5], [6, 5], [5, 6], [10, 9], [9, 10], [10, 10]]) put(x, y, light);
             return (spriteCache[key] = g);
+        }
+
+        if (kind === 'mutton') {
+            return (spriteCache[key] = createMuttonSpritePixels(mat === 'cooked'));
         }
 
         // As carnes: um naco de borda escura, duas veias de gordura clara e a

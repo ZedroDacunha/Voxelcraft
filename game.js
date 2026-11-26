@@ -83,13 +83,16 @@ import { FIRST_TOOL_POSE, applyFirstPersonToolPose } from './world-first-person-
 import { createSwordSwing, beginSwordSwing, swordPose, applyFirstPersonSwordPose, applyThirdPersonSwordPose } from './player-sword-animation.js';
 import { createSwordModel } from './world-sword-model.js';
 import { DROP_APPLE_SCALE, createAppleModel, createProgressiveAppleModel, setAppleBiteStage } from './world-apple-model.js';
+import { DROP_MUTTON_SCALE, createMuttonModel, createProgressiveMuttonModel, setMuttonBiteStage } from './world-mutton-model.js';
 import {
     EAT_DURATION,
     sampleEatAnimation,
     eatBitePitch,
     applyFirstPersonAppleGrip,
+    applyFirstPersonMuttonGrip,
     applyFirstPersonEatPose,
     applyThirdPersonAppleGrip,
+    applyThirdPersonMuttonGrip,
     applyThirdPersonEatPose,
     createAppleCrumbSystem,
 } from './player-eat-animation.js';
@@ -1777,6 +1780,9 @@ function spawnItemEntity(id, count, pos, vel, delay = 0.5, damage = 0, opts = {}
     if (ITEMS[id].sprite?.kind === 'apple') {
         mesh = createAppleModel(THREE);
         mesh.scale.setScalar(DROP_APPLE_SCALE);
+    } else if (ITEMS[id].sprite?.kind === 'mutton') {
+        mesh = createMuttonModel(THREE, ITEMS[id].sprite.mat === 'cooked');
+        mesh.scale.setScalar(DROP_MUTTON_SCALE);
     } else {
         const block = ITEMS[id].block != null ? BLOCKS[ITEMS[id].block] : null;
         const mat = itemRenderMode(ITEMS[id]) === 'sprite' ? spriteMaterial :
@@ -2288,6 +2294,12 @@ function refreshHeldItem() {
             heldAnchor.add(heldMesh);
             return;
         }
+        if (item.sprite.kind === 'mutton') {
+            heldMesh = createProgressiveMuttonModel(THREE, item.sprite.mat === 'cooked');
+            applyFirstPersonMuttonGrip(heldMesh);
+            heldAnchor.add(heldMesh);
+            return;
+        }
         const px = 0.034;
         const key = 'spr' + id;
         if (!heldGeoCache[key]) {
@@ -2369,16 +2381,18 @@ function updateHand(dt) {
         0);
     if (heldSwordPose) applyFirstPersonSwordPose(handPivot, heldAnchor, heldSwordPose);
     setAppleBiteStage(heldMesh, currentEatPose.stage);
+    setMuttonBiteStage(heldMesh, currentEatPose.stage);
     applyFirstPersonEatPose(handPivot, heldMesh, currentEatPose);
     if (firstPersonCrumbs) {
         if (cameraView === 'first' && pendingAppleCrumbBites.length > 0 && heldMesh) {
             handCamera.updateMatrixWorld(true);
-            heldMesh.getWorldPosition(_fpCrumbOrigin);
+            const crumbTarget = heldMesh.getObjectByName?.('biteTarget') || heldMesh;
+            crumbTarget.getWorldPosition(_fpCrumbOrigin);
             handCamera.worldToLocal(_fpCrumbOrigin);
             _fpCrumbOrigin.y += 0.02;
             _fpCrumbOrigin.z += 0.035;
-            for (const biteNum of pendingAppleCrumbBites) {
-                firstPersonCrumbs.burst(_fpCrumbOrigin, biteNum, 1);
+            for (const ev of pendingAppleCrumbBites) {
+                firstPersonCrumbs.burst(_fpCrumbOrigin, ev.bite, 1, ev.kind);
             }
             pendingAppleCrumbBites.length = 0;
         }
@@ -4270,11 +4284,17 @@ function cancelEating() {
     if (heldMesh?.userData?.isAppleModel) {
         setAppleBiteStage(heldMesh, 0);
         applyFirstPersonAppleGrip(heldMesh);
+    } else if (heldMesh?.userData?.isMuttonModel) {
+        setMuttonBiteStage(heldMesh, 0);
+        applyFirstPersonMuttonGrip(heldMesh);
     }
     const tpHeld = playerHeldItem?.anchor?.children?.[0];
     if (tpHeld?.userData?.isAppleModel) {
         setAppleBiteStage(tpHeld, 0);
         applyThirdPersonAppleGrip(tpHeld);
+    } else if (tpHeld?.userData?.isMuttonModel) {
+        setMuttonBiteStage(tpHeld, 0);
+        applyThirdPersonMuttonGrip(tpHeld);
     }
 }
 
@@ -4284,12 +4304,15 @@ function updateEating(dt) {
     const food = st && ITEMS[st.id].food;
     if (!food || selectedSlot !== eat.slot || st.id !== eat.id || hunger >= MAX_HUNGER) { cancelEating(); return; }
     eat.progress += dt / EAT_TIME;
-    const isApple = ITEMS[eat.id]?.sprite?.kind === 'apple';
+    const eatSprite = ITEMS[eat.id]?.sprite;
+    const isApple = eatSprite?.kind === 'apple';
+    const isMutton = eatSprite?.kind === 'mutton';
+    const crumbKind = isApple ? 'apple' : (isMutton ? (eatSprite.mat === 'cooked' ? 'mutton-cooked' : 'mutton-raw') : null);
     const sample = sampleEatAnimation(Math.min(0.9999, eat.progress));
     if (sample.stage > eat.lastStage) {
         for (let s = eat.lastStage + 1; s <= sample.stage; s++) {
             audio.play(isApple ? 'eat-crunch' : 'eat-chew', { rate: eatBitePitch(s) });
-            if (isApple) pendingAppleCrumbBites.push(s);
+            if (crumbKind) pendingAppleCrumbBites.push({ bite: s, kind: crumbKind });
         }
         eat.lastStage = sample.stage;
     }
@@ -5880,15 +5903,17 @@ function updateThirdPerson() {
     if (heldSwordPose) applyThirdPersonSwordPose(playerModel, locomotionRig, heldSwordPose, 1 - swimState.blend);
     const tpHeldMesh = playerHeldItem.anchor.children[0] ?? null;
     setAppleBiteStage(tpHeldMesh, currentEatPose.stage);
+    setMuttonBiteStage(tpHeldMesh, currentEatPose.stage);
     applyThirdPersonEatPose(playerModel, locomotionRig, tpHeldMesh, currentEatPose, 1 - swimState.blend);
     if (pendingAppleCrumbBites.length > 0 && thirdPersonCrumbs && tpHeldMesh) {
         playerModel.root.updateMatrixWorld(true);
         const mouthObj = playerModel.head.getObjectByName('mouth') || playerModel.head;
         mouthObj.getWorldPosition(_tpMouthWorld);
-        tpHeldMesh.getWorldPosition(_tpAppleWorld);
+        const crumbTarget = tpHeldMesh.getObjectByName?.('biteTarget') || tpHeldMesh;
+        crumbTarget.getWorldPosition(_tpAppleWorld);
         _tpMouthWorld.lerp(_tpAppleWorld, 0.58);
-        for (const biteNum of pendingAppleCrumbBites) {
-            thirdPersonCrumbs.burst(_tpMouthWorld, biteNum, 1);
+        for (const ev of pendingAppleCrumbBites) {
+            thirdPersonCrumbs.burst(_tpMouthWorld, ev.bite, 1, ev.kind);
         }
         pendingAppleCrumbBites.length = 0;
     }
