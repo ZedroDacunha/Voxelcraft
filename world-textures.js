@@ -1,4 +1,5 @@
 import { soilPixel, grassTopPixel, grassSidePixel } from './world-ground-textures.js';
+import { BALANCED_TREE_TEXTURES } from './world-tree-textures.js';
 import { hash2, mulberry32 } from './world-math.js';
 import { copperArmorSprite } from './world-copper-armor-icons.js';
 import { ironArmorSprite } from './world-iron-armor-icons.js';
@@ -111,51 +112,12 @@ export function createTilePixelSource() {
             case TILE.COBBLE: {
                 return cobblePixel(x, y, alt);
             }
-            case TILE.WOOD: {
-                const column = Math.floor(x / 2);
-                const stripe = hash2(column, 0, 3623);
-                const segment = hash2(column, Math.floor(y / 6), 4919);
-                let color = [119, 101, 67];
-                if (stripe < 0.18) color = [75, 61, 41];
-                else if (stripe < 0.38) color = [94, 77, 51];
-                else if (stripe > 0.91) color = [158, 137, 91];
-                else if (stripe > 0.76) color = [137, 115, 75];
-                if (segment > 0.84) color = color.map(channel => channel + 15);
-                else if (segment < 0.14) color = color.map(channel => channel - 13);
-                const barkChip = hash2(x, Math.floor(y / 2), 6833);
-                if (barkChip > 0.985) color = [57, 45, 31];
-                return color.map(channel => channel + j(2));
-            }
-            case TILE.WOOD_END: {
-                const dx = Math.abs(x - 15.5), dy = Math.abs(y - 15.5);
-                const r = Math.max(dx, dy);
-                const depth = 15.5 - r;
-                if (r > 14.5) return [81 + j(2), 63 + j(2), 39 + j(2)];
-                const ring = depth > 1 && Math.floor(depth) % 4 === 3;
-                if (ring) return [127 + j(2), 99 + j(2), 59 + j(2)];
-                const band = Math.floor(depth / 4) % 2;
-                const heartwood = dx < 2 && dy < 2;
-                const color = heartwood ? [197, 161, 99] : band ? [216, 187, 128] : [199, 169, 108];
-                const grain = (hash2(Math.floor(x / 4), Math.floor(y / 4), 7727) - 0.5) * 5;
-                return color.map(channel => channel + grain + j(2));
-            }
-            case TILE.LEAVES: {
-                const canopy = hash2(Math.floor(x / 4), Math.floor(y / 4), 800 + alt * 97);
-                const opening = hash2(Math.floor(x / 2), Math.floor(y / 2), 1901 + alt * 131);
-                const tinyOpening = hash2(x, y, 3119 + alt * 173);
-                if (opening < (canopy < 0.4 ? 0.22 : 0.13) || (opening < 0.32 && tinyOpening < 0.055)) {
-                    return [0, 0, 0, 0];
-                }
-
-                const leaf = hash2(Math.floor(x / 2), Math.floor(y / 2), 4517 + alt * 199);
-                let color = canopy < 0.24 ? [29, 76, 29] : canopy > 0.84 ? [65, 126, 43] : [43, 103, 36];
-                if (leaf > 0.86) color = [75, 137, 48];
-                else if (leaf < 0.12) color = [34, 86, 31];
-                const glint = hash2(x, y, 7321 + alt * 223);
-                if (glint > 0.975) color = [91, 151, 54];
-                const fine = (hash2(x, y, 8161 + alt * 251) - 0.5) * 8;
-                return color.map(channel => channel + fine);
-            }
+            case TILE.WOOD:
+                return BALANCED_TREE_TEXTURES.wood(x, y);
+            case TILE.WOOD_END:
+                return BALANCED_TREE_TEXTURES.woodEnd(x, y);
+            case TILE.LEAVES:
+                return BALANCED_TREE_TEXTURES.leaves(x, y, alt);
             case TILE.PLANKS: {
                 const board = Math.floor(y / 8);
                 const row = y % 8;
