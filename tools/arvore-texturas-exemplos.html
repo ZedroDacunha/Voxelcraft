@@ -1,0 +1,952 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Voxelcraft — Primeiros 4 Exemplos de Texturas das Árvores</title>
+<style>
+  :root {
+    --bg: #171f18;
+    --card: #243025;
+    --card2: #1d271e;
+    --border: #556b56;
+    --text: #eef4ec;
+    --muted: #bfd0be;
+    --accent: #9fe092;
+    --accentBg: #345234;
+    --amber: #f2be6b;
+    --amberBg: #4c3718;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 20px 24px 34px;
+    font: 15px/1.48 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: radial-gradient(circle at 50% 0%, #243224 0%, var(--bg) 70%);
+    color: var(--text);
+  }
+  header, .toolbar, .ref-banner, .grid, footer {
+    max-width: 1220px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  header { margin-bottom: 14px; }
+  .kicker {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: rgba(159, 224, 146, 0.14);
+    color: var(--accent);
+    border: 1px solid rgba(159, 224, 146, 0.42);
+    margin-bottom: 6px;
+  }
+  h1 { margin: 0 0 5px; font-size: 25px; }
+  .lead { margin: 0; color: var(--muted); max-width: 1020px; font-size: 14.5px; }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+  }
+  .toolbar .group-label {
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-right: 2px;
+    font-weight: 600;
+  }
+  button {
+    background: #2e3d2f;
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 7px 11px;
+    border-radius: 8px;
+    cursor: pointer;
+    font: 600 12.5px/1.2 inherit;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  button:hover { background: #3b4e3c; }
+  button.active {
+    background: var(--accentBg);
+    border-color: var(--accent);
+    color: #fff;
+    box-shadow: 0 0 0 1px rgba(159, 224, 146, 0.28);
+  }
+  button.compare-btn.active {
+    background: var(--amberBg);
+    border-color: var(--amber);
+    color: #fff8eb;
+    box-shadow: 0 0 0 1px rgba(242, 190, 107, 0.34);
+  }
+  .sep {
+    width: 1px;
+    height: 22px;
+    background: rgba(124, 148, 124, 0.38);
+    margin: 0 3px;
+  }
+
+  .ref-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: rgba(29, 39, 30, 0.86);
+    border: 1px dashed rgba(145, 172, 144, 0.45);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+  }
+  .ref-banner .ref-copy {
+    font-size: 13px;
+    color: var(--muted);
+    max-width: 720px;
+  }
+  .ref-banner .ref-copy strong { color: var(--text); }
+  .ref-tiles {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .ref-tile-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .ref-tile-item canvas {
+    width: 44px;
+    height: 44px;
+    image-rendering: pixelated;
+    border-radius: 6px;
+    border: 1px solid #596f59;
+    background: #141b15;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+  @media (max-width: 860px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+  article {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  article.recommended {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px rgba(159, 224, 146, 0.28);
+  }
+  .viewer {
+    width: 100%;
+    aspect-ratio: 16 / 11;
+    position: relative;
+    cursor: grab;
+    touch-action: none;
+    background: #6fb4e8;
+  }
+  .viewer:active { cursor: grabbing; }
+  .viewer canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+  }
+  .badge-float {
+    position: absolute;
+    left: 10px;
+    top: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #eef7ed;
+    background: rgba(20, 28, 21, 0.84);
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(159, 224, 146, 0.48);
+    pointer-events: none;
+  }
+  .compare-pill {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff6e4;
+    background: rgba(76, 55, 24, 0.92);
+    padding: 3px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--amber);
+    pointer-events: none;
+    display: none;
+  }
+  body.comparing .compare-pill { display: inline-block; }
+  .hint {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    font-size: 11px;
+    color: #e4efe3;
+    background: rgba(18, 25, 19, 0.72);
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(132, 158, 132, 0.42);
+    pointer-events: none;
+  }
+
+  .swatches {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    padding: 10px 14px;
+    background: rgba(22, 30, 23, 0.65);
+    border-top: 1px solid rgba(112, 138, 112, 0.32);
+    border-bottom: 1px solid rgba(112, 138, 112, 0.28);
+  }
+  .swatch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .swatch canvas {
+    width: 56px;
+    height: 56px;
+    flex-shrink: 0;
+    image-rendering: pixelated;
+    border-radius: 6px;
+    border: 1px solid #5a705a;
+    background: #1a231b;
+  }
+  .swatch-meta {
+    font-size: 11.5px;
+    line-height: 1.3;
+    color: var(--muted);
+  }
+  .swatch-meta strong {
+    display: block;
+    color: var(--text);
+    font-size: 12px;
+  }
+
+  .info { padding: 12px 15px 15px; }
+  .info .tag {
+    display: inline-block;
+    font-size: 11px;
+    color: #deecdd;
+    background: #334534;
+    border: 1px solid #5c765d;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-bottom: 6px;
+  }
+  .info h2 { margin: 0 0 4px; font-size: 17.5px; }
+  .info p { margin: 0; color: var(--muted); font-size: 13.5px; }
+
+  footer {
+    margin-top: 16px;
+    color: #a8baa7;
+    font-size: 13px;
+  }
+  code {
+    background: #233024;
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="kicker">Arte do Mundo · Árvores 32×32 (Casca, Topo com Anéis &amp; Folhagem Cutout)</span>
+  <h1>Primeiros 4 Exemplos de Texturas das Árvores</h1>
+  <p class="lead">
+    Cada proposta redesenha os 3 blocos visuais da árvore em <strong>32×32 contínuo sem costura</strong>: <strong>casca lateral</strong> em placas verticais orgânicas, <strong>topo cortado</strong> com colar de casca + anéis arredondados de alburno/cerne, e <strong>folhas recortadas (<code>cutout</code> + variante <code>alt</code>)</strong> em tufos sombreados alinhados à nova grama de <code>world-ground-textures.js</code>.
+  </p>
+</header>
+
+<div class="toolbar">
+  <span class="group-label">Cena:</span>
+  <button id="scene-tree" class="active" type="button">🌳 Árvore no Gramado</button>
+  <button id="scene-blocks" type="button">🪵 Close-up nos Blocos</button>
+  <button id="scene-under" type="button">🌤️ Vista de Baixo da Copa</button>
+  <div class="sep"></div>
+  <span class="group-label">Luz:</span>
+  <button id="light-day" class="active" type="button">☀️ Meio-Dia</button>
+  <button id="light-sunset" type="button">🌅 Fim de Tarde</button>
+  <div class="sep"></div>
+  <button id="btn-tile2x2" type="button">Amostras 2D: 1×1 (32px)</button>
+  <button id="btn-spin" class="active" type="button">Giro: ON</button>
+  <button id="btn-compare" class="compare-btn" type="button">👁️ Alternar p/ Atual do Jogo: OFF</button>
+</div>
+
+<section class="ref-banner" aria-label="Referência da textura atual no jogo">
+  <div class="ref-copy">
+    <strong>Referência atual em <code>world-textures.js</code>:</strong> o Exemplo 1 equilibrado foi implementado no jogo; a folhagem poderá ser refinada depois. Arraste qualquer cartão 3D abaixo para girar as 4 árvores sincronizadas (ou use a roda do mouse para aproximar).
+  </div>
+  <div class="ref-tiles">
+    <div class="ref-tile-item">
+      <canvas id="ref-wood" width="64" height="64"></canvas>
+      <span>Casca<br>atual</span>
+    </div>
+    <div class="ref-tile-item">
+      <canvas id="ref-end" width="64" height="64"></canvas>
+      <span>Topo<br>atual</span>
+    </div>
+    <div class="ref-tile-item">
+      <canvas id="ref-leaves" width="64" height="64"></canvas>
+      <span>Folhas<br>atuais</span>
+    </div>
+  </div>
+</section>
+
+<div class="grid" id="grid"></div>
+
+<footer>
+  Preview independente em <code>tools/arvore-texturas-exemplos.html</code> (<code>tools/proposta-texturas-arvore.js</code>) — o Exemplo 1 equilibrado está implementado no jogo. As demais propostas permanecem disponíveis para comparação.
+</footer>
+
+<script>
+window.addEventListener('error', e => {
+  const p = document.createElement('pre');
+  p.style.cssText = 'color:#ff9b9b;position:fixed;bottom:0;left:0;right:0;background:#2a0808;padding:10px;z-index:99;margin:0;font-size:12px;white-space:pre-wrap';
+  p.textContent = e.message + '\n' + (e.filename || '') + ':' + (e.lineno || '');
+  document.body.appendChild(p);
+});
+</script>
+
+<script type="module">
+import * as THREE from '../vendor/three/three.module.js';
+import { soilPixel, grassTopPixel, grassSidePixel } from '../world-ground-textures.js';
+import { TREE_TEXTURE_EXAMPLES, createCurrentTreeTextures } from '../tools/proposta-texturas-arvore.js';
+
+const currentTextures = createCurrentTreeTextures();
+
+// Desenha um tile 32×32 (ou malha 2×2 = 64×64) em um canvas 2D
+function paintSwatchCanvas(canvas, sampleFn, { tiled = false, skyBg = null } = {}) {
+  const size = tiled ? 64 : 32;
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const alt = ((x >> 5) + (y >> 5)) & 1;
+      const c = sampleFn(x % 32, y % 32, alt);
+      const a = c.length >= 4 ? c[3] : 255;
+      const i = (y * size + x) * 4;
+      if (a === 0 && skyBg) {
+        img.data[i] = skyBg[0];
+        img.data[i + 1] = skyBg[1];
+        img.data[i + 2] = skyBg[2];
+        img.data[i + 3] = 255;
+      } else {
+        img.data[i] = c[0];
+        img.data[i + 1] = c[1];
+        img.data[i + 2] = c[2];
+        img.data[i + 3] = a;
+      }
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+paintSwatchCanvas(document.getElementById('ref-wood'), (x, y) => currentTextures.wood(x, y), { tiled: false });
+paintSwatchCanvas(document.getElementById('ref-end'), (x, y) => currentTextures.woodEnd(x, y), { tiled: false });
+paintSwatchCanvas(document.getElementById('ref-leaves'), (x, y, alt) => currentTextures.leaves(x, y, alt), {
+  tiled: false,
+  skyBg: [118, 178, 234],
+});
+
+// Mini-atlas por variante (10 slots com borda extrudada de 2 px para zero sangramento UV)
+const SLOT = {
+  GRASS_TOP: 0,
+  GRASS_TOP_ALT: 1,
+  GRASS_SIDE: 2,
+  GRASS_SIDE_ALT: 3,
+  DIRT: 4,
+  DIRT_ALT: 5,
+  WOOD: 6,
+  WOOD_END: 7,
+  LEAVES: 8,
+  LEAVES_ALT: 9,
+};
+const CELL_STRIDE = 40; // 32px + 4px gutter em cada eixo
+const ATLAS_COLS = 4;
+const ATLAS_ROWS = 3;
+const ATLAS_W = ATLAS_COLS * CELL_STRIDE;
+const ATLAS_H = ATLAS_ROWS * CELL_STRIDE;
+const PAD = 4;
+
+function slotUV(slot) {
+  const col = slot % ATLAS_COLS;
+  const row = Math.floor(slot / ATLAS_COLS);
+  const x0 = col * CELL_STRIDE + PAD;
+  const y0 = row * CELL_STRIDE + PAD;
+  return {
+    u0: x0 / ATLAS_W,
+    u1: (x0 + 32) / ATLAS_W,
+    v0: 1 - (y0 + 32) / ATLAS_H,
+    v1: 1 - y0 / ATLAS_H,
+  };
+}
+
+function buildMiniAtlas(variant) {
+  const canvas = document.createElement('canvas');
+  canvas.width = ATLAS_W;
+  canvas.height = ATLAS_H;
+  const ctx = canvas.getContext('2d');
+  const img = ctx.createImageData(ATLAS_W, ATLAS_H);
+
+  const slotSampler = (slot, x, y) => {
+    switch (slot) {
+      case SLOT.GRASS_TOP: return grassTopPixel(x, y, 0);
+      case SLOT.GRASS_TOP_ALT: return grassTopPixel(x, y, 1);
+      case SLOT.GRASS_SIDE: return grassSidePixel(x, y, 0);
+      case SLOT.GRASS_SIDE_ALT: return grassSidePixel(x, y, 1);
+      case SLOT.DIRT: return soilPixel(x, y, 0);
+      case SLOT.DIRT_ALT: return soilPixel(x, y, 1);
+      case SLOT.WOOD: return variant.wood(x, y);
+      case SLOT.WOOD_END: return variant.woodEnd(x, y);
+      case SLOT.LEAVES: return variant.leaves(x, y, 0);
+      case SLOT.LEAVES_ALT: return variant.leaves(x, y, 1);
+      default: return [255, 0, 255, 255];
+    }
+  };
+
+  for (let slot = 0; slot <= SLOT.LEAVES_ALT; slot++) {
+    const col = slot % ATLAS_COLS;
+    const row = Math.floor(slot / ATLAS_COLS);
+    const ox = col * CELL_STRIDE + PAD;
+    const oy = row * CELL_STRIDE + PAD;
+    for (let dy = -PAD; dy < 32 + PAD; dy++) {
+      const sy = Math.max(0, Math.min(31, dy));
+      for (let dx = -PAD; dx < 32 + PAD; dx++) {
+        const sx = Math.max(0, Math.min(31, dx));
+        const c = slotSampler(slot, sx, sy);
+        const idx = ((oy + dy) * ATLAS_W + (ox + dx)) * 4;
+        img.data[idx] = c[0];
+        img.data[idx + 1] = c[1];
+        img.data[idx + 2] = c[2];
+        img.data[idx + 3] = c.length >= 4 ? c[3] : 255;
+      }
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.generateMipmaps = false;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+// Mesma tabela de faces e oclusão de ambiente do Voxelcraft (`game.js` / `menu-panorama.js`)
+const FACES = [
+  {
+    dir: [0, 1, 0], kind: 'top', shade: 1.00,
+    corners: [
+      { pos: [0, 1, 1], uv: [0, 0] },
+      { pos: [1, 1, 1], uv: [1, 0] },
+      { pos: [0, 1, 0], uv: [0, 1] },
+      { pos: [1, 1, 0], uv: [1, 1] },
+    ],
+  },
+  {
+    dir: [0, -1, 0], kind: 'bottom', shade: 0.56,
+    corners: [
+      { pos: [0, 0, 0], uv: [0, 0] },
+      { pos: [1, 0, 0], uv: [1, 0] },
+      { pos: [0, 0, 1], uv: [0, 1] },
+      { pos: [1, 0, 1], uv: [1, 1] },
+    ],
+  },
+  {
+    dir: [0, 0, 1], kind: 'sideZ', shade: 0.88,
+    corners: [
+      { pos: [0, 0, 1], uv: [0, 0] },
+      { pos: [1, 0, 1], uv: [1, 0] },
+      { pos: [0, 1, 1], uv: [0, 1] },
+      { pos: [1, 1, 1], uv: [1, 1] },
+    ],
+  },
+  {
+    dir: [0, 0, -1], kind: 'sideZ', shade: 0.80,
+    corners: [
+      { pos: [1, 0, 0], uv: [0, 0] },
+      { pos: [0, 0, 0], uv: [1, 0] },
+      { pos: [1, 1, 0], uv: [0, 1] },
+      { pos: [0, 1, 0], uv: [1, 1] },
+    ],
+  },
+  {
+    dir: [1, 0, 0], kind: 'sideX', shade: 0.92,
+    corners: [
+      { pos: [1, 0, 1], uv: [0, 0] },
+      { pos: [1, 0, 0], uv: [1, 0] },
+      { pos: [1, 1, 1], uv: [0, 1] },
+      { pos: [1, 1, 0], uv: [1, 1] },
+    ],
+  },
+  {
+    dir: [-1, 0, 0], kind: 'sideX', shade: 0.76,
+    corners: [
+      { pos: [0, 0, 0], uv: [0, 0] },
+      { pos: [0, 0, 1], uv: [1, 0] },
+      { pos: [0, 1, 0], uv: [0, 1] },
+      { pos: [0, 1, 1], uv: [1, 1] },
+    ],
+  },
+];
+
+function buildVoxelDataset(mode) {
+  const map = new Map();
+  const put = (x, y, z, kind) => map.set(`${x},${y},${z}`, kind);
+
+  if (mode === 'blocks') {
+    // Pedestal compacto 4×4 de grama + terra
+    for (let x = -2; x <= 1; x++) {
+      for (let z = -2; z <= 1; z++) {
+        put(x, 0, z, 'grass');
+      }
+    }
+    // Tronco empilhado (2 blocos de altura -> prova zero costura vertical!)
+    put(-1, 1, -1, 'log');
+    put(-1, 2, -1, 'log');
+    // Tora deitada com o corte (WOOD_END) virado para frente (+Z/-Z)
+    put(-1, 1, 1, 'logZ');
+    // Aglomerado de folhas (LEAVES + LEAVES_ALT)
+    put(1, 1, -1, 'leaves');
+    put(1, 2, -1, 'leaves');
+    put(0, 1, -1, 'leaves');
+    put(1, 1, 0, 'leaves');
+    return map;
+  }
+
+  // Ilha 5×5 com grama e terra aprovadas (`world-ground-textures.js`)
+  for (let x = -2; x <= 2; x++) {
+    for (let z = -2; z <= 2; z++) {
+      if (Math.abs(x) === 2 && Math.abs(z) === 2 && mode === 'under') continue;
+      put(x, -1, z, 'dirt');
+      put(x, 0, z, 'grass');
+    }
+  }
+  // Árvore idêntica ao gerador real (`world-terrain.js`, altura = 5)
+  const treeHeight = 5;
+  for (let k = 1; k <= treeHeight; k++) put(0, k, 0, 'log');
+  for (let dy = treeHeight - 2; dy <= treeHeight + 1; dy++) {
+    const radius = dy >= treeHeight ? 1 : 2;
+    for (let dx = -radius; dx <= radius; dx++) {
+      for (let dz = -radius; dz <= radius; dz++) {
+        if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
+        if (dy === treeHeight + 1 && Math.abs(dx) + Math.abs(dz) > 1) continue;
+        if (dx === 0 && dz === 0 && dy <= treeHeight) continue;
+        put(dx, dy, dz, 'leaves');
+      }
+    }
+  }
+  // Toco recém-cortado no canto frontal da ilha para exibir `WOOD_END` junto à árvore!
+  if (mode === 'tree') {
+    put(2, 1, 2, 'log');
+  }
+  return map;
+}
+
+function buildVoxelMeshes(voxels, opaqueMat, cutoutMat) {
+  const at = (x, y, z) => voxels.get(`${x},${y},${z}`) ?? null;
+  const isCutout = k => k === 'leaves';
+  const aoWeight = k => (!k ? 0 : isCutout(k) ? 0.35 : 1.0);
+
+  const cornerAO = (x, y, z, face, corner) => {
+    let axisA, axisB;
+    if (face.dir[0] !== 0) { axisA = 1; axisB = 2; }
+    else if (face.dir[1] !== 0) { axisA = 0; axisB = 2; }
+    else { axisA = 0; axisB = 1; }
+    const signA = corner.pos[axisA] === 0 ? -1 : 1;
+    const signB = corner.pos[axisB] === 0 ? -1 : 1;
+    const base = [x + face.dir[0], y + face.dir[1], z + face.dir[2]];
+    const side1 = [...base]; side1[axisA] += signA;
+    const side2 = [...base]; side2[axisB] += signB;
+    const diag = [...base]; diag[axisA] += signA; diag[axisB] += signB;
+    const s1 = aoWeight(at(...side1));
+    const s2 = aoWeight(at(...side2));
+    const dg = aoWeight(at(...diag));
+    const occ = (s1 >= 1 && s2 >= 1) ? 3 : Math.min(3, s1 + s2 + dg);
+    return 1 - occ * 0.13;
+  };
+
+  const pickSlot = (kind, faceKind, alt) => {
+    if (kind === 'grass') {
+      if (faceKind === 'top') return alt ? SLOT.GRASS_TOP_ALT : SLOT.GRASS_TOP;
+      if (faceKind === 'bottom') return alt ? SLOT.DIRT_ALT : SLOT.DIRT;
+      return alt ? SLOT.GRASS_SIDE_ALT : SLOT.GRASS_SIDE;
+    }
+    if (kind === 'dirt') return alt ? SLOT.DIRT_ALT : SLOT.DIRT;
+    if (kind === 'log') {
+      return (faceKind === 'top' || faceKind === 'bottom') ? SLOT.WOOD_END : SLOT.WOOD;
+    }
+    if (kind === 'logZ') {
+      return faceKind === 'sideZ' ? SLOT.WOOD_END : SLOT.WOOD;
+    }
+    return alt ? SLOT.LEAVES_ALT : SLOT.LEAVES;
+  };
+
+  const makeBuf = () => ({ pos: [], norm: [], uv: [], col: [], idx: [] });
+  const opaque = makeBuf();
+  const cutout = makeBuf();
+
+  for (const [key, kind] of voxels) {
+    const [x, y, z] = key.split(',').map(Number);
+    const alt = (x + y + z) & 1;
+    const curCut = isCutout(kind);
+    const dst = curCut ? cutout : opaque;
+
+    for (const f of FACES) {
+      const nx = x + f.dir[0], ny = y + f.dir[1], nz = z + f.dir[2];
+      const nKind = at(nx, ny, nz);
+      if (nKind) {
+        const nCut = isCutout(nKind);
+        if (!nCut) continue; // vizinho opaco esconde a face
+        // Regra exata do Voxelcraft (`game.js:992`): tronco continua visível sob folhas,
+        // e pares de folhas mantêm uma face interna (`dir > 0`) para dar profundidade à copa!
+        if (curCut && !(f.dir[0] > 0 || f.dir[1] > 0 || f.dir[2] > 0)) continue;
+      }
+
+      const slot = pickSlot(kind, f.kind, alt);
+      const { u0, u1, v0, v1 } = slotUV(slot);
+      const baseV = dst.pos.length / 3;
+
+      for (const c of f.corners) {
+        dst.pos.push(x + c.pos[0] - 0.5, y + c.pos[1], z + c.pos[2] - 0.5);
+        dst.norm.push(...f.dir);
+        // Rotaciona UV da tora deitada nas faces superiores/laterais para as fibras acompanharem o eixo Z
+        if (kind === 'logZ' && f.kind === 'top') {
+          dst.uv.push(c.uv[1] ? u1 : u0, c.uv[0] ? v1 : v0);
+        } else {
+          dst.uv.push(c.uv[0] ? u1 : u0, c.uv[1] ? v1 : v0);
+        }
+        const light = f.shade * cornerAO(x, y, z, f, c);
+        dst.col.push(light, light, light);
+      }
+      dst.idx.push(baseV, baseV + 1, baseV + 2, baseV + 2, baseV + 1, baseV + 3);
+    }
+  }
+
+  const toMesh = (buf, mat) => {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(buf.pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(buf.norm, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(buf.uv, 2));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(buf.col, 3));
+    geo.setIndex(buf.idx);
+    return new THREE.Mesh(geo, mat);
+  };
+
+  const group = new THREE.Group();
+  group.add(toMesh(opaque, opaqueMat));
+  group.add(toMesh(cutout, cutoutMat));
+  return group;
+}
+
+const SCENE_PRESETS = {
+  tree:   { target: [0, 2.75, 0], yaw: 0.68, pitch: 0.22, dist: 12.4 },
+  blocks: { target: [-0.15, 1.25, -0.15], yaw: 0.66, pitch: 0.34, dist: 5.6 },
+  under:  { target: [0, 3.45, 0], yaw: 0.55, pitch: -0.50, dist: 4.3 },
+};
+
+const LIGHT_PRESETS = {
+  day: {
+    sky: 0x7ec0ee,
+    hemiSky: 0xdff2ff,
+    hemiGround: 0x5c7244,
+    hemiInt: 0.92,
+    sunColor: 0xfff7e2,
+    sunInt: 1.05,
+    sunPos: [8, 14, 9],
+    swatchSky: [118, 178, 234],
+  },
+  sunset: {
+    sky: 0xd98a5c,
+    hemiSky: 0xffcda2,
+    hemiGround: 0x4b4234,
+    hemiInt: 0.78,
+    sunColor: 0xffae62,
+    sunInt: 1.22,
+    sunPos: [12, 6, 7],
+    swatchSky: [217, 138, 92],
+  },
+};
+
+let currentSceneMode = 'tree';
+let currentLightMode = 'day';
+let autoSpin = true;
+let compareCurrent = false;
+let tiledSwatches = false;
+
+const camState = { ...SCENE_PRESETS.tree, target: [...SCENE_PRESETS.tree.target] };
+const cards = [];
+const gridEl = document.getElementById('grid');
+
+for (const ex of TREE_TEXTURE_EXAMPLES) {
+  const article = document.createElement('article');
+  if (ex.recommended) article.classList.add('recommended');
+  article.innerHTML = `
+    <div class="viewer">
+      <span class="badge-float">${ex.badge}</span>
+      <span class="compare-pill">Mostrando: Atual do Jogo</span>
+      <span class="hint">Arraste p/ girar · Scroll p/ zoom</span>
+    </div>
+    <div class="swatches">
+      <div class="swatch">
+        <canvas class="sw-wood" width="32" height="32"></canvas>
+        <div class="swatch-meta"><strong>Casca</strong><code>WOOD</code> 32×32</div>
+      </div>
+      <div class="swatch">
+        <canvas class="sw-end" width="32" height="32"></canvas>
+        <div class="swatch-meta"><strong>Topo / Anéis</strong><code>WOOD_END</code></div>
+      </div>
+      <div class="swatch">
+        <canvas class="sw-leaves" width="32" height="32"></canvas>
+        <div class="swatch-meta"><strong>Folhas</strong><code>LEAVES</code> cutout</div>
+      </div>
+    </div>
+    <div class="info">
+      <span class="tag">${ex.tag}</span>
+      <h2>${ex.title}</h2>
+      <p>${ex.description}</p>
+    </div>
+  `;
+  gridEl.appendChild(article);
+
+  const viewer = article.querySelector('.viewer');
+  const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  viewer.prepend(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(42, 16 / 11, 0.1, 80);
+
+  const hemi = new THREE.HemisphereLight(0xdff2ff, 0x5c7244, 0.92);
+  const sun = new THREE.DirectionalLight(0xfff7e2, 1.05);
+  sun.position.set(8, 14, 9);
+  scene.add(hemi, sun);
+
+  const atlasProposed = buildMiniAtlas(ex);
+  const atlasCurrent = buildMiniAtlas(currentTextures);
+
+  const opaqueMat = new THREE.MeshLambertMaterial({ map: atlasProposed, vertexColors: true });
+  const cutoutMat = new THREE.MeshLambertMaterial({
+    map: atlasProposed,
+    alphaTest: 0.5,
+    transparent: false,
+    depthWrite: true,
+    vertexColors: true,
+    side: THREE.DoubleSide,
+  });
+
+  const card = {
+    ex,
+    viewer,
+    renderer,
+    scene,
+    camera,
+    hemi,
+    sun,
+    atlasProposed,
+    atlasCurrent,
+    opaqueMat,
+    cutoutMat,
+    rootGroup: null,
+    swWood: article.querySelector('.sw-wood'),
+    swEnd: article.querySelector('.sw-end'),
+    swLeaves: article.querySelector('.sw-leaves'),
+  };
+  cards.push(card);
+
+  // Interação sincronizada de órbita + zoom
+  let dragging = false;
+  let lastX = 0;
+  let lastY = 0;
+  viewer.addEventListener('pointerdown', ev => {
+    dragging = true;
+    lastX = ev.clientX;
+    lastY = ev.clientY;
+    viewer.setPointerCapture(ev.pointerId);
+  });
+  viewer.addEventListener('pointermove', ev => {
+    if (!dragging) return;
+    const dx = ev.clientX - lastX;
+    const dy = ev.clientY - lastY;
+    lastX = ev.clientX;
+    lastY = ev.clientY;
+    camState.yaw -= dx * 0.0085;
+    camState.pitch = Math.max(-1.15, Math.min(1.15, camState.pitch + dy * 0.0075));
+  });
+  const endDrag = () => { dragging = false; };
+  viewer.addEventListener('pointerup', endDrag);
+  viewer.addEventListener('pointercancel', endDrag);
+  viewer.addEventListener('wheel', ev => {
+    ev.preventDefault();
+    camState.dist = Math.max(2.4, Math.min(18, camState.dist * (1 + Math.sign(ev.deltaY) * 0.09)));
+  }, { passive: false });
+}
+
+function refreshCardSwatches() {
+  const skyBg = LIGHT_PRESETS[currentLightMode].swatchSky;
+  for (const c of cards) {
+    const src = compareCurrent ? currentTextures : c.ex;
+    paintSwatchCanvas(c.swWood, (x, y) => src.wood(x, y), { tiled: tiledSwatches });
+    paintSwatchCanvas(c.swEnd, (x, y) => src.woodEnd(x, y), { tiled: tiledSwatches });
+    paintSwatchCanvas(c.swLeaves, (x, y, alt) => src.leaves(x, y, alt), { tiled: tiledSwatches, skyBg });
+  }
+}
+
+function rebuildScenes() {
+  const voxels = buildVoxelDataset(currentSceneMode);
+  for (const c of cards) {
+    if (c.rootGroup) {
+      c.rootGroup.traverse(obj => { if (obj.geometry) obj.geometry.dispose(); });
+      c.scene.remove(c.rootGroup);
+    }
+    c.rootGroup = buildVoxelMeshes(voxels, c.opaqueMat, c.cutoutMat);
+    c.scene.add(c.rootGroup);
+  }
+}
+
+function applyLightPreset() {
+  const lp = LIGHT_PRESETS[currentLightMode];
+  for (const c of cards) {
+    c.scene.background = new THREE.Color(lp.sky);
+    c.hemi.color.setHex(lp.hemiSky);
+    c.hemi.groundColor.setHex(lp.hemiGround);
+    c.hemi.intensity = lp.hemiInt;
+    c.sun.color.setHex(lp.sunColor);
+    c.sun.intensity = lp.sunInt;
+    c.sun.position.set(...lp.sunPos);
+  }
+  refreshCardSwatches();
+}
+
+function applyCompareState() {
+  document.body.classList.toggle('comparing', compareCurrent);
+  for (const c of cards) {
+    const tex = compareCurrent ? c.atlasCurrent : c.atlasProposed;
+    c.opaqueMat.map = tex;
+    c.cutoutMat.map = tex;
+    c.opaqueMat.needsUpdate = true;
+    c.cutoutMat.needsUpdate = true;
+  }
+  refreshCardSwatches();
+}
+
+function resizeAll() {
+  for (const c of cards) {
+    const w = Math.max(1, c.viewer.clientWidth);
+    const h = Math.max(1, c.viewer.clientHeight);
+    c.renderer.setSize(w, h, false);
+    c.camera.aspect = w / h;
+    c.camera.updateProjectionMatrix();
+  }
+}
+window.addEventListener('resize', resizeAll);
+
+// Controles da barra superior
+function bindSceneBtn(id, mode) {
+  document.getElementById(id).addEventListener('click', () => {
+    currentSceneMode = mode;
+    for (const bid of ['scene-tree', 'scene-blocks', 'scene-under']) {
+      document.getElementById(bid).classList.toggle('active', bid === id);
+    }
+    const preset = SCENE_PRESETS[mode];
+    camState.target = [...preset.target];
+    camState.yaw = preset.yaw;
+    camState.pitch = preset.pitch;
+    camState.dist = preset.dist;
+    rebuildScenes();
+  });
+}
+bindSceneBtn('scene-tree', 'tree');
+bindSceneBtn('scene-blocks', 'blocks');
+bindSceneBtn('scene-under', 'under');
+
+document.getElementById('light-day').addEventListener('click', () => {
+  currentLightMode = 'day';
+  document.getElementById('light-day').classList.add('active');
+  document.getElementById('light-sunset').classList.remove('active');
+  applyLightPreset();
+});
+document.getElementById('light-sunset').addEventListener('click', () => {
+  currentLightMode = 'sunset';
+  document.getElementById('light-sunset').classList.add('active');
+  document.getElementById('light-day').classList.remove('active');
+  applyLightPreset();
+});
+
+const btnTile = document.getElementById('btn-tile2x2');
+btnTile.addEventListener('click', () => {
+  tiledSwatches = !tiledSwatches;
+  btnTile.classList.toggle('active', tiledSwatches);
+  btnTile.textContent = tiledSwatches ? 'Amostras 2D: Malha 2×2' : 'Amostras 2D: 1×1 (32px)';
+  refreshCardSwatches();
+});
+
+const btnSpin = document.getElementById('btn-spin');
+btnSpin.addEventListener('click', () => {
+  autoSpin = !autoSpin;
+  btnSpin.classList.toggle('active', autoSpin);
+  btnSpin.textContent = autoSpin ? 'Giro: ON' : 'Giro: OFF';
+});
+
+const btnCompare = document.getElementById('btn-compare');
+btnCompare.addEventListener('click', () => {
+  compareCurrent = !compareCurrent;
+  btnCompare.classList.toggle('active', compareCurrent);
+  btnCompare.textContent = compareCurrent
+    ? '👁️ Alternar p/ Atual do Jogo: ON'
+    : '👁️ Alternar p/ Atual do Jogo: OFF';
+  applyCompareState();
+});
+
+rebuildScenes();
+applyLightPreset();
+resizeAll();
+
+let prevTime = performance.now();
+function tick(now) {
+  const dt = Math.min(0.05, (now - prevTime) / 1000);
+  prevTime = now;
+  if (autoSpin) camState.yaw += dt * 0.32;
+
+  const cosP = Math.cos(camState.pitch);
+  const cx = camState.target[0] + Math.sin(camState.yaw) * cosP * camState.dist;
+  const cy = camState.target[1] + Math.sin(camState.pitch) * camState.dist;
+  const cz = camState.target[2] + Math.cos(camState.yaw) * cosP * camState.dist;
+
+  for (const c of cards) {
+    c.camera.position.set(cx, cy, cz);
+    c.camera.lookAt(camState.target[0], camState.target[1], camState.target[2]);
+    c.renderer.render(c.scene, c.camera);
+  }
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
