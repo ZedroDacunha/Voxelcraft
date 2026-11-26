@@ -14,6 +14,7 @@ import { damageEquippedArmor } from './world-armor-durability.js';
 import { armorPoints, armorToughness, damageAfterArmor } from './world-armor-protection.js';
 import { createPlayerArmor } from './player-armor.js';
 import { craftConsume, invCollectSame, invFillRecipe, invLeftClick, invQuickMove, invQuickMoveToCraft, invRightClick, invTouchRightClick, invSwapHotbar, stackable } from './inventory-logic.js';
+import { craftSlotsAlongSegment, createCraftRightDrag } from './inventory-craft-drag.js';
 import { stackHtml, updateSlotElement } from './inventory-view.js';
 import { createRecipeBook } from './inventory-recipe-book.js';
 import { craftGridTemplateColumns } from './inventory-layout.js';
@@ -2494,6 +2495,13 @@ let inventoryTouchGesture = null;
 let inventoryPlayerRotation = null;
 const craftInv = new Inventory(9);
 let craftN = 2;
+const craftRightDrag = createCraftRightDrag({ craftInv, cursor: cursorHeld, gridSize: () => craftN });
+let craftDragPoint = null;
+
+function cancelCraftRightDrag() {
+    craftRightDrag.cancel();
+    craftDragPoint = null;
+}
 
 function handleOutputClick(e) {
     const r = matchRecipe(craftInv, craftN);
@@ -2954,6 +2962,10 @@ function buildInventoryUI() {
     document.addEventListener('visibilitychange', () => { if (document.hidden) inventoryTouchGesture.cancel(); });
     overlay.addEventListener('mousedown', onInventoryMouseDown);
     overlay.addEventListener('mousemove', onInventoryMouseMove);
+    document.addEventListener('mousemove', onCraftDragMove);
+    document.addEventListener('mouseup', event => { if (event.button === 2) cancelCraftRightDrag(); });
+    window.addEventListener('blur', cancelCraftRightDrag);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) cancelCraftRightDrag(); });
     overlay.addEventListener('keydown', onInventoryKeyDown);
 }
 
@@ -3168,14 +3180,39 @@ function onInventoryMouseMove(e) {
     updateInventoryFloaters();
 }
 
+function onCraftDragMove(e) {
+    if (!craftRightDrag.active) return;
+    if (!inventoryOpen || !(e.buttons & 2) || (station && station.type !== 'crafting')) {
+        cancelCraftRightDrag();
+        return;
+    }
+    const point = { x: e.clientX, y: e.clientY };
+    const slots = craftSlotEls.slice(0, craftN * craftN).map((el, index) => {
+        const rect = el.getBoundingClientRect();
+        return { index, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+    });
+    const indices = craftSlotsAlongSegment(craftDragPoint, point, slots);
+    craftDragPoint = point;
+    let changed = false;
+    for (const index of indices) changed = craftRightDrag.visit(index) || changed;
+    if (changed) renderInventory();
+    if (!cursorHeld.stack) cancelCraftRightDrag();
+}
+
 function onInventoryMouseDown(e) {
+    cancelCraftRightDrag();
     if (e.target.closest('button, input, textarea, select')) return;
     e.preventDefault();
     invMouse.x = e.clientX; invMouse.y = e.clientY; invMouse.seen = true;
     const el = e.target.closest('.islot');
 
     if (!el) {
-        if (e.target.closest('#inv-panel')) return;
+        if (e.target.closest('#inv-panel')) {
+            if (e.button === 2 && (!station || station.type === 'crafting') && craftRightDrag.start()) {
+                craftDragPoint = { x: e.clientX, y: e.clientY };
+            }
+            return;
+        }
         const c = cursorHeld.stack;
         if (c) {
             const dmg = c.damage || 0;
@@ -3186,6 +3223,13 @@ function onInventoryMouseDown(e) {
         return;
     }
 
+    if (e.button === 2 && el.dataset.inv === 'craft' && craftRightDrag.start(Number(el.dataset.index))) {
+        craftDragPoint = { x: e.clientX, y: e.clientY };
+        invHover = { inv: 'craft', i: Number(el.dataset.index) };
+        renderInventory();
+        if (!cursorHeld.stack) cancelCraftRightDrag();
+        return;
+    }
     activateSlot(el, { button: e.button, shiftKey: e.shiftKey });
 }
 
@@ -3290,6 +3334,7 @@ function giveBack(s) {
 function closeInventory(relock) {
     if (!inventoryOpen) return;
     inventoryTouchGesture?.cancel();
+    cancelCraftRightDrag();
     inventoryPlayerRotation?.close();
     inventoryOpen = false;
     renderInventoryTouchHeld();
