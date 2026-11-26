@@ -336,7 +336,25 @@ import { hash2 } from '../world-math.js';
 import { BALANCED_TREE_TEXTURES } from '../world-tree-textures.js';
 import { TREE_TEXTURE_EXAMPLES, createCurrentTreeTextures } from '../tools/proposta-texturas-arvore.js';
 
-const leafStage = new URLSearchParams(location.search).get('folhas');
+const query = new URLSearchParams(location.search);
+const leafStage = query.get('folhas');
+const fallingLeafStage = query.get('folhas-caindo');
+const fallingLeafMode = ['1', '2', '3', '4', '5', '6', '7', '8'].includes(fallingLeafStage);
+const naturalRefinementMode = fallingLeafStage === '4';
+const fallingWindMode = fallingLeafStage === '6';
+const fallingSmoothLandingMode = fallingLeafStage === '8';
+const fallingLandingMode = ['7', '8'].includes(fallingLeafStage);
+const fallingEmissionMode = ['5', '6', '7', '8'].includes(fallingLeafStage);
+const fallingTextureMode = ['3', '4'].includes(fallingLeafStage);
+const fallingMotionMode = ['2', '3', '4', '5', '6', '7', '8'].includes(fallingLeafStage);
+const fallingLeafModule = fallingLeafMode ? await import('../tools/proposta-folhas-caindo.js') : null;
+const fallingMotionModule = fallingMotionMode ? await import('../tools/proposta-movimento-folhas.js') : null;
+const fallingTextureModule = fallingTextureMode ? await import('../tools/proposta-textura-folha-caindo.js') : null;
+const naturalRefinementModule = naturalRefinementMode || fallingEmissionMode ? await import('../tools/proposta-folha-natural.js') : null;
+const fallingEmissionModule = fallingEmissionMode ? await import('../tools/proposta-emissao-folhas.js') : null;
+const fallingWindModule = fallingWindMode ? await import('../tools/proposta-emissao-vento.js') : null;
+const fallingLandingModule = fallingLandingMode ? await import('../tools/proposta-pouso-folhas.js') : null;
+const fallingSmoothLandingModule = fallingSmoothLandingMode ? await import('../tools/proposta-pouso-suave.js') : null;
 const leafShapeMode = ['1', '2', '3', '4'].includes(leafStage);
 const leafColorMode = leafStage === '2';
 const leafOpeningMode = leafStage === '3';
@@ -354,12 +372,106 @@ const openingExamples = leafOpeningMode || leafReviewMode
 const previousReference = leafStage === '1' || leafReviewMode;
 const currentTextures = leafOpeningMode ? colorExamples[0] : leafColorMode ? shapeExamples[0]
   : previousReference ? BALANCED_TREE_TEXTURES : createCurrentTreeTextures();
-const examples = leafReviewMode
+const examples = fallingEmissionMode
+  ? (fallingSmoothLandingMode ? [fallingSmoothLandingModule.LONG_LANDING] : fallingLandingMode ? fallingLandingModule.LANDING_STYLES : fallingWindMode ? fallingWindModule.WIND_LEAF_SCENARIOS : fallingEmissionModule.FALLING_LEAF_EMISSION_STYLES).map(style => ({ ...currentTextures, ...fallingMotionModule.FALLING_LEAF_MOTIONS[3], ...naturalRefinementModule.NATURAL_LEAF_REFINEMENTS[1], ...style, recommended: !!style.recommended }))
+  : naturalRefinementMode
+  ? naturalRefinementModule.NATURAL_LEAF_REFINEMENTS.map(texture => ({ ...currentTextures, ...fallingMotionModule.FALLING_LEAF_MOTIONS[3], ...texture, recommended: !!texture.recommended }))
+  : fallingTextureMode
+  ? fallingTextureModule.FALLING_LEAF_TEXTURE_EXAMPLES.map(texture => ({ ...currentTextures, ...fallingMotionModule.FALLING_LEAF_MOTIONS[3], ...texture, recommended: !!texture.recommended }))
+  : fallingMotionMode
+  ? fallingMotionModule.FALLING_LEAF_MOTIONS.map(motion => ({ ...currentTextures, ...fallingLeafModule.FALLING_LEAF_EXAMPLES[0], ...motion, recommended: !!motion.recommended }))
+  : fallingLeafMode ? fallingLeafModule.FALLING_LEAF_EXAMPLES.map(ex => ({ ...currentTextures, ...ex }))
+  : leafReviewMode
   ? [
       { ...openingExamples[2], badge: 'Implementada · Arejada', tag: 'Oval + verde natural + arejada', title: 'Folhas escolhidas', description: 'As escolhas das três etapas, agora aplicadas ao jogo.', recommended: true },
       { ...currentTextures, badge: 'Referência · Anterior', tag: 'Antes da alteração', title: 'Folhas anteriores', description: 'A folhagem anterior, na mesma árvore e iluminação para comparação.' },
     ]
   : leafOpeningMode ? openingExamples : leafColorMode ? colorExamples : leafShapeMode ? shapeExamples : TREE_TEXTURE_EXAMPLES;
+
+if (fallingLeafMode) {
+  document.title = 'Voxelcraft — Folhas caindo: parte 1';
+  document.querySelector('.kicker').textContent = 'Folhas caindo · Parte 1 de 5 · Aparência';
+  document.querySelector('h1').textContent = 'Escolha o formato das folhas';
+  document.querySelector('.lead').innerHTML = 'Compare quatro folhinhas em pixel art com as cores da árvore. As folhas estão <strong>paradas apenas para mostrar a aparência e a escala</strong>: movimento, quantidade, vento e contato com o chão serão trabalhados depois.';
+  document.querySelector('.ref-copy').innerHTML = '<strong>Árvore atual do jogo.</strong> Arraste para girar todas juntas e use a roda para aproximar. As folhas em posições fixas ilustram a escala; não representam a frequência definitiva do efeito.';
+  document.querySelector('footer').textContent = 'Estudo visual isolado: estas folhinhas ainda não foram adicionadas ao jogo.';
+  for (const id of ['scene-blocks', 'btn-tile2x2', 'btn-compare']) document.getElementById(id).hidden = true;
+  const close = document.createElement('button');
+  close.id = 'scene-close'; close.type = 'button'; close.textContent = '🔎 Copa de perto';
+  document.querySelector('#scene-under').after(close);
+  const size = document.createElement('button');
+  size.id = 'leaf-size'; size.type = 'button'; size.textContent = fallingMotionMode ? 'Tamanho: 0,25 bloco' : 'Tamanho: 0,38 bloco';
+  document.querySelector('#btn-spin').before(size);
+  document.querySelector('#btn-spin').classList.remove('active');
+  document.querySelector('#btn-spin').textContent = 'Giro: OFF';
+  if (fallingMotionMode) {
+    document.title = 'Voxelcraft — Folhas caindo: parte 2';
+    document.querySelector('.kicker').textContent = 'Folhas caindo · Parte 2 de 5 · Movimento';
+    document.querySelector('h1').textContent = 'Escolha o movimento das folhas';
+    document.querySelector('.lead').innerHTML = 'Compare quatro movimentos para a <strong>folha oval menor</strong>. As folhas seguem trajetórias de demonstração em ciclo; a quantidade, a emissão, o vento do jogo e a reação ao chão serão definidos depois.';
+    document.querySelector('.ref-copy').innerHTML = '<strong>Prévia ilustrativa:</strong> as quatro cenas usam as mesmas folhas e uma distribuição semelhante para facilitar a comparação. Arraste para girar, use a roda para aproximar e pause quando quiser observar um detalhe.';
+    document.querySelector('footer').textContent = 'Estudo isolado de movimento; não há colisão nem folhas caindo no jogo ainda.';
+    close.textContent = '🔎 Queda de perto';
+    close.classList.add('active');
+    document.querySelector('#scene-tree').classList.remove('active');
+    const pause = document.createElement('button');
+    pause.id = 'leaf-pause'; pause.type = 'button'; pause.textContent = '⏸️ Pausar folhas';
+    document.querySelector('#leaf-size').before(pause);
+    if (fallingEmissionMode) {
+      document.title = 'Voxelcraft — Emissão de folhinhas';
+      document.querySelector('.kicker').textContent = 'Folhas caindo · Parte 3 de 5 · Emissão';
+      document.querySelector('h1').textContent = 'Onde e com que frequência as folhas aparecem';
+      document.querySelector('.lead').innerHTML = 'As quatro cenas usam a <strong>folha oval pequena com nervura suave</strong> e o movimento de giro escolhido. Compare a frequência e a distribuição sob a copa; o pouso e o vento do jogo serão estudados depois.';
+      document.querySelector('.ref-copy').innerHTML = '<strong>Prévia de uma árvore:</strong> as folhas nascem em pontos variados abaixo dos blocos da copa e desaparecem antes do chão. Frequências são médias ilustrativas por árvore, não a quantidade definitiva para uma floresta.';
+      document.querySelector('footer').textContent = 'Estudo isolado de emissão: não há partículas novas no jogo nem simulação de pouso ainda.';
+      if (fallingLandingMode) {
+        document.title = 'Voxelcraft — Pouso das folhinhas';
+        document.querySelector('.kicker').textContent = 'Folhas caindo · Parte 4 de 5 · Pouso e desaparecimento';
+        document.querySelector('h1').textContent = 'Como as folhas pousam e desaparecem';
+        document.querySelector('.lead').innerHTML = 'A mesma <strong>folha oval com nervura suave e giro e planeio</strong> em três opções de pouso. Compare quanto tempo ela permanece sobre a grama antes de desaparecer.';
+        document.querySelector('.ref-copy').innerHTML = '<strong>Prévia em uma ilha plana:</strong> as três cenas usam a mesma sequência e simulam vento leve (em média, uma folha a cada 1,6 segundo). Nesta demonstração as folhas pousam sobre a grama; a colisão com terrenos variados será implementada depois.';
+        document.querySelector('footer').textContent = 'Estudo isolado: o pouso em outros blocos e o efeito no jogo ainda não foram implementados.';
+        close.textContent = '🔎 Queda e pouso';
+        if (fallingSmoothLandingMode) {
+          document.title = 'Voxelcraft — Pouso demorado refinado';
+          document.querySelector('.kicker').textContent = 'Folhas caindo · Parte 4 de 5 · Refinamento do pouso';
+          document.querySelector('h1').textContent = 'Um pouso mais natural';
+          document.querySelector('.lead').innerHTML = 'Mantivemos o <strong>pouso demorado</strong> que você escolheu. Agora a mesma folha se inclina gradualmente até se deitar sobre a grama, sem trocar de desenho no contato.';
+          document.querySelector('.ref-copy').innerHTML = '<strong>Prévia em uma ilha plana:</strong> vento leve simulado, uma folha a cada 1,6 segundo em média. A folha permanece 3 segundos no chão e depois desaparece. Pause ou aproxime para observar a transição.';
+          document.querySelector('footer').textContent = 'Estudo isolado: a colisão em terrenos variados e a integração ao jogo ainda serão trabalhadas.';
+        }
+      }
+      if (fallingWindMode) {
+        document.body.classList.add('wind-preview');
+        document.title = 'Voxelcraft — Folhas e vento';
+        document.querySelector('.kicker').textContent = 'Folhas caindo · Parte 3 de 5 · Vento e emissão';
+        document.querySelector('h1').textContent = 'Folhas em diferentes condições de vento';
+        document.querySelector('.lead').innerHTML = 'Em <strong>calmaria</strong>, a queda é discreta. Com vento, a frequência cresce suavemente da equilibrada até a frequente; as três cenas mostram intensidades fixas para comparação.';
+        document.querySelector('.ref-copy').innerHTML = '<strong>Prévia de uma árvore:</strong> as folhas nascem sob a copa e desaparecem antes do chão. Os intervalos são médias ilustrativas; o vento é simulado somente para comparar a frequência. Integração com o vento real e pouso virão depois.';
+        document.querySelector('footer').textContent = 'Prévia isolada: a intensidade não muda sozinha e as folhas ainda não pousam nem fazem parte do jogo.';
+      }
+    }
+    if (fallingTextureMode) {
+      document.title = 'Voxelcraft — Textura das folhinhas';
+      document.querySelector('.kicker').textContent = 'Folhas caindo · Refinamento da textura';
+      document.querySelector('h1').textContent = 'Detalhes para a folha oval';
+      document.querySelector('.lead').innerHTML = 'A mesma <strong>folha oval menor</strong> e o movimento <strong>giro e planeio</strong> em todas as opções. Compare cores e detalhes no interior da folha; o contorno e o tamanho permanecem iguais.';
+      document.querySelector('.ref-copy').innerHTML = '<strong>Prévia ilustrativa:</strong> amplie a folha no cartão e observe-a em movimento. Pause para comparar os detalhes ou alterne para a textura oval anterior. A frequência e o contato com o chão ficam para depois.';
+      document.querySelector('footer').textContent = 'Estudo visual isolado: estas texturas ainda não foram adicionadas ao jogo.';
+      const compare = document.querySelector('#btn-compare');
+      compare.hidden = false;
+      compare.textContent = '👁️ Textura anterior: OFF';
+      if (naturalRefinementMode) {
+        document.title = 'Voxelcraft — Refinamentos da folha natural';
+        document.querySelector('.kicker').textContent = 'Folhas caindo · Ajustes da textura natural';
+        document.querySelector('h1').textContent = 'Refinamentos da folha natural';
+        document.querySelector('.lead').innerHTML = 'Quatro ajustes sutis da <strong>natural delicada</strong> escolhida, com o mesmo contorno oval, tamanho menor e movimento de giro e planeio. Compare nervura, luz e sombra.';
+        document.querySelector('.ref-copy').innerHTML = '<strong>Comparação com a natural anterior:</strong> pause para ver a folha ampliada ou observe o efeito em movimento. O botão mostra a textura natural que você escolheu, no mesmo lugar e ângulo.';
+        compare.textContent = '👁️ Natural anterior: OFF';
+      }
+    }
+  }
+}
 
 if (leafShapeMode) {
   document.querySelector('.ref-copy').innerHTML = '<strong>Referência: folhagem anterior à mudança.</strong> Arraste uma árvore para girar todas juntas; use a roda do mouse para aproximar. O botão de comparação mostra a referência no mesmo ângulo.';
@@ -614,7 +726,7 @@ function buildVoxelDataset(mode) {
   // Ilha 5×5 com grama e terra aprovadas (`world-ground-textures.js`)
   for (let x = -2; x <= 2; x++) {
     for (let z = -2; z <= 2; z++) {
-      if (Math.abs(x) === 2 && Math.abs(z) === 2 && mode === 'under') continue;
+      if (Math.abs(x) === 2 && Math.abs(z) === 2 && mode === 'under' && !fallingLandingMode) continue;
       put(x, -1, z, 'dirt');
       put(x, 0, z, 'grass');
     }
@@ -634,7 +746,7 @@ function buildVoxelDataset(mode) {
     }
   }
   // Toco recém-cortado no canto frontal da ilha para exibir `WOOD_END` junto à árvore!
-  if (mode === 'tree') {
+  if (mode === 'tree' && !fallingLandingMode) {
     put(2, 1, 2, 'log');
   }
   return map;
@@ -688,7 +800,7 @@ function buildVoxelMeshes(voxels, opaqueMat, cutoutMat) {
     // Na revisão, usa a mesma regra de variantes do mesher, em coordenadas
     // exemplares de mundo. As demais prévias conservam a malha alternada.
     const worldY = y + 64;
-    const alt = leafReviewMode
+    const alt = leafReviewMode || fallingLeafMode
       ? Number(hash2(x + 32 + worldY * 13, z + 32 - worldY * 7, 404) <= 0.16)
       : (x + y + z) & 1;
     const curCut = isCutout(kind);
@@ -744,6 +856,8 @@ function buildVoxelMeshes(voxels, opaqueMat, cutoutMat) {
 const SCENE_PRESETS = {
   tree:   { target: [0, 2.75, 0], yaw: 0.68, pitch: 0.22, dist: 12.4 },
   review: { target: [0, 2.75, 0], yaw: 0.68, pitch: 0.22, dist: 14.0 },
+  motion: { target: [0, 2.25, 0.5], yaw: 0.68, pitch: 0.10, dist: 7.8 },
+  landing: { target: [0, 1.75, 0], yaw: 0.68, pitch: 0.38, dist: 8.4 },
   blocks: { target: [-0.15, 1.25, -0.15], yaw: 0.66, pitch: 0.34, dist: 5.6 },
   under:  { target: [0, 3.45, 0], yaw: 0.55, pitch: -0.50, dist: 4.3 },
   close:  { target: [0, 4.05, 0], yaw: 0.68, pitch: 0.12, dist: 7.0 },
@@ -775,14 +889,28 @@ const LIGHT_PRESETS = {
 
 let currentSceneMode = 'tree';
 let currentLightMode = 'day';
-let autoSpin = !leafReviewMode;
+let autoSpin = !(leafReviewMode || fallingLeafMode);
 let compareCurrent = false;
 let tiledSwatches = false;
+let leafSize = fallingMotionMode ? 0.25 : 0.38;
+let leafMotionRunning = true;
+let leafMotionTime = fallingEmissionMode ? 12 : 0;
 
-const initialPreset = leafReviewMode ? SCENE_PRESETS.review : SCENE_PRESETS.tree;
+const initialPreset = fallingLandingMode ? SCENE_PRESETS.landing : fallingMotionMode ? SCENE_PRESETS.motion : leafReviewMode || fallingLeafMode ? SCENE_PRESETS.review : SCENE_PRESETS.tree;
 const camState = { ...initialPreset, target: [...initialPreset.target] };
 const cards = [];
 const gridEl = document.getElementById('grid');
+
+function paintFallingLeaf(canvas, example) {
+  canvas.width = 12;
+  canvas.height = 12;
+  const ctx = canvas.getContext('2d');
+  const image = ctx.createImageData(12, 12);
+  for (let y = 0; y < 12; y++) for (let x = 0; x < 12; x++) {
+    image.data.set(fallingLeafModule.fallingLeafPixel(example, x, y), (y * 12 + x) * 4);
+  }
+  ctx.putImageData(image, 0, 0);
+}
 
 for (const ex of examples) {
   const article = document.createElement('article');
@@ -814,7 +942,15 @@ for (const ex of examples) {
     </div>
   `;
   gridEl.appendChild(article);
-  if (leafOpeningMode) article.querySelector('.compare-pill').textContent = 'Mostrando: recortes da parte 2';
+  if (fallingLeafMode) {
+    const swatches = article.querySelector('.swatches');
+    swatches.style.gridTemplateColumns = '1fr';
+    const swatchSize = fallingTextureMode ? 112 : 80;
+    swatches.innerHTML = `<div class="swatch"><canvas class="sw-drop" width="12" height="12" style="width:${swatchSize}px;height:${swatchSize}px;background:#708eaf"></canvas><div class="swatch-meta"><strong>Folha ampliada</strong>Pixel art 12×12<br>Fundo azul mostra a transparência</div></div>`;
+    paintFallingLeaf(article.querySelector('.sw-drop'), ex);
+  }
+  if (fallingTextureMode) article.querySelector('.compare-pill').textContent = naturalRefinementMode ? 'Mostrando: natural anterior' : 'Mostrando: textura anterior';
+  else if (leafOpeningMode) article.querySelector('.compare-pill').textContent = 'Mostrando: recortes da parte 2';
   else if (leafColorMode) article.querySelector('.compare-pill').textContent = 'Mostrando: formato 1 original';
   else if (previousReference) article.querySelector('.compare-pill').textContent = 'Mostrando: folhas anteriores';
   if (leafShapeMode) {
@@ -838,6 +974,15 @@ for (const ex of examples) {
 
   const atlasProposed = buildMiniAtlas(ex);
   const atlasCurrent = buildMiniAtlas(currentTextures);
+  let fallingSpriteMaterial = null;
+  if (fallingLeafMode) {
+    const tex = new THREE.CanvasTexture(article.querySelector('.sw-drop'));
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.generateMipmaps = false;
+    fallingSpriteMaterial = new THREE.SpriteMaterial({ map: tex, transparent: true, alphaTest: fallingMotionMode ? 0.01 : 0.5, depthWrite: false, toneMapped: false });
+  }
 
   const opaqueMat = new THREE.MeshLambertMaterial({ map: atlasProposed, vertexColors: true });
   const cutoutMat = new THREE.MeshLambertMaterial({
@@ -861,7 +1006,11 @@ for (const ex of examples) {
     atlasCurrent,
     opaqueMat,
     cutoutMat,
+    fallingSpriteMaterial,
+    fallingSprites: [],
+    landedLeaves: [],
     rootGroup: null,
+    swDrop: article.querySelector('.sw-drop'),
     swWood: article.querySelector('.sw-wood'),
     swEnd: article.querySelector('.sw-end'),
     swLeaves: article.querySelector('.sw-leaves'),
@@ -899,6 +1048,7 @@ for (const ex of examples) {
 function refreshCardSwatches() {
   const skyBg = LIGHT_PRESETS[currentLightMode].swatchSky;
   for (const c of cards) {
+    if (fallingLeafMode) continue; // Os desenhos 12×12 já foram pintados.
     const src = compareCurrent ? currentTextures : c.ex;
     paintSwatchCanvas(c.swWood, (x, y) => src.wood(x, y), { tiled: tiledSwatches });
     if (leafShapeMode) {
@@ -914,10 +1064,37 @@ function rebuildScenes() {
   const voxels = buildVoxelDataset(currentSceneMode);
   for (const c of cards) {
     if (c.rootGroup) {
-      c.rootGroup.traverse(obj => { if (obj.geometry) obj.geometry.dispose(); });
+      c.rootGroup.traverse(obj => { if (obj.isMesh && obj.geometry) obj.geometry.dispose(); });
+      if (fallingMotionMode) for (const sprite of c.fallingSprites) sprite.material.dispose();
+      for (const leaf of c.landedLeaves) leaf.material.dispose();
       c.scene.remove(c.rootGroup);
     }
     c.rootGroup = buildVoxelMeshes(voxels, c.opaqueMat, c.cutoutMat);
+    c.fallingSprites = [];
+    c.landedLeaves = [];
+    if (fallingLeafMode) {
+      // Parte 1 usa posições fixas; parte 2 anima cópias independentes.
+      const positions = [[-1.2, 2.75, 1.0], [0.2, 2.85, 1.2], [1.35, 2.5, 0.8],
+                         [-0.85, 1.8, 1.15], [0.35, 1.55, 1.15], [1.3, 1.25, 0.9]];
+      const count = fallingEmissionMode ? 20 : positions.length;
+      for (let i = 0; i < count; i++) {
+        const sprite = new THREE.Sprite(fallingMotionMode ? c.fallingSpriteMaterial.clone() : c.fallingSpriteMaterial);
+        sprite.position.set(...positions[i % positions.length]);
+        sprite.scale.set(leafSize, leafSize, 1);
+        if (fallingEmissionMode) sprite.visible = false;
+        c.rootGroup.add(sprite);
+        c.fallingSprites.push(sprite);
+        if (fallingLandingMode) {
+          const material = new THREE.MeshBasicMaterial({ map: c.fallingSpriteMaterial.map, transparent: true, alphaTest: 0.01, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
+          material.color.copy(c.fallingSpriteMaterial.color);
+          const leaf = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
+          leaf.rotation.x = -Math.PI / 2;
+          leaf.visible = false;
+          c.rootGroup.add(leaf);
+          c.landedLeaves.push(leaf);
+        }
+      }
+    }
     c.scene.add(c.rootGroup);
   }
 }
@@ -932,6 +1109,13 @@ function applyLightPreset() {
     c.sun.color.setHex(lp.sunColor);
     c.sun.intensity = lp.sunInt;
     c.sun.position.set(...lp.sunPos);
+    // Aproximação visual: o sprite não recebe luz Lambert como os blocos.
+    if (fallingLeafMode) {
+      const tint = currentLightMode === 'day' ? 0xffffff : 0xffd5aa;
+      c.fallingSpriteMaterial.color.setHex(tint);
+      if (fallingMotionMode) for (const sprite of c.fallingSprites) sprite.material.color.setHex(tint);
+      for (const leaf of c.landedLeaves) leaf.material.color.setHex(tint);
+    }
   }
   refreshCardSwatches();
 }
@@ -974,12 +1158,25 @@ function bindSceneBtn(id, mode, presetName = mode) {
     rebuildScenes();
   });
 }
-bindSceneBtn('scene-tree', 'tree', leafReviewMode ? 'review' : 'tree');
+bindSceneBtn('scene-tree', 'tree', leafReviewMode || fallingLeafMode ? 'review' : 'tree');
 bindSceneBtn('scene-blocks', 'blocks');
 bindSceneBtn('scene-under', 'under');
-if (leafReviewMode) {
-  bindSceneBtn('scene-close', 'tree', 'close');
-  bindSceneBtn('scene-far', 'tree', 'far');
+if (leafReviewMode || fallingLeafMode) bindSceneBtn('scene-close', 'tree', fallingLandingMode ? 'landing' : fallingMotionMode ? 'motion' : 'close');
+if (leafReviewMode) bindSceneBtn('scene-far', 'tree', 'far');
+if (fallingLeafMode) {
+  const sizes = fallingMotionMode ? [0.25, 0.18, 0.38] : [0.38, 0.25, 0.5];
+  document.getElementById('leaf-size').addEventListener('click', event => {
+    leafSize = sizes[(sizes.indexOf(leafSize) + 1) % sizes.length];
+    event.currentTarget.textContent = `Tamanho: ${leafSize.toFixed(2).replace('.', ',')} bloco`;
+    for (const c of cards) for (const sprite of c.fallingSprites) sprite.scale.set(leafSize, leafSize, 1);
+  });
+}
+if (fallingMotionMode) {
+  document.getElementById('leaf-pause').addEventListener('click', event => {
+    leafMotionRunning = !leafMotionRunning;
+    event.currentTarget.textContent = leafMotionRunning ? '⏸️ Pausar folhas' : '▶️ Retomar folhas';
+    event.currentTarget.classList.toggle('active', !leafMotionRunning);
+  });
 }
 
 document.getElementById('light-day').addEventListener('click', () => {
@@ -1014,6 +1211,16 @@ const btnCompare = document.getElementById('btn-compare');
 btnCompare.addEventListener('click', () => {
   compareCurrent = !compareCurrent;
   btnCompare.classList.toggle('active', compareCurrent);
+  if (fallingTextureMode) {
+    document.body.classList.toggle('comparing', compareCurrent);
+    btnCompare.textContent = `👁️ ${naturalRefinementMode ? 'Natural anterior' : 'Textura anterior'}: ${compareCurrent ? 'ON' : 'OFF'}`;
+    const baseline = naturalRefinementMode ? fallingTextureModule.FALLING_LEAF_TEXTURE_EXAMPLES[0] : fallingLeafModule.FALLING_LEAF_EXAMPLES[0];
+    for (const c of cards) {
+      paintFallingLeaf(c.swDrop, compareCurrent ? baseline : c.ex);
+      c.fallingSpriteMaterial.map.needsUpdate = true;
+    }
+    return;
+  }
   btnCompare.textContent = leafOpeningMode
     ? `👁️ Comparar com parte 2: ${compareCurrent ? 'ON' : 'OFF'}`
     : leafColorMode ? `👁️ Comparar com formato 1: ${compareCurrent ? 'ON' : 'OFF'}`
@@ -1026,22 +1233,71 @@ rebuildScenes();
 applyLightPreset();
 resizeAll();
 
+const landingFace = new THREE.Quaternion();
+const landingFlat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+const landingSpin = new THREE.Quaternion();
+const landingTarget = new THREE.Quaternion();
+const landingZ = new THREE.Vector3(0, 0, 1);
+const landingAxisX = new THREE.Vector3();
+const landingAxisY = new THREE.Vector3();
 let prevTime = performance.now();
 function tick(now) {
   const dt = Math.min(0.05, (now - prevTime) / 1000);
   prevTime = now;
   if (autoSpin) camState.yaw += dt * 0.32;
-
   const cosP = Math.cos(camState.pitch);
   const cx = camState.target[0] + Math.sin(camState.yaw) * cosP * camState.dist;
   const cy = camState.target[1] + Math.sin(camState.pitch) * camState.dist;
   const cz = camState.target[2] + Math.cos(camState.yaw) * cosP * camState.dist;
-
   for (const c of cards) {
     c.camera.position.set(cx, cy, cz);
     c.camera.lookAt(camState.target[0], camState.target[1], camState.target[2]);
-    c.renderer.render(c.scene, c.camera);
   }
+  if (fallingMotionMode) {
+    if (leafMotionRunning) leafMotionTime += dt;
+    for (const c of cards) {
+      const emissions = fallingSmoothLandingMode ? fallingSmoothLandingModule.sampleSmoothLanding(leafMotionTime) : fallingLandingMode ? fallingLandingModule.sampleLanding(c.ex, leafMotionTime) : fallingEmissionMode ? fallingEmissionModule.sampleLeafEmission(c.ex, leafMotionTime) : null;
+      for (let i = 0; i < c.fallingSprites.length; i++) {
+        const sprite = c.fallingSprites[i];
+        const sample = fallingEmissionMode ? emissions[i] : fallingMotionModule.sampleFallingLeafMotion(c.ex, leafMotionTime, i);
+        sprite.visible = !fallingSmoothLandingMode && !!sample && (!fallingLandingMode || sample.flyingOpacity > 0);
+        if (fallingSmoothLandingMode) {
+          const leaf = c.landedLeaves[i];
+          leaf.visible = !!sample && sample.opacity > 0;
+          if (sample) {
+            landingSpin.setFromAxisAngle(landingZ, sample.rotation);
+            landingFace.copy(c.camera.quaternion).multiply(landingSpin);
+            landingTarget.copy(landingFlat).multiply(landingSpin);
+            leaf.quaternion.copy(landingFace).slerp(landingTarget, sample.tilt);
+            landingAxisX.set(1, 0, 0).applyQuaternion(leaf.quaternion);
+            landingAxisY.set(0, 1, 0).applyQuaternion(leaf.quaternion);
+            const y = fallingSmoothLandingModule.landingCenterY(sample.desiredY, leafSize, sample.width, landingAxisX.y, landingAxisY.y);
+            leaf.position.set(sample.x, y, sample.z);
+            leaf.scale.set(leafSize * sample.width, leafSize, 1);
+            leaf.material.opacity = sample.opacity;
+          }
+          continue;
+        }
+        if (fallingLandingMode) {
+          const leaf = c.landedLeaves[i];
+          leaf.visible = !!sample && sample.groundOpacity > 0;
+          if (sample) {
+            leaf.position.set(sample.x, sample.groundY, sample.z);
+            leaf.rotation.z = sample.rotation;
+            leaf.scale.set(leafSize, leafSize, 1);
+            leaf.material.opacity = sample.groundOpacity;
+          }
+        }
+        if (!sample) continue;
+        sprite.position.set(sample.x, sample.y, sample.z);
+        sprite.scale.set(leafSize * sample.width, leafSize, 1);
+        sprite.material.rotation = sample.rotation;
+        sprite.material.opacity = fallingLandingMode ? sample.flyingOpacity : sample.opacity;
+      }
+    }
+  }
+
+  for (const c of cards) c.renderer.render(c.scene, c.camera);
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);

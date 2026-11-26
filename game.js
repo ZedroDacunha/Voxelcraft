@@ -42,6 +42,7 @@ import { createWorldGraphicsQuality } from './world-graphics-quality.js';
 import { createFrameSamples } from './world-performance-samples.js';
 import { raycastVoxels } from './world-raycast.js';
 import { createBreakParticleSystem } from './world-break-particles.js';
+import { createFallingLeaves } from './world-falling-leaves.js';
 import { InstancedBlockManager, testInstancedMesh } from './world-instanced-manager.js';
 import { chunkKey, floorDiv, idx } from './world-grid.js';
 import { buildLightRegions } from './world-light-region.js';
@@ -3456,7 +3457,7 @@ function updateWaterfall(dt) {
 // 6. ESTADO GERAL
 // =====================================================================
 let zombiePopulation = null;
-let camera, swimCamera, thirdCamera, playerModel, playerArmor, playerHeldItem, scene, renderer, controls, world, creatureSystem, sheepSystem, tallGrassMaterial, tallGrassMaterials = [];
+let camera, swimCamera, thirdCamera, playerModel, playerArmor, playerHeldItem, scene, renderer, controls, world, creatureSystem, sheepSystem, fallingLeaves, tallGrassMaterial, tallGrassMaterials = [];
 let cameraView = 'first';
 const thirdDirection = new THREE.Vector3();
 const frontCameraTurn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
@@ -5218,6 +5219,16 @@ async function init() {
     window.testInstancedMesh = () => testInstancedMesh(THREE, renderer);
 
     world = new World(scene, SEED, decorations, grassGeometries, tallGrassMaterials);
+    fallingLeaves = createFallingLeaves({
+        THREE, scene,
+        // getBlock trata chunk ausente como ar; partículas não podem atravessá-lo.
+        readBlock: (x, y, z) => {
+            if (y < 0) return ID.STONE;
+            if (y >= WORLD_HEIGHT) return 0;
+            if (!world.getChunk(floorDiv(x, CHUNK_SIZE), floorDiv(z, CHUNK_SIZE))) return null;
+            return world.getBlock(x, y, z);
+        },
+    });
     creatureSystem = new CreatureSystem(world);
     sheepSystem = new SheepSystem(world);
     const save = onlineGuest ? null : await loadGame();
@@ -5854,6 +5865,7 @@ async function init() {
     if (new URLSearchParams(location.search).has('debug')) {
         window.dbg = {
             position: () => player.pos.toArray(),
+            fallingLeaves: () => ({ count: fallingLeaves.count, trees: fallingLeaves.treeCount }),
             peerPosition: () => peerAvatar?.root.visible ? peerAvatar.root.position.toArray() : null,
             damage: (n = 1) => { invuln = 0; takeDamage(n); },
             kill: () => { invuln = 0; takeDamage(999, 'kill'); },
@@ -6129,6 +6141,11 @@ function animate() {
         if (currentEatPose.camNod > 0) swimCamera.rotateX(-currentEatPose.camNod);
         swimCamera.updateMatrixWorld();
         visualCamera = swimCamera;
+    }
+    if (worldRunning && !dead && !document.hidden) {
+        const quality = typeof gfx.mode === 'number' ? gfx.mode : gfx.scale;
+        fallingLeaves.update(dt, { player: player.pos, camera: thirdViewActive ? thirdCamera : visualCamera,
+            wind: windState.level, quality, light: 0.45 + 0.55 * worldSky.day });
     }
     renderer.render(scene, thirdViewActive ? thirdCamera : visualCamera);
     renderer.clearDepth();
