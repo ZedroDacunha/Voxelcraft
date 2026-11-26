@@ -68,3 +68,44 @@ test('modelo inteiro cabe na câmera ao girar para qualquer direção', async ()
     }
     model.dispose();
 });
+
+test('prévia do inventário levanta o braço ao exibir item equipado e mantém reto sem item', () => {
+    let rightArmX = null;
+    let heldCount = 0;
+    const renderer = {
+        getRenderTarget: () => null,
+        setRenderTarget() {},
+        clear() {},
+        render(scene) {
+            const player = scene.getObjectByName('player');
+            const rightArm = player.getObjectByName('rightArm');
+            rightArmX = rightArm.rotation.x;
+            const anchor = player.getObjectByName('heldItem');
+            heldCount = anchor ? anchor.children.length : 0;
+        },
+        readRenderTargetPixels() {},
+    };
+    const canvas = {
+        getContext: () => ({
+            createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4) }),
+            putImageData() {},
+        }),
+    };
+
+    renderInventoryPlayer({ THREE, renderer, canvas });
+    assert.equal(rightArmX, 0);
+    assert.equal(heldCount, 0);
+
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshBasicMaterial());
+    renderInventoryPlayer({
+        THREE,
+        renderer,
+        canvas,
+        heldItem: { id: 5, mesh, flame: null, isSprite: false, isTool: false },
+    });
+    assert.ok(Math.abs(rightArmX - (-0.28)) < 1e-9, `braço meio levantado no inventário: ${rightArmX}`);
+    assert.equal(heldCount, 1);
+    mesh.geometry.dispose();
+    mesh.material.dispose();
+});
+

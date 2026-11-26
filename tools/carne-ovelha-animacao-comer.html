@@ -277,7 +277,7 @@
     import * as THREE from '../vendor/three/three.module.js';
     import { createPlayerModel, PLAYER_MODEL_COLORS } from '../player-model.js';
     import { rigLocomotion, createLocomotion, advanceLocomotion, groundPose, applyGroundPose } from '../player-locomotion.js';
-    import { createPlayerHeldItem } from '../player-held-item.js';
+    import { createPlayerHeldItem, applyThirdPersonHeldArmPose } from '../player-held-item.js';
     import { createAudioSystem } from '../world-audio.js';
     import { EAT_DURATION, sampleEatAnimation, eatBitePitch } from '../player-eat-animation.js';
 
@@ -1002,16 +1002,31 @@
         0.10 - 0.05 * eat.lift
       );
 
-      // 3ª Pessoa: aplica locomoção (Parado/Andando/Correndo) + pose de comer segurando pelo osso!
-      const speed = gaitMode === 'run' ? 5.6 : (gaitMode === 'walk' ? 3.2 : 0);
-      advanceLocomotion(loco, dt, { speed, onGround: true, sprinting: gaitMode === 'run', crouching: false });
-      applyGroundPose(playerModel, locoRig, groundPose(loco, dt, speed), 1);
+      // 3ª Pessoa: aplica locomoção (Parado/Andando/Correndo) + braço meio levantado segurando item + pose de comer!
+      playerModel.root.position.set(0, 0, 0);
+      playerModel.root.rotation.set(0, 0, 0);
+      playerModel.leftLeg.rotation.set(0, 0, 0);
+      playerModel.rightLeg.rotation.set(0, 0, 0);
+      playerModel.leftArm.rotation.set(0, 0, 0);
+      playerModel.rightArm.rotation.set(0, 0, 0);
+      playerModel.head.rotation.set(0, 0, 0);
+      playerModel.torso.rotation.set(0, 0, 0);
+
+      let walkPose;
+      if (gaitMode !== 'idle') {
+        const rate = gaitMode === 'run' ? 11.2 : 7.6;
+        const prevSteps = Math.floor((t - dt) * rate / Math.PI);
+        const nextSteps = Math.floor(t * rate / Math.PI);
+        advanceLocomotion(loco, Math.max(0, nextSteps - prevSteps), gaitMode === 'run', dt);
+        walkPose = groundPose(loco, (t * rate) % (Math.PI * 2), gaitMode === 'run' ? 1.0 : 0.82);
+      } else {
+        advanceLocomotion(loco, 0, false, dt);
+        walkPose = groundPose(loco, 0, 0);
+      }
+      applyGroundPose(playerModel, locoRig, walkPose, 1);
+      applyThirdPersonHeldArmPose(playerModel, locoRig, true, walkPose, 1);
 
       if (!eat.active) {
-        if (speed === 0) {
-          playerModel.rightArm.rotation.x = -0.28;
-          locoRig.elbows[1].rotation.x = -0.36;
-        }
         tpHolder.visible = true;
         tpHolder.scale.setScalar(0.35);
         tpHolder.position.set(0.03, -0.11, -0.058);

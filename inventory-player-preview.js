@@ -1,10 +1,12 @@
 import { createPlayerModel, PLAYER_MODEL_HEIGHT } from './player-model.js';
 import { createPlayerArmor } from './player-armor.js';
+import { rigLocomotion } from './player-locomotion.js';
+import { createPlayerHeldItem, applyThirdPersonHeldArmPose } from './player-held-item.js';
 
 export const INVENTORY_PLAYER_INITIAL_ANGLE = -0.55;
 
 /** Renderiza uma vez no contexto do jogo, sem criar um segundo WebGLRenderer. */
-export function renderInventoryPlayer({ THREE, renderer, canvas, angle = INVENTORY_PLAYER_INITIAL_ANGLE, armor = [] }) {
+export function renderInventoryPlayer({ THREE, renderer, canvas, angle = INVENTORY_PLAYER_INITIAL_ANGLE, armor = [], heldItem = null }) {
     const width = 144, height = 192;
     const context = canvas.getContext('2d');
     if (!context) throw new Error('Canvas 2D indisponível para o personagem');
@@ -15,6 +17,12 @@ export function renderInventoryPlayer({ THREE, renderer, canvas, angle = INVENTO
     light.position.set(3, 5, 4);
     scene.add(light);
     const model = createPlayerModel(THREE);
+    if (heldItem?.id && heldItem?.mesh) {
+        const held = createPlayerHeldItem(THREE, model.rightArm);
+        const rig = rigLocomotion(THREE, model);
+        held.update(heldItem.id, heldItem.mesh, heldItem.flame ?? null, Boolean(heldItem.isSprite), Boolean(heldItem.isTool));
+        applyThirdPersonHeldArmPose(model, rig, true);
+    }
     const equipment = createPlayerArmor(THREE, model, PLAYER_MODEL_HEIGHT/32);
     equipment.setEquipment(armor);
     scene.add(model.root);

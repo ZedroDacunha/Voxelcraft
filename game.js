@@ -67,7 +67,7 @@ import { createZombiePopulation, zombieSpawnAllowed, zombieFullBlockSupport } fr
 import { PLAYER_MODEL_HEIGHT } from './player-model.js';
 import { advanceSwim, createSwimState, swimFirstPersonPose, swimPose } from './player-swim-animation.js';
 import { advanceLocomotion, applyGroundPose, createLocomotion, groundPose, rigLocomotion } from './player-locomotion.js';
-import { createPlayerHeldItem } from './player-held-item.js';
+import { createPlayerHeldItem, applyThirdPersonHeldArmPose } from './player-held-item.js';
 import { THIRD_PERSON_BODY_MIN_DISTANCE, THIRD_PERSON_DISTANCE, cameraOffsetSign, nextCameraView, thirdPersonDistance } from './player-third-person.js';
 import { ATTACK_COOLDOWN, attackReady, createCreatureSystemClass } from './world-creature.js';
 import { creatureInReach } from './world-mob-hit.js';
@@ -2896,7 +2896,24 @@ function buildInventoryUI() {
     const overlay = document.getElementById('inventory');
     const playerCanvas = document.getElementById('inv-player');
     inventoryPlayerRotation = createInventoryPlayerRotation({ canvas: playerCanvas, render: angle => {
-        try { renderInventoryPlayer({ THREE, renderer, canvas: playerCanvas, angle, armor: armorSlots }); }
+        try {
+            refreshHeldItem();
+            const heldInfo = ITEMS[heldId];
+            renderInventoryPlayer({
+                THREE,
+                renderer,
+                canvas: playerCanvas,
+                angle,
+                armor: armorSlots,
+                heldItem: heldId && heldMesh ? {
+                    id: heldId,
+                    mesh: heldMesh,
+                    flame: heldFlameMesh,
+                    isSprite: Boolean(heldInfo && heldInfo.sprite?.kind !== 'bed' && itemRenderMode(heldInfo) === 'sprite'),
+                    isTool: Boolean(heldInfo && HELD_TOOL_KINDS.has(heldInfo.sprite?.kind)),
+                } : null,
+            });
+        }
         catch (error) {
             playerCanvas.hidden = true;
             inventoryPlayerRotation?.close();
@@ -3138,6 +3155,9 @@ function renderInventory() {
     renderInventoryTouchHeld();
     updateHotbarUI();
     recipeBook?.refreshAvailability();
+    if (inventoryOpen && !station && (inventory.slots[selectedSlot]?.id || 0) !== heldId) {
+        inventoryPlayerRotation?.refresh();
+    }
 }
 
 function onInventoryMouseMove(e) {
@@ -5897,11 +5917,12 @@ function updateThirdPerson() {
     const pickaxe = pickaxeMiningPose(ITEMS[heldId]?.tool?.type, handAnim);
     playerModel.rightArm.rotation.x = pose.rightArm - 0.65 * pickaxe.lift + 0.4 * pickaxe.strike;
     applyGroundPose(playerModel, locomotionRig, ground, 1 - swimState.blend);
+    const tpHeldMesh = playerHeldItem.anchor.children[0] ?? null;
+    applyThirdPersonHeldArmPose(playerModel, locomotionRig, Boolean(tpHeldMesh), ground, 1 - swimState.blend);
     playerModel.rightArm.rotation.y = 0;
     playerModel.rightArm.rotation.z = 0;
     locomotionRig.elbows[1].rotation.z = 0;
     if (heldSwordPose) applyThirdPersonSwordPose(playerModel, locomotionRig, heldSwordPose, 1 - swimState.blend);
-    const tpHeldMesh = playerHeldItem.anchor.children[0] ?? null;
     setAppleBiteStage(tpHeldMesh, currentEatPose.stage);
     setMuttonBiteStage(tpHeldMesh, currentEatPose.stage);
     applyThirdPersonEatPose(playerModel, locomotionRig, tpHeldMesh, currentEatPose, 1 - swimState.blend);
