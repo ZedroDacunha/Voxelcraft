@@ -3,6 +3,7 @@ export function createBreakParticleSystem({
     getScene,
     getBlockColor,
     getImmersionAt,
+    isSolidAt = () => false,
     maxParticles = 150,
     particlesPerBreak = 12,
 }) {
@@ -15,9 +16,9 @@ export function createBreakParticleSystem({
     function materialFor(blockType, color) {
         const key = color == null ? `b${blockType}` : `c${color}`;
         if (!materials.has(key)) {
-            materials.set(key, new THREE.MeshBasicMaterial({
-                color: color == null ? getBlockColor(blockType) : color,
-            }));
+            materials.set(key, color == null
+                ? new THREE.MeshLambertMaterial({ color: getBlockColor(blockType) })
+                : new THREE.MeshBasicMaterial({ color }));
         }
         return materials.get(key);
     }
@@ -38,21 +39,83 @@ export function createBreakParticleSystem({
         const total = Math.max(0, Math.min(Math.round(count), maxParticles - particles.length));
         for (let i = 0; i < total; i++) {
             const mesh = new THREE.Mesh(geometry, material);
-            mesh.position.set(
-                x + (Math.random() - 0.5) * spread,
-                y + (Math.random() - 0.5) * spread,
-                z + (Math.random() - 0.5) * spread,
+            const isBlock = blockType != null;
+            const velocity = new THREE.Vector3(
+                (Math.random() - 0.5) * 3 * speed,
+                (Math.random() * 3 + 1) * speed,
+                (Math.random() - 0.5) * 3 * speed,
             );
+            const remnant = isBlock && i % 4 === 0;
+            let scale = 1;
+            if (isBlock) {
+                // Distribui as origens pelos oito octantes do bloco quebrado.
+                const dx = i % 2 ? 1 : -1;
+                const dy = Math.floor(i / 2) % 2 ? 1 : -1;
+                const dz = Math.floor(i / 4) % 2 ? 1 : -1;
+                mesh.position.set(
+                    x + 0.5 + dx * (0.14 + Math.random() * 0.18),
+                    y + 0.5 + dy * (0.14 + Math.random() * 0.18),
+                    z + 0.5 + dz * (0.14 + Math.random() * 0.18),
+                );
+                velocity.x = dx * (0.55 + Math.random() * 1.25);
+                velocity.z = dz * (0.55 + Math.random() * 1.25);
+                scale = (remnant ? 1.4 : 0.7) + Math.random() * 0.45;
+                mesh.scale.setScalar(scale);
+                mesh.rotation.y = Math.random() * Math.PI;
+            } else {
+                mesh.position.set(
+                    x + (Math.random() - 0.5) * spread,
+                    y + (Math.random() - 0.5) * spread,
+                    z + (Math.random() - 0.5) * spread,
+                );
+            }
             scene.add(mesh);
             particles.push({
-                mesh,
-                velocity: new THREE.Vector3(
-                    (Math.random() - 0.5) * 3 * speed,
-                    (Math.random() * 3 + 1) * speed,
-                    (Math.random() - 0.5) * 3 * speed,
-                ),
-                life: 0.6 + Math.random() * 0.4,
+                mesh, velocity, isBlock, scale,
+                spin: isBlock ? (Math.random() - 0.5) * 10 : 0,
+                canBounce: remnant,
+                life: (remnant ? 2.8 : 0.6) + Math.random() * 0.4,
             });
+        }
+    }
+
+    // Avança cada eixo até a primeira face sólida. O passo do jogo é limitado a 0,05 s.
+    function moveFragment(particle, dt) {
+        const { mesh, velocity } = particle;
+        const scale = particle.scale * Math.min(1, particle.life / 0.25);
+        mesh.scale.setScalar(scale);
+        const pos = mesh.position;
+        mesh.rotation.y += particle.spin * dt;
+        const half = 0.05 * scale;
+        const horizontalRadius = half * (Math.abs(Math.cos(mesh.rotation.y)) + Math.abs(Math.sin(mesh.rotation.y)));
+        for (const axis of ['x', 'z', 'y']) {
+            if (velocity[axis] === 0) continue;
+            const direction = Math.sign(velocity[axis]);
+            const next = pos[axis] + velocity[axis] * dt;
+            const radius = axis === 'y' ? half : horizontalRadius;
+            const edge = Math.floor(next + direction * radius);
+            if (isSolidAt(axis === 'x' ? edge : Math.floor(pos.x),
+                          axis === 'y' ? edge : Math.floor(pos.y),
+                          axis === 'z' ? edge : Math.floor(pos.z))) {
+                pos[axis] = edge + (direction < 0 ? 1 + radius : -radius);
+                const impact = Math.abs(velocity[axis]);
+                velocity[axis] = 0;
+                if (axis === 'y' && direction < 0) {
+                    if (particle.canBounce && impact > 2) {
+                        velocity.y = impact * 0.23;
+                        velocity.x *= 0.4;
+                        velocity.z *= 0.4;
+                        particle.spin *= 0.4;
+                        particle.canBounce = false;
+                    } else {
+                        velocity.x = 0;
+                        velocity.z = 0;
+                        particle.spin = 0;
+                    }
+                }
+            } else {
+                pos[axis] = next;
+            }
         }
     }
 
@@ -74,7 +137,8 @@ export function createBreakParticleSystem({
                 particle.velocity.y += 20 * immersion * dt;
                 particle.velocity.multiplyScalar(Math.exp(-4.5 * immersion * dt));
             }
-            position.addScaledVector(particle.velocity, dt);
+            if (particle.isBlock) moveFragment(particle, dt);
+            else position.addScaledVector(particle.velocity, dt);
         }
     }
 
