@@ -1,7 +1,8 @@
 // Servidor estático mínimo para rodar o jogo localmente, sem dependências.
 //
-//   node tools/serve.mjs            # porta 8000 em 0.0.0.0
-//   node tools/serve.mjs 8080       # outra porta
+//   node tools/serve.mjs                              # porta 8000 em 0.0.0.0
+//   node tools/serve.mjs 8080                         # outra porta
+//   node tools/serve.mjs 8001 tools/maca-icone.html   # abre outra página em /
 //   PORT=8080 HOST=127.0.0.1 node tools/serve.mjs
 //
 // O jogo não tem build: estes arquivos são servidos como estão. Precisa ser um
@@ -16,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.argv[2] || process.env.PORT || 8000);
 const HOST = process.env.HOST || '0.0.0.0';
+const ENTRY = process.argv[3] || process.env.ENTRY || 'index.html';
 
 const MIME = new Map(Object.entries({
     '.html': 'text/html; charset=utf-8',
@@ -46,7 +48,8 @@ async function resolveTarget(url) {
     const info = await stat(target).catch(() => null);
     if (!info) return null;
     if (info.isDirectory()) {
-        const index = path.join(target, 'index.html');
+        const index = path.resolve(target, target === ROOT ? ENTRY : 'index.html');
+        if (index !== ROOT && !index.startsWith(ROOT + path.sep)) return null;
         const indexInfo = await stat(index).catch(() => null);
         return indexInfo?.isFile() ? { file: index, size: indexInfo.size } : null;
     }

@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Maçã — ícone antes e depois</title>
+<style>
+  :root { --bg:#1c241d; --card:#303a30; --border:#71816e; --accent:#9fd49b; --text:#ecf2e8; --muted:#c6d1c2; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:24px; font:16px/1.5 system-ui, -apple-system, Segoe UI, sans-serif; background:var(--bg); color:var(--text); }
+  h1 { margin:0 0 4px; font-size:26px; }
+  .lead { margin:0 0 20px; color:var(--muted); max-width:980px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px; max-width:980px; }
+  article { padding:16px; background:var(--card); border:1px solid var(--border); border-radius:8px; }
+  article.atual { border-color:var(--accent); box-shadow:0 0 0 1px rgba(159,212,155,.35); }
+  article h2 { margin:0 0 4px; font-size:19px; display:flex; align-items:center; gap:8px; }
+  .badge { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; background:#233824; color:var(--accent); border:1px solid var(--accent); padding:1px 6px; border-radius:999px; }
+  article p { margin:0 0 12px; color:var(--muted); font-size:14px; }
+  canvas.big { width:100%; max-width:240px; aspect-ratio:1; background:#1d251f; image-rendering:pixelated; border:1px solid #556655; border-radius:6px; display:block; }
+  .row { display:flex; gap:16px; align-items:flex-end; margin-top:12px; flex-wrap:wrap; }
+  .slot { width:48px; height:48px; background:rgba(255,255,255,.2); border:1px solid rgba(255,255,255,.35); border-radius:4px; display:flex; align-items:center; justify-content:center; position:relative; }
+  .slot canvas { width:30px; height:30px; image-rendering:pixelated; }
+  .slot .n { position:absolute; top:2px; left:4px; font-size:10px; font-weight:bold; color:#fff; text-shadow:1px 1px 0 #000; }
+  .slot .c { position:absolute; right:3px; bottom:1px; font: bold 12px monospace; color:#fff; text-shadow:1px 1px 0 #000; }
+  .actual { width:16px; height:16px; image-rendering:pixelated; background:#1d251f; border:1px solid #556655; }
+  small { color:var(--muted); }
+  code { background:#253025; padding:1px 5px; border-radius:4px; font-size:.95em; }
+  footer { margin-top:20px; color:#aab8aa; font-size:13px; max-width:980px; }
+</style>
+</head>
+<body>
+  <h1>Maçã · evolução do ícone</h1>
+  <p class="lead">Comparação do círculo antigo, da 1ª grade (onde o brilho ainda era um quadrado 2×2 colado no canto e a sombra descia reta a 45°) e do <strong>ícone atual</strong>: reflexo oval lustroso almofadado por meio-brilho e luz quente, covinha marcada sob o cabinho, sombra curva em dois níveis (meia-sombra + rubi-vinho) abraçando a base e folha em 3 tons. O cartão <strong>Agora</strong> lê o sprite direto de <code>world-textures.js</code>.</p>
+
+  <div class="grid">
+    <article class="atual">
+      <h2>Agora <span class="badge">no jogo</span></h2>
+      <p>Brilho lustroso suave com halo, covinha sombreada, sombra curva em meia-lua de 2 tons e folha com volume.</p>
+      <canvas class="big" id="agora-grande" width="16" height="16" aria-label="Maçã atual com brilho e sombra refinados, ampliada"></canvas>
+      <div class="row">
+        <div class="slot" aria-label="Maçã atual na barra de itens"><span class="n">1</span><canvas id="agora-slot" width="16" height="16"></canvas><span class="c">64</span></div>
+        <div><small>Tamanho real (16 px):</small><br><canvas class="actual" id="agora-16" width="16" height="16"></canvas></div>
+      </div>
+    </article>
+
+    <article>
+      <h2>1ª grade (chapada)</h2>
+      <p>Boa silhueta, mas o brilho era um quadrado 2×2 colado na borda e a sombra cortava reto em 45°.</p>
+      <canvas class="big" id="v1-grande" width="16" height="16" aria-label="Primeira grade da maçã, ampliada"></canvas>
+      <div class="row">
+        <div class="slot" aria-label="Primeira grade na barra de itens"><span class="n">1</span><canvas id="v1-slot" width="16" height="16"></canvas><span class="c">64</span></div>
+        <div><small>Tamanho real (16 px):</small><br><canvas class="actual" id="v1-16" width="16" height="16"></canvas></div>
+      </div>
+    </article>
+
+    <article>
+      <h2>Antes (círculo antigo)</h2>
+      <p>Círculo matemático de raio 4,5, 2 px de brilho e folha de 2 px solta — lia como bola.</p>
+      <canvas class="big" id="antes-grande" width="16" height="16" aria-label="Maçã antiga circular, ampliada"></canvas>
+      <div class="row">
+        <div class="slot" aria-label="Maçã antiga na barra de itens"><span class="n">1</span><canvas id="antes-slot" width="16" height="16"></canvas><span class="c">64</span></div>
+        <div><small>Tamanho real (16 px):</small><br><canvas class="actual" id="antes-16" width="16" height="16"></canvas></div>
+      </div>
+    </article>
+  </div>
+
+  <footer>
+    <p>Paleta atual da maçã: contorno <code>#60101a</code>, sombra funda <code>#881422</code>, meia-sombra <code>#ac1c27</code>, corpo <code>#d02a2c</code>, luz <code>#ea4c3a</code>, meio-brilho <code>#f68062</code>, brilho <code>#fdc2a6</code>, cabinho <code>#623c1a</code>/<code>#865626</code>, folha <code>#265e22</code>/<code>#428e34</code>/<code>#70be4e</code>.</p>
+  </footer>
+
+<script type="module">
+import { createTextureTools } from '../world-textures.js';
+
+function desenhar(canvas, pixels) {
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, 16, 16);
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    const c = pixels[y][x];
+    if (!c) continue;
+    ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+    ctx.fillRect(x, y, 1, 1);
+  }
+}
+
+function macaAntiga() {
+  const g = Array.from({ length: 16 }, () => Array(16).fill(null));
+  const put = (x, y, c) => { if (x >= 0 && x < 16 && y >= 0 && y < 16) g[y][x] = c; };
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    const dx = (x - 7.5) / 4.5, dy = (y - 9.5) / 4.5;
+    if (dx * dx + dy * dy <= 1)
+      put(x, y, ((x === 6 && y === 7) || (x === 5 && y === 8)) ? [240, 110, 100] : (dx + dy > 0.9 ? [150, 25, 30] : [205, 40, 45]));
+  }
+  put(8, 4, [110, 70, 30]); put(8, 5, [110, 70, 30]); put(9, 4, [60, 150, 50]); put(10, 4, [60, 150, 50]);
+  return g;
+}
+
+function macaPrimeiraGrade() {
+  const grade = [
+    '................',
+    '............ll..',
+    '........T.lllL..',
+    '........TLLLLL..',
+    '.......TTLLL....',
+    '....OOO.OOO.....',
+    '...O44322222O...',
+    '...O44322222O...',
+    '...O33222222O...',
+    '...O32222221O...',
+    '...O22222211O...',
+    '...O22222111O...',
+    '...O22221111O...',
+    '....O222111O....',
+    '.....OOOOOO.....',
+    '................',
+  ];
+  const cores = {
+    O: [122, 24, 28], '1': [160, 28, 34], '2': [205, 40, 45],
+    '3': [232, 78, 66], '4': [248, 168, 140],
+    T: [110, 70, 30], L: [42, 102, 38], l: [96, 176, 72],
+  };
+  return grade.map(linha => [...linha].map(s => cores[s] ?? null));
+}
+
+const THREE = {
+  CanvasTexture: class { constructor(image) { this.image = image; } },
+  NearestFilter: 1006, ClampToEdgeWrapping: 1001, SRGBColorSpace: 'srgb',
+};
+const tools = createTextureTools(THREE);
+const antes = macaAntiga();
+const v1 = macaPrimeiraGrade();
+const agora = tools.spritePixels('apple', 'food');
+
+for (const [prefixo, pixels] of [['agora', agora], ['v1', v1], ['antes', antes]]) {
+  desenhar(document.getElementById(`${prefixo}-grande`), pixels);
+  desenhar(document.getElementById(`${prefixo}-slot`), pixels);
+  desenhar(document.getElementById(`${prefixo}-16`), pixels);
+}
+</script>
+</body>
+</html>

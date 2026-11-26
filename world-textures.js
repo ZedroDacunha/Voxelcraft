@@ -721,13 +721,52 @@ export function createTextureTools(THREE) {
         // uma elipse chapada e ficava quase igual ao mineral na barra de itens.
         if (kind === 'charcoal') return (spriteCache[key] = createCoalItemSpritePixels('vegetal'));
 
+        // Maçã: pixel art desenhada na grade 16×16 (como a semente de trigo e
+        // a porta): dois lobos com a covinha no topo, cabinho de madeira com
+        // luz própria, folha diagonal em três tons grudada no cabinho e luz de
+        // cima-esquerda (GUIA-DE-ARTE §5). O reflexo `4` fica 1 px para dentro
+        // da borda, almofadado pelo meio-brilho `h` e pela luz quente `3` (sem
+        // quadrado chapado no canto), a covinha marca `(7,6)` e a sombra desce
+        // em meia-lua em dois níveis (`1` meia-sombra e `s` sombra funda fria)
+        // abraçando a direita e a base arredondada. Contorno `O` tingido em
+        // vinho profundo — nunca preto puro.
         if (kind === 'apple') {
+            const applePixels = [
+                '................',
+                '............ll..',
+                '........t.llmL..',
+                '........tmmmLL..',
+                '.......tTmLL....',
+                '....OOO.OOO.....',
+                '...O3hh13221O...',
+                '...Oh4h32221O...',
+                '...Oh432221sO...',
+                '...O3h32221sO...',
+                '...O2322211sO...',
+                '...O122211ssO...',
+                '...O1111ssssO...',
+                '....OssssssO....',
+                '.....OOOOOO.....',
+                '................',
+            ];
+            const appleColors = {
+                O: [96, 16, 26],      // contorno: vinho profundo tingido
+                s: [136, 20, 34],     // sombra funda: rubi-vinho na base e direita
+                '1': [172, 28, 39],   // meia-sombra: transição curva e covinha
+                '2': [208, 42, 44],   // corpo: vermelho maçã vivo
+                '3': [234, 76, 58],   // luz: escarlate quente
+                h: [246, 128, 98],    // meio-brilho: halo suave do reflexo
+                '4': [253, 194, 166], // brilho: reflexo lustroso no ombro esquerdo
+                T: [98, 60, 26],      // cabinho na sombra
+                t: [134, 86, 38],     // cabinho na luz
+                L: [38, 94, 34],      // folha na sombra
+                m: [66, 142, 52],     // folha corpo
+                l: [112, 190, 78],    // folha na luz (topo)
+            };
             for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-                const dx = (x - 7.5) / 4.5, dy = (y - 9.5) / 4.5;
-                if (dx * dx + dy * dy <= 1)
-                    put(x, y, ((x === 6 && y === 7) || (x === 5 && y === 8)) ? [240, 110, 100] : (dx + dy > 0.9 ? [150, 25, 30] : [205, 40, 45]));
+                const color = appleColors[applePixels[y][x]];
+                if (color) put(x, y, color);
             }
-            put(8, 4, [110, 70, 30]); put(8, 5, [110, 70, 30]); put(9, 4, [60, 150, 50]); put(10, 4, [60, 150, 50]);
             return (spriteCache[key] = g);
         }
 
