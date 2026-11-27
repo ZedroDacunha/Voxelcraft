@@ -160,7 +160,7 @@ A interface é operável sem mouse:
   ele fica disponível.
 - `prefers-reduced-motion` desliga as animações de HUD.
 
-Detalhes em [`MELHORIA-20261102-acessibilidade.md`](MELHORIA-20261102-acessibilidade.md).
+Detalhes em [`MELHORIA-20261102-acessibilidade.md`](docs/melhorias/MELHORIA-20261102-acessibilidade.md).
 
 ## Som
 
@@ -358,9 +358,11 @@ a Microsoft, e não usa arte, som, código ou marca de nenhum jogo comercial.
   teste e sua documentação.
 - Regra de jogo em **módulo puro** (sem DOM, sem three.js) sempre que possível —
   é o que permite testar com `node --test`.
-- Bug corrigido ganha um `BUG-AAAAMMDD-*.md` com sintoma, causa, correção e
-  validação.
-- Análises e revisões ficam em `ANALISE-*.md` e `REVISAO-*.md`; melhoria de
-  interface/polimento ganha um `MELHORIA-AAAAMMDD-*.md` com antes, depois,
-  validação e limitações; cobertura de teste nova ganha um
-  `TESTES-AAAAMMDD-*.md` dizendo o que passou a ser verificado.
+- A documentação datada fica em `docs/`, fora da raiz: bug corrigido ganha um
+  `docs/bugs/BUG-AAAAMMDD-*.md` com sintoma, causa, correção e validação;
+  melhoria de interface/polimento ganha um `docs/melhorias/MELHORIA-AAAAMMDD-*.md`
+  com antes, depois, validação e limitações; cobertura de teste nova ganha um
+  `docs/testes/TESTES-AAAAMMDD-*.md` dizendo o que passou a ser verificado;
+  análises, diagnósticos e revisões ficam em `docs/analises/` (`ANALISE-*`,
+  `DIAGNOSTICO-*`, `REVISAO-*`). Só vivem na raiz os documentos de referência
+  permanente (`README.md`, `GUIA-DE-ARTE.md`, `TESTE-EM-NAVEGADOR.md`).

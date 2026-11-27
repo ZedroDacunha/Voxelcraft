@@ -6,15 +6,15 @@ ferramentas, itens, minérios, blocos do inventário.
 > Origem: em 06/11/2026 as ferramentas tinham sido **transcritas pixel a pixel**
 > do sprite clássico (256/256 iguais). Funcionava — e era cópia. Este guia é o que
 > passou a valer no lugar disso, começando pelo redesenho da picareta, do machado
-> e da pá ([`MELHORIA-20261106-arte-autoral-ferramentas.md`](MELHORIA-20261106-arte-autoral-ferramentas.md)).
+> e da pá ([`MELHORIA-20261106-arte-autoral-ferramentas.md`](docs/melhorias/MELHORIA-20261106-arte-autoral-ferramentas.md)).
 >
 > **Revisão de 07/11/2026 — base fiel com ajustes.** Depois de ver as três
 > ferramentas prontas, a direção mudou: a **pirâmide de intensidade** caiu para
 > *"parecida com a do jogo, com ajustes pequenos e nossos"*. A **picareta** e o
 > **machado** voltaram à **base fiel** do sprite clássico e receberam só alguns
 > pixels de forma, paleta suave e veios de metal
-> ([`MELHORIA-20261107-picareta-ajustes.md`](MELHORIA-20261107-picareta-ajustes.md),
-> [`MELHORIA-20261107-machado-ajustes.md`](MELHORIA-20261107-machado-ajustes.md)).
+> ([`MELHORIA-20261107-picareta-ajustes.md`](docs/melhorias/MELHORIA-20261107-picareta-ajustes.md),
+> [`MELHORIA-20261107-machado-ajustes.md`](docs/melhorias/MELHORIA-20261107-machado-ajustes.md)).
 > A **pá** ainda é o desenho autoral do #122 — é a próxima.
 > Regra prática: **a forma pode ser próxima; a cor e o detalhe são nossos.**
 
