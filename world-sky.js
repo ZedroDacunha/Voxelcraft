@@ -85,6 +85,21 @@ export function createWorldSkySystem({
     const warmLight = new THREE.Color(0xffb070);
     const whiteLight = new THREE.Color(0xffffff);
     const moonLight = new THREE.Color(0x8fa6ff);
+    // Tintas do clima: a luz difusa do céu acompanha a cor do próprio céu —
+    // dia neutra, crepúsculo quente e noite azul-frio. O dia (1) é exatamente
+    // o branco de sempre, então o jogo no meio-dia não muda sem o ciclo.
+    const hemiSkyDay = new THREE.Color(0xffffff);
+    const hemiGroundDay = new THREE.Color(0x444444);
+    const hemiSkyDusk = new THREE.Color(0xffb070);
+    const hemiGroundDusk = new THREE.Color(0x6a4a35);
+    const hemiSkyNight = new THREE.Color(0x2a3d66);
+    const hemiGroundNight = new THREE.Color(0x161f33);
+    // Mergulhado: a água absorve a luz quente e o horizonte some — a névoa e
+    // a luz difusa viram azul profundo, e o fundo da cena acompanha.
+    const underwaterSky = new THREE.Color(0x1a4a66);
+    const underwaterFog = new THREE.Color(0x0d2e46);
+    const hemiSky = new THREE.Color();
+    const hemiGround = new THREE.Color();
     const sunDirection = new THREE.Vector3();
     const uniforms = {
         horizon: { value: new THREE.Color() },
@@ -152,15 +167,27 @@ export function createWorldSkySystem({
         uniforms.zenith.value.copy(nightColor).lerp(zenithDay, day).lerp(zenithDusk, twilight);
         uniforms.horizon.value.copy(horizonNight).lerp(horizonDay, day).lerp(horizonDusk, twilight);
         gradient.visible = !underwater;
-        scene.fog.color.copy(uniforms.horizon.value);
-        scene.background.copy(uniforms.horizon.value);
         const viewDistance = renderDistance * chunkSize;
         // Quem tem enquadramento próprio (o panorama do menu) manda as distâncias
         // de nevoeiro; o jogo deixa o padrão, que é proporcional ao alcance.
         scene.fog.near = fogNear ?? viewDistance * 0.55;
         scene.fog.far = fogFar ?? viewDistance * 0.95;
 
+        // A luz difusa leva a tinta do clima: dia neutra, crepúsculo quente,
+        // noite azul-frio. O fundo e a névoa saem do horizonte e, ao mergulhar,
+        // viram o azul profundo da água.
+        hemiSky.copy(hemiSkyDay).lerp(hemiSkyNight, 1 - day).lerp(hemiSkyDusk, twilight);
+        hemiGround.copy(hemiGroundDay).lerp(hemiGroundNight, 1 - day).lerp(hemiGroundDusk, twilight);
+        if (underwater) {
+            hemiSky.lerp(underwaterSky, 0.65);
+            hemiGround.lerp(underwaterSky, 0.4);
+        }
+        hemiLight.color.copy(hemiSky);
+        hemiLight.groundColor.copy(hemiGround);
         hemiLight.intensity = 0.22 + 0.58 * day;
+        const skyTint = underwater ? underwaterFog : uniforms.horizon.value;
+        scene.fog.color.copy(skyTint);
+        scene.background.copy(skyTint);
         if (elevation >= -0.05) {
             sunLight.position.copy(sunDirection).multiplyScalar(50);
             sunLight.color.copy(whiteLight).lerp(warmLight, warm);
@@ -170,7 +197,12 @@ export function createWorldSkySystem({
             sunLight.color.copy(moonLight);
             sunLight.intensity = 0.14 * smoothstep(-0.05, -0.25, elevation);
         }
-        if (handAmbient) handAmbient.intensity = 0.38 + 0.37 * day;
+        if (handAmbient) {
+            // A mão de primeira pessoa tem a mesma luz difusa do mundo, para o
+            // item segurado não ficar num branco de sempre no crepúsculo ou na noite.
+            handAmbient.color.copy(hemiSky);
+            handAmbient.intensity = 0.38 + 0.37 * day;
+        }
 
         const cameraPosition = camera.position;
         sunMesh.position.copy(cameraPosition).addScaledVector(sunDirection, skyDistance);
