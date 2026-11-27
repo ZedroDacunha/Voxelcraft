@@ -1,3 +1,4 @@
+import { TreeShapes } from './world-tree-shapes.js';
 import { clamp01, hash2, mulberry32, Noise2D, smoothstep } from './world-math.js';
 import { COAL_VEIN_CONFIG, OreGenerator } from './world-ore-generation.js';
 import { TerrainGenerator } from './world-terrain.js';
@@ -17,6 +18,7 @@ export function createTerrainWorkerSource({ CHUNK_SIZE, WORLD_HEIGHT, TERRAIN_CO
         hash2.toString(),
         Noise2D.toString(),
         OreGenerator.toString(),
+        TreeShapes.toString(),
         TerrainGenerator.toString(),
         `let workerGenerator = null; let workerSeed = null;`,
         `self.onmessage = ({ data }) => {`,

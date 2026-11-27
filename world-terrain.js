@@ -1,3 +1,4 @@
+import { TreeShapes } from './world-tree-shapes.js';
 import { hash2, Noise2D, smoothstep } from './world-math.js';
 import { OreGenerator } from './world-ore-generation.js';
 import { BlockCatalog, ID } from './world-catalog.js';
@@ -198,6 +199,7 @@ export class TerrainGenerator {
     constructor(seed, config) {
         this.seed = seed;
         this.config = config;
+        this.treeShapes = new TreeShapes(config.ID);
         this.continents = new Noise2D(seed);
         this.hills = new Noise2D(seed + 1013);
         this.temperature = new Noise2D(seed + 2131);
@@ -329,26 +331,14 @@ export class TerrainGenerator {
         const riverWaterTop = riverStrength > 0.72 ? Math.max(WATER_LEVEL, Math.floor(baseHeight) - 2) : WATER_LEVEL;
         return { height, biome: this.biomeAt(wx, wz), submerged: height < riverWaterTop };
     }
-    /**
-     * Planta árvores cujo tronco pode estar até `canopy` blocos fora do chunk.
-     *
-     * A decisão de cada árvore depende só de (x, z) do mundo: o hash da coluna,
-     * a altura do terreno e o bioma. Por isso a árvore é idêntica não importa
-     * qual chunk seja gerado primeiro, e a copa que atravessa a divisa aparece
-     * completa nos dois lados — cada chunk escreve apenas as células que são
-     * dele. Antes o laço ia de 2 a 13 (16 - 2 - 1) para nunca escrever fora do
-     * chunk, o que deixava uma faixa de 4 blocos sem árvores em cada divisa,
-     * visível como grade nas florestas.
-     */
+    // Cada chunk reconstrói também as árvores vizinhas que podem alcançá-lo.
     plantTrees(chunk, heights, biomes, waterTops, ox, oz) {
         const { CHUNK_SIZE, WORLD_HEIGHT, WATER_LEVEL, ID, BIOME, TREE_CHANCE_FOREST, TREE_CHANCE_PLAINS } = this.config;
-        const canopy = 2;
+        const canopy = TreeShapes.radius;
         // Maior chance entre os biomas: com ela o hash da coluna descarta ~96%
         // das posições antes de qualquer cálculo de ruído.
         const maxChance = Math.max(TREE_CHANCE_FOREST, TREE_CHANCE_PLAINS);
         const set = (lx, y, lz, type) => {
-            if (y < 0 || y >= WORLD_HEIGHT) return;
-            if (lx < 0 || lx >= CHUNK_SIZE || lz < 0 || lz >= CHUNK_SIZE) return;
             const i = this.index(lx, y, lz);
             const current = chunk.data[i];
             // Tronco vence folha — sem isso a copa de uma árvore vizinha corta o
@@ -383,18 +373,14 @@ export class TerrainGenerator {
                 if (roll > treeChance) continue;
                 if (h <= WATER_LEVEL + 1) continue;
                 if (submerged) continue;
-                const treeHeight = 4 + Math.floor(hash2(wx, wz, this.seed + 7) * 3);
-                if (h + treeHeight + 2 >= WORLD_HEIGHT) continue;
-                for (let k = 1; k <= treeHeight; k++) set(lx, h + k, lz, ID.LOG);
-                for (let dy = treeHeight - 2; dy <= treeHeight + 1; dy++) {
-                    const radius = dy >= treeHeight ? 1 : 2;
-                    for (let dx = -radius; dx <= radius; dx++) {
-                        for (let dz = -radius; dz <= radius; dz++) {
-                            if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
-                            if (dy === treeHeight + 1 && Math.abs(dx) + Math.abs(dz) > 1) continue;
-                            set(lx + dx, h + dy, lz + dz, ID.LEAVES);
-                        }
-                    }
+                const shape = this.treeShapes.at(wx, wz, this.seed, biome === BIOME.FOREST);
+                if (h + shape.height >= WORLD_HEIGHT) continue;
+                for (const [dx, dy, dz, type] of shape.cells) {
+                    const x = lx + dx, z = lz + dz;
+                    if (x < 0 || z < 0 || x >= CHUNK_SIZE || z >= CHUNK_SIZE) continue;
+                    // Raízes laterais só aparecem sobre chão firme, inclusive em encostas.
+                    if (type === ID.LOG && dy === 1 && (dx || dz) && heights[x + z * CHUNK_SIZE] !== h) continue;
+                    set(x, h + dy, z, type);
                 }
             }
         }
@@ -405,10 +391,19 @@ export function findSpawn(generator, config) {
     const { WATER_LEVEL, TREE_CHANCE_FOREST } = config;
     const step = 4, maxRadius = 512;
     const minHeight = WATER_LEVEL + 2;
-    const noTreeNear = (x, z) => {
-        for (let dx = -3; dx <= 3; dx++) {
-            for (let dz = -3; dz <= 3; dz++) {
-                if (hash2(x + dx, z + dz, generator.seed) <= TREE_CHANCE_FOREST) return false;
+    const noTreeNear = (x, z, height) => {
+        // Mantém a clareira de três blocos e confere se uma copa mais
+        // distante atravessa a cabeça ou os pés do jogador em uma encosta.
+        for (let dx = -TreeShapes.radius; dx <= TreeShapes.radius; dx++) {
+            for (let dz = -TreeShapes.radius; dz <= TreeShapes.radius; dz++) {
+                if (hash2(x + dx, z + dz, generator.seed) > TREE_CHANCE_FOREST) continue;
+                if (Math.abs(dx) <= 3 && Math.abs(dz) <= 3) return false;
+                const root = generator.columnSummary(x + dx, z + dz);
+                if (root.height > height + 1 || root.height <= WATER_LEVEL + 1 || root.submerged) continue;
+                if (root.biome !== config.BIOME.FOREST && root.biome !== config.BIOME.PLAINS) continue;
+                const shape = generator.treeShapes.at(x + dx, z + dz, generator.seed, root.biome === config.BIOME.FOREST);
+                if (shape.cells.some(([sx, sy, sz]) => sx === -dx && sz === -dz &&
+                    root.height + sy > height && root.height + sy <= height + 2)) return false;
             }
         }
         return true;
@@ -419,7 +414,7 @@ export function findSpawn(generator, config) {
             for (let dz = -radius; dz <= radius; dz += step) {
                 if (Math.max(Math.abs(dx), Math.abs(dz)) !== radius) continue;
                 const height = generator.heightAt(dx, dz);
-                if (height >= minHeight && noTreeNear(dx, dz)) return { x: dx + 0.5, y: height + 1, z: dz + 0.5 };
+                if (height >= minHeight && noTreeNear(dx, dz, height)) return { x: dx + 0.5, y: height + 1, z: dz + 0.5 };
             }
         }
     }
