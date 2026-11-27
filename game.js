@@ -145,6 +145,7 @@ import {
 import {
     TALL_GRASS_VARIANTS, createTallGrassGeometry, createTallGrassMaterial, tallGrassTextureUrl,
 } from './world-tall-grass.js';
+import { gammaForBrightness, installBrightnessToneMapping } from './world-brightness.js';
 
 async function loadThreeModules() {
     // A cópia em vendor/ evita depender de CDN (funciona offline e garante a
@@ -420,7 +421,10 @@ class World {
             map: atlas, alphaTest: 0.5, transparent: false, depthWrite: true, vertexColors: true, side: THREE.DoubleSide,
         });
         
-        this.torchFlameMaterial = new THREE.MeshBasicMaterial({ map: createTorchFlameTexture(), transparent: false, alphaTest: 0.5, depthWrite: true, side: THREE.DoubleSide, toneMapped: false });
+        // Sem opt-out do tone mapping, de propósito: a chama é parte do mundo
+        // e acompanha o Brilho das opções como todo o resto (a 100% a gama é
+        // identidade, então a cor de sempre não muda).
+        this.torchFlameMaterial = new THREE.MeshBasicMaterial({ map: createTorchFlameTexture(), transparent: false, alphaTest: 0.5, depthWrite: true, side: THREE.DoubleSide });
         this.furnaceSmoke = new FurnaceSmokeSystem(THREE, scene);
         configureTorchFlameAnimation(this.torchFlameMaterial);
         configureTorchFlicker(this.chunkMaterial);
@@ -4098,6 +4102,10 @@ function applyGameSettings(settings, { quiet = false } = {}) {
     GAME_SETTINGS.fov = settings.fov;
     GAME_SETTINGS.volume = settings.volume;
     GAME_SETTINGS.uiScale = settings.uiScale;
+    // Brilho: o expoente da gama vai direto para o uniform que o renderer já
+    // manda a todos os materiais — trocar de valor é só isso.
+    GAME_SETTINGS.brightness = settings.brightness;
+    if (renderer) renderer.toneMappingExposure = gammaForBrightness(settings.brightness);
     // Efeitos: os cinco on/off entram no snapshot que o laço de animação lê a
     // cada quadro; as nuvens levam a notícia na hora (a malha pode já estar na
     // cena, e o valor persiste para quando o próximo mundo carregar).
@@ -5243,7 +5251,14 @@ async function init() {
     targetMesh.visible = false;
     scene.add(targetMesh);
 
+    // Brilho: a gama mora no ponto de extensão CustomToneMapping do three e é
+    // instalada aqui, antes do primeiro material do mundo compilar. O expoente
+    // viaja no uniform toneMappingExposure que o renderer já manda a todos —
+    // nenhum uniform novo, nenhum passe de render extra.
+    installBrightnessToneMapping(THREE.ShaderChunk);
     renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: GPU_PREF });
+    renderer.toneMapping = THREE.CustomToneMapping;
+    renderer.toneMappingExposure = gammaForBrightness(GAME_SETTINGS.brightness);
     renderer.autoClear = false;
     renderer.info.autoReset = false;
     renderer.setSize(window.innerWidth, window.innerHeight);

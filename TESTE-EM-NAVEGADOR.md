@@ -1472,3 +1472,24 @@ Menu → **Opções** → **Gráficos** → **Efeitos** (ou ESC → Opções no 
 - [ ] `Restaurar padrões` dentro de Efeitos devolve os cinco para ligados, e
       as escolhas **ficam guardadas** (feche, reabra, entre no mundo: continuam
       onde você deixou).
+
+## 76. Brilho
+
+Parte das opções: [`MELHORIA-20261127-brilho.md`](docs/melhorias/MELHORIA-20261127-brilho.md).
+Menu → **Opções** → **Gráficos** → **Brilho** (ou ESC → Opções no jogo).
+
+- [ ] A linha **Brilho** é a **segunda** da grade de Gráficos (logo abaixo de
+      `Gráficos`), com trilho e o valor `100%` — e com o jogo rodando, `100%`
+      é o mundo de sempre, pixel a pixel.
+- [ ] Arraste para `150%` com o jogo rodando: o chão escuro e a caverna sobem
+      **na hora**, enquanto o sol e o céu de dia quase não mudam; volte para
+      `100%` e tudo volta.
+- [ ] `200%` num lugar sem tocha (noite ou caverna) dá para **enxergar o
+      terreno**; `50%` escurece de propósito, para quem gosta de atmosfera.
+- [ ] Sol, lua, estrelas, nuvens, **chama de tocha** e **folhas caindo**
+      acompanham o mesmo valor — nada fica "para trás" em 100%.
+- [ ] HUD e flash de dano **não** mudam (interface é interface): os corações
+      continuam na mesma vermelhidão com o brilho no máximo.
+- [ ] A escolha fica guardada: feche as opções, reabra, entre no mundo — o
+      valor continua onde você deixou; **Restaurar padrões** volta a 100%.
+- [ ] No celular a barra arrasta no dedo igual às outras barras de Gráficos.

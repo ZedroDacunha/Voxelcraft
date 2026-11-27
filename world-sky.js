@@ -53,6 +53,9 @@ function createSkyGradient(THREE, uniforms) {
                            * (1.0 - smoothstep(0.10, 0.55, height));
                 sky = mix(sky, sunset, twilight * band * towardSun * towardSun);
                 gl_FragColor = vec4(sky, 1.0);
+                // A gama do Brilho entra antes da conversão de cor, como nos
+                // materiais do three — céu e terreno no mesmo expoente.
+                #include <tonemapping_fragment>
                 #include <colorspace_fragment>
             }`,
     });

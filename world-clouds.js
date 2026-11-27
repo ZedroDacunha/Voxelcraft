@@ -47,6 +47,8 @@ export function createWorldClouds({ THREE, Noise2D, faces, config = WORLD_CLOUD_
             varying vec3 faceColor;
             void main() {
                 gl_FragColor = vec4(faceColor, 0.88);
+                // Idem o céu: a gama do Brilho antes da conversão de cor.
+                #include <tonemapping_fragment>
                 #include <colorspace_fragment>
             }`,
     });

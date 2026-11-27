@@ -56,7 +56,9 @@ export function createFallingLeaves({ THREE, scene, readBlock, random = Math.ran
     }
     const slots = [];
     for (let i = 0; i < LEAF_MAX; i++) {
-        const material = new THREE.MeshBasicMaterial({ map, transparent: true, alphaTest: 0.01, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
+        // Sem opt-out do tone mapping: a folha é parte do mundo e acompanha o
+        // Brilho das opções (gama identidade a 100% não muda a cor de sempre).
+        const material = new THREE.MeshBasicMaterial({ map, transparent: true, alphaTest: 0.01, depthWrite: false, side: THREE.DoubleSide });
         const mesh = new THREE.Mesh(geometry, material);
         mesh.visible = false; scene.add(mesh);
         slots.push({ mesh, active: false });

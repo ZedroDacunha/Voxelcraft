@@ -1,5 +1,5 @@
 // Preferências do jogo (não do save): sensibilidade, campo de visão, distância
-// de render, volume, qualidade gráfica, resolução de renderização e os efeitos
+// de render, volume, qualidade gráfica, resolução, brilho e os efeitos
 // (partículas, nuvens, folhas, balanço da câmera e flash de dano). Ficam em
 // localStorage e são lidas quando `game.js` é importado (ao entrar em um mundo).
 // A tela de opções — do menu e a do ESC durante o jogo — grava aqui.
@@ -43,6 +43,12 @@ export const GAME_SETTING_FIELDS = Object.freeze({
         default: 'auto',
         format: value => GAME_SETTING_FIELDS.graphics.labels[value] ?? 'Automática',
     }),
+    // Brilho: gama do mundo inteiro (ver world-brightness.js). 1 = 100%, o
+    // jogo de sempre; 2 = 200%, caverna e noite sobem sem estourar o sol.
+    brightness: {
+        min: 0.5, max: 2, step: 0.1, default: 1,
+        format: value => `${Math.round(value * 100)}%`,
+    },
     // Resolução de renderização: quantos pixels o jogo desenha antes de a
     // imagem ser esticada para a tela (ver world-render-resolution.js). É uma
     // lista, mas com `slider`: vinte resoluções em degraus pedem barra, não
