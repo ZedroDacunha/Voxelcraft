@@ -16,6 +16,9 @@ const BOTTOM = [0, 0, -0.20, -0.45];
 export function createWorldClouds({ THREE, Noise2D, faces, config = WORLD_CLOUD_CONFIG }) {
     let cloudMesh = null;
     let cloudNoise = null;
+    // Preferência da opção Nuvens: guardada aqui (e não só na malha) porque a
+    // malha nasce a cada mundo — a escolha do jogador sobrevive ao carregamento.
+    let visible = true;
     const night = new THREE.Color(0x303952);
     const dayColor = new THREE.Color(0xfafcff);
     const duskShade = new THREE.Color(0xa69db2);
@@ -61,6 +64,7 @@ export function createWorldClouds({ THREE, Noise2D, faces, config = WORLD_CLOUD_
         cloudMesh = new THREE.Mesh(new THREE.BufferGeometry(), cloudMaterial);
         cloudMesh.frustumCulled = false;
         cloudMesh.renderOrder = -0.5;
+        cloudMesh.visible = visible;
         scene.add(cloudMesh);
     }
 
@@ -133,7 +137,9 @@ export function createWorldClouds({ THREE, Noise2D, faces, config = WORLD_CLOUD_
     }
 
     function update(deltaSeconds, camera) {
-        if (!cloudMesh) return;
+        // Nuvens desligadas: sem malha não há o que animar, e congelar o
+        // deslocamento faz o céu continuar de onde parou quando religarem.
+        if (!cloudMesh || !visible) return;
         state.scroll += deltaSeconds * config.speed / config.cellSize;
         const cellX = Math.floor(camera.position.x / config.cellSize - state.scroll);
         const cellZ = Math.floor(camera.position.z / config.cellSize);
@@ -153,10 +159,16 @@ export function createWorldClouds({ THREE, Noise2D, faces, config = WORLD_CLOUD_
         uniforms.sunDirection.value.copy(sunDirection);
     }
 
+    function setVisible(value) {
+        visible = Boolean(value);
+        if (cloudMesh) cloudMesh.visible = visible;
+    }
+
     return {
-        create, update, updateTint,
+        create, update, updateTint, setVisible,
         get cells() { return state.cells; },
         get gridSize() { return grid; },
         get height() { return config.height; },
+        get visible() { return visible; },
     };
 }

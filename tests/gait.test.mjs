@@ -196,11 +196,13 @@ test('game.js lê a passada para o balanço, o braço e o som', () => {
     assert.match(source, /const gait = createGait\(\)/);
     assert.doesNotMatch(source, /bobTimer/, 'o cronômetro paralelo do braço saiu de cena');
 
-    // Câmera: desce, vai de lado e inclina, sempre pela pose da passada.
+    // Câmera: desce, vai de lado e inclina, sempre pela pose da passada — e a
+    // opção Efeitos > Balanço da câmera corta os três (posição, rolagem e mão).
     assert.match(source, /const pose = gaitPose\(gait\)/);
+    assert.match(source, /if \(pose\.amplitude > 0 && GAME_SETTINGS\.cameraBob !== 'off'\)/);
     assert.match(source, /camera\.position\.addScaledVector\(cameraRight, pose\.sway\)/);
     assert.match(source, /camera\.position\.y \+= pose\.bobY/);
-    assert.match(source, /lookEuler\.set\(look\.pitch, look\.yaw, gaitPose\(gait\)\.roll, 'YXZ'\)/);
+    assert.match(source, /lookEuler\.set\(look\.pitch, look\.yaw, GAME_SETTINGS\.cameraBob !== 'off' \? gaitPose\(gait\)\.roll : 0, 'YXZ'\)/);
     // Braço e som na mesma fase.
     assert.match(source, /const gaitNow = gaitPose\(gait\)/);
     assert.match(source, /gaitNow\.handX \* 0\.012 \* ba/);

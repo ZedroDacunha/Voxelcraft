@@ -6,6 +6,9 @@ export function createBreakParticleSystem({
     isSolidAt = () => false,
     maxParticles = 150,
     particlesPerBreak = 12,
+    // Opção Partículas do menu de Efeitos: quando desligada, nada nasce — o que
+    // já está no ar termina sozinho, sem congelar no meio do caminho.
+    enabled = () => true,
 }) {
     const particles = [];
     const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
@@ -31,6 +34,7 @@ export function createBreakParticleSystem({
      * o de um bloco, `count`, `spread` e `speed` (0..1 na prática).
      */
     function spawn(x, y, z, blockType, { color = null, count = particlesPerBreak, spread = 1, speed = 1 } = {}) {
+        if (!enabled()) return;
         if (particles.length >= maxParticles) return;
         const scene = getScene();
         if (!scene) return;

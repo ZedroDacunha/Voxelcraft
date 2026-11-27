@@ -49,6 +49,33 @@ test('a nuvem engrossa no centro e só expõe os degraus entre colunas', () => {
     assert.deepEqual(seams, [[0.55, 1.3], [-0.2, 0]]);
 });
 
+test('a opção Nuvens esconde a malha, congela a atualização e sobrevive ao recarregar', () => {
+    const { clouds, camera, mesh } = fixture();
+    assert.equal(clouds.visible, true);
+    const geometry = mesh.geometry;
+    clouds.setVisible(false);
+    assert.equal(clouds.visible, false);
+    assert.equal(mesh.visible, false, 'a malha na cena some na hora');
+    // escondida: nem o deslocamento nem o rebuild rodam (e o céu congela
+    // de onde parou, para não dar um salto ao religarem)
+    clouds.update(0.1, camera);
+    camera.position.x += 1;
+    clouds.update(0, camera);
+    assert.equal(mesh.geometry, geometry, 'sem rebuild enquanto desligada');
+    assert.equal(mesh.position.x, 0, 'sem deslocamento enquanto desligada');
+    // religar: a malha volta e o scroll anda de novo
+    clouds.setVisible(true);
+    assert.equal(mesh.visible, true);
+    clouds.update(0.1, camera);
+    assert.notEqual(mesh.geometry, geometry, 'depois de religar o rebuild volta');
+    assert.ok(mesh.position.x > 0, 'o scroll continua de onde parou');
+    // e a escolha sobrevive ao carregamento: o próximo mundo nasce sem nuvens
+    clouds.setVisible(false);
+    const fresh = new THREE.Scene();
+    clouds.create(fresh, 7);
+    assert.equal(fresh.children[0].visible, false, 'a malha nova já nasce escondida');
+});
+
 test('o vento e o giro do sol reutilizam a malha dentro da mesma célula', () => {
     const { clouds, camera, mesh } = fixture();
     const geometry = mesh.geometry;
