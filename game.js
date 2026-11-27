@@ -63,7 +63,8 @@ import {
 import { DAWN_TIME, bedRespawnPoint, canSleepAt, sleepPhaseAt } from './world-sleep.js';
 import { collidesInWorld, movePlayerAxis, playerIntersectsBlock, unstickInWorld } from './player-physics.js';
 import { canJumpFrom, createJumpState, updateJumpWindow } from './player-jump.js';
-import { createPlayerModel, PLAYER_MODEL_COLORS } from './player-model.js';
+import { createFirstPersonArms } from './player-first-person-arms.js';
+import { createPlayerModel } from './player-model.js';
 import { createZombieModel } from './world-zombie-model.js';
 import { createZombieTest } from './world-zombie-test.js';
 import { createZombiePopulation, zombieSpawnAllowed, zombieFullBlockSupport } from './world-zombie-spawn.js';
@@ -192,7 +193,7 @@ async function loadThreeModules() {
 }
 
 const { THREE, PointerLockControls } = await loadThreeModules();
-const { spritePixels, createAtlasTexture, createNoiseTexture } = createTextureTools(THREE);
+const { spritePixels, createAtlasTexture } = createTextureTools(THREE);
 const inventoryAssets = createInventoryAssets(THREE);
 
 // =====================================================================
@@ -2235,7 +2236,7 @@ function initGameplayAssets() {
 // =====================================================================
 let handScene, handCamera, handPivot, heldAnchor, handAmbient;
 let heldMesh = null, heldFlameMesh = null, heldTorchLight = null, heldId = -1;
-let handSleeve = null, handBlock = null;
+let firstPersonArms;
 const handAnim = createHandAnimation();
 const swordSwing = createSwordSwing();
 let heldSwordPose = null;
@@ -2259,22 +2260,13 @@ function createHand() {
     dl.position.set(0.5, 1, 0.8);
     handScene.add(dl);
 
-    handPivot = new THREE.Group();
-    handSleeve = new THREE.Mesh(
-        new THREE.BoxGeometry(0.16, 0.16, 0.40),
-        new THREE.MeshLambertMaterial({ map: createNoiseTexture([
-            (PLAYER_MODEL_COLORS.tunic >> 16) & 255, (PLAYER_MODEL_COLORS.tunic >> 8) & 255, PLAYER_MODEL_COLORS.tunic & 255,
-        ], 11) }));
-    handSleeve.position.z = -0.20;
-    handBlock = new THREE.Mesh(
-        new THREE.BoxGeometry(0.13, 0.13, 0.20),
-        new THREE.MeshLambertMaterial({ map: createNoiseTexture([214, 166, 125], 12, 8) }));
-    handBlock.position.z = -0.50;
+    firstPersonArms = createFirstPersonArms(THREE, playerModel, locomotionRig);
+    handPivot = firstPersonArms.right;
     heldAnchor = new THREE.Group();
     heldAnchor.position.set(0, 0.03, -0.62);
-    handPivot.add(handSleeve, handBlock, heldAnchor);
+    firstPersonArms.grip.add(heldAnchor);
     handScene.add(handCamera);
-    handCamera.add(handPivot);
+    handCamera.add(firstPersonArms.left, handPivot);
     firstPersonCrumbs = createAppleCrumbSystem(THREE, handCamera, {
         sizeMin: 0.011,
         sizeSpan: 0.006,
@@ -2293,10 +2285,6 @@ function refreshHeldItem() {
     if (heldMesh) { heldAnchor.remove(heldMesh); heldMesh = null; }
     if (heldFlameMesh) { heldAnchor.remove(heldFlameMesh); heldFlameMesh = null; }
     heldAnchor.rotation.set(0, 0, 0);
-    handBlock.position.set(0, 0, -0.50);
-    handSleeve.position.set(0, 0, -0.20);
-    handBlock.scale.set(1, 1, 1);
-    handSleeve.scale.set(1, 1, 1);
     heldAnchor.position.set(0, 0.03, -0.62);
     heldAnchor.scale.setScalar(1);
     if (!id) return;
@@ -2406,11 +2394,18 @@ function updateHand(dt) {
     // à parte, que podia sair fora de fase do barulho dos pés.
     const gaitNow = gaitPose(gait);
     const swim = swimFirstPersonPose(swimState);
-    // Balanço da câmera desligado: a mão deixa de acompanhar o compasso dos
-    // passos (o balanço de nadar e os golpes continuam, são outros).
+    // Os braços seguem a passada mesmo com o balanço da câmera desligado.
+    const ground = groundPose(locomotion, gaitNow.phase, gaitNow.amplitude);
+    const busy = Math.max(currentEatPose.lift, swing, heldSwordPose?.cut ?? 0, heldSwordPose?.prepare ?? 0);
+    const rightWeight = (heldMesh ? 0.70 : 1) * (1 - 0.75 * busy);
+    firstPersonArms.pose(ground, swim.walkWeight, rightWeight);
+    const left = firstPersonArms.left;
+    const shoulderX = HAND_BASE.x * Math.min(1, handCamera.aspect);
+    left.position.set(-shoulderX - swim.handX, HAND_BASE.y - 0.055 - swim.handY, HAND_BASE.z - swim.handZ);
+    left.rotation.set(0.22 - swim.handPitch, -0.25, 0);
     const ba = (GAME_SETTINGS.cameraBob !== 'off' ? gaitNow.amplitude : 0) * swim.walkWeight;
     handPivot.position.set(
-        HAND_BASE.x + gaitNow.handX * 0.012 * ba + swim.handX,
+        shoulderX + gaitNow.handX * 0.012 * ba + swim.handX,
         HAND_BASE.y + gaitNow.handY * 0.010 * ba + swim.handY - dip - 0.05 * armSwingWhileEating + 0.07 * pickaxe.lift - 0.04 * pickaxe.strike,
         HAND_BASE.z + swim.handZ - 0.12 * armSwingWhileEating);
     handPivot.rotation.set(
