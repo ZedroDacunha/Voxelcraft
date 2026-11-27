@@ -3510,6 +3510,7 @@ const breakParticles = createBreakParticleSystem({
     THREE,
     getScene: () => scene,
     getBlockColor: type => inventoryAssets.blockColors[type],
+    isSolidAt: (x, y, z) => world.isSolidForPhysics(x, y, z),
     getImmersionAt: (x, y, z, halfHeight) => waterImmersionAt(world, x, y, z, halfHeight),
 });
 const WORLD_RAYCAST_ACCESS = {
