@@ -21,6 +21,47 @@ export function sunDirectionAt(worldTime, target = { x: 0, y: 0, z: 0 }) {
     return target;
 }
 
+// Um triângulo na profundidade máxima: o teste de profundidade descarta o céu
+// atrás do terreno opaco. A direção depende da câmera que realmente desenha o
+// quadro, inclusive em terceira pessoa. Transladar a câmera não move o horizonte.
+function createSkyGradient(THREE, uniforms) {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+        -1, -1, 0, 3, -1, 0, -1, 3, 0,
+    ], 3));
+    const material = new THREE.ShaderMaterial({
+        uniforms,
+        depthWrite: false,
+        vertexShader: `
+            varying vec3 skyRay;
+            void main() {
+                vec2 scale = vec2(projectionMatrix[0][0], projectionMatrix[1][1]);
+                skyRay = vec3(position.xy / scale, -1.0) * mat3(viewMatrix);
+                gl_Position = vec4(position.xy, 1.0, 1.0);
+            }`,
+        fragmentShader: `
+            uniform vec3 horizon, zenith, sunset, sunDirection;
+            uniform float twilight;
+            varying vec3 skyRay;
+            void main() {
+                vec3 ray = normalize(skyRay);
+                float height = max(ray.y, 0.0);
+                float rise = height / (0.28 + 0.72 * height);
+                vec3 sky = mix(horizon, zenith, rise);
+                float towardSun = max(dot(ray, sunDirection), 0.0);
+                float band = smoothstep(0.0, 0.085, height)
+                           * (1.0 - smoothstep(0.10, 0.55, height));
+                sky = mix(sky, sunset, twilight * band * towardSun * towardSun);
+                gl_FragColor = vec4(sky, 1.0);
+                #include <colorspace_fragment>
+            }`,
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.frustumCulled = false;
+    mesh.renderOrder = 1;
+    return mesh;
+}
+
 export function createWorldSkySystem({
     THREE,
     clamp01,
@@ -32,15 +73,25 @@ export function createWorldSkySystem({
     renderDistance,
     chunkSize,
 }) {
-    const dayColor = new THREE.Color(skyColor);
+    const horizonDay = new THREE.Color(skyColor).lerp(new THREE.Color(0xe0eff7), 0.64);
+    const horizonNight = new THREE.Color(0x172037);
+    const horizonDusk = new THREE.Color(0xc5a1a4);
+    const zenithDay = new THREE.Color(0x4388d2);
+    const zenithDusk = new THREE.Color(0x514d82);
     const nightColor = new THREE.Color(0x070b1c);
-    const duskColor = new THREE.Color(0xf08a4b);
     const warmLight = new THREE.Color(0xffb070);
     const whiteLight = new THREE.Color(0xffffff);
     const moonLight = new THREE.Color(0x8fa6ff);
-    const skyColorScratch = new THREE.Color();
     const sunDirection = new THREE.Vector3();
+    const uniforms = {
+        horizon: { value: new THREE.Color() },
+        zenith: { value: new THREE.Color() },
+        sunset: { value: new THREE.Color(0xffb172) },
+        sunDirection: { value: sunDirection },
+        twilight: { value: 0 },
+    };
     const state = { elevation: 1, day: 1 };
+    let gradient = null;
     let sunMesh = null;
     let moonMesh = null;
     let starPoints = null;
@@ -50,12 +101,14 @@ export function createWorldSkySystem({
             new THREE.PlaneGeometry(size, size),
             new THREE.MeshBasicMaterial({ color, fog: false, depthWrite: false, side: THREE.DoubleSide }),
         );
-        mesh.renderOrder = -1;
+        mesh.renderOrder = 2;
         mesh.frustumCulled = false;
         return mesh;
     }
 
     function create(scene) {
+        gradient = createSkyGradient(THREE, uniforms);
+        scene.add(gradient);
         sunMesh = makeSquareMesh(36, 0xfff2a8);
         moonMesh = makeSquareMesh(26, 0xdfe6f5);
         scene.add(sunMesh, moonMesh);
@@ -81,7 +134,7 @@ export function createWorldSkySystem({
     }
 
     function update({ scene, camera, hemiLight, sunLight, handAmbient = null, worldTime,
-        fogNear = null, fogFar = null }) {
+        fogNear = null, fogFar = null, underwater = false }) {
         if (!sunMesh || !moonMesh || !starPoints) return;
         const angle = worldTime * Math.PI * 2;
         sunDirectionAt(worldTime, sunDirection);
@@ -91,10 +144,13 @@ export function createWorldSkySystem({
         state.elevation = elevation;
         state.day = day;
 
-        skyColorScratch.copy(nightColor).lerp(dayColor, day)
-            .lerp(duskColor, warm * (1 - Math.abs(day - 0.5) * 0.6));
-        scene.background.copy(skyColorScratch);
-        scene.fog.color.copy(skyColorScratch);
+        const twilight = 1 - smoothstep(0.025, 0.32, Math.abs(elevation));
+        uniforms.twilight.value = twilight;
+        uniforms.zenith.value.copy(nightColor).lerp(zenithDay, day).lerp(zenithDusk, twilight);
+        uniforms.horizon.value.copy(horizonNight).lerp(horizonDay, day).lerp(horizonDusk, twilight);
+        gradient.visible = !underwater;
+        scene.fog.color.copy(uniforms.horizon.value);
+        scene.background.copy(uniforms.horizon.value);
         const viewDistance = renderDistance * chunkSize;
         // Quem tem enquadramento próprio (o panorama do menu) manda as distâncias
         // de nevoeiro; o jogo deixa o padrão, que é proporcional ao alcance.

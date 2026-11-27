@@ -3413,7 +3413,10 @@ function updateWorldClock(dt) {
 }
 
 function updateSky() {
-    worldSky.update({ scene, camera, hemiLight, sunLight, handAmbient, worldTime: worldClock.time });
+    worldSky.update({
+        scene, camera, hemiLight, sunLight, handAmbient, worldTime: worldClock.time,
+        underwater: world?.water.headInWater,
+    });
 }
 
 // =====================================================================
