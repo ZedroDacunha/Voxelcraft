@@ -1529,3 +1529,23 @@ O gradiente de luz das tochas deixa de mostrar degraus visíveis.
       antes (o dither não toca neles).
 - [ ] Ao mover a câmera depressa, o dither não trava nem pisca: é
       ruído de posição da tela, fixo por pixel.
+
+## 79. Sombra de contato
+
+Parte da iluminação: [`MELHORIA-20261127-sombra-de-contato.md`](docs/melhorias/MELHORIA-20261127-sombra-de-contato.md).
+Blobs escuros no chão sob criaturas terrestres e sob o jogador em terceira
+pessoa — o "chão" que faltava para as entidades não parecem flutuar.
+
+- [ ] Uma **ovelha** no pasto tem um blob escuro sob ela no chão, que
+      acompanha seus passos.
+- [ ] Um **zumbi** tem o mesmo blob sob ele, que acompanha seu
+      movimento.
+- [ ] Em **terceira pessoa**, o **jogador** tem o blob sob os pés; em
+      primeira pessoa não (o corpo não está visível).
+- [ ] Quando a ovelha/zumbi **pula** (sobre um degrau), o blob **fica no
+      chão** — a criatura salta sobre o próprio blob.
+- [ ] O **Mofim** (que flutua) **não** tem blob no chão.
+- [ ] O blob **não atravessa a água**: o jogador mergulhado não mostra
+      blob.
+- [ ] O blob **não atrapalha** o Brilho das opções nem a luz da tocha
+      (é um plano semitransparente, não um objeto escuro sólido).
