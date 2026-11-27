@@ -52,9 +52,12 @@ test('corrente sob outra água preenche toda a altura, mesmo no nível mais raso
 
 test('espessura compartilhada mede o fundo, afina na margem e satura em cinco blocos', () => {
     const basin = depth => (x, y, z) => y <= 12 && y > 12 - depth ? ID.WATER : 0;
-    assert.equal(Water.cornerDepth(basin(1), -16, 12, 16), Water.surfaceHeight);
-    assert.equal(Water.cornerDepth(basin(3), -16, 12, 16), 2 + Water.surfaceHeight);
-    assert.equal(Water.cornerDepth(basin(12), -16, 12, 16), 4 + Water.surfaceHeight);
+    const check = (read, x, expected) => {
+        assert.ok(Math.abs(Water.cornerDepth(read, x, 12, 16) - expected) < 1e-8);
+    };
+    check(basin(1), -16, Water.surfaceHeight);
+    check(basin(3), -16, 2 + Water.surfaceHeight);
+    check(basin(12), -16, 4 + Water.surfaceHeight);
     const bank = (x, y, z) => x < 0 ? ID.STONE : basin(1)(x, y, z);
-    assert.equal(Water.cornerDepth(bank, 0, 12, 16), Water.surfaceHeight / 2);
+    check(bank, 0, Water.surfaceHeight / 2);
 });
