@@ -25,7 +25,7 @@ export const NATURAL_LEAF_REFINEMENTS = [
         id: 'natural-nervura', badge: '2 · Nervura', tag: 'Traço delicado',
         title: '2 — Nervura suave',
         description: 'Um fio verde-claro sugere a nervura central sem virar uma linha muito marcada.',
-        palette: { ...original.palette, v: [132, 178, 77, 255], a: [82, 128, 53, 255] },
+        palette: { ...original.palette, v: [92, 125, 54, 255], a: [57, 90, 37, 255] },
         pixels: paint([[5, 3, 'v'], [5, 4, 'v'], [5, 5, 'v'], [6, 6, 'v'], [6, 7, 'v'], [6, 8, 'a'], [4, 5, 'm']]),
     },
     {
