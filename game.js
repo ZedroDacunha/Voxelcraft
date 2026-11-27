@@ -1,3 +1,4 @@
+import { createFirstPersonBody } from './player-first-person-body.js';
 
 import { openDatabase as dbOpen, storeRequest as dbRun } from './world-storage.js';
 import { clamp01, hash2, mulberry32, Noise2D, smoothstep } from './world-math.js';
@@ -3541,7 +3542,7 @@ function updateWaterfall(dt) {
 // =====================================================================
 let zombiePopulation = null;
 let contactShadows = null;
-let camera, swimCamera, thirdCamera, playerModel, playerArmor, playerHeldItem, scene, renderer, controls, world, creatureSystem, sheepSystem, fallingLeaves, tallGrassMaterial, tallGrassMaterials = [];
+let camera, swimCamera, thirdCamera, playerModel, firstPersonBody, playerArmor, playerHeldItem, scene, renderer, controls, world, creatureSystem, sheepSystem, fallingLeaves, tallGrassMaterial, tallGrassMaterials = [];
 let cameraView = 'first';
 const thirdDirection = new THREE.Vector3();
 const frontCameraTurn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
@@ -5257,6 +5258,7 @@ async function init() {
     playerArmor = createPlayerArmor(THREE, playerModel, PLAYER_MODEL_HEIGHT/32);
     playerHeldItem = createPlayerHeldItem(THREE, playerModel.rightArm);
     locomotionRig = rigLocomotion(THREE, playerModel);
+    firstPersonBody = createFirstPersonBody(playerModel);
     playerModel.root.visible = false;
     scene.add(playerModel.root);
     thirdPersonCrumbs = createAppleCrumbSystem(THREE, scene, {
@@ -6022,12 +6024,8 @@ function toggleThirdPerson() {
     showToast({ first: 'Primeira pessoa', rear: 'Terceira pessoa — costas', front: 'Terceira pessoa — frente' }[cameraView]);
 }
 
-// A câmera de interação permanece nos olhos. A câmera visual fica na linha
-// do olhar: atrás ou na frente, conforme a vista escolhida.
-function updateThirdPerson() {
-    const active = cameraView !== 'first' && !sleep.active;
-    playerModel.root.visible = active;
-    if (!active) return false;
+function updatePlayerBody(firstPerson) {
+    firstPersonBody.setFirstPerson(firstPerson);
     const yaw = look.yaw + Math.PI;
     const gaitNow = gaitPose(gait);
     const ground = groundPose(locomotion, gaitNow.phase, gaitNow.amplitude);
@@ -6041,7 +6039,14 @@ function updateThirdPerson() {
     playerModel.leftArm.rotation.x = pose.leftArm;
     const pickaxe = pickaxeMiningPose(ITEMS[heldId]?.tool?.type, handAnim);
     playerModel.rightArm.rotation.x = pose.rightArm - 0.65 * pickaxe.lift + 0.4 * pickaxe.strike;
+    playerModel.torso.rotation.x = 0;
+    playerModel.head.rotation.y = 0;
     applyGroundPose(playerModel, locomotionRig, ground, 1 - swimState.blend);
+    if (firstPerson) {
+        playerArmor.sync();
+        firstPersonBody.align(player.pos, yaw, 1 - swimState.blend);
+        return;
+    }
     const tpHeldMesh = playerHeldItem.anchor.children[0] ?? null;
     applyThirdPersonHeldArmPose(playerModel, locomotionRig, Boolean(tpHeldMesh), ground, 1 - swimState.blend);
     playerModel.rightArm.rotation.y = 0;
@@ -6064,13 +6069,18 @@ function updateThirdPerson() {
         pendingAppleCrumbBites.length = 0;
     }
     playerArmor.sync();
+}
+
+// A câmera de interação permanece nos olhos. A câmera visual fica na linha
+// do olhar: atrás ou na frente, conforme a vista escolhida.
+function updateThirdPerson() {
+    if (cameraView === 'first' || sleep.active) return false;
     camera.getWorldDirection(thirdDirection).multiplyScalar(cameraOffsetSign(cameraView));
     const hit = raycastVoxels(camera.position, thirdDirection, THIRD_PERSON_DISTANCE, {
         getBlock: (x, y, z) => world.getBlock(x, y, z),
         isIgnoredBlock: (type, x, y, z) => !world.isSolidForPhysics(x, y, z, type),
     });
     const distance = thirdPersonDistance(hit?.dist);
-    playerModel.root.visible = distance >= THIRD_PERSON_BODY_MIN_DISTANCE;
     thirdCamera.position.copy(camera.position).addScaledVector(thirdDirection, distance);
     thirdCamera.quaternion.copy(camera.quaternion);
     if (cameraView === 'front') thirdCamera.quaternion.multiply(frontCameraTurn);
@@ -6251,6 +6261,10 @@ function animate() {
     renderer.clear();
     if (online) updateOnlinePlay(now, dt);
     const thirdViewActive = updateThirdPerson();
+    playerModel.root.visible = thirdViewActive
+        ? thirdCamera.position.distanceToSquared(camera.position) >= THIRD_PERSON_BODY_MIN_DISTANCE ** 2
+        : look.pitch < 0 && !sleep.active && !dead && !pauseMenuShown;
+    if (thirdViewActive || playerModel.root.visible) updatePlayerBody(!thirdViewActive);
     let visualCamera = camera;
     if (!thirdViewActive && !sleep.active && (swimState.blend > 0 || currentEatPose.camNod > 0)) {
         // Só a imagem balança. A câmera original continua nos olhos e é usada
