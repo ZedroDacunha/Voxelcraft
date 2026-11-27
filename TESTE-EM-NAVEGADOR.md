@@ -1129,7 +1129,7 @@ de ouro`, `… pá de diamante`) e olhe na barra, no inventário e **na mão**.
 ## 59. A picareta volta à base fiel
 
 A picareta foi refeita **em cima da versão fiel do #119**, com ajustes pequenos
-([`MELHORIA-20261107-picareta-ajustes.md`](MELHORIA-20261107-picareta-ajustes.md)).
+([`MELHORIA-20261107-picareta-ajustes.md`](docs/melhorias/MELHORIA-20261107-picareta-ajustes.md)).
 Pegue as seis (`/give picareta de madeira`, `… de pedra`, `… de cobre`, `… de
 ferro`, `… de ouro`, `… de diamante`) e olhe na barra, no inventário e na mão.
 
@@ -1153,7 +1153,7 @@ ferro`, `… de ouro`, `… de diamante`) e olhe na barra, no inventário e na m
 ## 60. O machado volta à base fiel
 
 O machado foi refeito **em cima do desenho clássico**, com a mesma receita da
-picareta ([`MELHORIA-20261107-machado-ajustes.md`](MELHORIA-20261107-machado-ajustes.md)).
+picareta ([`MELHORIA-20261107-machado-ajustes.md`](docs/melhorias/MELHORIA-20261107-machado-ajustes.md)).
 Pegue os seis (`/give machado de madeira` … `… de diamante`) e olhe na barra, no
 inventário e na mão.
 
@@ -1173,7 +1173,7 @@ inventário e na mão.
 ## 61. O cabo é das tábuas
 
 O cabo das três ferramentas passou a usar os tons do tile de tábuas
-([`MELHORIA-20261107-cabo-de-tabua.md`](MELHORIA-20261107-cabo-de-tabua.md)).
+([`MELHORIA-20261107-cabo-de-tabua.md`](docs/melhorias/MELHORIA-20261107-cabo-de-tabua.md)).
 
 - [ ] Coloque uma **picareta de ferro**, um **machado de ouro** e uma **pá de
       diamante** na barra e olhe na mão: o cabo é o mesmo nas três.
@@ -1188,9 +1188,9 @@ O cabo das três ferramentas passou a usar os tons do tile de tábuas
 ## 62. Sem acento, e a pá na base fiel
 
 Duas mudanças seguidas de 07/11/2026: o **acento** amarelo saiu de todas as
-ferramentas ([`MELHORIA-20261107-sem-acento.md`](MELHORIA-20261107-sem-acento.md))
+ferramentas ([`MELHORIA-20261107-sem-acento.md`](docs/melhorias/MELHORIA-20261107-sem-acento.md))
 e a **pá** voltou à base fiel
-([`MELHORIA-20261107-pa-ajustes.md`](MELHORIA-20261107-pa-ajustes.md)).
+([`MELHORIA-20261107-pa-ajustes.md`](docs/melhorias/MELHORIA-20261107-pa-ajustes.md)).
 
 - [ ] Nenhuma ferramenta tem mais o **ponto amarelo** — nem no alto, nem na ponta.
 - [ ] Olhando as três de perto, não há **nenhum pixel fora da rampa do material**
@@ -1209,7 +1209,7 @@ e a **pá** voltou à base fiel
 ## 63. A tesoura entra na régua
 
 A tesoura deixou de ser desenhada por código e passou a usar a arte da família
-([`MELHORIA-20261107-tesoura.md`](MELHORIA-20261107-tesoura.md)).
+([`MELHORIA-20261107-tesoura.md`](docs/melhorias/MELHORIA-20261107-tesoura.md)).
 
 - [ ] Faça uma **tesoura** (duas barras de ferro na diagonal) e olhe na barra,
       no inventário e na mão.
@@ -1227,7 +1227,7 @@ A tesoura deixou de ser desenhada por código e passou a usar a arte da família
 
 O usuário avisou: a imagem de exemplo era a do **jogo original** — e a primeira
 tesoura da família era fiel demais. A passada autoral está em
-[`MELHORIA-20261107-tesoura-autoral.md`](MELHORIA-20261107-tesoura-autoral.md).
+[`MELHORIA-20261107-tesoura-autoral.md`](docs/melhorias/MELHORIA-20261107-tesoura-autoral.md).
 
 - [ ] Faça uma **tesoura** e olhe na barra, no inventário e na mão.
 - [ ] A **ponta da lâmina** sobe mais que antes e afina — dá para ver o fio
@@ -1246,7 +1246,7 @@ tesoura da família era fiel demais. A passada autoral está em
 ## 65. A picareta ganha cabeça própria
 
 A picareta deixou de ser "base fiel + 2 px" e ganhou a passada autoral
-([`MELHORIA-20261107-picareta-autoral.md`](MELHORIA-20261107-picareta-autoral.md)).
+([`MELHORIA-20261107-picareta-autoral.md`](docs/melhorias/MELHORIA-20261107-picareta-autoral.md)).
 
 - [ ] Faça uma **picareta** e olhe no inventário, na barra e na mão.
 - [ ] A **cabeça é mais fina** que a de antes: o fundo perdeu uma fileira e dá
@@ -1265,7 +1265,7 @@ A picareta deixou de ser "base fiel + 2 px" e ganhou a passada autoral
 
 Terceira ferramenta da passada autoral, e a mais difícil: a cabeça do machado é
 uma mancha só. O que mudou está em
-[`MELHORIA-20261107-machado-autoral.md`](MELHORIA-20261107-machado-autoral.md).
+[`MELHORIA-20261107-machado-autoral.md`](docs/melhorias/MELHORIA-20261107-machado-autoral.md).
 
 - [ ] Faça um **machado** e olhe no inventário, na barra e na mão.
 - [ ] A **borda de corte** é vertical e clara — o fio corre reto, sem degrau.
@@ -1284,7 +1284,7 @@ uma mancha só. O que mudou está em
 
 A carne de ovelha ganhou a versão assada, e a tabela das carnes
 ([`world-meats.js`](world-meats.js), ver
-[`MELHORIA-20261107-carne-assada.md`](MELHORIA-20261107-carne-assada.md)) já deixa
+[`MELHORIA-20261107-carne-assada.md`](docs/melhorias/MELHORIA-20261107-carne-assada.md)) já deixa
 o próximo bicho pronto.
 
 - [ ] `/give carne 4` e `/give planks 4` (ou corte madeira) e monte uma
@@ -1304,7 +1304,7 @@ o próximo bicho pronto.
 
 A cama é o primeiro bloco do jogo que não é cubo nem painel: são duas metades
 (cabeceira e pés) com pernas, travessa, colchão e travesseiro. Ver
-[`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
+[`MELHORIA-20261107-cama.md`](docs/melhorias/MELHORIA-20261107-cama.md).
 
 - [ ] `/give cama` (ou 3 blocos de lã branca + 3 tábuas na bancada) e coloque no chão.
 - [ ] Ao colocar, a **cabeceira fica do lado oposto ao seu** — o travesseiro
@@ -1331,7 +1331,7 @@ A cama é o primeiro bloco do jogo que não é cubo nem painel: são duas metade
 
 ## 69. Dormir na cama e renascer nela
 
-A parte 2 da cama. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
+A parte 2 da cama. Ver [`MELHORIA-20261107-cama.md`](docs/melhorias/MELHORIA-20261107-cama.md).
 
 - [ ] De **dia**, com a cama na mira, clique direito: aparece o aviso *"Só dá
       para dormir à noite"* e **nada acontece** (o jogador não deita).
@@ -1360,7 +1360,7 @@ A parte 2 da cama. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
 
 ## 70. As três camas (uma por cor de lã)
 
-Parte 3 da cama. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
+Parte 3 da cama. Ver [`MELHORIA-20261107-cama.md`](docs/melhorias/MELHORIA-20261107-cama.md).
 
 - [ ] Na bancada, **3 blocos de lã branca + 3 tábuas** → **Cama** (a de sempre).
       Se a versão que você está jogando ainda pede fardo solto, é cache: a
@@ -1382,7 +1382,7 @@ Parte 3 da cama. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
 
 ## 71. A cama 3D na mão
 
-Parte 4 da cama. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
+Parte 4 da cama. Ver [`MELHORIA-20261107-cama.md`](docs/melhorias/MELHORIA-20261107-cama.md).
 
 - [ ] `/give cama` e selecione: na mão aparece a **cama inteira em 3D** (pernas,
       colchão e travesseiro), atravessada na diagonal — não a figura chata.
@@ -1402,7 +1402,7 @@ Parte 4 da cama. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
 ## 72. A parte de baixo do travesseiro no mundo
 
 Correção do mesher: a face do travesseiro virada para o meio da cama não some
-mais. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
+mais. Ver [`MELHORIA-20261107-cama.md`](docs/melhorias/MELHORIA-20261107-cama.md).
 
 - [ ] Coloque uma cama no chão e vá até o **pé dela**, de frente para a
       cabeceira (o travesseiro no fundo).
@@ -1420,7 +1420,7 @@ mais. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
 
 ## 73. A cama precisa de chão (e o renascimento vai com ela)
 
-Parte 5 da cama. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
+Parte 5 da cama. Ver [`MELHORIA-20261107-cama.md`](docs/melhorias/MELHORIA-20261107-cama.md).
 
 - [ ] Coloque uma cama no chão, com **terra embaixo das duas metades**.
 - [ ] Durma nela uma noite (o aviso de "ponto de renascimento" aparece ao
@@ -1439,7 +1439,7 @@ Parte 5 da cama. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
 
 ## 74. A cama se costura com bloco de lã
 
-Parte 6 da cama. Ver [`MELHORIA-20261107-cama.md`](MELHORIA-20261107-cama.md).
+Parte 6 da cama. Ver [`MELHORIA-20261107-cama.md`](docs/melhorias/MELHORIA-20261107-cama.md).
 
 - [ ] Na bancada, **4 fardos de lã branca** (2×2) → **1 bloco de lã branca**.
 - [ ] Na bancada, **3 blocos de lã branca em cima + 3 tábuas embaixo** → **Cama**.
