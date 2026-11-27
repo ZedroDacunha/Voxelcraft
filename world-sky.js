@@ -180,7 +180,7 @@ export function createWorldSkySystem({
         starPoints.rotation.z = angle;
         starPoints.material.opacity = clamp01((0.35 - day) / 0.35) * 0.9;
         starPoints.visible = starPoints.material.opacity > 0.01;
-        clouds?.updateTint?.(day, warm);
+        clouds?.updateTint?.(day, warm, sunDirection);
     }
 
     return {

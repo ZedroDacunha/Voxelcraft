@@ -14,8 +14,10 @@
 
 import * as THREE from 'three';
 import { TILE, TILE_PX, atlasTileRect } from './world-catalog.js';
-import { clamp01, mulberry32, smoothstep } from './world-math.js';
+import { clamp01, mulberry32, Noise2D, smoothstep } from './world-math.js';
 import { createTextureTools } from './world-textures.js';
+import { createWorldClouds, WORLD_CLOUD_CONFIG } from './world-clouds.js';
+import { FACES } from './world-faces.js';
 import { createWorldSkySystem } from './world-sky.js';
 import { MENU_CAMERA, MENU_SUN_TIME, menuCameraPosition } from './menu-framing.js';
 import { MENU_LAKE, buildMenuPanorama, panoramaGeometry } from './menu-panorama.js';
@@ -54,24 +56,17 @@ const sunLight = new THREE.DirectionalLight(0xffffff, 0.6);
 sunLight.position.set(10, 20, 10);
 scene.add(hemiLight, sunLight);
 
-// Nuvens: o céu avisa a hora e a cor quente para elas acompanharem o sol.
-const cloudMaterial = new THREE.MeshLambertMaterial({ color: 0xf2f4ec, flatShading: true });
-const cloudNight = new THREE.Color(0x232a46);
-const cloudDusk = new THREE.Color(0xffb690);
-const cloudDay = new THREE.Color(0xf2f4ec);
-const cloudColor = new THREE.Color();
-const cloudTint = {
-    updateTint(day, warm) {
-        cloudColor.copy(cloudNight).lerp(cloudDay, day).lerp(cloudDusk, warm * 0.55);
-        cloudMaterial.color.copy(cloudColor);
-    },
-};
+const clouds = createWorldClouds({
+    THREE, Noise2D, faces: FACES,
+    config: { ...WORLD_CLOUD_CONFIG, height: 28, cellSize: 5, thickness: 2, speed: 0.45 },
+});
+clouds.create(scene, 42);
 const worldSky = createWorldSkySystem({
     THREE,
     clamp01,
     smoothstep,
     mulberry32,
-    clouds: cloudTint,
+    clouds,
     skyColor: SKY_COLOR,
 });
 worldSky.create(scene);
@@ -129,18 +124,6 @@ water.scale.set(
 );
 scene.add(water);
 
-const clouds = new THREE.Group();
-const cloudShapes = [
-    [-25, 20, -12, 8, 1, 4], [-6, 23, -24, 7, 1, 3], [15, 19, -18, 9, 1, 3],
-    [30, 22, 2, 8, 1, 4], [-34, 18, 13, 7, 1, 3], [4, 25, 21, 8, 1, 3],
-];
-for (const [x, y, z, width, height, depth] of cloudShapes) {
-    const cloud = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), cloudMaterial);
-    cloud.position.set(x, y, z);
-    clouds.add(cloud);
-}
-scene.add(clouds);
-
 function resize() {
     const width = window.innerWidth;
     const height = window.innerHeight;
@@ -155,11 +138,11 @@ let frameId = 0;
 let previousFrame = 0;
 function render(now = 0) {
     frameId = 0;
-    clouds.position.x = reduceMotion.matches ? 0 : Math.sin(now * 0.000035) * 2.1;
     // O giro e o ponto de partida (virado para o sol) vêm de `menu-framing.js`.
     const pose = menuCameraPosition(now, { reduced: reduceMotion.matches });
     camera.position.set(pose.x, pose.y, pose.z);
     camera.lookAt(target);
+    clouds.update(reduceMotion.matches ? 0 : Math.min((now - previousFrame) / 1000, 0.1), camera);
     worldSky.update({
         scene,
         camera,
