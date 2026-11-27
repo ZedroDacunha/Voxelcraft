@@ -7,13 +7,31 @@ export const LEAF_PIXELS = Object.freeze([
     '..hllvmm....', '..hlmvmms...', '..hlmmvsd...', '...mmmvsd...',
     '....msadd...', '.....sdd....', '......s.....', '......s.....',
 ]);
+// Paleta mais escura, no mesmo verde da copa das árvores (world-leaf-textures.js),
+// para a folha caindo não parecer mais clara que a árvore onde nasceu.
 export const LEAF_PALETTE = Object.freeze({
-    '.': [0, 0, 0, 0], h: [148, 190, 82, 255], l: [120, 169, 69, 255],
-    m: [95, 145, 61, 255], s: [65, 110, 48, 255], d: [43, 83, 38, 255],
-    v: [132, 178, 77, 255], a: [82, 128, 53, 255],
+    '.': [0, 0, 0, 0], h: [104, 133, 57, 255], l: [84, 118, 48, 255],
+    m: [67, 101, 43, 255], s: [46, 77, 34, 255], d: [30, 58, 26, 255],
+    v: [92, 125, 54, 255], a: [57, 90, 37, 255],
 });
 export const LEAF_SIZE = 0.25;
 export const LEAF_MAX = 24;
+// Mesmo ganho e teto da iluminação dos blocos (game.js), para a folha caindo
+// acompanhar o ambiente: céu bloqueado por árvores e luz de tochas afetam.
+const BLOCK_LIGHT_GAIN = 3.4;
+const BLOCK_LIGHT_MAX = 2.5;
+
+// Iluminação do ambiente no ponto de uma folha: combina o céu bloqueado
+// (skyLight, 0..15) e a luz de tochas (blockLight, 0..15) como os blocos fazem.
+// `light` é o fator de dia/noite global (0..1). Retorna a escala 0..1 aplicada
+// à cor da folha.
+export function leafAmbientLight({ sky, block }, light) {
+    const skyN = clamp(sky / 15, 0, 1);
+    const blockN = Math.min(BLOCK_LIGHT_MAX, block / 15 * BLOCK_LIGHT_GAIN);
+    const illumination = Math.max(0.18 + skyN * 0.82, 0.18 + blockN * 0.82);
+    return clamp(light * illumination, 0.14, 1);
+}
+
 const SCAN_RADIUS = 10, SCAN_BATCH = 24, SCAN_INTERVAL = 0.2, TREE_TTL = 4;
 const offsets = [];
 for (let z = -SCAN_RADIUS; z <= SCAN_RADIUS; z++) for (let x = -SCAN_RADIUS; x <= SCAN_RADIUS; x++) {
@@ -42,7 +60,7 @@ export function leafBlockKind(type) {
     return BLOCKS[type]?.solid === false ? 'pass' : 'solid';
 }
 
-export function createFallingLeaves({ THREE, scene, readBlock, random = Math.random, texture = null }) {
+export function createFallingLeaves({ THREE, scene, readBlock, readLight = null, random = Math.random, texture = null }) {
     const geometry = new THREE.PlaneGeometry(1, 1);
     let map = texture;
     if (!map) {
@@ -152,6 +170,14 @@ export function createFallingLeaves({ THREE, scene, readBlock, random = Math.ran
             slot.support = { x: hit.x, y: hit.y, z: hit.z, type: hit.type };
         } else slot.pos = next;
     }
+    // Iluminação do ambiente no ponto da folha: céu bloqueado por árvores/blocos
+    // + luz de tochas. Sem `readLight`, usa só o fator de dia/noite (`light`).
+    function ambientLight(x, y, z, light) {
+        if (!readLight) return light;
+        const at = readLight(x, y, z);
+        if (!at) return light;
+        return leafAmbientLight(at, light);
+    }
     function render(slot, camera, light) {
         const mesh = slot.mesh;
         const p = slot.age / (5 * slot.speed);
@@ -177,7 +203,7 @@ export function createFallingLeaves({ THREE, scene, readBlock, random = Math.ran
         mesh.position.set(slot.pos.x, y, slot.pos.z);
         mesh.scale.set(LEAF_SIZE * width, LEAF_SIZE, 1);
         mesh.material.opacity = slot.landed ? clamp(1 - Math.max(0, slot.landAge - 3) / 1.2, 0, 1) : clamp(slot.age / 0.4, 0, 1);
-        mesh.material.color.setScalar(clamp(light, 0.3, 1));
+        mesh.material.color.setScalar(ambientLight(slot.pos.x, slot.pos.y, slot.pos.z, light));
     }
     function update(dt, { player, camera, wind = 0, quality = 1, light = 1 } = {}) {
         const limit = leafLimit(quality);

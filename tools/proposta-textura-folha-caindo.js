@@ -16,8 +16,8 @@ export const FALLING_LEAF_TEXTURE_EXAMPLES = [
     {
         id: 'natural', badge: 'Textura 1 · Natural', tag: 'Equilíbrio com a copa', recommended: true,
         title: '1 — Natural delicada',
-        description: 'Verde próximo ao da copa, com uma nervura discreta e pequenos volumes suaves.',
-        palette: { ...FALLING_LEAF_PALETTE, h: [148, 190, 82, 255], l: [120, 169, 69, 255], m: [95, 145, 61, 255], s: [65, 110, 48, 255], d: [43, 83, 38, 255] },
+        description: 'Verde escuro próximo ao da copa, com uma nervura discreta e pequenos volumes suaves.',
+        palette: { ...FALLING_LEAF_PALETTE, h: [104, 133, 57, 255], l: [84, 118, 48, 255], m: [67, 101, 43, 255], s: [46, 77, 34, 255], d: [30, 58, 26, 255] },
         pixels: repaint([[5, 4, 's'], [5, 5, 's'], [6, 6, 's'], [6, 7, 's'], [6, 8, 'd'], [3, 6, 'l']]),
     },
     {

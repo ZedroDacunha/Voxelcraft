@@ -5368,6 +5368,16 @@ async function init() {
             if (!world.getChunk(floorDiv(x, CHUNK_SIZE), floorDiv(z, CHUNK_SIZE))) return null;
             return world.getBlock(x, y, z);
         },
+        // readLight: iluminação real do ambiente no ponto da folha — céu bloqueado
+        // por árvores/blocos (skyLight) e luz de tochas (blockLight). A folha caindo
+        // acompanha a cena, em vez de usar só o fator de dia/noite.
+        readLight: (x, y, z) => {
+            if (y < 0 || y >= WORLD_HEIGHT) return null;
+            const chunk = world.getChunk(floorDiv(x, CHUNK_SIZE), floorDiv(z, CHUNK_SIZE));
+            if (!chunk) return null;
+            const i = idx(x - chunk.cx * CHUNK_SIZE, y, z - chunk.cz * CHUNK_SIZE);
+            return { sky: chunk.skyLight[i], block: chunk.blockLight[i] };
+        },
     });
     creatureSystem = new CreatureSystem(world);
     sheepSystem = new SheepSystem(world);

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from '../vendor/three/three.module.js';
 import { ID } from '../world-catalog.js';
 import { NATURAL_LEAF_REFINEMENTS } from '../tools/proposta-folha-natural.js';
-import { LEAF_PIXELS, LEAF_PALETTE, LEAF_MAX, leafInterval, leafLimit, leafBlockKind, createFallingLeaves } from '../world-falling-leaves.js';
+import { LEAF_PIXELS, LEAF_PALETTE, LEAF_MAX, leafInterval, leafLimit, leafBlockKind, leafAmbientLight, createFallingLeaves } from '../world-falling-leaves.js';
 
 function makeWorld() {
     const blocks = new Map();
@@ -92,4 +92,58 @@ test('sem tronco ou em chunk ausente não surgem folhas', () => {
     for (let i = 0; i < 200; i++) system.update(0.05, { player: { x: 0, y: 1, z: 0 }, camera, quality: 1 });
     assert.equal(system.count, 0);
     assert.equal(system.treeCount, 0);
+});
+
+test('a paleta caindo é escura, no mesmo verde da copa', () => {
+    // As folhas caindo não podem ser mais claras que a copa: cada cor RGB deve
+    // estar abaixo do verde vivo antigo (ex.: canais <= 140) e acima do escuro total.
+    for (const [sym, color] of Object.entries(LEAF_PALETTE)) {
+        if (sym === '.') continue;
+        assert.ok(color[0] < 140 && color[1] < 170 && color[2] < 100, `${sym} deve ser verde escuro: ${color}`);
+        assert.ok(color[1] >= color[0] && color[1] >= color[2], `${sym} deve ser tom verde: ${color}`);
+    }
+});
+
+test('a iluminação do ambiente afeta a folha caindo', () => {
+    const noon = 1;
+    // Céu aberto (sky 15, sem tocha): iluminação máxima para o dia.
+    assert.ok(Math.abs(leafAmbientLight({ sky: 15, block: 0 }, noon) - noon) < 1e-9);
+    // Céu bloqueado (árvore/caverna, sky 0, sem tocha): fica escuro, mas não some.
+    const dark = leafAmbientLight({ sky: 0, block: 0 }, noon);
+    assert.ok(dark > 0.14 && dark < noon, `céu bloqueado deve escurecer: ${dark}`);
+    // Luz de tocha (block alto) ilumina o ambiente mesmo com céu escuro.
+    const torch = leafAmbientLight({ sky: 0, block: 15 }, noon);
+    assert.ok(torch > dark, `tocha deve iluminar mais que o escuro total: ${torch} > ${dark}`);
+    // Noite (light baixo) fica ainda mais escuro que o dia.
+    assert.ok(leafAmbientLight({ sky: 15, block: 0 }, 0.3) < leafAmbientLight({ sky: 15, block: 0 }, noon));
+});
+
+test('folhas caindo usam a luz real do ambiente quando readLight é fornecido', () => {
+    const world = makeWorld(), camera = new THREE.PerspectiveCamera();
+    camera.position.set(5, 4, 5); camera.lookAt(0, 1, 0);
+    const opts = { player: { x: 0.5, y: 1, z: 3 }, camera, wind: 1, quality: 1, light: 1 };
+    const sample = light => {
+        const scene = new THREE.Scene();
+        const system = createFallingLeaves({
+            THREE, scene, readBlock: world.read,
+            readLight: () => light, random: () => 0.5,
+        });
+        let brightest = 0;
+        for (let i = 0; i < 600; i++) {
+            system.update(0.025, opts);
+            for (const mesh of scene.children) {
+                if (!mesh.visible) continue;
+                brightest = Math.max(brightest, mesh.material.color.r);
+            }
+        }
+        return brightest;
+    };
+    // Céu bloqueado (árvore/caverna), sem tocha: a folha deve ficar escura.
+    const dark = sample({ sky: 0, block: 0 });
+    // Céu aberto, sem tocha: a folha deve ficar clara.
+    const light = sample({ sky: 15, block: 0 });
+    // A iluminação do ambiente afeta: céu bloqueado fica bem mais escuro que céu aberto.
+    assert.ok(dark < 0.35, `céu bloqueado deve escurecer: ${dark}`);
+    assert.ok(light > 0.9, `céu aberto deve clarear: ${light}`);
+    assert.ok(dark < light, 'céu bloqueado mais escuro que céu aberto');
 });

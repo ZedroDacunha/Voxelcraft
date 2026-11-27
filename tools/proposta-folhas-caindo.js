@@ -1,12 +1,14 @@
 // Parte 1: desenhos estáticos de folhinhas, apenas para a prévia.
 // A queda, a densidade e o comportamento ainda não fazem parte deste estudo.
+// Paleta mais escura, no mesmo verde da copa das árvores, para a folha caindo
+// não parecer mais clara que a árvore onde nasceu.
 export const FALLING_LEAF_PALETTE = {
     '.': [0, 0, 0, 0],
-    h: [155, 197, 85, 255],
-    l: [127, 176, 74, 255],
-    m: [101, 154, 66, 255],
-    s: [71, 120, 53, 255],
-    d: [47, 87, 40, 255],
+    h: [104, 133, 57, 255],
+    l: [84, 118, 48, 255],
+    m: [67, 101, 43, 255],
+    s: [46, 77, 34, 255],
+    d: [30, 58, 26, 255],
 };
 
 export const FALLING_LEAF_EXAMPLES = [
