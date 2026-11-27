@@ -8,7 +8,7 @@ import {
     formatSetting, loadGameSettings, notifyGameSettingsChange, onGameSettingsChange,
     sanitizeGameSettings, saveGameSettings, settingFraction, settingFromFraction, stepSetting,
 } from '../world-game-settings.js';
-import { OPTION_CONTROLS, OPTION_SCREENS, TOUCH_OPTION_CONTROLS } from '../world-options-view.js';
+import { EFFECTS_OPTION_CONTROLS, OPTION_CONTROLS, OPTION_SCREENS, TOUCH_OPTION_CONTROLS } from '../world-options-view.js';
 
 function fakeStorage(initial = {}) {
     const map = new Map(Object.entries(initial));
@@ -77,6 +77,7 @@ test('save grava na chave certa e load devolve o mesmo', () => {
     const storage = fakeStorage();
     const settings = {
         sensitivity: 1.5, fov: 90, renderDistance: 2, uiScale: 'auto', volume: 0.35, graphics: '0.5',
+        particles: 'off', clouds: 'off', leaves: 'off', cameraBob: 'off', hurtFlash: 'off',
         touchAimMode: 'finger', touchLayout: 'left', touchButtonSize: 1.2, touchVibration: 'off',
         touchSensitivity: 1.1, resolution: '1280x720',
     };
@@ -114,16 +115,18 @@ test('todo controle da tela de opções existe no index.html', () => {
 });
 
 test('a tela de opções tem uma barra para cada campo, numa tela só', () => {
-    // as categorias (Áudio, Gráficos, Controles, Toque), juntas, cobrem todos
+    // as categorias (Áudio, Gráficos, Efeitos, Controles, Toque), juntas,
+    // cobrem todos os campos
     const keys = OPTION_CONTROLS.map(row => row.key);
     assert.deepEqual([...keys].sort(), Object.keys(GAME_SETTING_FIELDS).sort());
     // e nenhum campo aparece em duas categorias
     assert.equal(new Set(keys).size, keys.length, 'campo repetido entre as categorias');
     // cada categoria da lista tem a sua grade com as linhas dela
     const screens = OPTION_SCREENS.filter(screen => screen.controls);
-    assert.deepEqual(screens.map(screen => screen.key), ['audio', 'graphics', 'controls', 'touch']);
+    assert.deepEqual(screens.map(screen => screen.key), ['audio', 'graphics', 'effects', 'controls', 'touch']);
     assert.deepEqual(screens.flatMap(screen => screen.controls), OPTION_CONTROLS);
     assert.equal(screens.find(screen => screen.key === 'touch').controls, TOUCH_OPTION_CONTROLS);
+    assert.equal(screens.find(screen => screen.key === 'effects').controls, EFFECTS_OPTION_CONTROLS);
 });
 
 // ------------------------------------------------ qualidade gráfica (lista)

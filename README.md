@@ -233,16 +233,17 @@ atrás, no formato do Minecraft — e **separada por categorias**: a janela abre
 com três botões (`Áudio`, `Gráficos`, `Controles`) e cada um troca a grade no
 lugar, com o título acompanhando e `Voltar` para a lista. O toque mora dentro de
 `Controles` (`Controles de toque`), porque é onde o jogador procura o mouse e o
-dedo juntos; a lista de teclas recolhida também é de lá. Uma janela só, nunca
-duas empilhadas.
+dedo juntos; a lista de teclas recolhida também é de lá. Os efeitos moram dentro
+de `Gráficos` (`Efeitos`): partículas, nuvens, folhas, balanço da câmera e flash
+de dano, tudo on/off e na hora. Uma janela só, nunca duas empilhadas.
 
 Dentro de uma categoria, o nome e o valor ficam **centrados** no botão
 (`Campo de visão: 75°`) e, nas opções de faixa, um trilho escuro com o **cursor**
 mostra onde o valor está. Clique e arraste na barra mudam pela posição (é o gesto
 que serve no dedo também), setas andam um passo e `Home`/`End` vão aos extremos;
 o leitor de tela recebe `role="slider"` com `aria-value*`. Já as opções de
-**lista** — hoje só `Gráficos` — são botão: cada clique passa para o modo
-seguinte, sem trilho nem cursor.
+**lista** — hoje as de `Gráficos` e as de `Efeitos` — são botão: cada clique
+passa para o modo seguinte, sem trilho nem cursor.
 
 | Opção | Categoria | Vale quando |
 | --- | --- | --- |
@@ -252,6 +253,11 @@ seguinte, sem trilho nem cursor.
 | Gráficos (automática/máxima/alta/média) | Gráficos | na hora — o mesmo caminho do `F4` |
 | Resolução (Janela/360p…4K) | Gráficos | na hora — numa resolução fixa o jogo entra em tela cheia e pede confirmação (10 s, senão volta) |
 | Distância de render | Gráficos | no próximo mundo (recarregar chunks ao vivo é outro assunto) — um recado avisa quando você muda |
+| Partículas (quebra, golpe, fumaça de forno, pó) | Gráficos → Efeitos | na hora — desligada não nasce nada novo; o que está no ar termina sozinho |
+| Nuvens | Gráficos → Efeitos | na hora — esconde a malha e congela o céu de onde parou até religar |
+| Folhas | Gráficos → Efeitos | na hora — as folhas no ar são apagadas no próprio quadro |
+| Balanço da câmera | Gráficos → Efeitos | na hora — trava posição, rolagem e mão na passada (o nadar e os golpes seguem) |
+| Flash de dano | Gráficos → Efeitos | na hora — o vermelho do dano nunca aparece |
 
 A **Resolução** é a do jogo, não a da janela: o navegador não deixa a página
 mudar a resolução do sistema, então o que se escolhe é **quantos pixels o canvas

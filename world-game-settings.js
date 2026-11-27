@@ -1,5 +1,6 @@
 // Preferências do jogo (não do save): sensibilidade, campo de visão, distância
-// de render, volume, qualidade gráfica e resolução de renderização. Ficam em
+// de render, volume, qualidade gráfica, resolução de renderização e os efeitos
+// (partículas, nuvens, folhas, balanço da câmera e flash de dano). Ficam em
 // localStorage e são lidas quando `game.js` é importado (ao entrar em um mundo).
 // A tela de opções — do menu e a do ESC durante o jogo — grava aqui.
 import { RESOLUTION_AUTO, RESOLUTION_IDS, resolutionLabel } from './world-render-resolution.js';
@@ -51,6 +52,40 @@ export const GAME_SETTING_FIELDS = Object.freeze({
         slider: true,
         default: RESOLUTION_AUTO,
         format: value => resolutionLabel(value),
+    }),
+    // Personalização de efeitos (sub-tela Efeitos, dentro de Gráficos): tudo
+    // on/off — serve para performance no celular e para conforto visual
+    // (fotosensibilidade, enjoo de balanço). O formato devolve o rótulo para a
+    // tela; o jogo lê o campo (on/off) direto.
+    particles: Object.freeze({
+        choices: Object.freeze(['on', 'off']),
+        labels: Object.freeze({ on: 'Ligadas', off: 'Desligadas' }),
+        default: 'on',
+        format: value => GAME_SETTING_FIELDS.particles.labels[value] ?? 'Ligadas',
+    }),
+    clouds: Object.freeze({
+        choices: Object.freeze(['on', 'off']),
+        labels: Object.freeze({ on: 'Ligadas', off: 'Desligadas' }),
+        default: 'on',
+        format: value => GAME_SETTING_FIELDS.clouds.labels[value] ?? 'Ligadas',
+    }),
+    leaves: Object.freeze({
+        choices: Object.freeze(['on', 'off']),
+        labels: Object.freeze({ on: 'Ligadas', off: 'Desligadas' }),
+        default: 'on',
+        format: value => GAME_SETTING_FIELDS.leaves.labels[value] ?? 'Ligadas',
+    }),
+    cameraBob: Object.freeze({
+        choices: Object.freeze(['on', 'off']),
+        labels: Object.freeze({ on: 'Ligado', off: 'Desligado' }),
+        default: 'on',
+        format: value => GAME_SETTING_FIELDS.cameraBob.labels[value] ?? 'Ligado',
+    }),
+    hurtFlash: Object.freeze({
+        choices: Object.freeze(['on', 'off']),
+        labels: Object.freeze({ on: 'Ligado', off: 'Desligado' }),
+        default: 'on',
+        format: value => GAME_SETTING_FIELDS.hurtFlash.labels[value] ?? 'Ligado',
     }),
     // Toque: de que lado ficam joystick e botões (canhoto troca tudo de lado) e
     // o tamanho dos controles. Valem só no modo toque; no desktop não há o que

@@ -1447,3 +1447,28 @@ Parte 6 da cama. Ver [`MELHORIA-20261107-cama.md`](docs/melhorias/MELHORIA-20261
 - [ ] O mesmo com cinza e preta: 4 fardos → bloco, 3 blocos → cama da cor.
 - [ ] A receita no livro da bancada mostra o **bloco de lã** no ícone dos
       ingredientes de cima, e não o fardo.
+
+## 75. Efeitos (partículas, nuvens, folhas, balanço e flash)
+
+Parte das opções: [`MELHORIA-20261127-opcoes-de-efeitos.md`](docs/melhorias/MELHORIA-20261127-opcoes-de-efeitos.md).
+Menu → **Opções** → **Gráficos** → **Efeitos** (ou ESC → Opções no jogo).
+
+- [ ] **Gráficos** fecha com a linha `Efeitos` no fim da grade; ela abre uma
+      grade com **cinco linhas** e **Voltar** cai em Gráficos (nunca numa
+      segunda janela por cima).
+- [ ] `Partículas: Desligadas` → quebre um bloco e dê um golpe num bicho:
+      **nada de lascas**; acenda um forno com combustível: **sem fumaça**; o
+      Mofim some sem pó. Religue: volta a aparecer tudo.
+- [ ] `Nuvens: Desligadas` → o céu fica **limpo na hora**; ande um pouco,
+      religue: as nuvens voltam **sem dar um salto** de posição.
+- [ ] `Folhas: Desligadas` → as folhas que estão no ar **somem no quadro** e
+      nenhuma nova cai; religue: voltam a cair.
+- [ ] `Balanço da câmera: Desligado` → ande: a câmera fica **firme** (sem
+      vai-e-vem nem rolagem do horizonte) e a mão deixa de acompanhar o
+      compasso; os golpes e o nadar continuam se mexendo. Religue: o balanço
+      volta.
+- [ ] `Flash de dano: Desligado` → leve um golpe: **nenhum vermelho** na tela
+      (o dano continua valendo); religue e leve outro: o flash volta.
+- [ ] `Restaurar padrões` dentro de Efeitos devolve os cinco para ligados, e
+      as escolhas **ficam guardadas** (feche, reabra, entre no mundo: continuam
+      onde você deixou).

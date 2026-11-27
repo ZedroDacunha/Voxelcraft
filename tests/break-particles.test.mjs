@@ -47,6 +47,27 @@ test('a quebra gera cubos na célula e deixa três fragmentos no chão antes de 
     assert.equal(scene.children.length, 0);
 });
 
+test('com a opção Partículas desligada nada nasce, e religar volta a lançar', () => {
+    const scene = new THREE.Scene();
+    let on = false;
+    const particles = createBreakParticleSystem({
+        THREE,
+        getScene: () => scene,
+        getBlockColor: () => 0x745238,
+        getImmersionAt: () => 0,
+        isSolidAt: (x, y, z) => y < 0 || x !== -3 || z !== 5,
+        enabled: () => on,
+    });
+    particles.spawn(-3, 0, 5, 1);
+    particles.spawn(2.3, 10, 5.5, null, { color: 0xffffff, count: 1, spread: 0 });
+    assert.equal(scene.children.length, 0, 'nem a quebra nem o golpe lançam');
+    assert.equal(particles.count, 0);
+    on = true;
+    particles.spawn(-3, 0, 5, 1);
+    assert.ok(scene.children.length > 0, 'religando volta a lançar');
+    particles.clear();
+});
+
 test('o efeito de golpe continua nas coordenadas exatas do animal', () => {
     const { scene, particles } = setup();
     particles.spawn(2.3, 10, 5.5, null, { color: 0xffffff, count: 1, spread: 0 });

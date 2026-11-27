@@ -1372,7 +1372,8 @@ const CreatureSystem = createCreatureSystemClass({
     },
     // Pó do rastro: sai de graça na qualidade alta, pela metade em 0,75 e não
     // sai em Baixa (escala 0,5) — partícula é a primeira coisa que se corta.
-    dustQuality: () => dustScaleFor(gfx.mode),
+    // Escala 0 dá passo vazio — com Partículas desligadas nenhum pó nasce.
+    dustQuality: () => (GAME_SETTINGS.particles === 'off' ? 0 : dustScaleFor(gfx.mode)),
     // O pó é soprado pelo mesmo vento que verga o capim: mesma direção (uma por
     // mundo) e mesma intensidade (a fase do ambiente, com rampa).
     wind: () => ({
@@ -1469,6 +1470,9 @@ const setSaveIndicator = createWorldSaveIndicator(
 );
 
 const furnaces = new Map();
+// Vazio compartilhado: com Partículas desligadas a fumaça dos fornos recebe
+// este mapa — os que já estão no ar terminam sozinhos, nenhum novo nasce.
+const NO_FURNACES = new Map();
 let station = null;
 let furnaceDirty = false;
 
@@ -2372,7 +2376,9 @@ function updateHand(dt) {
     // à parte, que podia sair fora de fase do barulho dos pés.
     const gaitNow = gaitPose(gait);
     const swim = swimFirstPersonPose(swimState);
-    const ba = gaitNow.amplitude * swim.walkWeight;
+    // Balanço da câmera desligado: a mão deixa de acompanhar o compasso dos
+    // passos (o balanço de nadar e os golpes continuam, são outros).
+    const ba = (GAME_SETTINGS.cameraBob !== 'off' ? gaitNow.amplitude : 0) * swim.walkWeight;
     handPivot.position.set(
         HAND_BASE.x + gaitNow.handX * 0.012 * ba + swim.handX,
         HAND_BASE.y + gaitNow.handY * 0.010 * ba + swim.handY - dip - 0.05 * armSwingWhileEating + 0.07 * pickaxe.lift - 0.04 * pickaxe.strike,
@@ -2394,7 +2400,7 @@ function updateHand(dt) {
             _fpCrumbOrigin.y += 0.02;
             _fpCrumbOrigin.z += 0.035;
             for (const ev of pendingAppleCrumbBites) {
-                firstPersonCrumbs.burst(_fpCrumbOrigin, ev.bite, 1, ev.kind);
+                if (GAME_SETTINGS.particles !== 'off') firstPersonCrumbs.burst(_fpCrumbOrigin, ev.bite, 1, ev.kind);
             }
             pendingAppleCrumbBites.length = 0;
         }
@@ -3515,6 +3521,8 @@ const breakParticles = createBreakParticleSystem({
     getBlockColor: type => inventoryAssets.blockColors[type],
     isSolidAt: (x, y, z) => world.isSolidForPhysics(x, y, z),
     getImmersionAt: (x, y, z, halfHeight) => waterImmersionAt(world, x, y, z, halfHeight),
+    // Opção Partículas: desligada, a quebra e o golpe não lançam nada novo.
+    enabled: () => GAME_SETTINGS.particles !== 'off',
 });
 const WORLD_RAYCAST_ACCESS = {
     getBlock: (x, y, z) => world.getBlock(x, y, z),
@@ -4090,6 +4098,15 @@ function applyGameSettings(settings, { quiet = false } = {}) {
     GAME_SETTINGS.fov = settings.fov;
     GAME_SETTINGS.volume = settings.volume;
     GAME_SETTINGS.uiScale = settings.uiScale;
+    // Efeitos: os cinco on/off entram no snapshot que o laço de animação lê a
+    // cada quadro; as nuvens levam a notícia na hora (a malha pode já estar na
+    // cena, e o valor persiste para quando o próximo mundo carregar).
+    GAME_SETTINGS.particles = settings.particles;
+    GAME_SETTINGS.clouds = settings.clouds;
+    GAME_SETTINGS.leaves = settings.leaves;
+    GAME_SETTINGS.cameraBob = settings.cameraBob;
+    GAME_SETTINGS.hurtFlash = settings.hurtFlash;
+    worldClouds.setVisible(settings.clouds !== 'off');
     applyUiScale(settings);
     // Toque: lado e tamanho dos controles valem na hora, inclusive com o dedo
     // já no joystick (o raio é lido a cada movimento).
@@ -4701,7 +4718,9 @@ function updatePhysics(dt) {
     player.eye += (targetEye - player.eye) * Math.min(1, 15 * dt);
     const pose = gaitPose(gait);
     camera.position.set(p.x, p.y + player.eye, p.z);
-    if (pose.amplitude > 0) {
+    // Balanço da câmera desligado (opção Efeitos): a câmera fica firme na
+    // altura do olho — a rolagem da passada e a mão também ficam.
+    if (pose.amplitude > 0 && GAME_SETTINGS.cameraBob !== 'off') {
         // O vai e vem é para os **lados da câmera**, não para os lados do mundo:
         // olhando para o norte, o corpo continua balançando nas laterais de quem
         // anda.
@@ -5047,8 +5066,9 @@ function updateSleep(dt) {
 function applyLook() {
     // A microinclinação da passada entra junto do olhar: no passo o horizonte
     // joga ~0,3° para um lado e para o outro. Como é rolagem em torno do eixo
-    // da frente, o ponto para onde se aponta continua o mesmo.
-    lookEuler.set(look.pitch, look.yaw, gaitPose(gait).roll, 'YXZ');
+    // da frente, o ponto para onde se aponta continua o mesmo. Com Balanço da
+    // câmera desligado a rolagem é zero e o olhar fica sem esse giro.
+    lookEuler.set(look.pitch, look.yaw, GAME_SETTINGS.cameraBob !== 'off' ? gaitPose(gait).roll : 0, 'YXZ');
     camera.quaternion.setFromEuler(lookEuler);
 }
 
@@ -5995,7 +6015,7 @@ function updateThirdPerson() {
         crumbTarget.getWorldPosition(_tpAppleWorld);
         _tpMouthWorld.lerp(_tpAppleWorld, 0.58);
         for (const ev of pendingAppleCrumbBites) {
-            thirdPersonCrumbs.burst(_tpMouthWorld, ev.bite, 1, ev.kind);
+            if (GAME_SETTINGS.particles !== 'off') thirdPersonCrumbs.burst(_tpMouthWorld, ev.bite, 1, ev.kind);
         }
         pendingAppleCrumbBites.length = 0;
     }
@@ -6139,7 +6159,7 @@ function animate() {
     if (worldRunning || inventoryOpen) {
         updateWorldClock(dt);
         updateFurnaces(dt);
-        world.furnaceSmoke.update(dt, furnaces, world, player.pos);
+        world.furnaceSmoke.update(dt, GAME_SETTINGS.particles === 'off' ? NO_FURNACES : furnaces, world, player.pos);
         if (inventoryOpen && station && station.type === 'furnace') {
             if (furnaceDirty) { furnaceDirty = false; renderInventory(); }
             else updateFurnaceBars();
@@ -6165,7 +6185,12 @@ function animate() {
     updateAmbient(dt);
     updateGrassWind(dt);
     updateWaterfall(dt);
-    if (hurtFlash > 0) { hurtFlash = Math.max(0, hurtFlash - dt * 2); hurtEl.style.opacity = hurtFlash; }
+    // Flash de dano desligado (opção Efeitos): o vermelho nunca aparece; a
+    // contagem segue para o caso de religarem no meio da pancada.
+    if (hurtFlash > 0) {
+        hurtFlash = Math.max(0, hurtFlash - dt * 2);
+        hurtEl.style.opacity = GAME_SETTINGS.hurtFlash === 'off' ? '0' : String(hurtFlash);
+    }
     world.update(player.pos.x, player.pos.z);
     // Cama que perdeu o chão (o jogador cavou embaixo dela) desaba: as duas
     // metades somem, cai o item e o renascimento que ela guardava se perde.
@@ -6193,8 +6218,10 @@ function animate() {
     }
     if (worldRunning && !dead && !document.hidden) {
         const quality = typeof gfx.mode === 'number' ? gfx.mode : gfx.scale;
+        // Folhas desligadas: qualidade 0 é o modo "sem folhas" do sistema —
+        // as que estão no ar são apagadas no próprio quadro.
         fallingLeaves.update(dt, { player: player.pos, camera: thirdViewActive ? thirdCamera : visualCamera,
-            wind: windState.level, quality, light: 0.45 + 0.55 * worldSky.day });
+            wind: windState.level, quality: GAME_SETTINGS.leaves === 'off' ? 0 : quality, light: 0.45 + 0.55 * worldSky.day });
     }
     renderer.render(scene, thirdViewActive ? thirdCamera : visualCamera);
     renderer.clearDepth();

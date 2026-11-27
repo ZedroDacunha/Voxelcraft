@@ -29,6 +29,18 @@ export const GRAPHICS_OPTION_CONTROLS = [
     { key: 'uiScale', button: 'opt-ui-scale', output: 'opt-ui-scale-value', label: 'Escala da interface' },
 ];
 
+// Efeitos: liga e desliga o que o mundo mostra além do básico — partículas
+// (lascas de quebra, golpe, fumaça de forno e pó de criatura), nuvens, folhas
+// caindo, balanço da câmera e o flash vermelho de dano. Tudo on/off e na hora;
+// cada linha é um botão de clique como os gráficos, sem barra.
+export const EFFECTS_OPTION_CONTROLS = [
+    { key: 'particles', button: 'opt-particles', output: 'opt-particles-value', label: 'Partículas' },
+    { key: 'clouds', button: 'opt-clouds', output: 'opt-clouds-value', label: 'Nuvens' },
+    { key: 'leaves', button: 'opt-leaves', output: 'opt-leaves-value', label: 'Folhas' },
+    { key: 'cameraBob', button: 'opt-camera-bob', output: 'opt-camera-bob-value', label: 'Balanço da câmera' },
+    { key: 'hurtFlash', button: 'opt-hurt-flash', output: 'opt-hurt-flash-value', label: 'Flash de dano' },
+];
+
 export const CONTROL_OPTION_CONTROLS = [
     { key: 'sensitivity', button: 'opt-sensitivity', output: 'opt-sensitivity-value', label: 'Sensibilidade do mouse' },
 ];
@@ -46,16 +58,19 @@ export const TOUCH_OPTION_CONTROLS = [
 // que todo campo tem uma linha e nenhuma tela repete campo.
 export const OPTION_CONTROLS = [
     ...AUDIO_OPTION_CONTROLS, ...GRAPHICS_OPTION_CONTROLS,
+    ...EFFECTS_OPTION_CONTROLS,
     ...CONTROL_OPTION_CONTROLS, ...TOUCH_OPTION_CONTROLS,
 ];
 
 // As telas do diálogo. `main` é a lista de categorias; as outras trocam a grade
 // no lugar, com o título acompanhando. `open` é o botão que leva à tela e
-// `parent` é para onde "Voltar" retorna — o toque mora dentro de Controles.
+// `parent` é para onde "Voltar" retorna — o toque mora dentro de Controles e
+// os efeitos dentro de Gráficos.
 export const OPTION_SCREENS = [
     { key: 'main', grid: 'options-main-grid', title: 'Opções' },
     { key: 'audio', grid: 'options-audio-grid', title: 'Áudio', open: 'opt-open-audio', parent: 'main', controls: AUDIO_OPTION_CONTROLS },
     { key: 'graphics', grid: 'options-graphics-grid', title: 'Gráficos', open: 'opt-open-graphics', parent: 'main', controls: GRAPHICS_OPTION_CONTROLS },
+    { key: 'effects', grid: 'options-effects-grid', title: 'Efeitos', open: 'opt-open-effects', parent: 'graphics', controls: EFFECTS_OPTION_CONTROLS },
     { key: 'controls', grid: 'options-controls-grid', title: 'Controles', open: 'opt-open-controls', parent: 'main', controls: CONTROL_OPTION_CONTROLS, keys: true },
     { key: 'touch', grid: 'options-touch-grid', title: 'Controles de toque', open: 'opt-touch-open', parent: 'controls', controls: TOUCH_OPTION_CONTROLS },
     { key: 'keybinds', grid: 'options-keybinds-grid', title: 'Teclado', open: 'opt-open-keybinds', parent: 'controls' },
