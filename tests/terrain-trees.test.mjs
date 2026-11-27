@@ -1,142 +1,120 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { TerrainGenerator } from '../world-terrain.js';
+import { findSpawn, TerrainGenerator } from '../world-terrain.js';
+import { TreeShapes } from '../world-tree-shapes.js';
 import { ID } from '../world-catalog.js';
-import { hash2 } from '../world-math.js';
 import { CHUNK_SIZE, WORLD_HEIGHT } from '../world-save-settings.js';
 
-// Configuração mínima do gerador (a mesma forma usada pelo jogo).
-const WATER_LEVEL = 26;
-const BIOME = Object.freeze({ PLAINS: 0, FOREST: 1, DESERT: 2, ROCKY: 3 });
-const TREE_CHANCE_FOREST = 0.035;
-const TREE_CHANCE_PLAINS = 0.008;
-const CONFIG = Object.freeze({
-    CHUNK_SIZE, WORLD_HEIGHT, WATER_LEVEL, ID, BIOME, TREE_CHANCE_FOREST, TREE_CHANCE_PLAINS,
-});
+const BIOME = { PLAINS: 0, FOREST: 1, DESERT: 2, ROCKY: 3 };
+const CONFIG = {
+    CHUNK_SIZE, WORLD_HEIGHT, WATER_LEVEL: 26, ID, BIOME,
+    TREE_CHANCE_FOREST: 0.035, TREE_CHANCE_PLAINS: 0.008,
+};
 
-const SEED = 12345;
-const RADIUS = 3; // 7x7 chunks = 112x112 blocos de mundo
-const MIN = -RADIUS * CHUNK_SIZE;
-const MAX = (RADIUS + 1) * CHUNK_SIZE - 1;
-
-function newChunk(cx, cz) {
-    return { cx, cz, data: new Uint8Array(CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT), maxY: 0 };
+function chunkAt(generator, cx, cz) {
+    const size = generator.config.CHUNK_SIZE;
+    const chunk = { cx, cz, data: new Uint8Array(size * size * WORLD_HEIGHT), maxY: 0 };
+    generator.fill(chunk);
+    return chunk;
 }
 
-// Gera a região uma vez só: os testes abaixo olham o mesmo mundo.
-const generator = new TerrainGenerator(SEED, CONFIG);
-const blocks = new Map();
-for (let cx = -RADIUS; cx <= RADIUS; cx++) {
-    for (let cz = -RADIUS; cz <= RADIUS; cz++) {
-        const chunk = newChunk(cx, cz);
-        generator.fill(chunk);
-        for (let lx = 0; lx < CHUNK_SIZE; lx++) {
-            for (let lz = 0; lz < CHUNK_SIZE; lz++) {
-                for (let y = 0; y < WORLD_HEIGHT; y++) {
-                    const type = chunk.data[generator.index(lx, y, lz)];
-                    if (type) blocks.set(`${cx * CHUNK_SIZE + lx},${y},${cz * CHUNK_SIZE + lz}`, type);
+test('copas e galhos nas divisas coincidem com uma região gerada inteira', () => {
+    const size = CHUNK_SIZE * 3;
+    const large = new TerrainGenerator(12345, { ...CONFIG, CHUNK_SIZE: size });
+    const regular = new TerrainGenerator(12345, CONFIG);
+    let leavesOnEdge = 0, logsOnEdge = 0;
+    // Inclui coordenadas negativas e os cantos onde quatro chunks se encontram.
+    for (const origin of [-1, 0]) {
+        const region = chunkAt(large, origin, origin);
+        for (let cz = 2; cz >= 0; cz--) {
+            for (let cx = 2; cx >= 0; cx--) {
+                const part = chunkAt(regular, origin * 3 + cx, origin * 3 + cz);
+                for (let z = 0; z < CHUNK_SIZE; z++) for (let x = 0; x < CHUNK_SIZE; x++) {
+                    for (let y = 0; y < WORLD_HEIGHT; y++) {
+                        const actual = part.data[regular.index(x, y, z)];
+                        const expected = region.data[large.index(cx * CHUNK_SIZE + x, y, cz * CHUNK_SIZE + z)];
+                        if ([ID.LEAVES, ID.LOG].includes(actual) || [ID.LEAVES, ID.LOG].includes(expected)) {
+                            assert.equal(actual, expected);
+                            assert.ok(y <= part.maxY);
+                            if ((cx > 0 && x === 0) || (cz > 0 && z === 0)) {
+                                if (actual === ID.LOG) logsOnEdge++;
+                                if (actual === ID.LEAVES) leavesOnEdge++;
+                            }
+                        }
+                    }
                 }
             }
         }
     }
-}
-
-const blockAt = (x, y, z) => blocks.get(`${x},${y},${z}`) || 0;
-
-/**
- * Reproduz a decisão do gerador para cada coluna do mundo: a árvore existe ou
- * não depende só de (x, z), nunca do chunk que a desenha. Serve de oráculo
- * independente para os testes.
- */
-function treesInRegion() {
-    const trees = [];
-    for (let wx = MIN; wx <= MAX; wx++) {
-        for (let wz = MIN; wz <= MAX; wz++) {
-            if (Math.abs(wx) < 4 && Math.abs(wz) < 4) continue; // área livre do spawn
-            const biome = generator.biomeAt(wx, wz);
-            if (biome === BIOME.DESERT || biome === BIOME.ROCKY) continue;
-            const chance = biome === BIOME.FOREST ? TREE_CHANCE_FOREST : TREE_CHANCE_PLAINS;
-            if (hash2(wx, wz, SEED) > chance) continue;
-            const column = generator.columnSummary(wx, wz);
-            if (column.height <= WATER_LEVEL + 1 || column.submerged) continue;
-            const height = 4 + Math.floor(hash2(wx, wz, SEED + 7) * 3);
-            if (column.height + height + 2 >= WORLD_HEIGHT) continue;
-            trees.push({ wx, wz, ground: column.height, height });
-        }
-    }
-    return trees;
-}
-
-const trees = treesInRegion();
-
-test('a região de teste tem árvores suficientes para o cenário ser real', () => {
-    assert.ok(trees.length > 60, `poucas árvores no cenário: ${trees.length}`);
+    assert.ok(leavesOnEdge > 0 && logsOnEdge > 0);
 });
 
-test('nenhuma copa é cortada na divisa do chunk', () => {
-    // Antes da correção, o gerador só plantava entre lx/lz 2..13 e descartava
-    // tudo que caía fora do chunk: ~2.500 células de copa viravam ar.
-    const cortadas = [];
-    for (const tree of trees) {
-        for (let dy = tree.height - 2; dy <= tree.height + 1; dy++) {
-            const radius = dy >= tree.height ? 1 : 2;
-            for (let dx = -radius; dx <= radius; dx++) {
-                for (let dz = -radius; dz <= radius; dz++) {
-                    if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
-                    if (dy === tree.height + 1 && Math.abs(dx) + Math.abs(dz) > 1) continue;
-                    const x = tree.wx + dx, z = tree.wz + dz, y = tree.ground + dy;
-                    // só células cujo chunk está na região gerada
-                    if (x < MIN || x > MAX || z < MIN || z > MAX) continue;
-                    if (blockAt(x, y, z) === 0) cortadas.push(`${x},${y},${z}`);
+test('as três silhuetas têm madeira ligada ao pé e cabem na margem dos chunks', () => {
+    const shapes = new TreeShapes(ID);
+    const neighbors = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+    for (const form of ['tall', 'spreading', 'weeping']) {
+        for (let variant = 0; variant < 64; variant++) {
+            const { cells, height } = shapes.build(form, variant);
+            const wood = new Set();
+            const all = new Set();
+            let branch = false;
+            for (const [x, y, z, type] of cells) {
+                assert.ok(Math.max(Math.abs(x), Math.abs(z)) <= TreeShapes.radius);
+                assert.ok(y >= 1 && y <= height);
+                assert.ok(type === ID.LOG || type === ID.LEAVES);
+                all.add([x,y,z].join());
+                if (type === ID.LOG) {
+                    wood.add([x,y,z].join());
+                    if (y > 1 && Math.max(Math.abs(x), Math.abs(z)) >= 2) branch = true;
                 }
+            }
+            assert.ok(branch);
+            assert.ok(all.size > wood.size);
+            for (const remaining of [wood, all]) {
+                const queue = [[0, 1, 0]];
+                assert.ok(remaining.delete('0,1,0'));
+                for (const [x, y, z] of queue) {
+                    for (const [dx, dy, dz] of neighbors) {
+                        const next = [x + dx, y + dy, z + dz];
+                        if (remaining.delete(next.join())) queue.push(next);
+                    }
+                }
+                assert.equal(remaining.size, 0, form + variant);
             }
         }
     }
-    assert.deepEqual(cortadas.slice(0, 10), [], `células de copa em ar: ${cortadas.length}`);
 });
 
-test('toda célula de tronco é madeira', () => {
-    const furos = [];
-    for (const tree of trees) {
-        for (let k = 1; k <= tree.height; k++) {
-            const y = tree.ground + k;
-            if (blockAt(tree.wx, y, tree.wz) !== ID.LOG) furos.push(`${tree.wx},${y},${tree.wz}`);
-        }
+test('sem árvores no deserto, na rocha ou em água', () => {
+    for (const [biome, flooded] of [[BIOME.DESERT, false], [BIOME.ROCKY, false], [BIOME.FOREST, true]]) {
+        const gen = new TerrainGenerator(5, { ...CONFIG, TREE_CHANCE_FOREST: 1, TREE_CHANCE_PLAINS: 1 });
+        gen.biomeAt = () => biome;
+        gen.baseHeightAt = () => 38;
+        gen.riverStrengthAt = () => flooded ? 1 : 0;
+        const { data } = chunkAt(gen, -1, 1);
+        assert.ok(!data.includes(ID.LOG) && !data.includes(ID.LEAVES));
     }
-    assert.deepEqual(furos.slice(0, 10), [], `troncos incompletos: ${furos.length}`);
-});
-
-test('troncos ocupam todas as colunas locais, inclusive a faixa de borda', () => {
-    const perColumn = new Array(CHUNK_SIZE).fill(0);
-    let border = 0;
-    for (const tree of trees) {
-        const lx = ((tree.wx % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
-        const lz = ((tree.wz % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
-        perColumn[lx]++;
-        perColumn[lz]++;
-        if (lx <= 1 || lx >= CHUNK_SIZE - 2 || lz <= 1 || lz >= CHUNK_SIZE - 2) border++;
-    }
-    assert.ok(border > 0, 'nenhuma árvore na faixa de borda dos chunks');
-    const vazias = perColumn.map((n, i) => (n ? null : i)).filter(i => i !== null);
-    assert.deepEqual(vazias, [], `colunas locais sem nenhuma árvore: ${vazias.join(', ')}`);
-});
-
-test('tronco não nasce em coluna alagada', () => {
-    const naAgua = trees.filter(tree => blockAt(tree.wx, tree.ground + 1, tree.wz) !== ID.LOG);
-    assert.deepEqual(naAgua.slice(0, 5), []);
 });
 
 test('a ordem de geração não altera o chunk', () => {
-    const first = new TerrainGenerator(SEED, CONFIG);
-    const solo = newChunk(2, 2);
-    first.fill(solo);
+    const first = new TerrainGenerator(12345, CONFIG);
+    const expected = chunkAt(first, 2, 2);
+    const after = new TerrainGenerator(12345, CONFIG);
+    for (const [cx, cz] of [[1, 2], [3, 2], [2, 1], [2, 3]]) chunkAt(after, cx, cz);
+    assert.deepEqual(chunkAt(after, 2, 2), expected);
+});
 
-    const after = new TerrainGenerator(SEED, CONFIG);
-    for (const [cx, cz] of [[1, 2], [3, 2], [2, 1], [2, 3], [2, 2]]) after.fill(newChunk(cx, cz));
-    const depois = newChunk(2, 2);
-    after.fill(depois);
-
-    assert.deepEqual(Array.from(depois.data), Array.from(solo.data));
-    assert.equal(depois.maxY, solo.maxY);
+test('o jogador nasce com espaço livre sob as novas copas', () => {
+    for (const seed of [1, 42, 817, 1515, 12345, 33901]) {
+        const gen = new TerrainGenerator(seed, CONFIG);
+        const spawn = findSpawn(gen, CONFIG);
+        const x = Math.floor(spawn.x), z = Math.floor(spawn.z);
+        const cx = Math.floor(x / CHUNK_SIZE), cz = Math.floor(z / CHUNK_SIZE);
+        const chunk = chunkAt(gen, cx, cz);
+        for (const y of [spawn.y, spawn.y + 1]) {
+            const block = chunk.data[gen.index(x - cx * CHUNK_SIZE, y, z - cz * CHUNK_SIZE)];
+            assert.ok(block !== ID.LOG && block !== ID.LEAVES);
+        }
+    }
 });
