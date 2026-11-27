@@ -251,6 +251,7 @@ passa para o modo seguinte, sem trilho nem cursor.
 | Sensibilidade do mouse | Controles | na hora |
 | Campo de visão | Gráficos | na hora |
 | Gráficos (automática/máxima/alta/média) | Gráficos | na hora — o mesmo caminho do `F4` |
+| Brilho (50% a 200%) | Gráficos | na hora — gama do mundo inteiro (céu, nuvens, chama e folhas junto); 100% é o de sempre |
 | Resolução (Janela/360p…4K) | Gráficos | na hora — numa resolução fixa o jogo entra em tela cheia e pede confirmação (10 s, senão volta) |
 | Distância de render | Gráficos | no próximo mundo (recarregar chunks ao vivo é outro assunto) — um recado avisa quando você muda |
 | Partículas (quebra, golpe, fumaça de forno, pó) | Gráficos → Efeitos | na hora — desligada não nasce nada novo; o que está no ar termina sozinho |

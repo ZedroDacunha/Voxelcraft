@@ -23,6 +23,7 @@ export const AUDIO_OPTION_CONTROLS = [
 
 export const GRAPHICS_OPTION_CONTROLS = [
     { key: 'graphics', button: 'opt-graphics', output: 'opt-graphics-value', label: 'Gráficos' },
+    { key: 'brightness', button: 'opt-brightness', output: 'opt-brightness-value', label: 'Brilho' },
     { key: 'resolution', button: 'opt-resolution', output: 'opt-resolution-value', label: 'Resolução' },
     { key: 'fov', button: 'opt-fov', output: 'opt-fov-value', label: 'Campo de visão' },
     { key: 'renderDistance', button: 'opt-render-distance', output: 'opt-render-distance-value', label: 'Distância de render' },

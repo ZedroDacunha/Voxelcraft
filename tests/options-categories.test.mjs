@@ -69,7 +69,7 @@ test('cada categoria tem a própria grade, escondida até ser aberta', () => {
 
 test('as linhas de valor ficam na categoria certa', () => {
     assert.deepEqual(AUDIO_OPTION_CONTROLS.map(row => row.key), ['volume']);
-    assert.deepEqual(GRAPHICS_OPTION_CONTROLS.map(row => row.key), ['graphics', 'resolution', 'fov', 'renderDistance', 'uiScale']);
+    assert.deepEqual(GRAPHICS_OPTION_CONTROLS.map(row => row.key), ['graphics', 'brightness', 'resolution', 'fov', 'renderDistance', 'uiScale']);
     assert.deepEqual(CONTROL_OPTION_CONTROLS.map(row => row.key), ['sensitivity']);
     assert.deepEqual(TOUCH_OPTION_CONTROLS.map(row => row.key),
         ['touchAimMode', 'touchSensitivity', 'touchLayout', 'touchButtonSize', 'touchVibration']);

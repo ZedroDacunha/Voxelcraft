@@ -22,7 +22,7 @@
     "./asset-versions.js": "./asset-versions.js?v=d42b8dc6ff",
     "./game-pause-menu.js": "./game-pause-menu.js?v=f625baba0f",
     "./game-pointer-lock.js": "./game-pointer-lock.js?v=cf53899b88",
-    "./game.js": "./game.js?v=716b67fc69",
+    "./game.js": "./game.js?v=fe5533cd5f",
     "./inventory-a11y.js": "./inventory-a11y.js?v=1bbf8184b5",
     "./inventory-armor.js": "./inventory-armor.js?v=19964c655c",
     "./inventory-assets.js": "./inventory-assets.js?v=a4e4fb2e9b",
@@ -89,12 +89,13 @@
     "./world-block-materials.js": "./world-block-materials.js?v=fee3236293",
     "./world-block-orientation.js": "./world-block-orientation.js?v=f6af440217",
     "./world-break-particles.js": "./world-break-particles.js?v=f60a39c67d",
+    "./world-brightness.js": "./world-brightness.js?v=3c4c54d4d9",
     "./world-catalog.js": "./world-catalog.js?v=76c8058ae9",
     "./world-chat-commands.js": "./world-chat-commands.js?v=989aac2a6a",
     "./world-chat-completion.js": "./world-chat-completion.js?v=f920c11c92",
     "./world-chat.js": "./world-chat.js?v=dbb76832dc",
     "./world-clock.js": "./world-clock.js?v=77473e68d7",
-    "./world-clouds.js": "./world-clouds.js?v=01d503dd2b",
+    "./world-clouds.js": "./world-clouds.js?v=8c9b87bcf0",
     "./world-copper-armor-icons.js": "./world-copper-armor-icons.js?v=57fd55b13f",
     "./world-creative.js": "./world-creative.js?v=0317fcd4a6",
     "./world-creature-base.js": "./world-creature-base.js?v=58074a3268",
@@ -105,13 +106,13 @@
     "./world-door.js": "./world-door.js?v=00488042b1",
     "./world-faces.js": "./world-faces.js?v=e72c54bfa4",
     "./world-falling-leaf-collision.js": "./world-falling-leaf-collision.js?v=0756a11522",
-    "./world-falling-leaves.js": "./world-falling-leaves.js?v=04fa447295",
+    "./world-falling-leaves.js": "./world-falling-leaves.js?v=725a335259",
     "./world-first-person-tool.js": "./world-first-person-tool.js?v=8f4c438da3",
     "./world-furnace-effects.js": "./world-furnace-effects.js?v=b5fc477140",
     "./world-furnace-rules.js": "./world-furnace-rules.js?v=195bb6a8fc",
     "./world-furnace-sounds.js": "./world-furnace-sounds.js?v=a844b58f3c",
     "./world-gait.js": "./world-gait.js?v=59f38aef73",
-    "./world-game-settings.js": "./world-game-settings.js?v=d657ce72cc",
+    "./world-game-settings.js": "./world-game-settings.js?v=a446ef8535",
     "./world-gold-armor-icons.js": "./world-gold-armor-icons.js?v=51c6342989",
     "./world-graphics-quality.js": "./world-graphics-quality.js?v=1aafc939df",
     "./world-grid.js": "./world-grid.js?v=be11481d71",
@@ -139,7 +140,7 @@
     "./world-mutton-model.js": "./world-mutton-model.js?v=7f4ef75820",
     "./world-online-menu.js": "./world-online-menu.js?v=89e4a3af28",
     "./world-online.js": "./world-online.js?v=3e9f33771e",
-    "./world-options-view.js": "./world-options-view.js?v=745e93ed13",
+    "./world-options-view.js": "./world-options-view.js?v=26ed1a5a02",
     "./world-ore-generation.js": "./world-ore-generation.js?v=7fe35588d3",
     "./world-performance-samples.js": "./world-performance-samples.js?v=65fe75cba2",
     "./world-pickaxe-animation.js": "./world-pickaxe-animation.js?v=ec9089044a",
@@ -157,7 +158,7 @@
     "./world-save-reset.js": "./world-save-reset.js?v=592b6481e2",
     "./world-save-settings.js": "./world-save-settings.js?v=5867d317b8",
     "./world-sheep.js": "./world-sheep.js?v=5bcd329e3f",
-    "./world-sky.js": "./world-sky.js?v=83a051d678",
+    "./world-sky.js": "./world-sky.js?v=e8482c2935",
     "./world-sleep.js": "./world-sleep.js?v=d760ea0366",
     "./world-step-sounds.js": "./world-step-sounds.js?v=be66738775",
     "./world-storage.js": "./world-storage.js?v=706891ec43",
@@ -404,6 +405,10 @@
         <div class="options-grid" id="options-graphics-grid" hidden>
             <button type="button" class="classic-btn option-btn" id="opt-graphics" aria-label="Gráficos">
                 <span class="option-text"><span class="option-name">Gráficos</span>: <span class="option-value" id="opt-graphics-value">Automática</span></span>
+            </button>
+            <button type="button" class="classic-btn option-btn option-slider" id="opt-brightness" aria-label="Brilho">
+                <span class="option-track" aria-hidden="true"><span class="option-knob"></span></span>
+                <span class="option-text"><span class="option-name">Brilho</span>: <span class="option-value" id="opt-brightness-value">100%</span></span>
             </button>
             <button type="button" class="classic-btn option-btn option-slider" id="opt-resolution" aria-label="Resolução">
                 <span class="option-track" aria-hidden="true"><span class="option-knob"></span></span>
