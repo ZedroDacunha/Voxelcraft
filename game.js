@@ -2378,7 +2378,8 @@ function updateHand(dt) {
     const { swing, dip } = handSwingAmount(handAnim);
     const hasSword = item?.tool?.type === 'sword';
     const armSwing = hasSword ? 0 : swing;
-    heldSwordPose = hasSword ? swordPose(swordSwing, performance.now() * .001) : null;
+    const now = performance.now() * .001;
+    heldSwordPose = hasSword ? swordPose(swordSwing, now) : null;
     const pickaxe = pickaxeMiningPose(item?.tool?.type, handAnim);
     const heldToolKind = ITEMS[heldId]?.sprite?.kind;
     if (HELD_TOOL_KINDS.has(heldToolKind)) {
@@ -2398,7 +2399,9 @@ function updateHand(dt) {
     const ground = groundPose(locomotion, gaitNow.phase, gaitNow.amplitude);
     const busy = Math.max(currentEatPose.lift, swing, heldSwordPose?.cut ?? 0, heldSwordPose?.prepare ?? 0);
     const rightWeight = (heldMesh ? 0.70 : 1) * (1 - 0.75 * busy);
-    firstPersonArms.pose(ground, swim.walkWeight, rightWeight);
+    const swordAttacking = hasSword && swordSwing.itemId === heldId && now - swordSwing.startedAt < ATTACK_COOLDOWN;
+    const acting = miningNow || handAnim.punch > 0 || swordAttacking || eat.active;
+    firstPersonArms.pose(ground, swim.walkWeight, { dt, acting, rightWeight });
     const left = firstPersonArms.left;
     const shoulderX = HAND_BASE.x * Math.min(1, handCamera.aspect);
     left.position.set(-shoulderX - swim.handX, HAND_BASE.y - 0.055 - swim.handY, HAND_BASE.z - swim.handZ);

@@ -52,7 +52,7 @@ test('braços alternam, ampliam a passada na corrida e trazem o item junto ao pu
         return [position(arms.left.getObjectByName('hand')).y, position(rightHand).y];
     };
     const rest = sample(0, 0, 0);
-    assert.ok(position(item).distanceTo(item.position) < 1e-8);
+    assert.ok(position(item).y < item.position.y);
     const gap = position(item).distanceTo(position(rightHand));
     const walk = sample(0, 0, 1);
     const run = sample(0, 1, 1);
@@ -63,6 +63,35 @@ test('braços alternam, ampliam a passada na corrida e trazem o item junto ao pu
     assert.ok(Math.abs(position(item).distanceTo(position(rightHand)) - gap) < 1e-8);
     assert.deepEqual(sample(1, 0, 0), rest);
     assert.equal(model.rightArm.rotation.x, 0);
+    armor.dispose();
+    model.dispose();
+});
+
+test('os braços sobem para a postura original durante a ação e voltam ao repouso ao soltar', () => {
+    const { model, armor, arms } = fixture();
+    const ground = stride(0, 0, 0);
+    const position = part => part.getWorldPosition(new THREE.Vector3());
+    const item = new THREE.Group();
+    item.position.set(0, 0.03, -0.62);
+    arms.grip.add(item);
+    const heights = () => [arms.left, arms.right].map(arm => position(arm.getObjectByName('hand')).y);
+    arms.pose(ground, 1);
+    const rest = heights();
+    arms.pose(ground, 1, { acting: true, dt: 0.03 });
+    const rising = heights();
+    arms.pose(ground, 1, { acting: true, dt: 0.08 });
+    const raised = heights();
+    assert.ok(position(item).distanceTo(item.position) < 1e-8);
+    arms.pose(ground, 1, { acting: true, dt: 0.18 });
+    assert.deepEqual(heights(), raised);
+    arms.pose(ground, 1, { dt: 0.1 });
+    const lowering = heights();
+    for (let side = 0; side < 2; side++) {
+        assert.ok(rest[side] < rising[side] && rising[side] < raised[side]);
+        assert.ok(rest[side] < lowering[side] && lowering[side] < raised[side]);
+    }
+    arms.pose(ground, 1, { dt: 0.2 });
+    assert.deepEqual(heights(), rest);
     armor.dispose();
     model.dispose();
 });

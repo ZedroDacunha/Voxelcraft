@@ -31,15 +31,24 @@ export function createFirstPersonArms(THREE, model, rig) {
 
     const [left, right] = arms;
     const grip = new THREE.Group();
-    // Em repouso o espaço do item coincide com o antigo espaço da mão.
+    // Na postura de ação o item coincide com o espaço original da mão.
     // Ao dobrar o cotovelo, a empunhadura segue o mesmo osso que a palma.
     right.pivot.add(grip);
     right.elbow.attach(grip);
 
-    function pose(ground, walkWeight, rightWeight = 1) {
+    let actionLift = 0;
+    function pose(ground, walkWeight, { dt = 0, acting = false, rightWeight = 1 } = {}) {
+        // Sobe no início do gesto e desce mais devagar ao soltar. A janela
+        // da ação cobre também o intervalo entre duas batidas de mineração.
+        actionLift = acting
+            ? Math.min(1, actionLift + dt / 0.09)
+            : Math.max(0, actionLift - dt / 0.24);
+        const easedLift = actionLift * actionLift * (3 - 2 * actionLift);
+        const restPitch = 0.23 * (1 - easedLift) * walkWeight;
+        const shoulderPitch = Math.PI / 2 - restPitch;
         const stride = ground.arm * walkWeight;
-        left.arm.rotation.x = Math.PI / 2 + 0.75 * stride;
-        right.arm.rotation.x = Math.PI / 2 - 0.75 * stride * rightWeight;
+        left.arm.rotation.x = shoulderPitch + 0.75 * stride;
+        right.arm.rotation.x = shoulderPitch - 0.75 * stride * rightWeight;
         left.elbow.rotation.x = -0.48 * ground.elbowLeft * walkWeight;
         right.elbow.rotation.x = -0.48 * ground.elbowRight * walkWeight * rightWeight;
         for (const { visual, source } of shoulders) visual.visible = source.visible;
