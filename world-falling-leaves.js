@@ -26,10 +26,12 @@ const BLOCK_LIGHT_MAX = 2.5;
 // `light` é o fator de dia/noite global (0..1). Retorna a escala 0..1 aplicada
 // à cor da folha.
 export function leafAmbientLight({ sky, block }, light) {
-    const skyN = clamp(sky / 15, 0, 1);
-    const blockN = Math.min(BLOCK_LIGHT_MAX, block / 15 * BLOCK_LIGHT_GAIN);
+    // Defesa: valores inválidos (undefined/NaN de uma leitura falha) não podem
+    // virar NaN na cor — isso pintaria a folha de preto.
+    const skyN = clamp(Number.isFinite(sky) ? sky / 15 : 0, 0, 1);
+    const blockN = Math.min(BLOCK_LIGHT_MAX, (Number.isFinite(block) ? block : 0) / 15 * BLOCK_LIGHT_GAIN);
     const illumination = Math.max(0.18 + skyN * 0.82, 0.18 + blockN * 0.82);
-    return clamp(light * illumination, 0.14, 1);
+    return clamp((Number.isFinite(light) ? light : 1) * illumination, 0.14, 1);
 }
 
 const SCAN_RADIUS = 10, SCAN_BATCH = 24, SCAN_INTERVAL = 0.2, TREE_TTL = 4;

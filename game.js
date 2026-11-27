@@ -5372,10 +5372,14 @@ async function init() {
         // por árvores/blocos (skyLight) e luz de tochas (blockLight). A folha caindo
         // acompanha a cena, em vez de usar só o fator de dia/noite.
         readLight: (x, y, z) => {
-            if (y < 0 || y >= WORLD_HEIGHT) return null;
-            const chunk = world.getChunk(floorDiv(x, CHUNK_SIZE), floorDiv(z, CHUNK_SIZE));
+            // A folha cai em coordenadas fracionárias; a luz é por voxel inteiro,
+            // então arredonda para o voxel que contém o ponto (evita índice fracionário
+            // que faria skyLight/blockLight voltarem undefined -> cor NaN = preto).
+            const lx = Math.floor(x), ly = Math.floor(y), lz = Math.floor(z);
+            if (ly < 0 || ly >= WORLD_HEIGHT) return null;
+            const chunk = world.getChunk(floorDiv(lx, CHUNK_SIZE), floorDiv(lz, CHUNK_SIZE));
             if (!chunk) return null;
-            const i = idx(x - chunk.cx * CHUNK_SIZE, y, z - chunk.cz * CHUNK_SIZE);
+            const i = idx(lx - chunk.cx * CHUNK_SIZE, ly, lz - chunk.cz * CHUNK_SIZE);
             return { sky: chunk.skyLight[i], block: chunk.blockLight[i] };
         },
     });

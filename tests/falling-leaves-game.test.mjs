@@ -104,6 +104,22 @@ test('a paleta caindo é escura, no mesmo verde da copa', () => {
     }
 });
 
+test('valores de luz inválidos não produzem cor NaN (folha não fica preta)', () => {
+    // Bug histórico: leitura de luz com índice fracionário/undefined fazia
+    // sky/block ser undefined -> NaN -> setScalar(NaN) pintava a folha de preto.
+    const cases = [
+        { sky: undefined, block: undefined },
+        { sky: NaN, block: NaN },
+        { sky: 15, block: undefined },
+        {},
+    ];
+    for (const c of cases) {
+        const v = leafAmbientLight(c, 1);
+        assert.ok(Number.isFinite(v), `iluminação inválida deve ser finita, não NaN: ${JSON.stringify(c)} -> ${v}`);
+        assert.ok(v >= 0.14 && v <= 1, `escala válida: ${v}`);
+    }
+});
+
 test('a iluminação do ambiente afeta a folha caindo', () => {
     const noon = 1;
     // Céu aberto (sky 15, sem tocha): iluminação máxima para o dia.
