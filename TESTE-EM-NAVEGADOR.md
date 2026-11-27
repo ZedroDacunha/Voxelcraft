@@ -1512,3 +1512,20 @@ A luz do mundo acompanha a cor do céu ao longo do ciclo dia/noite, sem custo.
       a névoa volta à cor do horizonte do céu.
 - [ ] O **Brilho** das opções continua funcionando em cada fase do ciclo
       (a tinta do clima é independente da gama).
+
+## 78. Anti-bandas da luz
+
+Parte da iluminação: [`MELHORIA-20261127-antibandas-de-luz.md`](docs/melhorias/MELHORIA-20261127-antibandas-de-luz.md).
+O gradiente de luz das tochas deixa de mostrar degraus visíveis.
+
+- [ ] Com uma tocha acesa, o **gradiente de luz ao redor dela** é contínuo:
+      não aparecem **bandas lisas** nas faces entre um nível e outro de
+      luz, nem no chão da caverna.
+- [ ] Em luz constante (dia, sol alto), o dither não inventa **ruído
+      visível**: o chão e as fachadas continuam lisos.
+- [ ] O **tremor da tocha** e o **pulo da fornalha** continuam normais —
+      nada que já existia some ou muda.
+- [ ] A **chama** e os **efeitos do Brilho** das opções continuam como
+      antes (o dither não toca neles).
+- [ ] Ao mover a câmera depressa, o dither não trava nem pisca: é
+      ruído de posição da tela, fixo por pixel.
