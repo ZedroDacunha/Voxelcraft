@@ -1493,3 +1493,22 @@ Menu → **Opções** → **Gráficos** → **Brilho** (ou ESC → Opções no j
 - [ ] A escolha fica guardada: feche as opções, reabra, entre no mundo — o
       valor continua onde você deixou; **Restaurar padrões** volta a 100%.
 - [ ] No celular a barra arrasta no dedo igual às outras barras de Gráficos.
+
+## 77. Clima do céu
+
+Parte da iluminação: [`MELHORIA-20261127-clima-do-ceu.md`](docs/melhorias/MELHORIA-20261127-clima-do-ceu.md).
+A luz do mundo acompanha a cor do céu ao longo do ciclo dia/noite, sem custo.
+
+- [ ] **Meio-dia é o jogo de sempre**: com o sol alto, o chão e o mundo têm
+      a iluminação neutra de sempre — nenhuma mudança perceptível.
+- [ ] **Pôr do sol** (sol no horizonte): o chão e os blocos aquecem junto
+      com o céu — o mundo reflete o crepúsculo, não fica neutro.
+- [ ] **Noite** (sol abaixo do horizonte): o mundo fica **escuro e azul-frio**,
+      não cinza — sem precisar de tocha, a atmosfera da noite aparece.
+- [ ] O **item na mão** acompanha o mesmo clima: no pôr do sol ele aquece,
+      na noite fica azulado.
+- [ ] **Mergulhado** (cabeça dentro da água): a névoa e o fundo da cena
+      viram **azul profundo da água**, e a luz fica azul-ciano; ao emergir,
+      a névoa volta à cor do horizonte do céu.
+- [ ] O **Brilho** das opções continua funcionando em cada fase do ciclo
+      (a tinta do clima é independente da gama).
