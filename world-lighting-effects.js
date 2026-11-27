@@ -15,11 +15,11 @@ export function configureTorchFlicker(material) {
         );
         shader.fragmentShader = shader.fragmentShader.replace(
             '#include <color_fragment>',
-            '#include <color_fragment>\nfloat torchFlicker = 1.0 + vTorchInfluence * (0.035 * sin(uTorchTime * 8.7) + 0.02 * sin(uTorchTime * 13.1 + 1.2));\ndiffuseColor.rgb *= torchFlicker;\nfloat fireMask = smoothstep(0.16, 0.48, diffuseColor.r - diffuseColor.b);\nfloat firePulse = 0.91 + 0.13 * sin(uTorchTime * 10.0 + vMapUv.y * 47.0 + vMapUv.x * 11.0);\ndiffuseColor.rgb *= 1.0 + vFurnaceFlame * fireMask * (firePulse - 1.0);'
+            '#include <color_fragment>\nfloat torchFlicker = 1.0 + vTorchInfluence * (0.035 * sin(uTorchTime * 8.7) + 0.02 * sin(uTorchTime * 13.1 + 1.2));\ndiffuseColor.rgb *= torchFlicker;\nfloat fireMask = smoothstep(0.16, 0.48, diffuseColor.r - diffuseColor.b);\nfloat firePulse = 0.91 + 0.13 * sin(uTorchTime * 10.0 + vMapUv.y * 47.0 + vMapUv.x * 11.0);\ndiffuseColor.rgb *= 1.0 + vFurnaceFlame * fireMask * (firePulse - 1.0);\n// Anti-bandas: a luz de bloco é propagada em 16 níveis, e a transição entre\n// níveis é um degrau visível nas faces. Um ruído de posição (um hash per-pixel,\n// amplitude de metade do salto de um nível) mascara o degrau, fazendo a\n// zona de penumbra da tocha parecer contínua. Vieite: não encobre o brilho,\n// nem a chama, nem o flicker — é só um ruído aditivo ao final.\nfloat dither = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);\ndiffuseColor.rgb += (dither - 0.5) * 0.06;'
         );
         material.userData.torchFlickerShader = shader;
     };
-    material.customProgramCacheKey = () => 'voxel-torch-flicker-v3-map-uv';
+    material.customProgramCacheKey = () => 'voxel-torch-flicker-v4-map-uv-dither';
 }
 
 export function configureTorchFlameAnimation(material) {
