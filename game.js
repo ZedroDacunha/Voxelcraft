@@ -954,6 +954,17 @@ class World {
 
         const cornerStride = CS + 1;
         const waterHeights = this.meshScratch.waterHeights ??= new Float32Array(cornerStride * cornerStride);
+        const waterDepths = this.meshScratch.waterDepths ??= new Float32Array(cornerStride * cornerStride);
+        let depthLayer = -1;
+        const waterDepthAt = (x, y, z) => {
+            if (depthLayer !== y) {
+                waterDepths.fill(-1);
+                depthLayer = y;
+            }
+            const i = x + z * cornerStride;
+            if (waterDepths[i] < 0) waterDepths[i] = WaterSystem.cornerDepth(blockAt, x, y, z);
+            return waterDepths[i];
+        };
         let waterLayer = -1;
         const waterCornerAt = (x, y, z) => {
             if (y !== waterLayer) {
@@ -1132,6 +1143,13 @@ class World {
                             indices = growTypedArray(indices, indexCount + 6);
                             target = indices; targetOffset = indexCount; indexCount += 6;
                         }
+                        let nx = f.dir[0], nz = f.dir[2];
+                        if (renderMode === 'liquid' && f.kind === 'top') {
+                            const h00 = waterCornerAt(lx, y, lz), h11 = waterCornerAt(lx + 1, y, lz + 1);
+                            const h10 = waterCornerAt(lx + 1, y, lz), h01 = waterCornerAt(lx, y, lz + 1);
+                            nx = (h00 + h01 - h10 - h11) * 0.5;
+                            nz = (h00 + h10 - h01 - h11) * 0.5;
+                        }
                         let cornerIndex = 0;
                         for (const c of f.corners) {
                             let py = y + (shape ? shape.min[1] + c.pos[1] * (shape.max[1] - shape.min[1]) : c.pos[1]);
@@ -1146,9 +1164,14 @@ class World {
                             positions[p] = lx + (shape ? shape.min[0] + c.pos[0] * (shape.max[0] - shape.min[0]) + orientation[0] * wallOffset : c.pos[0]) - f.dir[0] * layerInset;
                             positions[p + 1] = py - f.dir[1] * layerInset;
                             positions[p + 2] = lz + (shape ? shape.min[2] + c.pos[2] * (shape.max[2] - shape.min[2]) + orientation[1] * wallOffset : c.pos[2]) - f.dir[2] * layerInset;
-                            normals[p] = f.dir[0]; normals[p + 1] = f.dir[1]; normals[p + 2] = f.dir[2];
-                            uvs[uv] = tileUV.u0 + c.uv[0] * tileUV.uWidth;
-                            uvs[uv + 1] = tileUV.v0 + c.uv[1] * tileUV.vHeight;
+                            normals[p] = nx; normals[p + 1] = f.dir[1]; normals[p + 2] = nz;
+                            if (renderMode === 'liquid') {
+                                uvs[uv] = waterDepthAt(lx + c.pos[0], y, lz + c.pos[2]);
+                                uvs[uv + 1] = skyLightAt(lx, y + 1, lz) / 15;
+                            } else {
+                                uvs[uv] = tileUV.u0 + c.uv[0] * tileUV.uWidth;
+                                uvs[uv + 1] = tileUV.v0 + c.uv[1] * tileUV.vHeight;
+                            }
                             const shade = ambientOcclusionAt(lx, y, lz, f, c, renderMode !== 'liquid');
                             colors[p] = shade[0]; colors[p + 1] = shade[1]; colors[p + 2] = shade[2];
                             torchInfluence[vertex] = shade[3];
@@ -1186,7 +1209,7 @@ class World {
 
         storeScratch();
 
-        const mesh = new THREE.Mesh(geo, [this.chunkMaterial, this.cutoutMaterial, this.water.material]);
+        const mesh = new THREE.Mesh(geo, [this.chunkMaterial, this.cutoutMaterial, this.water.surfaceMaterial]);
         mesh.position.set(chunk.cx * CS, 0, chunk.cz * CS);
         this.scene.add(mesh);
         chunk.mesh = mesh;
@@ -3451,6 +3474,13 @@ function updateSky() {
         scene, camera, hemiLight, sunLight, handAmbient, worldTime: worldClock.time,
         underwater: world?.water.headInWater,
     });
+    if (world) {
+        const water = world.water.surfaceMaterial.uniforms;
+        water.horizonColor.value.copy(scene.fog.color);
+        water.lightDirection.value.copy(sunLight.position).normalize();
+        water.lightColor.value.copy(sunLight.color).multiplyScalar(sunLight.intensity);
+        water.daylight.value = worldSky.day;
+    }
 }
 
 // =====================================================================

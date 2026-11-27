@@ -55,6 +55,11 @@ async def main():
         await guest.locator("#online-leave").click()
         await guest.locator("#btn-open-worlds").click()
         assert await guest.get_by_text("Dupla ·", exact=False).count() == 0
+        pixels = await host.evaluate("""async () => {
+            const { testWaterRender } = await import('/tools/test-water-render.mjs');
+            return testWaterRender();
+        }""")
+        assert pixels["motion"] > 48 and pixels["depth"] > 48, pixels
         await browser.close()
 
 

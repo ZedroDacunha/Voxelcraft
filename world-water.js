@@ -1,3 +1,5 @@
+import { createWaterSurfaceMaterial } from './world-water-material.js';
+
 // Ritmo e limites da simulação de fluxo de água.
 export const WATER_FLOW_INTERVAL = 0.18;      // segundos entre passadas
 export const WATER_FLOW_CELLS_PER_TICK = 8;   // células processadas por passada
@@ -48,6 +50,21 @@ export function createWaterSystemClass({ THREE, BLOCKS, ID, WORLD_HEIGHT, onSubm
             return count ? sum / count : 0;
         }
 
+        // Espessura compartilhada pelas faces que encontram este canto. Margens
+        // secas contribuem com zero. Após cinco blocos a cor já atingiu o tom fundo.
+        static cornerDepth(blockAt, cornerX, y, cornerZ) {
+            let sum = 0;
+            for (let x = cornerX - 1; x <= cornerX; x++) {
+                for (let z = cornerZ - 1; z <= cornerZ; z++) {
+                    const type = blockAt(x, y, z);
+                    if (!WaterSystem.isBlock(type)) continue;
+                    sum += WaterSystem.surfaceHeightFor(type, blockAt(x, y + 1, z));
+                    for (let below = 1; below < 5 && WaterSystem.isBlock(blockAt(x, y - below, z)); below++) sum++;
+                }
+            }
+            return sum / 4;
+        }
+
         static surfaceAt(blockAt, x, y, z) {
             const bx = Math.floor(x), bz = Math.floor(z);
             const fx = x - bx, fz = z - bz;
@@ -66,6 +83,7 @@ export function createWaterSystemClass({ THREE, BLOCKS, ID, WORLD_HEIGHT, onSubm
             this.material = new THREE.MeshLambertMaterial({
                 map: atlas, transparent: true, opacity: 0.75, depthWrite: false, side: THREE.DoubleSide, vertexColors: true
             });
+            this.surfaceMaterial = createWaterSurfaceMaterial(THREE);
             this.headInWater = false;
             this.feetInWater = false;
             this.flowQueue = [];
@@ -213,8 +231,8 @@ export function createWaterSystemClass({ THREE, BLOCKS, ID, WORLD_HEIGHT, onSubm
         }
     
         update(world, dt, now) {
-            const pulse = Math.sin(now * 0.0017);
-            this.material.color.setRGB(0.96 + pulse * 0.025, 0.98 + pulse * 0.02, 1);
+            // Velocidades em décimos de radiano mantêm o ciclo contínuo na volta.
+            this.surfaceMaterial.uniforms.waterTime.value = (now * 0.001) % (20 * Math.PI);
             this.updateFlow(world, dt);
         }
     }

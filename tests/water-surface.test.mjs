@@ -49,3 +49,15 @@ test('corrente sob outra água preenche toda a altura, mesmo no nível mais raso
         for (const x of [0,1]) for (const z of [0,1]) assert.equal(Water.cornerHeight(read,x,2,z),1);
     }
 });
+
+test('espessura compartilhada mede o fundo, afina na margem e satura em cinco blocos', () => {
+    const basin = depth => (x, y, z) => y <= 12 && y > 12 - depth ? ID.WATER : 0;
+    const check = (read, x, expected) => {
+        assert.ok(Math.abs(Water.cornerDepth(read, x, 12, 16) - expected) < 1e-8);
+    };
+    check(basin(1), -16, Water.surfaceHeight);
+    check(basin(3), -16, 2 + Water.surfaceHeight);
+    check(basin(12), -16, 4 + Water.surfaceHeight);
+    const bank = (x, y, z) => x < 0 ? ID.STONE : basin(1)(x, y, z);
+    check(bank, 0, Water.surfaceHeight / 2);
+});

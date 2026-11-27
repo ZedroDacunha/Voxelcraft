@@ -464,7 +464,12 @@ export function createTilePixelSource() {
                 return [base + j(6), base - 34 + j(6), 46 + j(5)];
             }
             case TILE.WATER: {
-                return [45 + j(8), 110 + j(8), 215 + j(8)];
+                // Ícone e bloco na mão: cristas largas que fecham nas bordas do tile.
+                const phase = 2 * Math.PI / TILE_PX;
+                const bend = Math.sin((x + y) * phase);
+                const crest = Math.max(0, Math.sin(y * 3 * phase + 1.6 * bend)) ** 5;
+                const base = Math.cos((2 * x - y) * phase);
+                return [38 + 12 * crest + 3 * base, 112 + 23 * crest + 6 * base, 132 + 18 * crest + 5 * base];
             }
         }
         return [255, 0, 255];
