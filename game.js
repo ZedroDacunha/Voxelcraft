@@ -72,6 +72,7 @@ import { advanceLocomotion, applyGroundPose, createLocomotion, groundPose, rigLo
 import { createPlayerHeldItem, applyThirdPersonHeldArmPose } from './player-held-item.js';
 import { THIRD_PERSON_BODY_MIN_DISTANCE, THIRD_PERSON_DISTANCE, cameraOffsetSign, nextCameraView, thirdPersonDistance } from './player-third-person.js';
 import { ATTACK_COOLDOWN, attackReady, createCreatureSystemClass } from './world-creature.js';
+import { createContactShadowSystem } from './world-contact-shadows.js';
 import { creatureInReach } from './world-mob-hit.js';
 import { SHEEP_BLEAT_RANGE, SHEEP_WOOL_ITEMS, createSheepSystemClass } from './world-sheep.js';
 import { createChatState } from './world-chat.js';
@@ -1811,6 +1812,30 @@ function removeItemEntity(i) {
     itemEntities.splice(i, 1);
 }
 
+// Sombras de contato: blobs escuros no chão sob as criaturas terrestres
+// e sob o jogador em terceira pessoa. O Mofim flutua e não toca o chão,
+// então não ganha blob; o jogador mergulhado também não (a água cobre).
+function updateContactShadows() {
+    if (!contactShadows) return;
+    const targets = [];
+    if (cameraView !== 'first' && !sleep.active && !world.water.headInWater) {
+        targets.push({ x: player.pos.x, y: player.pos.y, z: player.pos.z, radius: 0.85, opacity: 0.45 });
+    }
+    if (sheepSystem) {
+        for (const e of sheepSystem.entities) {
+            if (e.dying) continue;
+            targets.push({ x: e.x, y: e.y, z: e.z, radius: 0.75, opacity: 0.4 });
+        }
+    }
+    if (zombiePopulation) {
+        for (const z of zombiePopulation.entities) {
+            if (z.state.dying) continue;
+            targets.push({ x: z.state.x, y: z.state.y, z: z.state.z, radius: 0.8, opacity: 0.42 });
+        }
+    }
+    contactShadows.update(targets);
+}
+
 function updateItemEntities(dt) {
     const half = ITEM_SIZE / 2;
     _pickupCenter.set(player.pos.x, player.pos.y + 0.9, player.pos.z);
@@ -3515,6 +3540,7 @@ function updateWaterfall(dt) {
 // 6. ESTADO GERAL
 // =====================================================================
 let zombiePopulation = null;
+let contactShadows = null;
 let camera, swimCamera, thirdCamera, playerModel, playerArmor, playerHeldItem, scene, renderer, controls, world, creatureSystem, sheepSystem, fallingLeaves, tallGrassMaterial, tallGrassMaterials = [];
 let cameraView = 'first';
 const thirdDirection = new THREE.Vector3();
@@ -5315,6 +5341,9 @@ async function init() {
     });
     creatureSystem = new CreatureSystem(world);
     sheepSystem = new SheepSystem(world);
+    // Sombras de contato: blobs escuros no chão sob as criaturas terrestres e
+    // sob o jogador em terceira pessoa. Pool fixo, criado junto com o mundo.
+    contactShadows = createContactShadowSystem({ THREE, scene, max: 16 });
     const save = onlineGuest ? null : await loadGame();
     if (save) {
         gameMode = online ? SURVIVAL : save.gameMode;
@@ -6146,6 +6175,7 @@ function animate() {
                         max: { x: player.pos.x + PLAYER_RADIUS, y: player.pos.y + player.height, z: player.pos.z + PLAYER_RADIUS } } });
             }
         }
+        updateContactShadows();
         updateSurvival(dt);
         updateItemEntities(dt);
         breakParticles.update(dt);
