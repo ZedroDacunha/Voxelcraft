@@ -3,6 +3,8 @@ import { createWaterSurfaceMaterial } from './world-water-material.js';
 import { clamp01, mulberry32, Noise2D, smoothstep } from './world-math.js';
 import { createTextureTools } from './world-textures.js';
 import { createWorldClouds, WORLD_CLOUD_CONFIG } from './world-clouds.js';
+import { buildMenuHorizon } from './menu-horizon.js';
+import { TILE, atlasTileRect } from './world-catalog.js';
 import { FACES } from './world-faces.js';
 import { createWorldSkySystem } from './world-sky.js';
 import { MENU_CAMERA, MENU_SUN_TIME, menuCameraPosition } from './menu-framing.js';
@@ -15,8 +17,8 @@ if (!canvas || !titleScreen) throw new Error('A tela inicial não está pronta p
 const SKY_COLOR = 0x9bcce7;
 // A hora do menu e o enquadramento da ilha moram em `menu-framing.js`: é lá que a
 // conta do sol em quadro fica testável (aqui há DOM, e teste não entra).
-const FOG_NEAR = 42;
-const FOG_FAR = 105;
+const FOG_NEAR = 44;
+const FOG_FAR = 143;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(SKY_COLOR);
@@ -61,6 +63,21 @@ worldSky.create(scene);
 // sombra de canto — o mesmo acabamento dos blocos do jogo.
 const atlas = createTextureTools(THREE).createAtlasTexture();
 const panorama = buildMenuPanorama();
+// Fora do bosque, o tile se repete a cada bloco mesmo nas faces distantes.
+function horizonMaterial(tile) {
+    const { x, y, size } = atlasTileRect(tile);
+    const image = document.createElement('canvas');
+    image.width = image.height = size;
+    image.getContext('2d').drawImage(atlas.image, x, y, size, size, 0, 0, size, size);
+    const texture = new THREE.CanvasTexture(image);
+    texture.colorSpace = atlas.colorSpace;
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.magFilter = THREE.NearestFilter;
+    return new THREE.MeshLambertMaterial({ map: texture });
+}
+scene.add(new THREE.Mesh(buildMenuHorizon(THREE, panorama), [
+    horizonMaterial(TILE.GRASS_TOP), horizonMaterial(TILE.DIRT),
+]));
 const panoramaParts = panoramaGeometry(panorama);
 const waterMaterial = createWaterSurfaceMaterial(THREE);
 const materials = {
@@ -121,6 +138,8 @@ function render(now, deltaSeconds) {
         fogNear: FOG_NEAR,
         fogFar: FOG_FAR,
     });
+    // A luz de preenchimento separa as copas da encosta atrás dos botões.
+    hemiLight.intensity *= 1.35;
     const water = waterMaterial.uniforms;
     water.waterTime.value = (now * 0.001) % (20 * Math.PI);
     water.horizonColor.value.copy(scene.fog.color);

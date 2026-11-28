@@ -21,8 +21,8 @@
 
 import { sunDirectionAt } from './world-sky.js';
 
-/** Hora do menu: fim de tarde. O sol fica a ~2° do horizonte. */
-export const MENU_SUN_TIME = 0.006;
+/** Hora do menu: fim de tarde. O sol fica a ~5° do horizonte. */
+export const MENU_SUN_TIME = 0.015;
 
 /** Vista sobre a margem do lago, com espaço acima das copas para o sol. */
 export const MENU_CAMERA = Object.freeze({

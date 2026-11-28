@@ -51,6 +51,8 @@ const keyOf = (x, y, z) => `${x},${y},${z}`;
 const smoothNoise = (x, z) => Math.sin(x * 0.21) * 1.35 + Math.cos(z * 0.17) * 1.25
     + Math.sin((x + z) * 0.095) * 1.1 + Math.cos((x - z) * 0.13) * 0.65;
 
+export const menuGrassHeight = (x, z) => Math.max(2, Math.round(4 + smoothNoise(x, z)));
+
 export function buildMenuPanorama({ radius = MENU_PANORAMA_RADIUS } = {}) {
     const blocks = new Map();
     const heights = new Map();
@@ -66,7 +68,7 @@ export function buildMenuPanorama({ radius = MENU_PANORAMA_RADIUS } = {}) {
             const lakeDistance = lakeX * lakeX + lakeZ * lakeZ;
             const isLake = lakeDistance < MENU_LAKE.fill;
             const isShore = lakeDistance >= MENU_LAKE.fill && lakeDistance < MENU_LAKE.shore;
-            const terrainHeight = Math.max(2, Math.round(4 + smoothNoise(x, z)));
+            const terrainHeight = menuGrassHeight(x, z);
             const height = isLake ? Math.floor(2 * lakeDistance / MENU_LAKE.fill)
                 : Math.min(terrainHeight, 2 + Math.floor(2 * Math.max(0, lakeDistance - MENU_LAKE.shore)));
             heights.set(`${x},${z}`, height);
@@ -107,7 +109,7 @@ export function buildMenuPanorama({ radius = MENU_PANORAMA_RADIUS } = {}) {
             }
         }
     }
-    return { radius, blocks, lake: MENU_LAKE, waterDepths };
+    return { radius, blocks, heights, lake: MENU_LAKE, waterDepths };
 }
 
 const renderOf = entry => (entry ? KINDS[entry.kind].render : null);

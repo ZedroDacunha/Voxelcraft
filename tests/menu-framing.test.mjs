@@ -54,7 +54,7 @@ test('a câmera abre virada para o sol', () => {
     const position = menuCameraPosition(0);
     assert.ok(Math.abs(Math.hypot(position.x, position.z) - MENU_CAMERA.radius) < 1e-9, 'no raio');
     const viewX = -position.x, viewZ = -position.z;
-    const dot = (viewX * sun.x + viewZ * sun.z) / Math.hypot(viewX, viewZ);
+    const dot = (viewX * sun.x + viewZ * sun.z) / (Math.hypot(viewX, viewZ) * Math.hypot(sun.x, sun.z));
     assert.ok(dot > 0.999, `vista apontando para o sol (${dot.toFixed(4)})`);
     assert.ok(Math.abs(angle - menuStartAngle(sun)) < 1e-12, 'e o ângulo é estável');
 });
