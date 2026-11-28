@@ -1,26 +1,12 @@
-// O panorama animado atrás do título: a ilha gira devagar enquanto o jogo abre.
-//
-// Ele agora usa a **mesma luz do mundo** em vez de uma cópia parecida:
-//
-// - a malha vem de `menu-panorama.js`, com as faces escondidas fora e a sombra
-//   de canto escrita em cor de vértice — o mesmo relevo dos blocos do jogo;
-// - o céu é o `world-sky.js`, que é quem decide cor do fundo, nevoeiro, força e
-//   cor do sol (e desenha sol, lua e estrelas). O relógio aqui é parado **no fim
-//   da tarde**: o sol fica logo acima da linha das árvores, aparece no quadro e
-//   pinta o céu de laranja. Um menu que escurece sozinho deixaria o título
-//   ilegível — por isso a hora não anda, só a câmera.
-// - as luzes (hemisférica + direcional) nascem com os valores do jogo e são
-//   reescritas pelo céu a cada quadro, como no mundo.
-
 import * as THREE from 'three';
-import { TILE, TILE_PX, atlasTileRect } from './world-catalog.js';
+import { createWaterSurfaceMaterial } from './world-water-material.js';
 import { clamp01, mulberry32, Noise2D, smoothstep } from './world-math.js';
 import { createTextureTools } from './world-textures.js';
 import { createWorldClouds, WORLD_CLOUD_CONFIG } from './world-clouds.js';
 import { FACES } from './world-faces.js';
 import { createWorldSkySystem } from './world-sky.js';
 import { MENU_CAMERA, MENU_SUN_TIME, menuCameraPosition } from './menu-framing.js';
-import { MENU_LAKE, buildMenuPanorama, panoramaGeometry } from './menu-panorama.js';
+import { buildMenuPanorama, panoramaGeometry } from './menu-panorama.js';
 
 const canvas = document.getElementById('menu-world');
 const titleScreen = document.getElementById('title-screen');
@@ -37,7 +23,7 @@ scene.background = new THREE.Color(SKY_COLOR);
 scene.fog = new THREE.Fog(SKY_COLOR, FOG_NEAR, FOG_FAR);
 
 // `far` generoso: o sol, a lua e as estrelas ficam a 250 unidades da câmera.
-const camera = new THREE.PerspectiveCamera(43, 1, 0.1, 400);
+const camera = new THREE.PerspectiveCamera(MENU_CAMERA.fov, 1, 0.1, 400);
 const target = new THREE.Vector3(0, MENU_CAMERA.targetY, 0);
 
 const renderer = new THREE.WebGLRenderer({
@@ -48,7 +34,7 @@ const renderer = new THREE.WebGLRenderer({
 });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
-renderer.setSize(window.innerWidth, window.innerHeight, false);
+
 
 // Mesmos valores do `init()` do jogo: quem manda neles depois é o céu.
 const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8);
@@ -76,7 +62,9 @@ worldSky.create(scene);
 const atlas = createTextureTools(THREE).createAtlasTexture();
 const panorama = buildMenuPanorama();
 const panoramaParts = panoramaGeometry(panorama);
-const blockMaterials = {
+const waterMaterial = createWaterSurfaceMaterial(THREE);
+const materials = {
+    water: waterMaterial,
     opaque: new THREE.MeshLambertMaterial({ map: atlas, vertexColors: true }),
     cutout: new THREE.MeshLambertMaterial({
         map: atlas,
@@ -87,7 +75,7 @@ const blockMaterials = {
         side: THREE.DoubleSide,
     }),
 };
-for (const name of ['opaque', 'cutout']) {
+for (const [name, material] of Object.entries(materials)) {
     const part = panoramaParts[name];
     if (!part.faces) continue;
     const geometry = new THREE.BufferGeometry();
@@ -95,34 +83,14 @@ for (const name of ['opaque', 'cutout']) {
     geometry.setAttribute('normal', new THREE.BufferAttribute(part.normals, 3));
     geometry.setAttribute('uv', new THREE.BufferAttribute(part.uvs, 2));
     geometry.setAttribute('color', new THREE.BufferAttribute(part.colors, 3));
+    if (name === 'water') {
+        geometry.setAttribute('torchInfluence', new THREE.BufferAttribute(new Float32Array(part.vertices), 1));
+    }
     geometry.setIndex(new THREE.BufferAttribute(part.indices, 1));
-    const mesh = new THREE.Mesh(geometry, blockMaterials[name]);
+    const mesh = new THREE.Mesh(geometry, material);
     mesh.frustumCulled = false;
     scene.add(mesh);
 }
-
-const waterTileCanvas = document.createElement('canvas');
-waterTileCanvas.width = waterTileCanvas.height = TILE_PX;
-const waterTile = atlasTileRect(TILE.WATER);
-waterTileCanvas.getContext('2d').drawImage(atlas.image, waterTile.x, waterTile.y, TILE_PX, TILE_PX, 0, 0, TILE_PX, TILE_PX);
-const waterTexture = new THREE.CanvasTexture(waterTileCanvas);
-waterTexture.magFilter = waterTexture.minFilter = THREE.NearestFilter;
-waterTexture.generateMipmaps = false;
-waterTexture.wrapS = waterTexture.wrapT = THREE.RepeatWrapping;
-waterTexture.repeat.set(8, 8);
-waterTexture.colorSpace = THREE.SRGBColorSpace;
-const water = new THREE.Mesh(
-    new THREE.CircleGeometry(1, 48),
-    new THREE.MeshLambertMaterial({ map: waterTexture, transparent: true, opacity: 0.9 }),
-);
-water.rotation.x = -Math.PI / 2;
-water.position.set(MENU_LAKE.centerX, MENU_LAKE.surfaceY, MENU_LAKE.centerZ);
-water.scale.set(
-    MENU_LAKE.radiusX * Math.sqrt(MENU_LAKE.fill) + 0.5,
-    MENU_LAKE.radiusZ * Math.sqrt(MENU_LAKE.fill) + 0.5,
-    1,
-);
-scene.add(water);
 
 function resize() {
     const width = window.innerWidth;
@@ -130,19 +98,20 @@ function resize() {
     camera.aspect = width / Math.max(1, height);
     camera.updateProjectionMatrix();
     renderer.setSize(width, height, false);
+    if (reduceMotion.matches && !document.hidden && !titleScreen.hidden) render(0, 0);
 }
 window.addEventListener('resize', resize, { passive: true });
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 let frameId = 0;
 let previousFrame = 0;
-function render(now = 0) {
-    frameId = 0;
+let elapsed = 0;
+function render(now, deltaSeconds) {
     // O giro e o ponto de partida (virado para o sol) vêm de `menu-framing.js`.
     const pose = menuCameraPosition(now, { reduced: reduceMotion.matches });
     camera.position.set(pose.x, pose.y, pose.z);
     camera.lookAt(target);
-    clouds.update(reduceMotion.matches ? 0 : Math.min((now - previousFrame) / 1000, 0.1), camera);
+    clouds.update(deltaSeconds, camera);
     worldSky.update({
         scene,
         camera,
@@ -152,23 +121,32 @@ function render(now = 0) {
         fogNear: FOG_NEAR,
         fogFar: FOG_FAR,
     });
+    const water = waterMaterial.uniforms;
+    water.waterTime.value = (now * 0.001) % (20 * Math.PI);
+    water.horizonColor.value.copy(scene.fog.color);
+    water.lightDirection.value.copy(sunLight.position).normalize();
+    water.lightColor.value.copy(sunLight.color).multiplyScalar(sunLight.intensity);
+    water.daylight.value = worldSky.day;
     renderer.render(scene, camera);
 }
 function animate(now) {
     frameId = 0;
     if (document.hidden || titleScreen.hidden) return;
     if (now - previousFrame >= 1000 / 30) {
+        const delta = Math.min(now - previousFrame, 100);
         previousFrame = now;
-        render(now);
+        elapsed += delta;
+        render(elapsed, delta / 1000);
     }
     frameId = requestAnimationFrame(animate);
 }
 function start() {
     if (frameId || document.hidden || titleScreen.hidden) return;
     if (reduceMotion.matches) {
-        render(performance.now());
+        render(0, 0);
         return;
     }
+    previousFrame = performance.now();
     frameId = requestAnimationFrame(animate);
 }
 function stop() {
@@ -183,10 +161,8 @@ new MutationObserver(() => titleScreen.hidden ? stop() : start()).observe(titleS
     attributeFilter: ['hidden'],
 });
 reduceMotion.addEventListener?.('change', () => {
-    if (reduceMotion.matches) {
-        stop();
-        render(performance.now());
-    } else start();
+    stop();
+    start();
 });
-render(0);
+resize();
 start();

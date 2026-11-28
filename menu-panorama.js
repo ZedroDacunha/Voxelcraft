@@ -1,27 +1,5 @@
-// O panorama da tela inicial: a ilha, o lago e as árvores que giram atrás do
-// título — agora montado como o mundo de verdade monta os pedaços dele.
-//
-// Antes o menu desenhava cada bloco como um cubo inteiro (seis faces, sempre) e
-// deixava a luz do Three fazer tudo. O mundo não faz isso: ele tira as faces que
-// ninguém vê, escurece o canto onde dois blocos se encostam (`ambientOcclusionAt`
-// em game.js) e escreve essa sombra em cor de vértice, que o material multiplica
-// pela textura. É daí que vem o relevo que dá gosto de olhar — e era exatamente
-// o que faltava no menu.
-//
-// Aqui a mesma conta, sem Three e sem estado: entra a ilha (blocos em um Map),
-// saem as arrays prontas (posições, normais, UV, cores e índices). Quem desenha
-// só embrulha isso em `BufferGeometry`.
-//
-// Duas diferenças propositais em relação ao mundo:
-//
-// - **Sem luz de bloco**: o panorama é céu aberto, então a iluminação é 1 em
-//   todo lugar e a sombra vira `0.58 + nível * 0.14` puro (as mesmas constantes
-//   do jogo, quando o céu está no máximo);
-// - **Malha única**: são ~20 mil blocos parados, nada muda entre um quadro e
-//   outro. Juntar tudo em duas geometrias (opaca e recortada) é mais barato do
-//   que instanciar cubo por cubo — e é o que permite a sombra por canto, que
-//   malha instanciada não tem (todas as instâncias compartilham os vértices).
-
+import { FACES } from './world-faces.js';
+import { TreeShapes } from './world-tree-shapes.js';
 import { ATLAS_UV_PAD_PX, BLOCKS, ID, TILE, atlasUV } from './world-catalog.js';
 import { hash2 } from './world-math.js';
 import { tileForBlockFace } from './world-block-orientation.js';
@@ -40,9 +18,9 @@ export const MENU_SHADE_STEP = 0.14;
  */
 export const MENU_LAKE = Object.freeze({
     centerX: 3,
-    centerZ: -3,
-    radiusX: 10,
-    radiusZ: 7,
+    centerZ: -5,
+    radiusX: 13,
+    radiusZ: 9,
     fill: 0.78,
     shore: 1.03,
     surfaceY: 2.42,
@@ -67,32 +45,16 @@ const ALT_TILES = new Map([
     [TILE.LEAVES, TILE.LEAVES_ALT],
 ]);
 
-// Ordem dos cantos idêntica à de `game.js` (FACES): posição 0/1 dentro do cubo e
-// UV 0/1 dentro do tile. Trocar a ordem aqui viraria textura espelhada.
-const FACES = [
-    { kind: 'side', dir: [-1, 0, 0], corners: [{ pos: [0, 1, 0], uv: [0, 1] }, { pos: [0, 0, 0], uv: [0, 0] }, { pos: [0, 1, 1], uv: [1, 1] }, { pos: [0, 0, 1], uv: [1, 0] }] },
-    { kind: 'side', dir: [1, 0, 0], corners: [{ pos: [1, 1, 1], uv: [0, 1] }, { pos: [1, 0, 1], uv: [0, 0] }, { pos: [1, 1, 0], uv: [1, 1] }, { pos: [1, 0, 0], uv: [1, 0] }] },
-    { kind: 'bottom', dir: [0, -1, 0], corners: [{ pos: [1, 0, 1], uv: [1, 0] }, { pos: [0, 0, 1], uv: [0, 0] }, { pos: [1, 0, 0], uv: [1, 1] }, { pos: [0, 0, 0], uv: [0, 1] }] },
-    { kind: 'top', dir: [0, 1, 0], corners: [{ pos: [0, 1, 1], uv: [1, 1] }, { pos: [1, 1, 1], uv: [0, 1] }, { pos: [0, 1, 0], uv: [1, 0] }, { pos: [1, 1, 0], uv: [0, 0] }] },
-    { kind: 'side', dir: [0, 0, -1], corners: [{ pos: [1, 0, 0], uv: [0, 0] }, { pos: [0, 0, 0], uv: [1, 0] }, { pos: [1, 1, 0], uv: [0, 1] }, { pos: [0, 1, 0], uv: [1, 1] }] },
-    { kind: 'side', dir: [0, 0, 1], corners: [{ pos: [0, 0, 1], uv: [0, 0] }, { pos: [1, 0, 1], uv: [1, 0] }, { pos: [0, 1, 1], uv: [0, 1] }, { pos: [1, 1, 1], uv: [1, 1] }] },
-];
-
 const variantFor = (x, y, z) => (hash2(x + y * 13, z - y * 7, 404) > 0.16 ? 0 : 1);
 const keyOf = (x, y, z) => `${x},${y},${z}`;
 
 const smoothNoise = (x, z) => Math.sin(x * 0.21) * 1.35 + Math.cos(z * 0.17) * 1.25
     + Math.sin((x + z) * 0.095) * 1.1 + Math.cos((x - z) * 0.13) * 0.65;
 
-/**
- * A ilha do menu: chão com relevo, lago com margem de areia, lençol de terra e
- * pedra embaixo e árvores espalhadas longe do lago.
- *
- * Mesma paisagem de antes — o que mudou foi só o acabamento com que ela é
- * desenhada.
- */
 export function buildMenuPanorama({ radius = MENU_PANORAMA_RADIUS } = {}) {
     const blocks = new Map();
+    const heights = new Map();
+    const waterDepths = new Map();
     const addBlock = (kind, x, y, z, variant = 0) => {
         blocks.set(keyOf(x, y, z), { kind, variant });
     };
@@ -104,7 +66,11 @@ export function buildMenuPanorama({ radius = MENU_PANORAMA_RADIUS } = {}) {
             const lakeDistance = lakeX * lakeX + lakeZ * lakeZ;
             const isLake = lakeDistance < MENU_LAKE.fill;
             const isShore = lakeDistance >= MENU_LAKE.fill && lakeDistance < MENU_LAKE.shore;
-            const height = isLake ? 0 : Math.max(2, Math.round(4 + smoothNoise(x, z)));
+            const terrainHeight = Math.max(2, Math.round(4 + smoothNoise(x, z)));
+            const height = isLake ? Math.floor(2 * lakeDistance / MENU_LAKE.fill)
+                : Math.min(terrainHeight, 2 + Math.floor(2 * Math.max(0, lakeDistance - MENU_LAKE.shore)));
+            heights.set(`${x},${z}`, height);
+            if (isLake) waterDepths.set(`${x},${z}`, MENU_LAKE.surfaceY - (height + 0.5));
             const sandyColumn = isLake || isShore;
             addBlock(sandyColumn ? 'sand' : 'grass', x, height, z,
                 sandyColumn ? 0 : variantFor(x, height, z));
@@ -117,26 +83,31 @@ export function buildMenuPanorama({ radius = MENU_PANORAMA_RADIUS } = {}) {
                 addBlock('stone', x, layerY, z, variantFor(x, layerY, z));
             }
 
-            const treeSeed = Math.abs(Math.sin(x * 127.1 + z * 311.7) * 43758.5453) % 1;
-            if (treeSeed > 0.89 && !isLake && !isShore && Math.abs(x) + Math.abs(z) > 8) {
-                const trunkHeight = 3 + Math.floor(treeSeed * 3);
-                for (let y = 1; y <= trunkHeight; y++) addBlock('wood', x, height + y, z);
-                const crownY = height + trunkHeight;
-                for (let dy = -1; dy <= 1; dy++) {
-                    const crownRadius = dy === 1 ? 1 : 2;
-                    for (let dx = -crownRadius; dx <= crownRadius; dx++) {
-                        for (let dz = -crownRadius; dz <= crownRadius; dz++) {
-                            if (Math.abs(dx) === crownRadius && Math.abs(dz) === crownRadius && dy === 0) continue;
-                            addBlock('leaves', x + dx, crownY + dy, z + dz, variantFor(x + dx, crownY + dy, z + dz));
-                        }
-                    }
-                }
-                addBlock('leaves', x, crownY + 2, z, variantFor(x, crownY + 2, z));
-            }
         }
     }
 
-    return { radius, blocks, lake: MENU_LAKE };
+    // O bosque enquadra o lago. A margem voltada para a câmera fica aberta.
+    const trees = new TreeShapes(ID);
+    const seed = 42;
+    const limit = radius - TreeShapes.radius;
+    for (let gx = -limit; gx <= limit; gx += 9) {
+        for (let gz = -limit; gz <= limit; gz += 9) {
+            const x = gx + Math.floor(hash2(gx, gz, seed) * 3) - 1;
+            const z = gz + Math.floor(hash2(gx, gz, seed + 1) * 3) - 1;
+            const ground = heights.get(`${x},${z}`);
+            if (blocks.get(keyOf(x, ground, z))?.kind !== 'grass') continue;
+            if (x < MENU_LAKE.centerX && Math.abs(z - MENU_LAKE.centerZ - 0.3 * (x - MENU_LAKE.centerX)) < 10) continue;
+            for (const [dx, dy, dz, id] of trees.at(x, z, seed, true).cells) {
+                const bx = x + dx, by = ground + dy, bz = z + dz;
+                if (dy === 1 && heights.get(`${bx},${bz}`) !== ground) continue;
+                const prior = blocks.get(keyOf(bx, by, bz));
+                if (prior && (prior.kind !== 'leaves' || id !== ID.LOG)) continue;
+                const kind = id === ID.LOG ? 'wood' : 'leaves';
+                addBlock(kind, bx, by, bz, variantFor(bx, by, bz));
+            }
+        }
+    }
+    return { radius, blocks, lake: MENU_LAKE, waterDepths };
 }
 
 const renderOf = entry => (entry ? KINDS[entry.kind].render : null);
@@ -197,12 +168,30 @@ const finishPart = part => ({
     get vertices() { return this.positions.length / 3; },
 });
 
-/**
- * Transforma os blocos em duas geometrias prontas para desenhar.
- *
- * `opaque` é o miolo da ilha (chão, terra, pedra, tronco); `cutout` são as
- * folhas, que precisam de `alphaTest` e de duas faces para os vãos aparecerem.
- */
+// Os quatro blocos que tocam cada canto compartilham a mesma profundidade
+// interpolada. Na margem, os blocos secos contribuem com profundidade zero.
+function lakeGeometry({ waterDepths, lake }) {
+    const part = emptyPart();
+    if (!waterDepths) return finishPart(part);
+    const top = FACES.find(face => face.kind === 'top');
+    const depthAt = (x, z) => waterDepths.get(`${x},${z}`) ?? 0;
+    for (const key of waterDepths.keys()) {
+        const [x, z] = key.split(',').map(Number);
+        const start = part.positions.length / 3;
+        for (const { pos } of top.corners) {
+            const cx = x + pos[0], cz = z + pos[2];
+            const depth = (depthAt(cx, cz) + depthAt(cx - 1, cz)
+                + depthAt(cx, cz - 1) + depthAt(cx - 1, cz - 1)) / 4;
+            part.positions.push(cx - 0.5, lake.surfaceY, cz - 0.5);
+            part.normals.push(0, 1, 0);
+            part.uvs.push(depth, 1);
+            part.colors.push(1, 1, 1);
+        }
+        part.indices.push(start, start + 1, start + 2, start + 2, start + 1, start + 3);
+    }
+    return finishPart(part);
+}
+
 export function panoramaGeometry(panorama) {
     const { blocks } = panorama;
     const at = (x, y, z) => blocks.get(keyOf(x, y, z)) ?? null;
@@ -238,6 +227,7 @@ export function panoramaGeometry(panorama) {
     }
 
     return {
+        water: lakeGeometry(panorama),
         opaque: finishPart(parts.opaque),
         cutout: finishPart(parts.cutout),
         stats: { blocks: blocks.size, faces },
