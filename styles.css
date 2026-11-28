@@ -395,7 +395,7 @@
         box-sizing: border-box; padding: clamp(14px, 2vw, 26px); color: #fff; font-family: Arial, sans-serif; isolation: isolate; }
     #title-screen[hidden] { display: none; }
     #title-screen::before, #title-screen::after { content: ''; position: absolute; inset: 0; pointer-events: none; }
-    #title-screen::before { z-index: -2; background: #8fc8e7 url('./menu-panorama.svg') center / cover no-repeat; image-rendering: pixelated; }
+    #title-screen::before { z-index: -2; background: #be927e url('./menu-panorama.webp') center / cover no-repeat; image-rendering: pixelated; }
     #title-screen::after { z-index: 0; background: linear-gradient(180deg, rgba(11, 22, 34, .16) 0%, rgba(13, 23, 28, .08) 38%, rgba(8, 15, 13, .36) 100%),
         radial-gradient(ellipse at center, transparent 38%, rgba(8, 15, 20, .2) 100%); }
     #menu-world { position: absolute; inset: 0; z-index: -1; display: block; width: 100%; height: 100%; pointer-events: none; }
