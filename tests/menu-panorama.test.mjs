@@ -191,3 +191,36 @@ test('cada face usa o tile certo do atlas (topo e lado da grama não são iguais
     }
     assert.equal(new Set(origins).size, 3, 'grama tem três tiles: topo, lado e fundo');
 });
+
+test('o lago acompanha as colunas molhadas e compartilha a profundidade em cada quina', () => {
+    const panorama = buildMenuPanorama();
+    const { water } = panoramaGeometry(panorama);
+    const { lake, blocks, radius } = panorama;
+    const corners = new Map();
+    const columns = new Set();
+    for (let face = 0; face < water.faces; face++) {
+        const first = face * 4;
+        let centerX = 0, centerZ = 0;
+        for (let i = first; i < first + 4; i++) {
+            const [x, y, z] = water.positions.subarray(i * 3, i * 3 + 3);
+            centerX += x / 4;
+            centerZ += z / 4;
+            assert.ok(Math.abs(y - lake.surfaceY) < 0.00001);
+            assert.equal(water.uvs[i * 2 + 1], 1);
+            const key = [x, z].join(',');
+            const depth = water.uvs[i * 2];
+            if (corners.has(key)) assert.equal(depth, corners.get(key));
+            corners.set(key, depth);
+        }
+        columns.add([centerX, centerZ].join(','));
+    }
+    assert.equal(columns.size, water.faces);
+    for (let x = -radius; x <= radius; x++) {
+        for (let z = -radius; z <= radius; z++) {
+            const belowWater = !blocks.has([x, Math.floor(lake.surfaceY), z].join(','));
+            assert.equal(columns.has([x, z].join(',')), belowWater);
+        }
+    }
+    assert.ok(Math.min(...corners.values()) < 0.5);
+    assert.ok(Math.max(...corners.values()) > 1.5);
+});

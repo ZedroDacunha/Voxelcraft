@@ -24,17 +24,11 @@ import { sunDirectionAt } from './world-sky.js';
 /** Hora do menu: fim de tarde. O sol fica a ~2° do horizonte. */
 export const MENU_SUN_TIME = 0.006;
 
-/**
- * Enquadramento da ilha.
- *
- * Antes: altura 18,5 · raio 39 · alvo em y=5 (ilha gigante, céu de 5%).
- * Agora: altura 14 · raio 44 · alvo em y=13 — a linha das árvores cai perto do
- * meio do quadro e sobra céu para o sol, sem a ilha virar selo no rodapé.
- */
+/** Vista sobre a margem do lago, com espaço acima das copas para o sol. */
 export const MENU_CAMERA = Object.freeze({
-    height: 14,
+    height: 18,
     radius: 44,
-    targetY: 13,
+    targetY: 14.5,
     fov: 43,
 });
 
